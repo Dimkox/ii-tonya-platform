@@ -2,9 +2,9 @@
 title: Local semantic hashtag recommendations and moderated selection
 created: 2026-10-27
 type: feature
-status: in-progress
+status: in-review
 baseline_commit: 254c8c169cbb8432654a46de206bd20500cecc3f
-review_loop_iteration: 1
+review_loop_iteration: 2
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -338,3 +338,36 @@ Preserve all passing model/callback/ordinary-reply/replay/upgrade/browser eviden
 Make bounded additive corrections, not destructive re-derivation; owner authorized
 continuation and necessary focused reruns. If0069 changes, reconstruct current state
 and update exact hash guards. Root does not run competing PG/build jobs.
+
+R4 immutable proof may use the existing immutable decision rows authoritatively
+bound to the reviewed version's draft/revision; a duplicate decision JSON column is
+not required. Prove the reviewed selection and associated decisions cannot be
+replaced by later mutable edits/new decisions, while retaining privacy erasure.
+
+R2 progress is per-scope selected occurrences, not only global DISTINCT identity
+count: the same obsolete tag in two services must be removable one occurrence at
+a time. No addition/non-tag edit is authorized; all final limits/validity remain.
+
+## R2 ordinary-path completion
+
+Second independent assessment accepts R1/R3–R6 but finds two remaining R2 seams.
+Profile confirmation must retain authoritative original legacy-catalogue selections
+when it replaces/deletes them; a live re-query after deletion cannot represent OLD
+selection. Do not trust an arbitrary caller-supplied repair snapshot or relax final
+SQL validity. Prove catalogue A plus staged B, both inactive, removal through the
+ordinary profile recommendation/confirmation while B remains, then B removal.
+
+Recommendations must preserve readable retained aliases consistently. Guided
+[ПА,#тревожность] and pending[ПА,#фобии], with anxiety/phobia disabled, must allow
+either obsolete selection to be removed while retaining the active panic choice.
+A presentational canonical label must not masquerade as a new scoped selection or
+make repair impossible. Preserve strict no-add/move and non-selection-content
+guards, current confirmation, original replay and whole-card moderation checks.
+
+Keep all accepted corrections/evidence. Add focused RED/GREEN actual owner ingress/
+repository proofs for these precise cases and relevant state/types/lint. Refresh
+0069 state if its SQL changes; unchanged broad/model suites remain unnecessary.
+
+The existing tagAction also admits an approved draft. Catalogue-only repair must
+handle its normal transition to collecting/confirmation invalidation while keeping
+the prior immutable approved version intact, not only an already-collecting fixture.

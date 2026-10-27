@@ -111,3 +111,28 @@ follow-up while three read-only reviewers inspect the stable committed block.
 Reviewers use the exact SHA rather than mutable working-tree files. No source
 changes by root; no competing tests/DB work. Pending correction will receive
 assigned review alongside all independent findings before acceptance.
+
+## Independent review triage and R1 acceptance
+
+All three initial reviewers completed79b5d233; six unique findings were accepted
+after claim/action deduplication. Contract iteration1 records bounded repairs;
+no destructive restart or new owner approval. R1 ordinary reply compatibility is
+accepted by both assigned blind/edge reviewers at9182ab18. Root verified final
+ordinary31/11 and reply13/4 artifact/source pins against4a8bd1a and9182ab18.
+R2–R6 (cross-scope inactive removal, punctuation negation, full-card moderation
+proof, clean-checkout output path, inherited richfixture authorization) remain
+with the single producer. All root/refreshed reviews are read-only; no competing
+PG/build jobs, source edits, final gate or provider activation.
+
+## Final R2 source ready for assigned review
+
+All three first-correction reviewers accepted R3/R4/R5/R6; R1 remained closed.
+Two remaining R2 normal-path failures were reproduced and corrected at
+c3244a5891189c6666c87165672006632463d57c. Root verified38 raw/archive pairs and12
+source pins. Catalogue deletion keeps actual OLD-row authority; retained choices
+stay in their original storage scopes/spelling. Approved-state repair and unchanged
+invalid confirmation, replay and R4 controls are exercised. Focused owner5/5,
+approved/moderation2/2 and state/history/scope24/24 passed. Final0069 replay reports
+213 tables/156 functions/194 triggers/1449 constraints/533 indexes/2 extensions.
+Source producer is idle; all assigned reviewers will reassess exact source. No
+final branch gate, push or provider activation yet. Preserve all earlier archives.

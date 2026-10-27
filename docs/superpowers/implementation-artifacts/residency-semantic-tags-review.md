@@ -7,12 +7,12 @@ mutating resources. All were launched before triage; all finals received.
 
 | ID | Reviewers | Severity / classification | Finding and required action | Status |
 | --- | --- | --- | --- | --- |
-| R1 | blind, edge | high / patch | Any Telegram reply entered custom-tag handling; media replies rejected. Recognize only original tag invitations; preserve ordinary interview/command replies and disabled-tag mode. service:482, ingress:168. | Corrected9182ab18, awaiting review closure |
+| R1 | blind, edge | high / patch | Any Telegram reply entered custom-tag handling; media replies rejected. Recognize only original tag invitations; preserve ordinary interview/command replies and disabled-tag mode. service:482, ingress:168. | Closed: blind + edge PASS9182ab18 |
 | R2 | blind, edge | high / bad_spec | SQL0069:96 rejects removing one inactive tag if another remains, deadlocking cross-scope cleanup. Allow bounded strictly reducing obsolete selections with final validity gates intact. | Open |
-| R3 | blind, edge | high / patch | contracts/resident-semantic-tags.ts:70 uses whitespace for negation and Unicode words for matching. Brackets/colon hide negation and preselect an excluded topic at100. Use consistent tokens and meaningful regression. | Open |
-| R4 | gap | medium / bad_spec | Tests show pending decisions/UI but never exercise whole-card SQL approval. Prove pending/rejected/stale rejection and current-approved immutable snapshot through actualPG review. | Open |
-| R5 | gap | medium / patch | tests/integration/resident-semantic-tags.test.ts:455 writes to an untracked directory, failing clean checkout withENOENT. Make optional export or created temporary destination. | Open |
-| R6 | gap | high / patch | Existing rich-onboarding fixture uses custom «поддержка» without current custom approval, so its approval/renewal/photo scenarios now fail. Update fixture through legitimate authority and run affected focused cases. | Open |
+| R3 | blind, edge | high / patch | contracts/resident-semantic-tags.ts:70 uses whitespace for negation and Unicode words for matching. Brackets/colon hide negation and preselect an excluded topic at100. Use consistent tokens and meaningful regression. | Closed: both PASS eb110d74 |
+| R4 | gap | medium / bad_spec | Tests show pending decisions/UI but never exercise whole-card SQL approval. Prove pending/rejected/stale rejection and current-approved immutable snapshot through actualPG review. | Closed: gap PASS eb110d74 |
+| R5 | gap | medium / patch | tests/integration/resident-semantic-tags.test.ts:455 writes to an untracked directory, failing clean checkout withENOENT. Make optional export or created temporary destination. | Closed: gap PASS eb110d74 |
+| R6 | gap | high / patch | Existing rich-onboarding fixture uses custom «поддержка» without current custom approval, so its approval/renewal/photo scenarios now fail. Update fixture through legitimate authority and run affected focused cases. | Closed: gap PASS eb110d74 |
 
 R2/R4 clarify non-frozen verification/repair requirements already implied by owner
 intent. No owner decision is missing. Preserve current working implementation and
@@ -23,3 +23,39 @@ production/provider activation or claim of whole-package completion.
 Only semantic_tags_implementer edits source/tests/0069/state/evidence. Root owns
 contract/review/status/coordinator/final gates. Independent reviewers will close
 assigned findings against exact corrected SHA and retained meaningful evidence.
+
+## R1 closure
+
+Both assigned blind and edge reviewers independently accepted R1 at
+9182ab188fad0907e5852fa35f96fce4e655a64a. They inspected the original invitation
+classification, ordinary routing/fingerprint compatibility and retained2/2 actual
+ingress/PG scenarios. Blind also independently verified13 archives/4 source hashes.
+No tests were repeated by reviewers. R2–R6 remain in implementation.
+
+R4 scope clarification: current immutable decision rows may remain separate from
+resident_card_versions if their authoritative draft/revision association is
+immutable. No duplicate JSON decision column is required. Proof must preserve
+reviewed selections and associated decisions against later mutable revision edits,
+while retaining existing privacy erasure. This avoids unnecessary schema expansion.
+
+## Correction review at eb110d74
+
+All three assigned reviewers completed the correction assessment. R3 is accepted
+by blind+edge; R4–R6 by gap. Root independently verified55 archives/13 source pins;
+reviewers independently verified the same evidence and migration/state hash chain.
+R1 remains accepted. R2 has two distinct remaining normal-path failures:
+
+- R2a (blind): profile recommendation deletes legacy catalogue rows before the draft
+  update. OLD and current selection helpers both read the now-empty live table, so
+  the removed obsolete occurrence is invisible. Select A through /tags, B in a
+  staged service, disable both; profile recommendation/deselectA/confirm fails
+  card_inactive_tag. Preserve authoritative pre-deletion context, not caller claims.
+- R2b (edge): retained «ПА» aliases become candidate «#панические_атаки» on recommend,
+  but repair compares raw scoped labels and treats this as an addition. Guided
+  [ПА,#тревожность], pending [ПА,#фобии], disable anxiety/phobia; neither scope can
+  remove its inactive label while retaining panic. Preserve readable existing
+  spelling/identity consistently through proposals and repair.
+
+One bounded second correction is assigned to the same producer, with actual ordinary
+flow regressions, preservation of all prior guard proofs, refreshed state if SQL
+changes, and no destructive restart/broad rerun. No new owner decision is needed.

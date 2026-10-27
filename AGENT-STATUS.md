@@ -1,8 +1,32 @@
+# Semantic tags final R2 reassessment — 2026-10-27
+
+Corrected sourcec3244a5891189c6666c87165672006632463d57c; producer idle, no heavy
+jobs. Root verified38 artifacts/12 source pins; prior101/31/13/55 archives unchanged.
+R2a catalogue-only repair retains actual deleted OLD-row authority and storage
+scopes; R2b retained aliases/choice numbering preserved. Approved→collecting repair
+preserves immutable prior approval; focused owner5/5 and approved/R4 controls2/2,
+state guards24/24. Final0069 counts213 tables/156 functions/194 triggers/1449
+constraints/533 indexes/2 extensions. All3 assigned reviewers reassess final change
+read-only; R1/R3–R6 already closed. Spec iteration2/in-review. Await all results,
+then canonical fullgate, mandatory push, DraftPR on PR115 and continue S4a/S4b.
+No S3b gate/push/PR yet; no provider activation or whole-package completion.
+
+# Semantic tags second bounded correction — 2026-10-27
+
+Sourceeb110d74 reviewed by all3. R1 and R3–R6 closed; R2 has two residual ordinary
+paths: profile confirmation loses deleted legacy catalogue context, and preserved
+active aliases canonicalize into apparent additions during strict repair. See
+residency-semantic-tags-review.md R2a/R2b and spec last section/iteration2. Same
+producer corrects these without restarting or weakening guards. Root verified
+55 archives/13 source hashes, all prior evidence unchanged. OnePG/heavyjobs owner.
+Root owns4 dirty docs; no S3b final gate/push/PR yet. Whole S4a/S4b still follows.
+
 # Semantic tags consolidated corrections — 2026-10-27
 
 All3 initial reviewers finished exact79b5d233. Six unique findings in
 docs/superpowers/implementation-artifacts/residency-semantic-tags-review.md. R1
-ordinary replies fixed9182ab18 (13 artifacts/4 source hashes rootverified). R2
+ordinary replies fixed9182ab18, accepted by blind+edge reviewers (13 artifacts/4
+source hashes rootverified). R2
 inactive cross-scope removal, R3 punctuation negation, R4 complete-card moderation
 proof, R5 clean-checkout fixture path, R6 inherited richfixture moderation remain.
 Same producer owns one consolidated correction; preserve existing evidence/code,
