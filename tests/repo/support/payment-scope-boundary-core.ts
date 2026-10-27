@@ -1658,7 +1658,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "a85d98083e13a8cf4a419e9de94eef8fbbc3381ec8c6539030ab8b08fb352d97",
+    "b9c66b8bb815b460dcf5fdbac623a9bb79c1c38239ca8dc618e59b5f0a86f0d7",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1738,7 +1738,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "a85d98083e13a8cf4a419e9de94eef8fbbc3381ec8c6539030ab8b08fb352d97",
+    "b9c66b8bb815b460dcf5fdbac623a9bb79c1c38239ca8dc618e59b5f0a86f0d7",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

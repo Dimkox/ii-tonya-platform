@@ -101,7 +101,7 @@ export class PostgresResidentNativeLogistics {
     const attempt = randomUUID();
     const claim = (
       await this.db.execute<{ reservationId: string }>(
-        sql`update resident_native_logistics n set state='sending',attempt_id=${attempt}::uuid,attempt_count=attempt_count+1,lease_until=clock_timestamp()+interval '30 seconds',updated_at=clock_timestamp() where n.id=${id}::uuid and exists(select 1 from booking_notification_contexts c where c.reservation_id=n.reservation_id and c.bot_key=${this.botKey}) and n.state='pending' and n.attempt_count<3 and n.due_at<=clock_timestamp() and (n.lease_until is null or n.lease_until<=clock_timestamp()) returning reservation_id as "reservationId"`,
+        sql`with control as materialized(select bot_key from booking_notification_bot_controls where bot_key=${this.botKey} and admission_enabled and paused_at is null and not_before<=clock_timestamp() for update) update resident_native_logistics n set state='sending',attempt_id=${attempt}::uuid,attempt_count=attempt_count+1,lease_until=clock_timestamp()+interval '30 seconds',updated_at=clock_timestamp() where n.id=${id}::uuid and exists(select 1 from control) and exists(select 1 from booking_notification_contexts c where c.reservation_id=n.reservation_id and c.bot_key=${this.botKey}) and n.state='pending' and n.attempt_count<3 and n.due_at<=clock_timestamp() and (n.lease_until is null or n.lease_until<=clock_timestamp()) returning reservation_id as "reservationId"`,
       )
     ).rows[0];
     if (!claim) return false;
@@ -140,7 +140,15 @@ export class PostgresResidentNativeLogistics {
         ).rows[0];
         const suppress = async () => {
           await tx.execute(
-            sql`update resident_native_logistics set state='suppressed',updated_at=clock_timestamp() where id=${id}::uuid and attempt_id=${attempt}::uuid`,
+            sql`update resident_native_logistics set state='suppressed',updated_at=clock_timestamp() where id=${id}::uuid and attempt_id=${attempt}::uuid and state='sending'`,
+          );
+          return false;
+        };
+        const deferUnsent = async () => {
+          // The committed claim did not reach the transport. Temporary controls
+          // must neither spend a wire attempt nor discard this appointment notice.
+          await tx.execute(
+            sql`update resident_native_logistics set state='pending',attempt_id=null,attempt_count=attempt_count-1,lease_until=null,updated_at=clock_timestamp() where id=${id}::uuid and attempt_id=${attempt}::uuid and state='sending'`,
           );
           return false;
         };
@@ -151,11 +159,11 @@ export class PostgresResidentNativeLogistics {
           !row.due ||
           !row.beforeStart ||
           row.status !== "booked" ||
-          !row.botAllowed ||
           !row.identityId ||
           !row.chatId
         )
           return suppress();
+        if (!row.botAllowed || !this.accepting) return deferUnsent();
         const recipient = await resolveBookingNotificationRecipient(
           tx,
           row.userId,
@@ -195,7 +203,8 @@ export class PostgresResidentNativeLogistics {
             sql`select s.starts_at>clock_timestamp() and n.due_at<=clock_timestamp() and n.lease_until>clock_timestamp() and r.status='booked' as allowed,least(n.lease_until,s.starts_at,clock_timestamp()+interval '15 seconds') as deadline from resident_native_logistics n join reservations r on r.id=n.reservation_id join slots s on s.id=r.slot_id where n.id=${id}::uuid`,
           )
         ).rows[0]!;
-        if (!clock.allowed || !this.accepting) return suppress();
+        if (!this.accepting) return deferUnsent();
+        if (!clock.allowed) return suppress();
         let outcome: NativeLogisticsOutcome;
         try {
           outcome = await this.transport.send({

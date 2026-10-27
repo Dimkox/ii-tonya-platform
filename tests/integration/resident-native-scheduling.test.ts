@@ -8,7 +8,7 @@ import { createRequire } from "node:module";
 import { telegramWebhookRoutes } from "../../apps/api/src/routes/telegram-webhook.js";
 import { PostgresExpertOnboardingMainPaymentRepository } from "../../packages/db/src/repositories/expert-onboarding-main-payment-repository.js";
 import { createHash, randomUUID } from "node:crypto";
-import { afterAll, beforeAll, it, expect } from "vitest";
+import { afterAll, beforeAll, it, expect, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import {
   createYooKassaClient,
@@ -24,6 +24,19 @@ import {
 } from "../../packages/db/src/testkit/expert-referral.js";
 import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 import { createExpertCardService } from "../../packages/application/src/expert-card-service.js";
+
+// Browser replay is an explicit local evidence export, never a prerequisite for tests.
+async function exportBrowserFixture(
+  name: string,
+  body: unknown,
+): Promise<void> {
+  const directory = process.env.II_TONYA_NATIVE_BROWSER_FIXTURE_DIR;
+  if (!directory) return;
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  await mkdir(directory, { recursive: true });
+  await writeFile(join(directory, name), JSON.stringify(body));
+}
 
 const promoScope = { botId: "717171", botKey: "core-promo" };
 const workScope = { botId: "818181", botKey: "core-work" };
@@ -898,13 +911,9 @@ it("real native catalog request → protected choice → callback replay → ord
   expect(JSON.stringify(otherSnapshot)).toContain("Разбор задач");
   if (publicSnapshot?.state !== "ready" || otherSnapshot?.state !== "ready")
     throw Error("choice_snapshot_missing");
-  const { writeFileSync } = await import("node:fs");
-  writeFileSync(
-    ".superpowers/sdd/native-scheduling-20261027/booking-api-fixture.json",
-    JSON.stringify({
-      cards: [...publicSnapshot.cards, ...otherSnapshot.cards],
-    }),
-  );
+  await exportBrowserFixture("booking-api-fixture.json", {
+    cards: [...publicSnapshot.cards, ...otherSnapshot.cards],
+  });
 
   const choice = (
     await database.db.execute<{ digest: `sha256:${string}` }>(
@@ -1216,7 +1225,7 @@ it("mixed native/external race shares buffered capacity and stale external remai
     ),
   ).rejects.toThrow();
 }, 60000);
-it("owner-scoped stable service versions replace only free slots and retain booked logistics through expiry", async () => {
+it("R3 owner-scoped stable service versions preserve candidate and callback detail through replacement and expiry", async () => {
   const richId = randomUUID(),
     f = await nativeFixture({ richId }),
     n = await notificationFixture(f),
@@ -1226,6 +1235,21 @@ it("owner-scoped stable service versions replace only free slots and retain book
       sql`select expert_service_id as id from resident_service_mappings m join expert_card_drafts d on d.id=m.draft_id where d.user_id=${f.userId}::uuid and rich_service_id=${richId}::uuid`,
     )
   ).rows[0]!;
+  const heldSlot = (
+    await database.db.execute<{ id: string }>(
+      sql`select s.id from slots s join resident_native_slots ns on ns.slot_id=s.id where s.expert_service_id=${original.id}::uuid and s.starts_at>=(select occupied_until from resident_native_slots where slot_id=${booked.slotId}::uuid) order by s.starts_at limit 1`,
+    )
+  ).rows[0]!;
+  const held = await n.bookings.reserve({
+    userId: await database.createUser(),
+    slotId: heldSlot.id,
+    idempotencyKey: randomUUID(),
+    correlationId: randomUUID(),
+    now: new Date(),
+    minimumLeadMs: 86400000,
+    confirmationBufferMs: 900000,
+  });
+  if (held.kind !== "reserved") throw Error("missing_preserved_native_hold");
   const other = await nativeFixture({ richId });
   const otherMap = (
     await database.db.execute<{ id: string }>(
@@ -1318,6 +1342,54 @@ it("owner-scoped stable service versions replace only free slots and retain book
       )
     ).rows[0],
   ).toEqual({ allowed: false, obligation: true });
+  const { PostgresExpertTelegramQueryRepository: QueryRepository } =
+    await import("../../packages/db/src/repositories/expert-telegram-query-repository.js");
+  const { createExpertTelegramQueryService } =
+    await import("../../packages/application/src/expert-telegram-query-service.js");
+  const { issueClientViewCallback, authenticateClientViewCallback } =
+    await import("../../packages/integrations/src/telegram/client-view-callback-token.js");
+  const queryRepository = new QueryRepository(database.db);
+  const clientSecret = Buffer.alloc(32, 39);
+  const principal = {
+    expertId: f.expertId,
+    telegramUserId: "301",
+    timezone: "Europe/Moscow",
+  };
+  const queryService = createExpertTelegramQueryService({
+    repository: queryRepository,
+    booking: {
+      getExpertSchedule: async () => {
+        throw Error("unused_schedule_read");
+      },
+    },
+    clientViewCallbacks: {
+      issue: (claims) =>
+        issueClientViewCallback(claims, clientSecret, queryRepository),
+    },
+    clock: { now: () => new Date() },
+  });
+  const choices = await queryService.clientChoices(principal);
+  expect(choices).toHaveLength(2);
+  const viewed: string[] = [];
+  for (const choice of choices) {
+    expect(choice.serviceName).toBe("Консультация");
+    const authenticated = await authenticateClientViewCallback(
+      choice.callbackData,
+      "301",
+      { ...principal, active: true, verified: true },
+      clientSecret,
+      queryRepository,
+      new Date(),
+    );
+    const detail = await queryService.clientView({
+      principal,
+      authenticated,
+      correlationId: randomUUID(),
+    });
+    viewed.push(detail.reservationId);
+    expect(detail.serviceName).toBe(choice.serviceName);
+  }
+  expect(viewed).toEqual([booked.reservationId, held.reservationId]);
   const { PostgresCatalogRepository } =
     await import("../../packages/db/src/repositories/catalog-repository.js");
   const catalog = new PostgresCatalogRepository(database.db);
@@ -1546,11 +1618,9 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
         0,
       );
       expect(response.json().item.rich.confirmed).toBe(true);
-      const { writeFileSync } = await import("node:fs");
-      writeFileSync(
-        ".superpowers/sdd/native-scheduling-20261027/manager-api-fixture.json",
-        JSON.stringify({ detail: response.json() }),
-      );
+      await exportBrowserFixture("manager-api-fixture.json", {
+        detail: response.json(),
+      });
       const expired = await staff();
       await database.db.execute(
         sql`update admin_sessions set created_at=clock_timestamp()-interval '2 minutes',mfa_verified_at=clock_timestamp()-interval '1 minute',expires_at=clock_timestamp()-interval '1 second' where session_id_hash=${expired.sessionHash}`,
@@ -1729,4 +1799,279 @@ it("expiry during an actual expert-row wait denies both native reserve and confi
       )
     ).rows[0],
   ).toEqual({ status: "reserved", version: 1 });
+}, 60000);
+
+it.each(["throttle", "pause"] as const)(
+  "R2 due native notices survive temporary bot %s without spending unsent attempts",
+  async (control) => {
+    const { PostgresResidentNativeLogistics } =
+      await import("../../packages/db/src/repositories/resident-native-logistics.js");
+    const f = await nativeFixture({ near: true, hybrid: true }),
+      n = await notificationFixture(f),
+      booked = await bookFirst(f, n, true);
+    let calls = 0;
+    const delivery = new PostgresResidentNativeLogistics(
+      database.db,
+      n.botKey,
+      {
+        send: async (input) => {
+          calls++;
+          if (calls === 1)
+            return control === "throttle"
+              ? { kind: "not_applied", retryAfterSeconds: 600 }
+              : { kind: "unknown", pauseBot: true, reasonCode: "bot_rejected" };
+          return {
+            kind: "applied",
+            receipt: {
+              botKey: input.botKey,
+              chatId: input.chatId,
+              messageId: 990 + calls,
+            },
+          };
+        },
+      },
+    );
+    const rows = () =>
+      database.db.execute(
+        sql`select state,attempt_count from resident_native_logistics where reservation_id=${booked.reservationId}::uuid order by due_at,id`,
+      );
+    expect(await delivery.runOnce()).toBe(0);
+    expect(calls).toBe(1);
+    expect((await rows()).rows).toEqual([
+      {
+        state: control === "throttle" ? "pending" : "unknown",
+        attempt_count: 1,
+      },
+      { state: "pending", attempt_count: 0 },
+    ]);
+    expect(await delivery.runOnce()).toBe(0);
+    expect(calls).toBe(1);
+    // Explicit synthetic operator recovery/elapsed throttle; never reset unknown work.
+    await database.db.execute(
+      sql`update booking_notification_bot_controls set paused_at=null,pause_reason=null,not_before=clock_timestamp()-interval '1 second' where bot_key=${n.botKey}`,
+    );
+    await database.db.execute(
+      sql`update resident_native_logistics set lease_until=null where reservation_id=${booked.reservationId}::uuid and state='pending'`,
+    );
+    expect(await delivery.runOnce()).toBe(control === "throttle" ? 2 : 1);
+    expect((await rows()).rows).toEqual([
+      {
+        state: control === "throttle" ? "delivered" : "unknown",
+        attempt_count: control === "throttle" ? 2 : 1,
+      },
+      { state: "delivered", attempt_count: 1 },
+    ]);
+    expect(await delivery.runOnce()).toBe(0);
+    expect(calls).toBe(control === "throttle" ? 3 : 2);
+  },
+  60000,
+);
+
+it.each(["expert_cancel", "client_cancel", "expire"] as const)(
+  "R4 unconfirmed native %s uses native ordinary worker presentation",
+  async (action) => {
+    const f = await nativeFixture(),
+      n = await notificationFixture(f);
+    const slot = (
+      await database.db.execute<{ id: string }>(
+        sql`select s.id from slots s join resident_native_slots ns on ns.slot_id=s.id join expert_services es on es.id=s.expert_service_id where es.expert_id=${f.expertId}::uuid order by s.starts_at limit 1`,
+      )
+    ).rows[0]!;
+    const hold = await n.bookings.reserve({
+      userId: n.clientId,
+      slotId: slot.id,
+      idempotencyKey: randomUUID(),
+      correlationId: randomUUID(),
+      now: new Date(),
+      minimumLeadMs: 86400000,
+      confirmationBufferMs: 900000,
+    });
+    if (hold.kind !== "reserved") throw Error("missing_native_hold");
+    expect(await n.runner.runOnce()).toMatchObject({ sent: 1 });
+    const priorMessages = n.bodies.length;
+    if (action === "expire")
+      await database.db.execute(
+        sql`update reservations set created_at=clock_timestamp()-interval '2 minutes',reserved_until=clock_timestamp()-interval '1 minute' where id=${hold.reservationId}::uuid`,
+      );
+    await n.bookings.transition({
+      reservationId: hold.reservationId,
+      expectedVersion: hold.version,
+      action,
+      actor: {
+        type:
+          action === "expert_cancel"
+            ? "expert"
+            : action === "client_cancel"
+              ? "client"
+              : "system",
+        id: action === "expert_cancel" ? f.expertId : n.clientId,
+      },
+      now: new Date(),
+      correlationId: randomUUID(),
+    });
+    expect(await n.runner.runOnce()).toMatchObject({ sent: 1 });
+    if (action === "expire")
+      expect(await n.runner.runOnce()).toMatchObject({ sent: 1 });
+    expect(n.bodies).toHaveLength(
+      priorMessages + (action === "expire" ? 2 : 1),
+    );
+    for (const body of n.bodies.slice(priorMessages)) {
+      expect(JSON.parse(body).text).not.toMatch(/календар|локальн/iu);
+      expect(JSON.parse(body).text).toMatch(
+        action === "expire" ? /истёк/u : /отменена/u,
+      );
+    }
+    expect(
+      (
+        await database.db.execute(
+          sql`select reservation_id from resident_native_confirmations where reservation_id=${hold.reservationId}::uuid`,
+        )
+      ).rows,
+    ).toEqual([]);
+    expect(
+      (
+        await database.db.execute(
+          sql`select id from planerka_booking_operations where reservation_id=${hold.reservationId}::uuid`,
+        )
+      ).rows,
+    ).toEqual([]);
+  },
+  60000,
+);
+
+it("R5 production-composed runtime delivers due native private logistics and recovery-only never sends", async () => {
+  const { createBookingNotificationRuntime } =
+    await import("../../apps/worker/src/booking-notifications.js");
+  const { createProductionWorkerRuntime } =
+    await import("../../apps/worker/src/runtime.js");
+  const { loadEnv } = await import("../../packages/config/src/index.js");
+  const f = await nativeFixture({ near: true, hybrid: true }),
+    n = await notificationFixture(f),
+    booked = await bookFirst(f, n, true);
+  const config = Object.assign(
+    loadEnv({
+      DATABASE_URL: "postgresql://synthetic:synthetic@localhost/test",
+      ALLOW_INSECURE_LOCAL_DATABASE: "true",
+    }),
+    {
+      clientTelegramBotKey: n.botKey,
+      clientTelegramBotToken: `12345:${"a".repeat(35)}`,
+      telegramWebhookSecret: "s".repeat(32),
+      clientMessagingConsentPolicyVersion: "client-messaging-v1",
+      bookingNotifications: {
+        admissionEnabled: true,
+        sendEnabled: true,
+        recoveryEnabled: true,
+      },
+      bookingCallbacks: {
+        hmacKey: Buffer.alloc(32, 91),
+        activeKeyId: "native-test",
+        keys: new Map([["native-test", Buffer.alloc(32, 92)]]),
+      },
+    },
+  );
+  config.features.bookingCallbacks = true;
+  const bodies: { chat_id: string; text: string }[] = [];
+  vi.stubGlobal("fetch", async (_url: unknown, init: RequestInit) => {
+    const body = JSON.parse(String(init.body));
+    bodies.push(body);
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        result: {
+          message_id: 1200 + bodies.length,
+          from: { id: 12345, is_bot: true },
+          chat: { id: Number(body.chat_id), type: "private" },
+        },
+      }),
+      { status: 200 },
+    );
+  });
+  let runtime: ReturnType<typeof createProductionWorkerRuntime> | undefined;
+  try {
+    const recovery = await createBookingNotificationRuntime(
+      {
+        ...config,
+        bookingNotifications: {
+          admissionEnabled: false,
+          sendEnabled: false,
+          recoveryEnabled: true,
+        },
+      },
+      database.db,
+    );
+    expect(await recovery!.runOnce()).toMatchObject({ sent: 0 });
+    expect(bodies).toEqual([]);
+    expect(
+      (
+        await database.db.execute(
+          sql`select state,attempt_count from resident_native_logistics where reservation_id=${booked.reservationId}::uuid`,
+        )
+      ).rows,
+    ).toEqual([
+      { state: "pending", attempt_count: 0 },
+      { state: "pending", attempt_count: 0 },
+    ]);
+    await recovery!.drain(Date.now() + 1000);
+    const notifications = await createBookingNotificationRuntime(
+      config,
+      database.db,
+    );
+    const empty = async () => ({});
+    runtime = createProductionWorkerRuntime({
+      bookingNotifications: notifications!,
+      jobsRepository: {
+        processDueBatch: empty,
+        expireDueBatch: empty,
+        listLocalReservations: async () => [],
+        recordProviderUnavailable: async () => {},
+        materializeOperatorCasesBatch: empty,
+      },
+      expertReferralJobsRepository: {
+        expireDueBatch: async () => ({ examined: 0, changed: 0, failed: 0 }),
+        listReconciliationBatch: async () => [],
+        recordReconciliationMismatches: async () => {},
+        replayDueBatch: async () => ({ examined: 0, granted: 0, cancelled: 0 }),
+      },
+      expertTelegramCheckoutRepository: {
+        clearExpiredCheckoutUrls: async () => 0,
+      },
+      outboxRepository: {
+        recoverExpiredDispatchLeases: async () => 0,
+        recoverExpiredReconciliationLeases: async () => 0,
+      },
+      closeDatabase: async () => {},
+      closeTelemetry: async () => {},
+      now: () => new Date(),
+    });
+    const report = await runtime.runOnce();
+    expect(report.bookingNotifications).toMatchObject({ sent: 3 });
+    expect(
+      bodies.filter((body) => body.text.includes("https://example.com/room")),
+    ).toEqual([expect.objectContaining({ chat_id: "401" })]);
+    expect(bodies.filter((body) => body.text.includes("Примерная"))).toEqual([
+      expect.objectContaining({ chat_id: "401" }),
+    ]);
+    expect(
+      (
+        await database.db.execute(
+          sql`select kind,state,attempt_count from resident_native_logistics where reservation_id=${booked.reservationId}::uuid order by kind`,
+        )
+      ).rows,
+    ).toEqual([
+      { kind: "offline", state: "delivered", attempt_count: 1 },
+      { kind: "online", state: "delivered", attempt_count: 1 },
+    ]);
+    const calls = bodies.length;
+    expect((await runtime.runOnce()).bookingNotifications).toMatchObject({
+      sent: 0,
+    });
+    expect(bodies).toHaveLength(calls);
+    notifications!.stopAccepting();
+    expect(await notifications!.runOnce()).toMatchObject({ sent: 0 });
+    expect(bodies).toHaveLength(calls);
+  } finally {
+    await runtime?.close();
+    vi.unstubAllGlobals();
+  }
 }, 60000);

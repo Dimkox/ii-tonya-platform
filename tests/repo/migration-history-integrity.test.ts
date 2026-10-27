@@ -8,6 +8,7 @@ const SCHEMA_DIR = "packages/db/src/schema";
 
 type JournalEntry = {
   idx: number;
+  when: number;
   version: string;
   tag: string;
   breakpoints: boolean;
@@ -435,6 +436,16 @@ describe("migration history integrity", () => {
         (entry) => entry.version !== journal.entries[0]?.version,
       ).length,
     ).toBe(0);
+  });
+
+  it("keeps migration timestamps strictly increasing for incremental Drizzle upgrades", () => {
+    for (let i = 0; i < journal.entries.length; i++) {
+      expect(Number.isSafeInteger(journal.entries[i]!.when)).toBe(true);
+      if (i > 0)
+        expect(journal.entries[i]!.when).toBeGreaterThan(
+          journal.entries[i - 1]!.when,
+        );
+    }
   });
 
   it("keeps every journal entry and migration file paired", () => {

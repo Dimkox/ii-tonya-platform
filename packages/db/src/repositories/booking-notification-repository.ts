@@ -447,6 +447,15 @@ async function validate(tx: Tx, d: Delivery, context?: Context) {
     (!op || op.id !== d.provider_operation_id || op.state !== "rejected")
   )
     return { reason: "source_invalid" };
+  // A declined or expired hold has no confirmation. Its immutable, owner-bound
+  // native slot source still identifies presentation; it never proves booked.
+  const nativeOrigin =
+    native ||
+    (
+      await tx.execute(
+        sql`select n.slot_id from reservations r join slots s on s.id=r.slot_id and s.provider='resident_native' join resident_native_slots n on n.slot_id=s.id join resident_service_versions v on v.id=n.service_version_id and v.expert_service_id=r.expert_service_id join resident_schedule_versions sv on sv.id=n.schedule_id and sv.expert_id=r.expert_id and sv.review_id=v.review_id where r.id=${d.reservation_id}::uuid`,
+      )
+    ).rows.length === 1;
   const legacy =
     (
       await tx.execute(
@@ -459,7 +468,7 @@ async function validate(tx: Tx, d: Delivery, context?: Context) {
       ? native
         ? "native_booked"
         : "verified_booked"
-      : native
+      : nativeOrigin
         ? "native_cancelled"
         : legacy
           ? "unknown"

@@ -51,7 +51,7 @@ describe("B1 schema/migration parity", () => {
     expect(journal.entries.at(-1)).toEqual({
       idx: 70,
       version: "7",
-      when: 1793079550433,
+      when: 1793152800001,
       tag: "0070_resident_native_scheduling",
       breakpoints: true,
     });

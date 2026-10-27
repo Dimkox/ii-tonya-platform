@@ -117,7 +117,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
         r.id as "reservationId",
         r.version,
         s.starts_at as "startsAt",
-        coalesce((select snapshot->>'title' from resident_native_confirmations where reservation_id=r.id),es.name) as "serviceName"
+        coalesce((select snapshot->>'title' from resident_native_confirmations where reservation_id=r.id and slot_id=r.slot_id),(select v.title from resident_native_slots n join slots native_slot on native_slot.id=n.slot_id and native_slot.provider='resident_native' join resident_service_versions v on v.id=n.service_version_id and v.expert_service_id=r.expert_service_id join resident_schedule_versions sv on sv.id=n.schedule_id and sv.expert_id=r.expert_id and sv.review_id=v.review_id where n.slot_id=r.slot_id),es.name) as "serviceName"
       from experts e
       join users u on u.id = e.user_id and u.active
       join channel_identities ci
@@ -330,7 +330,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
             else 'Клиент'
           end as client_display_name,
           s.starts_at,
-          es.name as service_name,
+          coalesce((select snapshot->>'title' from resident_native_confirmations where reservation_id=r.id and slot_id=r.slot_id),(select v.title from resident_native_slots n join slots native_slot on native_slot.id=n.slot_id and native_slot.provider='resident_native' join resident_service_versions v on v.id=n.service_version_id and v.expert_service_id=r.expert_service_id join resident_schedule_versions sv on sv.id=n.schedule_id and sv.expert_id=r.expert_id and sv.review_id=v.review_id where n.slot_id=r.slot_id),es.name) as service_name,
           case
             when note_consent.granted and handoff_consent.granted then cp.expert_note
             else null

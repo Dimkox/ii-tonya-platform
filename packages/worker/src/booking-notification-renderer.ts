@@ -76,12 +76,16 @@ export function renderBookingNotification(
     case "client.reservation_expired":
       return result(
         "client",
-        `Срок локальной заявки истёк. ${calendarText(view.calendar)} Время: ${time}.`,
+        view.calendar === "native_cancelled"
+          ? `Срок заявки истёк. Время: ${time}.`
+          : `Срок локальной заявки истёк. ${calendarText(view.calendar)} Время: ${time}.`,
       );
     case "expert.reservation_expired":
       return result(
         "expert",
-        `Срок локальной заявки истёк. Прежние кнопки недоступны. ${calendarText(view.calendar)} Время: ${time}.`,
+        view.calendar === "native_cancelled"
+          ? `Срок заявки истёк. Прежние кнопки недоступны. Время: ${time}.`
+          : `Срок локальной заявки истёк. Прежние кнопки недоступны. ${calendarText(view.calendar)} Время: ${time}.`,
       );
     case "client.booking_completed":
       return result(
