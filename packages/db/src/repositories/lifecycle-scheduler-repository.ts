@@ -160,6 +160,31 @@ export class PostgresLifecycleSchedulerRepository {
     }
   }
 
+  /** Recover scheduling from committed booking facts, including native confirmations.
+   * The bounded producer runs on the normal worker path and catches missed events. */
+  async runLifecycleBatch(command: {
+    now: Date;
+    batchSize: number;
+  }): Promise<LifecycleBatchResult> {
+    assertBatch(command);
+    const candidates = await this.db.execute<{ id: string }>(sql`
+      select r.id from reservations r join slots s on s.id=r.slot_id
+      join users u on u.id=r.user_id and u.active
+      where r.status='booked' and s.starts_at>clock_timestamp()+interval '1 hour'
+        and ${currentConsentGrantedSql({ userExpression: sql`r.user_id`, purpose: "client_messaging", policyVersion: sql`${this.messagingConsentPolicyVersion}` })}
+        and exists(select 1 from dialogues d where d.user_id=r.user_id and d.provider='telegram'
+          and d.bot_key=${this.botKey} and d.external_chat_id ~ '^[1-9][0-9]{0,19}$')
+        and exists(select 1 from (values ('booking_reminder_48h',48),('booking_reminder_24h',24),('booking_reminder_1h',1)) reminder(kind,hours)
+          where s.starts_at-reminder.hours*interval '1 hour'>clock_timestamp()
+            and not exists(select 1 from lifecycle_jobs job where job.subject_kind='reservation' and job.subject_id=r.id
+              and job.job_type=reminder.kind and job.occurrence_key=to_char(s.starts_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')))
+      order by s.starts_at,r.id limit ${command.batchSize}
+    `);
+    for (const row of candidates.rows)
+      await this.scheduleReservationLifecycle(row.id);
+    return this.processDueLifecycleBatch(command);
+  }
+
   async scheduleReservationLifecycle(reservationId: string): Promise<number> {
     assertLifecycleReservationId(reservationId);
     return this.db.transaction(async (tx) => {
@@ -329,7 +354,8 @@ export class PostgresLifecycleSchedulerRepository {
             select r.id as "reservationId",r.user_id as "userId",
               s.starts_at as "startsAt",cp.timezone,
               d.id as "dialogueId",d.bot_key as "botKey",
-              d.external_chat_id as "chatId",r.meeting_url as "meetingUrl"
+              d.external_chat_id as "chatId",
+              (case when s.provider='resident_native' then null else r.meeting_url end) as "meetingUrl"
             from lifecycle_jobs job
             join reservations r
               on job.subject_kind='reservation' and r.id=job.subject_id

@@ -42,7 +42,15 @@ export const bookingNotificationEventSchema = z.discriminatedUnion("topic", [
     "telegram.reservation_request",
     transitionPayload("reserve", "reserved"),
   ),
-  event("client.booking_confirmed", providerPayload),
+  event(
+    "client.booking_confirmed",
+    z.union([
+      providerPayload,
+      transitionPayload("expert_confirm", "booked").extend({
+        source: z.literal("resident_native"),
+      }),
+    ]),
+  ),
   event(
     "telegram.booking_cancelled",
     transitionPayload("client_cancel", "cancelled_by_client"),
@@ -81,6 +89,7 @@ export type BookingHandoffRevokedEvent = z.infer<
 
 const readyFields = { kind: z.literal("ready"), startsAt: z.iso.datetime() };
 const calendarCancellationSchema = z.enum([
+  "native_cancelled",
   "not_created",
   "cancelled",
   "cancellation_pending",
@@ -110,7 +119,7 @@ const readyView = z.discriminatedUnion("topic", [
     ...readyFields,
     topic: z.literal("client.booking_confirmed"),
     status: z.literal("booked"),
-    calendar: z.literal("verified_booked"),
+    calendar: z.enum(["verified_booked", "native_booked"]),
   }),
   z.strictObject({
     ...readyFields,

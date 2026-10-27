@@ -97,6 +97,8 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0075_resident_lifecycle_completion.sql",
+  "packages/db/migrations/0074_resident_native_scheduling.sql",
   "packages/db/migrations/0070_planerka_availability.sql",
   "packages/db/migrations/0069_resident_semantic_tags.sql",
   "packages/db/migrations/0060_separated_sales_review_corrections.sql",
@@ -146,6 +148,22 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "resident_lifecycle_subjects",
+  "resident_lifecycle_cases",
+  "resident_work_notices",
+  "resident_work_notice_attempts",
+  "resident_work_bot_state",
+
+  "resident_schedule_state",
+  "resident_schedule_previews",
+  "resident_service_mappings",
+  "resident_service_versions",
+  "resident_schedule_versions",
+  "resident_native_slots",
+  "resident_schedule_busy",
+  "resident_native_confirmations",
+  "resident_native_logistics",
+
   "forbidden_patterns",
   "resident_card_corrections",
   "resident_card_proposal_changes",
@@ -330,6 +348,10 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/admin/expert-cards/lifecycle",
+  "/v1/admin/expert-cards/lifecycle/:caseId",
+  "/v1/admin/expert-cards/lifecycle/:caseId/close",
+
   "/v1/admin/expert-verification/private-recovery",
   "/v1/admin/expert-verification/private-recovery/:custodyId",
   "/v1/admin/expert-verification/:applicationId/private-evidence",
@@ -426,6 +448,32 @@ const approvedPaymentBoundaryPaths = new Set([
   ...YOOKASSA_PAYMENT_ALLOWED_PATHS,
 ]);
 const approvedPaymentBoundaryHashes = new Map([
+  // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
+  [
+    "packages/db/src/index.ts",
+    "adacae9eb0c2ada1e1bdc9a3abf8e142f73af0b2edf4c89a819748b94c70b119",
+  ],
+  [
+    "packages/contracts/src/index.ts",
+    "b26ce919866a6b94ba398bfff3b1a9f8a46e4cac4829e81c9ee4437da960f10c",
+  ],
+  [
+    "packages/db/src/schema/index.ts",
+    "5e32828912caf3a71658e0163fa2849daa049d234347401e3b2e41a50979f319",
+  ],
+  [
+    "apps/api/src/routes/public-client-catalog.ts",
+    "e3940fbc4a7d9fea289ae937cb22dfd5e3d92eb3658b92e2929e9b3428aa0f30",
+  ],
+  [
+    "apps/api/src/expert-card-telegram-ingress.ts",
+    "f065c1884d3194c5dc6508bd9631ad61190e938e102b8271421bcf28731aaf11",
+  ],
+  [
+    "apps/worker/src/booking-notifications.ts",
+    "a6ecb6451040104885a89b440b9a6f21953dd923813bb923c8698074fbd0378d",
+  ],
+
   [
     "packages/integrations/src/yookassa/held-onboarding.ts",
     "f938a376d3cb0bfde235a619c4be9db6b27b8c531eee699dd1fd13f15cc66182",
@@ -539,7 +587,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/contracts/package.json",
-    "a516d484080039198439e6d4f035900b2d23252356d55896c4f63a36f5924eed",
+    "107c72668715f901d985b521260771b152b1efd78ca5f9ab9c719ca30db6d66a",
   ],
   [
     "packages/db/package.json",
@@ -569,6 +617,10 @@ const approvedPackageManifestHashes = new Map([
 // Existing loopback DOM harnesses load an operator-supplied Playwright install.
 // This exception covers unresolved loader names only, never internal mint access.
 const reviewedDomHarnessHashes = new Map([
+  [
+    "scripts/verify-resident-lifecycle-browser.mjs",
+    "d555549822084538af96023f6a7a1abe6f13549b7610cec24a5ac3b00cc1167f",
+  ],
   [
     "scripts/verify-resident-review-browser.mjs",
     "3ec062ea1c7b511a6a209ac24c95e22db51fbcc2dc1791c4bd44a19acd634be3",
@@ -628,15 +680,15 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "tests/acceptance/private-verification/make-parser-fixtures.py",
-    "22491e04222bc5be599ab20e22a7dc073ba4b79f44c23518114c816d27a20746",
+    "8f7227dab0409024f43609cf55e9dd3cbc6c3133f0e6b5964ff125280f8cdf30",
   ],
   [
     "tests/acceptance/private-verification/sandbox-probe.py",
-    "271a3b646dfe5e8a8f0a9ef3b96b07ade0c10cca8799e07c6a6fac5eb9a93d53",
+    "72b32159bdeb7b8d376700efcd8618e15c6baa471de7d748845bb6ac2cf93219",
   ],
   [
     "tests/acceptance/private-verification/socket-denial-probe.py",
-    "5b14f07f9b4eac0b4825a589c438bc52308f33932ba12400685687d899e84ab2",
+    "cef2796c060a34323c7ea38fb2bc6f135330b49641504c6fc44639497866c295",
   ],
   // Exact core stabilization artifacts; no adjacent namespace exemption.
   [
@@ -849,7 +901,10 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
     new Set(["@ii-tonya/contracts", "@ii-tonya/domain"]),
   ],
   ["packages/config/package.json", new Set(["zod"])],
-  ["packages/contracts/package.json", new Set(["zod"])],
+  [
+    "packages/contracts/package.json",
+    new Set(["zod", "@js-temporal/polyfill"]),
+  ],
   [
     "packages/db/package.json",
     new Set([
@@ -899,6 +954,7 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   ],
 ]);
 const approvedDependencySpecifiers = new Map([
+  ["@js-temporal/polyfill", "0.5.1"],
   ["@eslint/js", "^9.31.0"],
   ["@fastify/rate-limit", "^10.3.0"],
   ["@ii-tonya/application", "workspace:*"],
@@ -938,6 +994,64 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0075_resident_lifecycle_completion.sql",
+    "3fe2e53365eedb359d2912fe1b26962aeea520008a29d4e810456b67c3ddbda8",
+  ],
+  [
+    "packages/db/migrations/meta/0075_snapshot.json",
+    "7ae2df88f63b3a56802eaf72ccb4b544d76c1ecf0c6221a2dbee7541e84cf57a",
+  ],
+  [
+    "packages/db/migrations/state/0075_manifest.json",
+    "ce7082df4b3d7a4351774f2aafb789901c5d9d25038afdd30c6b395d3ea592af",
+  ],
+  [
+    "packages/db/migrations/state/0075_sql_objects.json",
+    "686d0d154b0c0897cbf57b321e2cca55d3355ab9082aac8cd5e1d57e8a83d80f",
+  ],
+
+  [
+    "packages/db/migrations/0074_resident_native_scheduling.sql",
+    "7ad346d5b1601d517173b03d1de7d020c8368ea195cc36e0facb2bb4cdd1fc53",
+  ],
+  [
+    "packages/db/migrations/meta/0074_snapshot.json",
+    "660ae7042892e4e001f33b719370fb79862d8a039ef8b84955b19add73421f72",
+  ],
+  [
+    "packages/db/migrations/state/0074_manifest.json",
+    "b49f86f02dc39518573bc381cb62b174c05988c41a281334f2caff58501b3bf3",
+  ],
+  [
+    "packages/db/migrations/state/0074_sql_objects.json",
+    "1210b6e2625484f2027a41afa2e4ef10452b3c64756e19e6c5beeee6ba21f4ca",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/0070_resident_native_scheduling.sql",
+    "57aa4832165fcaf88665ee6d3d9b358a05c94c8d27f1a6bc09167d0667129e75",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/manifest.json",
+    "85f53a3b8e77704c1110ab4e8b1af8f15d0628f6de076de1a56e39b304665713",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/meta/0070_snapshot.json",
+    "790760c28b969aecb1131ff8645c6a5708102318fc579b50a2e0bb778f07b220",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/meta/_journal.json",
+    "b9c66b8bb815b460dcf5fdbac623a9bb79c1c38239ca8dc618e59b5f0a86f0d7",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/state/0070_manifest.json",
+    "222b8f1e33823895774099ce115cb6475adfa2e279850e91c8a29a41b27b800e",
+  ],
+  [
+    "packages/db/migrations/history/native-before-main-20261027/state/0070_sql_objects.json",
+    "82fc8811b7e6c761a16a63c9fcb919d814000692c75abfdf345b9f7e5b4cfee0",
+  ],
+
   [
     "packages/db/migrations/meta/0070_snapshot.json",
     "538bfaf12180e49f5f2a0e9d4a4d2574645b899401d52aaf632fe1ce37b4ab0c",
@@ -1697,7 +1811,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "a3e589e564641129dc592202e39155a2e66d3434e1a09ff56316fc7dd39f56ed",
+    "cd945edf6146c9c82545521800c0756947708b1ae4030bb14dda028cff067e21",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1777,7 +1891,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "a3e589e564641129dc592202e39155a2e66d3434e1a09ff56316fc7dd39f56ed",
+    "cd945edf6146c9c82545521800c0756947708b1ae4030bb14dda028cff067e21",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -2896,3 +3010,24 @@ export const classifyApprovedTrackedScopeContent = ({
     ? []
     : [`approved tracked scope hash mismatch: ${actualHash}`];
 };
+
+/** Full PG75 catalogue crossed 1 MiB; never broaden the general inspection bound.
+ * Read callback is invoked only for this exact path and observed byte count;
+ * original exact artifact hash still owns admission. */
+export function isApprovedLargeScopeArtifact(
+  path: string,
+  bytes: number,
+  read: () => string,
+): boolean {
+  if (
+    path !== "packages/db/migrations/state/0075_sql_objects.json" ||
+    bytes !== 1064832
+  )
+    return false;
+  const content = read();
+  return (
+    Buffer.byteLength(content, "utf8") === bytes &&
+    createHash("sha256").update(content).digest("hex") ===
+      approvedMigrationHashes.get(path)
+  );
+}

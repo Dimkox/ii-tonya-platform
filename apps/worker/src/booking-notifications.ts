@@ -1,6 +1,7 @@
 import type { RuntimeConfig } from "@ii-tonya/config";
 import { randomUUID } from "node:crypto";
 import {
+  PostgresResidentNativeLogistics,
   PostgresBookingNotificationRepository,
   PostgresBookingNotificationCallbackRepository,
   sql,
@@ -110,7 +111,7 @@ export async function createBookingNotificationRuntime(
           throw invalid();
         },
       };
-  return createBookingNotificationRunner({
+  const runner = createBookingNotificationRunner({
     workerId: `booking-${randomUUID()}`,
     sendEnabled: flags.sendEnabled,
     callbacks,
@@ -144,4 +145,61 @@ export async function createBookingNotificationRuntime(
       },
     },
   });
+  const native = new PostgresResidentNativeLogistics(
+    db,
+    botKey,
+    flags.sendEnabled
+      ? createBookingNotificationTransport({
+          botKey,
+          token: config.clientTelegramBotToken!,
+        })
+      : {
+          send: async () => {
+            throw invalid();
+          },
+        },
+  );
+  if (!flags.sendEnabled) native.stopAccepting();
+  let accepting = true;
+  let active: Promise<{ sent: number; pendingCompletion: boolean }> | undefined;
+  return {
+    runOnce() {
+      if (!active)
+        active = (async () => {
+          const result = await runner.runOnce();
+          const sent = accepting && native ? await native.runOnce() : 0;
+          return {
+            ...result,
+            sent: result.sent + sent,
+            pendingCompletion:
+              result.pendingCompletion || (native?.pendingCompletion ?? false),
+          };
+        })().finally(() => {
+          active = undefined;
+        });
+      return active;
+    },
+    stopAccepting() {
+      accepting = false;
+      native?.stopAccepting();
+      runner.stopAccepting();
+    },
+    async drain(deadline: number) {
+      accepting = false;
+      native?.stopAccepting();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        if (active)
+          await Promise.race([
+            active,
+            new Promise<void>((resolve) => {
+              timer = setTimeout(resolve, Math.max(0, deadline - Date.now()));
+            }),
+          ]);
+      } finally {
+        clearTimeout(timer);
+        await runner.drain(deadline);
+      }
+    },
+  };
 }

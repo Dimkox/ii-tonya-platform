@@ -1,3 +1,4 @@
+import { recordResidentFirstActivation } from "./resident-lifecycle-completion-repository.js";
 import { sql } from "drizzle-orm";
 import { lockClientConsentSubject } from "./client-consent-authority.js";
 import {
@@ -105,5 +106,9 @@ export async function restoreSettledMainCardProjection(
   await tx.execute(
     sql`update expert_residency_lifecycle set status='active' where user_id=${input.userId}::uuid and expert_id=${input.expertId}::uuid and status<>'paused'`,
   );
+  await recordResidentFirstActivation(tx, {
+    ...input,
+    orderId: source.orderId,
+  });
   return true;
 }

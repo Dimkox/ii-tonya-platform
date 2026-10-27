@@ -8,6 +8,7 @@ const SCHEMA_DIR = "packages/db/src/schema";
 
 type JournalEntry = {
   idx: number;
+  when: number;
   version: string;
   tag: string;
   breakpoints: boolean;
@@ -131,6 +132,8 @@ const HAND_SQL_FUNCTIONS = [
   "reject_partner_commerce_mutation",
   "reject_selarti_budget_policy_mutation",
   "reject_test_expert_immutable_mutation",
+  "resident_apply_schedule",
+  "resident_approved_services",
   "resident_card_correction_guard",
   "resident_card_effective_fields",
   "resident_card_media_erasure",
@@ -138,6 +141,18 @@ const HAND_SQL_FUNCTIONS = [
   "resident_card_review_safety_guard",
   "resident_card_version_source",
   "resident_financial_attempt_source",
+  "resident_initial_schedule_guard",
+  "resident_lifecycle_source_guard",
+  "resident_materialize_approved_services",
+  "resident_native_admission",
+  "resident_native_confirmation_source",
+  "resident_native_logistics_capture",
+  "resident_native_logistics_guard",
+  "resident_native_obligation",
+  "resident_native_reservation_identity_guard",
+  "resident_native_slot_source",
+  "resident_native_slot_times_guard",
+  "resident_native_slot_valid",
   "resident_private_erasure_completion",
   "resident_reapply_deadline",
   "resident_reapply_eligible",
@@ -160,7 +175,12 @@ const HAND_SQL_FUNCTIONS = [
   "resident_safety_publication_authorize",
   "resident_safety_publish",
   "resident_safety_subject_guard",
+  "resident_schedule_preview_guard",
+  "resident_schedule_version_source",
   "resident_selected_tags",
+  "resident_service_mapping_source",
+  "resident_service_version_source",
+  "resident_slot_fresh",
   "resident_tag_aggregate_guard",
   "resident_tag_before_write",
   "resident_tag_cache_valid",
@@ -184,6 +204,9 @@ const HAND_SQL_FUNCTIONS = [
   "resident_verification_stage_projection",
   "resident_verification_version_valid",
   "resident_verification_write_guard",
+  "resident_version_schedule_source",
+  "resident_waitlist_join_immutable",
+  "resident_work_delivery_consistent",
   "retain_resident_private_deletion",
   "validate_and_consume_selarti_budget_approval",
   "validate_test_expert_campaign_prompt",
@@ -319,6 +342,7 @@ const HAND_SQL_TRIGGERS = [
   "planerka_reservation_transition_guard",
   "prompt_versions_append_only",
   "reconciliation_mismatches_append_only",
+  "resident_approved_services",
   "resident_card_correction_source",
   "resident_card_corrections_immutable",
   "resident_card_media_erase",
@@ -328,7 +352,17 @@ const HAND_SQL_TRIGGERS = [
   "resident_card_version_immutable",
   "resident_card_version_source",
   "resident_financial_attempt_source",
+  "resident_initial_schedule_guard",
+  "resident_lifecycle_case_guard",
+  "resident_lifecycle_subject_guard",
   "resident_message_templates_immutable",
+  "resident_native_confirmation_immutable",
+  "resident_native_confirmation_source",
+  "resident_native_logistics_capture",
+  "resident_native_logistics_guard",
+  "resident_native_reservation_identity_guard",
+  "resident_native_slot_source",
+  "resident_native_slot_times_guard",
   "resident_object_key_immutable",
   "resident_private_erasure_completion_guard",
   "resident_private_objects_erase",
@@ -349,6 +383,12 @@ const HAND_SQL_TRIGGERS = [
   "resident_safety_publication_authorize",
   "resident_safety_publication_immutable",
   "resident_safety_rules_immutable",
+  "resident_schedule_preview_guard",
+  "resident_schedule_version_immutable",
+  "resident_schedule_version_source",
+  "resident_service_mapping_source",
+  "resident_service_version_immutable",
+  "resident_service_version_source",
   "resident_tag_aggregate_draft",
   "resident_tag_aggregate_selection",
   "resident_tag_aggregate_status",
@@ -360,6 +400,12 @@ const HAND_SQL_TRIGGERS = [
   "resident_verification_quote_guard",
   "resident_verification_stage_projection",
   "resident_verification_write_guard",
+  "resident_version_schedule_source",
+  "resident_waitlist_join_guard",
+  "resident_work_attempt_delivery_guard",
+  "resident_work_attempt_guard",
+  "resident_work_notice_delivery_guard",
+  "resident_work_notice_guard",
   "safety_incidents_append_only",
   "security_logs_immutable",
   "selarti_budget_policy_approval",
@@ -406,6 +452,16 @@ describe("migration history integrity", () => {
     ).toBe(0);
   });
 
+  it("keeps migration timestamps strictly increasing for incremental Drizzle upgrades", () => {
+    for (let i = 0; i < journal.entries.length; i++) {
+      expect(Number.isSafeInteger(journal.entries[i]!.when)).toBe(true);
+      if (i > 0)
+        expect(journal.entries[i]!.when).toBeGreaterThan(
+          journal.entries[i - 1]!.when,
+        );
+    }
+  });
+
   it("keeps every journal entry and migration file paired", () => {
     const tags = journal.entries.map((entry) => entry.tag).sort();
     expect(tags).toEqual(sqlNames);
@@ -437,7 +493,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(73);
+    expect(newest).toBe(75);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -552,7 +608,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0069 adds public vector cache and revision-bound custom tag decisions.
-    expect(declared.size).toBe(218);
+    // Canonical main through0073, native0074 and lifecycle0075.
+    expect(declared.size).toBe(232);
   });
 });

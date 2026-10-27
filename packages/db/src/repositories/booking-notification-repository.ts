@@ -85,7 +85,7 @@ export interface BookingNotificationGrant {
   chatId: string;
   startsAt: string;
   status: string;
-  calendar: BookingCalendarCancellation | "verified_booked";
+  calendar: BookingCalendarCancellation | "verified_booked" | "native_booked";
   deadline: string;
 }
 export interface BookingNotificationReceipt {
@@ -247,6 +247,15 @@ async function prepareCapture(
   let operationId: string | null = null;
   if (version !== null) {
     if (
+      topic === "client.booking_confirmed" &&
+      !(
+        await tx.execute(
+          sql`select reservation_id from resident_native_confirmations where reservation_id=${payload.reservationId}::uuid and reservation_version=${version}`,
+        )
+      ).rows.length
+    )
+      return quarantine("booking_notification_source_invalid");
+    if (
       source.idempotency_key !== `${payload.reservationId}:${version}:${topic}`
     )
       return quarantine("booking_notification_source_invalid");
@@ -377,8 +386,8 @@ async function validate(tx: Tx, d: Delivery, context?: Context) {
       eligible: boolean;
       starts_at: Date | string;
       valid: boolean;
-    }>(sql`select r.status,r.version,r.user_id,cu.active as client_active,e.user_id as expert_user,(e.active and e.verified and u.active) as eligible,s.starts_at,
- (r.reserved_until>clock_timestamp() and s.starts_at>clock_timestamp() and s.observed_at between clock_timestamp()-interval '15 minutes' and clock_timestamp() and es.active) as valid
+    }>(sql`select r.status,r.version,r.user_id,cu.active as client_active,e.user_id as expert_user,((e.active or exists(select 1 from resident_native_confirmations nc where nc.reservation_id=r.id)) and e.verified and u.active and not exists(select 1 from expert_referral_abuse_holds h where h.expert_id=e.id and h.status='open')) as eligible,s.starts_at,
+ (r.reserved_until>clock_timestamp() and s.starts_at>clock_timestamp() and resident_slot_fresh(s.id,clock_timestamp()) and es.active) as valid
  from reservations r join slots s on s.id=r.slot_id join expert_services es on es.id=r.expert_service_id and es.expert_id=r.expert_id join experts e on e.id=r.expert_id join users u on u.id=e.user_id join users cu on cu.id=r.user_id where r.id=${d.reservation_id}::uuid`)
   ).rows[0];
   if (
@@ -404,6 +413,12 @@ async function validate(tx: Tx, d: Delivery, context?: Context) {
     (d.source_version !== null && r.version !== d.source_version)
   )
     return { reason: "state_superseded" };
+  const native =
+    (
+      await tx.execute(
+        sql`select reservation_id from resident_native_confirmations where reservation_id=${d.reservation_id}::uuid and (${d.source_version}::int is null or reservation_version<=${d.source_version})`,
+      )
+    ).rows.length === 1;
   const op = (
     await tx.execute<{
       id: string;
@@ -418,6 +433,7 @@ async function validate(tx: Tx, d: Delivery, context?: Context) {
     return { reason: "state_superseded" };
   if (
     d.kind === "client.booking_confirmed" &&
+    !native &&
     (!op ||
       op.id !== d.provider_operation_id ||
       op.state !== "booked" ||
@@ -431,26 +447,40 @@ async function validate(tx: Tx, d: Delivery, context?: Context) {
     (!op || op.id !== d.provider_operation_id || op.state !== "rejected")
   )
     return { reason: "source_invalid" };
+  // A declined or expired hold has no confirmation. Its immutable, owner-bound
+  // native slot source still identifies presentation; it never proves booked.
+  const nativeOrigin =
+    native ||
+    (
+      await tx.execute(
+        sql`select n.slot_id from reservations r join slots s on s.id=r.slot_id and s.provider='resident_native' join resident_native_slots n on n.slot_id=s.id join resident_service_versions v on v.id=n.service_version_id and v.expert_service_id=r.expert_service_id join resident_schedule_versions sv on sv.id=n.schedule_id and sv.expert_id=r.expert_id and sv.review_id=v.review_id where r.id=${d.reservation_id}::uuid`,
+      )
+    ).rows.length === 1;
   const legacy =
     (
       await tx.execute(
         sql`select reservation_id from planerka_legacy_booking_reviews where reservation_id=${d.reservation_id}::uuid and resolved_at is null`,
       )
     ).rows.length > 0;
-  const calendar: BookingCalendarCancellation | "verified_booked" =
+  const calendar:
+    BookingCalendarCancellation | "verified_booked" | "native_booked" =
     d.kind === "client.booking_confirmed"
-      ? "verified_booked"
-      : legacy
-        ? "unknown"
-        : !op || op.state === "rejected"
-          ? "not_created"
-          : op.state === "cancelled"
-            ? op.provider_uid
-              ? "cancelled"
-              : "not_created"
-            : ["unknown", "cancel_unknown", "manual"].includes(op.state)
-              ? "unknown"
-              : "cancellation_pending";
+      ? native
+        ? "native_booked"
+        : "verified_booked"
+      : nativeOrigin
+        ? "native_cancelled"
+        : legacy
+          ? "unknown"
+          : !op || op.state === "rejected"
+            ? "not_created"
+            : op.state === "cancelled"
+              ? op.provider_uid
+                ? "cancelled"
+                : "not_created"
+              : ["unknown", "cancel_unknown", "manual"].includes(op.state)
+                ? "unknown"
+                : "cancellation_pending";
   return {
     startsAt: new Date(r.starts_at).toISOString(),
     status: r.status,
@@ -784,7 +814,7 @@ export class PostgresBookingNotificationRepository {
         if (fresh.length !== 2) return undefined;
         const eligible = (
           await tx.execute(
-            sql`select r.id from reservations r join slots s on s.id=r.slot_id where r.id=${d.reservation_id}::uuid and r.reserved_until>clock_timestamp()+interval '15 seconds' and s.starts_at>clock_timestamp()+interval '15 seconds' and s.observed_at between clock_timestamp()-interval '15 minutes' and clock_timestamp()`,
+            sql`select r.id from reservations r join slots s on s.id=r.slot_id where r.id=${d.reservation_id}::uuid and r.reserved_until>clock_timestamp()+interval '15 seconds' and s.starts_at>clock_timestamp()+interval '15 seconds' and resident_slot_fresh(s.id,clock_timestamp())`,
           )
         ).rows.length;
         if (!eligible) return undefined;

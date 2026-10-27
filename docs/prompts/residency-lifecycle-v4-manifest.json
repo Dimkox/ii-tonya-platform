@@ -1,0 +1,26 @@
+{
+  "key": "expert.functional",
+  "version": 4,
+  "status": "inactive",
+  "ruleVersion": "residency_offer_v3",
+  "priorManifests": [
+    "docs/prompts/residency-offer-v2-manifest.json",
+    "docs/prompts/residency-separated-sales-v3-manifest.json"
+  ],
+  "sourceCommit": "117af4a74b104bb0f0967868a8d7e46894b05c7b",
+  "assets": [
+    {
+      "path": "docs/prompts/demo_access_test_expert.md",
+      "sha256": "62c1443bbce232782297ae49fdeb50281a44f8b74a73092ee6b5a30270332b30"
+    },
+    {
+      "path": "docs/prompts/work_expert_residency_v2.md",
+      "sha256": "14d8c9587009b9ae1adb06f6fe1bcaf15739fab4b9da103dd56425bb1f29df62"
+    }
+  ],
+  "activationRequirements": [
+    "approved_prompt_copy",
+    "official_selarti_contract",
+    "provider_activation_gate"
+  ]
+}

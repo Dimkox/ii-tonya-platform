@@ -111,22 +111,27 @@ export const publicClientCatalogRoutes: FastifyPluginAsync<{
         const items: {
           displayName: string;
           serviceCode: string;
+          serviceTitle?: string;
           language: string;
         }[] = [];
         for (const row of rows) {
           if (!row || typeof row !== "object" || Array.isArray(row))
             throw new Error("invalid_catalog");
-          const { displayName, serviceCode, language } = row as Record<
-            string,
-            unknown
-          >;
+          const { displayName, serviceCode, serviceTitle, language } =
+            row as Record<string, unknown>;
           if (
             !validText(displayName, 200) ||
             !validText(serviceCode, 64) ||
+            (serviceTitle !== undefined && !validText(serviceTitle, 160)) ||
             !validText(language, 32)
           )
             throw new Error("invalid_catalog");
-          items.push({ displayName, serviceCode, language });
+          items.push({
+            displayName,
+            serviceCode,
+            language,
+            ...(typeof serviceTitle === "string" ? { serviceTitle } : {}),
+          });
         }
         return { items };
       } catch {

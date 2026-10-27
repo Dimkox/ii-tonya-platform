@@ -519,6 +519,20 @@
       "when": 1793152800004,
       "tag": "0073_booking_reschedule_replay",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1793152800005,
+      "tag": "0074_resident_native_scheduling",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1793152800006,
+      "tag": "0075_resident_lifecycle_completion",
+      "breakpoints": true
     }
   ]
 }

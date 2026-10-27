@@ -3,6 +3,7 @@ import { PrivacyClient } from "./privacy-client.js";
 export interface BookingCard {
   displayName: string;
   serviceCode: string;
+  serviceTitle?: string;
   language: string;
   availability: "catalog_only" | "fresh_slots";
   slots: { startsAt: string; choiceHandle?: string }[];
@@ -169,6 +170,11 @@ export class BookingClient {
             (card) =>
               typeof card.displayName !== "string" ||
               typeof card.serviceCode !== "string" ||
+              (card.serviceTitle !== undefined &&
+                (typeof card.serviceTitle !== "string" ||
+                  card.serviceTitle.length < 1 ||
+                  card.serviceTitle.length > 160 ||
+                  /[\u0000-\u001f\u007f]/u.test(card.serviceTitle))) ||
               typeof card.language !== "string" ||
               !["catalog_only", "fresh_slots"].includes(card.availability) ||
               !Array.isArray(card.slots) ||

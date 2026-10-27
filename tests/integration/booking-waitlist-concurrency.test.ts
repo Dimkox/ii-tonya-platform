@@ -25,7 +25,7 @@ describe("booking waitlist concurrent FIFO promotion", () => {
       where id=${fixture.occupied.reservationId}::uuid
     `);
     await database.db.execute(sql`
-      update slots set starts_at=${new Date(
+      update slots set ends_at=ends_at+interval '24 hours',starts_at=${new Date(
         fixture.occupied.databaseNow.getTime() + 96 * 60 * 60 * 1_000,
       )},observed_at=${fixture.occupied.databaseNow}
       where id=${fixture.occupied.slotId}::uuid
@@ -95,7 +95,7 @@ describe("booking waitlist promotion deadline policy", () => {
         where id=${fixture.occupied.reservationId}::uuid
       `);
         await database.db.execute(sql`
-        update slots set starts_at=${startsAt},observed_at=${fixture.occupied.databaseNow}
+        update slots set starts_at=${startsAt},ends_at=${new Date(startsAt.getTime() + 3600000)},observed_at=${fixture.occupied.databaseNow}
         where id=${fixture.occupied.slotId}::uuid
       `);
 
@@ -114,7 +114,7 @@ describe("booking waitlist promotion deadline policy", () => {
   );
 
   it.each([
-    ["immediately above 24 hours", 24 * 60 * 60 * 1_000 + 1],
+    ["above 24 hours with execution margin", 24 * 60 * 60 * 1_000 + 60_000],
     ["exactly at 72 hours", 72 * 60 * 60 * 1_000],
   ])(
     "promotes %s and caps at start minus the configured buffer",
@@ -140,7 +140,7 @@ describe("booking waitlist promotion deadline policy", () => {
         where id=${fixture.occupied.reservationId}::uuid
       `);
         await database.db.execute(sql`
-        update slots set starts_at=${startsAt},observed_at=${fixture.occupied.databaseNow}
+        update slots set starts_at=${startsAt},ends_at=${new Date(startsAt.getTime() + 3600000)},observed_at=${fixture.occupied.databaseNow}
         where id=${fixture.occupied.slotId}::uuid
       `);
 

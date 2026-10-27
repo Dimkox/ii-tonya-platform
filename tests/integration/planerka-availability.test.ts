@@ -1,5 +1,5 @@
 import { randomUUID, createHash } from "node:crypto";
-import { readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { readFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
@@ -943,23 +943,23 @@ it("availability performs no HTTP and returns a fixed result while the durable a
     await transaction;
   }
 }, 2000);
-it("pins canonical0073 metadata including Planerka availability, SQL objects, predecessor and all input hashes", async () => {
+it("pins canonical0074 metadata including Planerka availability, SQL objects, predecessor and all input hashes", async () => {
   const read = (p: string) =>
     JSON.parse(readFileSync(`packages/db/migrations/${p}`, "utf8"));
-  const snapshot = read("meta/0073_snapshot.json");
-  expect(Object.keys(snapshot.tables)).toHaveLength(218);
+  const snapshot = read("meta/0074_snapshot.json");
+  expect(Object.keys(snapshot.tables)).toHaveLength(227);
   expect(
     snapshot.tables["public.slots"].indexes.slots_planerka_service_start_idx,
   ).toBeDefined();
-  expect(snapshot.prevId).toBe(read("meta/0072_snapshot.json").id);
+  expect(snapshot.prevId).toBe(read("meta/0073_snapshot.json").id);
   expect(
     snapshot.tables["public.planerka_availability_refreshes"],
   ).toBeDefined();
-  const manifest = read("state/0073_manifest.json");
+  const manifest = read("state/0074_manifest.json");
   expect(manifest.databaseVersion).toBe("170005");
   for (const [path, hash] of [
-    ["meta/0073_snapshot.json", manifest.snapshotSha256],
-    ["state/0073_sql_objects.json", manifest.sqlObjectsSha256],
+    ["meta/0074_snapshot.json", manifest.snapshotSha256],
+    ["state/0074_sql_objects.json", manifest.sqlObjectsSha256],
   ])
     expect(
       createHash("sha256")
@@ -972,9 +972,9 @@ it("pins canonical0073 metadata including Planerka availability, SQL objects, pr
         .update(readFileSync(`packages/db/migrations/${m.tag}.sql`))
         .digest("hex"),
     ).toBe(m.sha256);
-  const state = read("state/0073_sql_objects.json");
-  expect(state.functions).toHaveLength(158);
-  expect(state.triggers).toHaveLength(196);
+  const state = read("state/0074_sql_objects.json");
+  expect(state.functions).toHaveLength(177);
+  expect(state.triggers).toHaveLength(212);
   expect((await database.db.execute(sql.raw(constraintStateSql))).rows).toEqual(
     state.constraints,
   );
@@ -997,17 +997,29 @@ it("pins canonical0073 metadata including Planerka availability, SQL objects, pr
   ).toEqual(state.functions);
   const output = mkdtempSync(join(tmpdir(), "planerka-availability-verify-"));
   try {
+    const configPath = join(output, "drizzle.config.ts");
+    writeFileSync(
+      configPath,
+      `export default {dialect:"postgresql",dbCredentials:{url:process.env.II_TONYA_STATE_TEST_URL},out:${JSON.stringify(output)}};`,
+      { mode: 0o600 },
+    );
     await new Promise<void>((resolve, reject) => {
       const child = spawn(
         process.execPath,
         [
           "node_modules/drizzle-kit/bin.cjs",
           "introspect",
-          "--dialect=postgresql",
-          `--url=${database.db.$client.options.connectionString}`,
-          `--out=${output}`,
+          `--config=${configPath}`,
         ],
-        { stdio: "ignore", timeout: 60000 },
+        {
+          stdio: "ignore",
+          timeout: 60000,
+          env: {
+            ...process.env,
+            II_TONYA_STATE_TEST_URL:
+              database.db.$client.options.connectionString,
+          },
+        },
       );
       child.on("error", reject);
       child.on("exit", (code) =>

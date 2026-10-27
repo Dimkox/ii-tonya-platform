@@ -1,3 +1,5 @@
+import { PostgresResidentLifecycleCompletionRepository } from "@ii-tonya/db";
+import type { ResidentLifecycleStaffRepository } from "@ii-tonya/application";
 import { createExpertCardTagPrompt } from "./expert-card-tag-prompt.js";
 import {
   createPrivateObjectStore,
@@ -25,6 +27,7 @@ import {
   sql,
 } from "@ii-tonya/db";
 export interface ExpertCardCapability {
+  lifecycle?: ResidentLifecycleStaffRepository;
   initializeTags?: () => Promise<"semantic" | "exact-only">;
   answerTagCallback?: (input: {
     botId: string;
@@ -206,6 +209,16 @@ export function createExpertCardComposition(
         )
       : undefined;
   return {
+    ...(config.residentLifecycleCompletion?.enabled
+      ? {
+          lifecycle: new PostgresResidentLifecycleCompletionRepository(db, {
+            workBotId: settings.workBotId,
+            workBotKey: settings.workBotKey,
+            messagingConsentPolicyVersion:
+              settings.messagingConsentPolicyVersion,
+          }),
+        }
+      : {}),
     initializeTags: () => repository.initializeTagCache(),
     ...(acknowledge
       ? {

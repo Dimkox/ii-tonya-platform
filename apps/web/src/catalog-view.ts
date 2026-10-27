@@ -50,7 +50,7 @@ export function renderCatalogResults(
   const visible = matchingItems(items, filters);
   if (!visible.length)
     return "<p>Среди загруженных услуг нет совпадений по выбранным фильтрам. Попробуй изменить или сбросить фильтры.</p>";
-  return `<ul class="catalog-list">${visible.map((item) => `<li class="catalog-card" data-catalog-item><h2>${escape(item.displayName)}</h2><p>Услуга: ${escape(item.serviceCode)}</p><p>Язык: ${escape(item.language)}</p></li>`).join("")}</ul>`;
+  return `<ul class="catalog-list">${visible.map((item) => `<li class="catalog-card" data-catalog-item><h2>${escape(item.displayName)}</h2><p>Услуга: ${escape(item.serviceTitle ?? item.serviceCode)}</p><p>Язык: ${escape(item.language)}</p></li>`).join("")}</ul>`;
 }
 
 export function bindCatalogActions(
@@ -81,7 +81,12 @@ export function bindCatalogActions(
     for (const value of ["", ...new Set(values)]) {
       const option = document.createElement("option");
       option.value = value;
-      option.textContent = value || label;
+      option.textContent =
+        (select === service
+          ? items.find((item) => item.serviceCode === value)?.serviceTitle
+          : undefined) ||
+        value ||
+        label;
       select.append(option);
     }
     select.disabled = false;

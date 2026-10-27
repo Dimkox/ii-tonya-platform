@@ -41,8 +41,8 @@ describe("booking waitlist D1 migration", () => {
     const journal = JSON.parse(
       readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
     ) as { entries: Array<{ idx: number; tag: string }> };
-    expect(journal.entries.at(-2)?.tag).toBe("0072_booking_waitlist_d1");
-    expect(journal.entries.at(-1)).toMatchObject({
+    expect(journal.entries[72]?.tag).toBe("0072_booking_waitlist_d1");
+    expect(journal.entries[73]).toMatchObject({
       idx: 73,
       tag: "0073_booking_reschedule_replay",
     });

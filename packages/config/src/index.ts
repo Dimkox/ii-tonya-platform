@@ -18,3 +18,5 @@ export { assertExpertResidencyLifecycleConfig } from "./expert-residency-lifecyc
 export type { ExpertResidencyLifecycleConfig } from "./expert-residency-lifecycle-config.js";
 
 export * from "./client-account-queries-config.js";
+
+export * from "./resident-lifecycle-completion-config.js";

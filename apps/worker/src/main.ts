@@ -1,3 +1,4 @@
+import { createResidentLifecycleCompletionWorker } from "./resident-lifecycle-completion-composition.js";
 import { createResidentPrivateJobsLifecycle } from "./resident-private-jobs-composition.js";
 import { createResidentReviewNotificationLifecycle } from "./resident-review-notification-composition.js";
 import { createSeparatedSalesRunner } from "./expert-separated-sales-composition.js";
@@ -157,6 +158,7 @@ export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly expertCardMaterialFetch?: typeof globalThis.fetch;
   readonly residentWorkspaceNotifier?: import("@ii-tonya/db").WorkspaceNotifier;
   readonly expertResidencyNoticeFetch?: typeof globalThis.fetch;
+  readonly residentWorkNoticeFetch?: typeof globalThis.fetch;
   readonly clientAsyncCapabilities?: ClientAsyncCapabilities;
   readonly yookassaReader?: ExpertResidencyProviderReader;
   readonly waitlistRepositoryFactory?: (
@@ -636,6 +638,12 @@ export function createProductionWorkerRuntimeFactory(
             : { fetch: deps.expertResidencyNoticeFetch }),
         },
       );
+      const residentLifecycleCompletion =
+        createResidentLifecycleCompletionWorker(
+          db,
+          config,
+          deps.residentWorkNoticeFetch,
+        );
       const expertPersonalOffers =
         config.features.expertResidencyLifecycle === true
           ? (() => {
@@ -742,6 +750,7 @@ export function createProductionWorkerRuntimeFactory(
               },
             }),
         ...(expertSeparatedSales ? { expertSeparatedSales } : {}),
+        ...(residentLifecycleCompletion ? { residentLifecycleCompletion } : {}),
         bookingHandoffRevocations: () =>
           bookingHandoffRevocations.consumePending(20),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
@@ -776,7 +785,7 @@ export function createProductionWorkerRuntimeFactory(
           ? {}
           : {
               lifecycleScheduler: () =>
-                lifecycleSchedulerRepository.processDueLifecycleBatch({
+                lifecycleSchedulerRepository.runLifecycleBatch({
                   now: new Date(),
                   batchSize: 100,
                 }),

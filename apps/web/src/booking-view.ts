@@ -47,7 +47,7 @@ export function renderBookingChoices(
   return cards
     .map(
       (card, index) =>
-        `<section class="consent-card"><h3>${escape(card.displayName)}</h3><p>${escape(card.serviceCode)} · ${escape(card.language)}</p>${
+        `<section class="consent-card"><h3>${escape(card.displayName)}</h3><p>${escape(card.serviceTitle ?? card.serviceCode)} · ${escape(card.language)}</p>${
           card.availability !== "fresh_slots" ||
           !card.slots.some((slot) => slot.choiceHandle)
             ? "<p>Нет доступного времени для записи.</p>"
@@ -257,7 +257,10 @@ export function bindBookingActions(
         for (const value of new Set(values)) {
           const option = document.createElement("option");
           option.value = value;
-          option.textContent = value;
+          option.textContent =
+            (selector === "[data-service]"
+              ? items.find((item) => item.serviceCode === value)?.serviceTitle
+              : undefined) || value;
           select.append(option);
         }
       }

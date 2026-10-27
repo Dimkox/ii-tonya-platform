@@ -1,0 +1,25 @@
+{
+  "head": "586f89f06782891bf5b225cae794d362e479ea7f",
+  "runtimeAcceptedHead": "b1872e94030666bf97bb50fb366caa7d5a8906b2",
+  "command": "pnpm verify:gate --full --range c207735727210660ac949b78b84cf7463519fb99..HEAD --changed-file /tmp/residency-native-scheduling-final-paths-20261027.txt",
+  "repositoryTestsPassed": 616,
+  "hostedCI": false,
+  "files": [
+    {
+      "file": "residency-native-scheduling-final-gate-1793086601190661079.log.gz",
+      "bytes": 281,
+      "sha256": "968029f2887ce1a9e3153f3ada6511e98d36b48479d3e2670cb055452c3af9e7",
+      "rawBytes": 498,
+      "rawSha256": "b858de379e98ef6e6275bed0c3b6e1239f012030ee4dd0434996c86e052b34f5",
+      "exitCode": 0
+    },
+    {
+      "file": "residency-native-scheduling-final-repo-1793086601190661079.log.gz",
+      "bytes": 2440,
+      "sha256": "0ca6631d0e7bf698bea32725af87b516521078abe41af3a8504c77280dfd7ecc",
+      "rawBytes": 8701,
+      "rawSha256": "4da957d30f38391433623ad0632c2de1c3601c4cf71889795e3147bd981f860e",
+      "exitCode": 0
+    }
+  ]
+}

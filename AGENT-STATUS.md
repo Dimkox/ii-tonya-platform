@@ -1,3 +1,140 @@
+# S4b residency lifecycle completion — candidate for independent review 2026-10-27
+
+Current branch `codex/residency-lifecycle-completion-20261027`, isolated candidate
+under `.getzilla/runtime/worktrees/residency-lifecycle-completion-20261027`.
+Baseline native integration is `117af4a74b104bb0f0967868a8d7e46894b05c7b`.
+Use Git HEAD for the exact source; historical status sections below are superseded.
+Active route `35ab697bf43e`, package `.getzilla/runtime/changes/20261027-task-35ab69/`.
+One integration implementer owns source; coordinator owns independent review,
+final qualification and push. No deployment/provider/feature activation is authorized.
+
+Implemented additive0075 lifecycle state, source-bound WORK review/first-activation
+notices, fee-only acquisition/quality cases, fresh-MFA staff API and existing panel,
+separate default-off normal worker, verified permanent-tariff link and runtime
+prompt context. See `docs/runbooks/resident-lifecycle-completion.md` and
+`docs/superpowers/implementation-artifacts/spec-resident-lifecycle-completion.md`.
+
+Focused new PostgreSQL file passed11/11 on invocation3; its three-run allowance is
+exhausted. Do not rerun it or the exhausted historical native file. Actual composed
+form/manager/held3000/main/WORK/native-booking/logistics/renewal/pause/return passed.
+Populated baseline74→75 direct Drizzle SQL migration witness passed on its third attempt;
+this did not execute repository `migrateDb` exact-prefix preflight.
+Original failures retained. Real state reconstruction:232tables/180functions/
+219triggers/1605constraints/580indexes on PostgreSQL17.5. Actual Chromium panel
+proof passed; full workspace build4 passed. Focused unit/state batch107/110 initially
+failed only stale migration-history inventory; correction passed10/10. Workspace
+types and scoped lint passed. Separate authority file covers source/identity wait
+fences, expiry/replacement and current-gate privacy suppression; its bounded run
+ledger records final4/4 on invocation3; no further PG reruns. Final scope140/140,
+lifecycle state5/5, calendar prompt33/33, types, scoped lint and formatting passed.
+The exact PG75
+catalogue size/hash exception preserves the general1MiB inspection bound.
+
+No local pass implies release readiness. Native DraftPR119 previously passed its
+normal push gate641/641, but final Getzilla qualification FAILED and stays failed.
+Independent review of207 found two P2 defects: promoted waitlist reschedules lost
+quality provenance and normal shutdown skipped retained WORK receipt recovery.
+Both have targeted corrections. New lineage regression passed2/2 on invocation2;
+invocation3 passed those2 but failed an optional PG17 timeout experiment. That
+experiment and timeout change were removed; failed diagnostics remain. Final
+normal-close unit passed4/4 on invocation3. No exhausted PG rerun is permitted.
+See current package ledger. Fresh exact-source review and final qualification remain pending.
+Preserve PG17.5, private parser/semantic sockets and all prior evidence. No secrets
+in logs/argv. New manifest `residency-lifecycle-v4-manifest.json` binds current
+explanatory assets; old inactive manifests retain their original baseline hashes.
+
+# Native scheduling/main integration — candidate for independent review 2026-10-27
+
+Current source branch `codex/residency-native-scheduling-20261027`, existing worktree.
+Original native source `f047f295b26fc9ef6c90fa9c143447d118ab498c` was pushed;
+candidate retains main `2220f523b7ce66ccda4df74c2715c2f937304594` as its second parent.
+Use Git HEAD for the exact candidate identity; do not infer delivery from this note.
+Active Getzilla route `81b179d811aa`, package
+`.getzilla/runtime/changes/20261027-task-81b179/` owns current scope and evidence.
+Implementation and focused checks are recorded in the package evidence; independent
+review and final Getzilla/push gates remain pending. Main migration history 0000..0073
+is preserved; native becomes additive0074, old native0070 lineage rejects automatically.
+Root owns final gate, exact-source independent reviews and feature-branch Draft PR.
+Do not follow historical stacked-PR delivery instructions below. S4b remains next;
+its prepared spec/coverage live under canonical `.getzilla/runtime/scratch/`.
+No deployment, provider activation, ledger reconciliation or whole-task completion.
+Preserve existing task PostgreSQL/parser/semantic services and historical evidence.
+
+# Native scheduling ready for gated push — 2026-10-27
+
+Runtime b1872e94030666bf97bb50fb366caa7d5a8906b2 accepted by all three reviewers;
+R1–R6 closed. Evidence23d722b6 retains66 corrective artifacts over original86.
+Canonical full gate586f89f0 passes616/616 and all static/type checks. Spec done
+with Suggested Review Order. No active producer/reviewer/heavy jobs remain.
+Root now runs /tmp/residency-native-scheduling-observed-push.py, verifies remote
+exact SHA/clean tree, then creates stacked DraftPR on semantic-tags branch/PR116.
+Archive push evidence in the next S4b preparation commit; avoid recursive log commits.
+Continue S4b lifecycle/quality/final journey after delivery, not whole-task completion.
+Keep taskPG/parser/semantic helper. S4b draft and final ownercoverage map remain in
+/tmp, with actual main settlement source at expert-residency-provider-inbox-repository.ts
+calling publishSettledMainCard; normal original WORK-bot producer is still required.
+No production activation or routine approval loop.
+
+# Native scheduling accepted; canonical gate next — 2026-10-27
+
+Current branch codex/residency-native-scheduling-20261027, same isolated worktree.
+All3 reviewers PASS sourceb1872e94030666bf97bb50fb366caa7d5a8906b2; R1–R6 closed.
+Evidence23d722b638c462ab7b75ca6ec3aa2600f53305b6; root verified86+66 artifact pairs,
+49/50 source pins, preserved original manifest and protected credential absence.
+No active producer/reviewer/PG/build jobs. Root owns canonical full gate, acceptance
+completion docs, mandatory gated push and stacked DraftPR on semantic-tags branch
+(PR116/c2077357). Then continue S4b; do not finish the whole owner task here.
+Gate/push capture helpers ready at /tmp/residency-native-scheduling-observed-{gate,push}.py.
+Baselinec207735727210660ac949b78b84cf7463519fb99. State222tables/175functions/
+210triggers/1509constraints/549indexes/2extensions; migration0070 timestamp now
+1793152800001, strict monotonic guard and actual migrateDb upgrade1/1 verified.
+Full19-case correction run retained as18/19 (test receipt-counter defect), affected
+R4 cases corrected3/3; all assigned reviewers accepted that qualification. External
+PG37/37, expert queries10/10, focusedstatic222/222, actual browser/fullbuild/types/
+lint/format/whitespace pass. No hostedCI/deployment/provider activation claim.
+Keep taskPG17.5/parser/semantic helper and protected rotated config for whole journey.
+S4b draft /tmp/spec-residency-lifecycle-completion-draft-20261027.md and finalcoverage
+/tmp/residency-owner-final-coverage-20261027.md are prepared; final draft includes
+actual reservation audit provenance and S4a migration/fixture/composition lessons.
+
+# Native scheduling review corrections — 2026-10-27
+
+Current branch codex/residency-native-scheduling-20261027, same isolated worktree.
+Source9ce9eb23181be0a6ee54a0920fbc952d9e5aaf3e; evidencec80ca4a82a7b2838a624f75aa57f87ce46664ce1.
+All three independent reviewers finished; root triaged six real findings R1–R6 in
+residency-native-scheduling-review.md. Existing native_scheduling_implementer will
+fix them sequentially; reviewers stay read-only/idle until exact corrected source.
+No root heavy checks while implementer runs. No push/branch acceptance yet.
+Prior proof: native13/13 + HTTPimport1/1, external37/37,495 static cases across
+initial/focused corrections, actual browser/types/lint/webbuild. Root verified all86
+archive/raw pairs and49 source hashes; actual local credential absent. Actual state
+is222tables/175functions/210triggers/1509constraints/549indexes/2extensions.
+R1 must prove normal migrateDb upgrade (journal70 timestamp is currently below69);
+R2 defer temporary throttle;R3 immutable /client detail;R4 native pre-confirm cancel;
+R5 actual composed logistics delivery;R6 ordinary test must not require ignored dirs.
+Keep one taskPG17.5/parser/semantic helper and protected rotated configuration; no
+secrets in logs/argv. Existing owner autonomous correction/focused-rerun approval
+persists. No quota/permission loop, no production activation, no old SQL rewrite.
+S4b draft /tmp/spec-residency-lifecycle-completion-draft-20261027.md now includes
+actual client reservation audit provenance; root final coverage draft is in /tmp.
+After accepted S4a: canonical gate, gated push/DraftPR, then S4b and whole journey.
+
+# Native scheduling implementation starting — 2026-10-27
+
+S3b pushed clean atc207735727210660ac949b78b84cf7463519fb99; DraftPR116
+base PR115/254c8c. Mandatory push613/613 and source/raw/gzip logs archived in this
+preparation commit. Fullgate613/613 plus all relevant types/static checks; all7
+review findings accepted. No hostedCI or deployment claim.
+Current branch codex/residency-native-scheduling-20261027, same isolated worktree.
+Root froze spec-residency-native-scheduling.md against delivered S3b; migration0070
+next. RequireDocker preflight clean. One fresh implementer owns source/tests/SQL/
+state/runbook/evidence; root owns docs/review/gates/delivery. No descendants or
+competing heavy jobs. Keep taskPG/parser/semantic helper; protected rotated config
+remains /tmp/verification-form-20261026.compose.json, never print/pass secrets inargv.
+S4a completes actual native owner/client/worker paths and logistics, then S4b
+lifecycle/quality/final journey. No routine approval loops or early whole-task stop.
+S4b reconciled draft in /tmp/spec-residency-lifecycle-completion-draft-20261027.md.
+
 # Semantic tags ready for mandatory gated push — 2026-10-27
 
 Runtime790d308c accepted by all3 reviewers, R1–R7 closed. Exact registryef94cd03

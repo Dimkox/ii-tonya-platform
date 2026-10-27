@@ -394,3 +394,7 @@ export {
 export * from "./repositories/resident-review-repository.js";
 
 export * from "./repositories/resident-private-jobs-repository.js";
+
+export * from "./repositories/resident-native-logistics.js";
+
+export * from "./repositories/resident-lifecycle-completion-repository.js";

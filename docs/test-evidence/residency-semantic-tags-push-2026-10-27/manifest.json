@@ -1,0 +1,25 @@
+{
+  "head": "c207735727210660ac949b78b84cf7463519fb99",
+  "command": "git push -u origin codex/residency-semantic-tags-20261027",
+  "repositoryTestsPassed": 613,
+  "hostedCI": false,
+  "pullRequest": "https://github.com/Dimkox/ii-tonya-platform/pull/116",
+  "files": [
+    {
+      "file": "residency-semantic-tags-push-gate-1793078927104825356.log.gz",
+      "bytes": 450,
+      "sha256": "16c4abec07f60ad629dab49204793cb1616a0f634af203b5d1433e52f2d78c5d",
+      "rawBytes": 940,
+      "rawSha256": "1eb20adad722503134e7702577d9253dd9a2769c418618cdabde515264223250",
+      "exitCode": 0
+    },
+    {
+      "file": "residency-semantic-tags-push-repo-1793078927104825356.log.gz",
+      "bytes": 2426,
+      "sha256": "16f764f5f47cf9eae1379ef3559654acef53719734c7eaa2553383d11a3f3167",
+      "rawBytes": 8523,
+      "rawSha256": "6b6c9bd922186ca440e762d27cad42bc5e7a46396b1a1bf60e93fb4e6345015e",
+      "exitCode": 0
+    }
+  ]
+}

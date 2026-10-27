@@ -40,6 +40,7 @@ export const expertCardDrafts = pgTable(
       .notNull()
       .default([]),
     tagPreview: jsonb("tag_preview"),
+    initialSchedule: jsonb("initial_schedule"),
     richMode: boolean("rich_mode").notNull().default(false),
     richProfile:
       jsonb("rich_profile").$type<import("@ii-tonya/contracts").RichProfile>(),

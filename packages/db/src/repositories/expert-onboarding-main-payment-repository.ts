@@ -1,3 +1,4 @@
+import { recordResidentMainInvoice } from "./resident-lifecycle-completion-repository.js";
 import {
   beginScheduledMainCheckout,
   scheduledMainInput,
@@ -279,6 +280,7 @@ export class PostgresExpertOnboardingMainPaymentRepository {
     raw: MainCardCheckoutCommand,
     orderId: string,
     paymentId: string,
+    verifiedUrl?: string,
   ): Promise<boolean> {
     const input = parseMainCardCommand(raw, "checkout");
     if (typeof orderId !== "string" || !uuid.test(orderId))
@@ -302,7 +304,35 @@ export class PostgresExpertOnboardingMainPaymentRepository {
           sql`select payment_deadline>clock_timestamp() as valid from expert_residency_orders where id=${binding.orderId}::uuid and status='payment_pending'`,
         )
       ).rows[0]?.valid;
-      return !!operation && valid === true;
+      if (!operation || valid !== true) return false;
+      if (verifiedUrl !== undefined) {
+        let url: URL;
+        try {
+          url = new URL(verifiedUrl);
+        } catch {
+          return false;
+        }
+        if (
+          url.protocol !== "https:" ||
+          url.username ||
+          url.password ||
+          url.port ||
+          !["yookassa.ru", "pay.yookassa.ru", "yoomoney.ru"].includes(
+            url.hostname,
+          ) ||
+          url.toString().length > 2048
+        )
+          return false;
+        // A verified checkout result is persisted only during the write command.
+        // Reading the personal offer never creates an invoice or calls a provider.
+        await tx.execute(sql`insert into expert_personal_offer_state(user_id,quote_id,order_id,payment_id,payment_url,next_refresh_at)
+          select m.user_id,m.quote_id,o.id,${paymentId},${url.toString()},clock_timestamp()+interval '15 minutes'
+          from expert_card_main_orders m join expert_residency_orders o on o.id=m.order_id
+          where o.id=${binding.orderId}::uuid and o.status='payment_pending' and o.payment_deadline>clock_timestamp()
+          on conflict(user_id) do update set quote_id=excluded.quote_id,schedule_id=null,order_id=excluded.order_id,payment_id=excluded.payment_id,payment_url=excluded.payment_url,refreshed_at=clock_timestamp(),next_refresh_at=excluded.next_refresh_at`);
+        await recordResidentMainInvoice(tx, binding.userId, binding.orderId);
+      }
+      return true;
     });
   }
   async createScheduledMainInvoice(scheduleId: string, quoteId: string) {

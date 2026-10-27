@@ -12,6 +12,7 @@ import {
   classifyApprovedTrackedScopeContent,
   classifyPaymentScopeProbe,
   isPaymentScopeInspectionPath,
+  isApprovedLargeScopeArtifact,
   PAYMENT_SCOPE_MAX_FILE_BYTES,
   PAYMENT_SCOPE_MAX_TRACKED_FILES,
 } from "./support/payment-scope-boundary.js";
@@ -548,7 +549,12 @@ describe("MVP scope boundary", () => {
         existsSync(candidate) && isPaymentScopeInspectionPath(candidate),
     )) {
       const size = statSync(path).size;
-      if (size > PAYMENT_SCOPE_MAX_FILE_BYTES) {
+      if (
+        size > PAYMENT_SCOPE_MAX_FILE_BYTES &&
+        !isApprovedLargeScopeArtifact(path, size, () =>
+          readFileSync(path, "utf8"),
+        )
+      ) {
         violations.push(`${path}: exceeds bounded inspection size`);
         continue;
       }

@@ -188,7 +188,7 @@ describe("MVP schema", () => {
       where table_schema = 'public' order by table_name
     `);
     const names = rows.rows.map((row) => row.table_name);
-    // Literal union inventory verified against the PostgreSQL-derived0073 state.
+    // Literal union inventory verified against the PostgreSQL-derived0074 state.
     expect(names).toEqual([
       "admin_approvals",
       "admin_case_actions",
@@ -373,6 +373,9 @@ describe("MVP schema", () => {
       "resident_evidence_jobs",
       "resident_information_requests",
       "resident_message_templates",
+      "resident_native_confirmations",
+      "resident_native_logistics",
+      "resident_native_slots",
       "resident_object_deletions",
       "resident_private_objects",
       "resident_review_events",
@@ -384,6 +387,12 @@ describe("MVP schema", () => {
       "resident_safety_policies",
       "resident_safety_publications",
       "resident_sales_application",
+      "resident_schedule_busy",
+      "resident_schedule_previews",
+      "resident_schedule_state",
+      "resident_schedule_versions",
+      "resident_service_mappings",
+      "resident_service_versions",
       "resident_social_observations",
       "resident_tag_decisions",
       "resident_verification_application_updates",

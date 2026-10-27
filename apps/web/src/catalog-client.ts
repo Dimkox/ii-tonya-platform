@@ -1,6 +1,7 @@
 export interface PublicCatalogItem {
   displayName: string;
   serviceCode: string;
+  serviceTitle?: string;
   language: string;
 }
 
@@ -69,17 +70,23 @@ function decodeCatalog(value: unknown): PublicCatalogItem[] {
   return rows.map((row: unknown) => {
     if (!row || typeof row !== "object" || Array.isArray(row))
       throw new Error("invalid_catalog");
-    const { displayName, serviceCode, language } = row as Record<
+    const { displayName, serviceCode, serviceTitle, language } = row as Record<
       string,
       unknown
     >;
     if (
       !validText(displayName, 200) ||
       !validText(serviceCode, 64) ||
+      (serviceTitle !== undefined && !validText(serviceTitle, 160)) ||
       !validText(language, 32)
     )
       throw new Error("invalid_catalog");
-    return { displayName, serviceCode, language };
+    return {
+      displayName,
+      serviceCode,
+      language,
+      ...(typeof serviceTitle === "string" ? { serviceTitle } : {}),
+    };
   });
 }
 

@@ -110,3 +110,26 @@ it.each([
 ])("formats integer kopecks %s as user rubles", (minor, expected) => {
   expect(formatPersonalOfferMoney(minor)).toBe(expected);
 });
+
+it("permanent price displays only an eligible active link without a discount countdown", () => {
+  const view = {
+    selected_locked_total: "599400",
+    selected_locked_term: 1 as const,
+    offer_start_date: "2026-10-01T00:00:00Z",
+    current_discount_stage: 4,
+    discount_percent: 40,
+    locked_price_monthly: "599400",
+    locked_price_package: null,
+    payment_link_expires_at: "2026-10-02T00:00:00Z",
+    remaining_seconds: 0,
+    readiness: "ready" as const,
+    payment_url: "https://yookassa.ru/checkout/current",
+  };
+  expect(renderPersonalOffer(view)).toContain(
+    "Оплатить: https://yookassa.ru/checkout/current",
+  );
+  expect(renderPersonalOffer(view)).not.toMatch(/Осталось|срок ссылки|Скидка/);
+  expect(
+    renderPersonalOffer({ ...view, readiness: "pending_gates" }),
+  ).not.toContain("https:");
+});

@@ -1,3 +1,7 @@
+import {
+  admitExternalSlot,
+  lockExternalSlotAuthority,
+} from "./external-slot-admission.js";
 import { createHash } from "node:crypto";
 
 import { sql } from "drizzle-orm";
@@ -140,6 +144,7 @@ export class PostgresWaitlistRepository {
               and cr.user_id=${command.userId}::uuid and cr.state='ready'
               and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
               and c.expires_at>clock_timestamp() and cr.expires_at>clock_timestamp()
+              and s.provider<>'resident_native'
               and s.starts_at>clock_timestamp()+interval '24 hours'
               and s.observed_at>=clock_timestamp()-interval '15 minutes'
               and s.observed_at<=clock_timestamp()
@@ -346,33 +351,14 @@ export class PostgresWaitlistRepository {
           join experts e on e.id=es.expert_id
           where s.id=${command.slotId}::uuid and es.active and e.active and e.verified
             and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+            and s.provider<>'resident_native'
             and s.starts_at>${command.now}::timestamptz+interval '24 hours'
             and s.observed_at>=${command.now}::timestamptz-interval '15 minutes'
             and s.observed_at<=${command.now}::timestamptz
-          for update of s
+
         `)
     ).rows[0];
     if (!slot) return { kind: "stale_slot" };
-    let reservedUntil: Date;
-    try {
-      reservedUntil = computeReservedUntil(
-        command.now,
-        new Date(slot.startsAt),
-        this.confirmationBufferMs,
-      );
-    } catch {
-      return { kind: "stale_slot" };
-    }
-    const occupancy = Number(
-      (
-        await tx.execute<{ count: string }>(sql`
-        select count(*)::text count from reservations
-        where slot_id=${command.slotId}::uuid
-          and (status='booked' or (status='reserved' and reserved_until>${command.now}))
-      `)
-      ).rows[0]!.count,
-    );
-    if (occupancy >= slot.capacity) return { kind: "slot_full" };
     const entry = (
       await tx.execute<{
         id: string;
@@ -384,10 +370,34 @@ export class PostgresWaitlistRepository {
           join users u on u.id=w.user_id and u.active=true
           where w.slot_id=${command.slotId}::uuid and w.status='waiting'
           order by w.created_at,w.id
-          for update of w skip locked limit 1
+          limit 1
         `)
     ).rows[0];
     if (!entry) return { kind: "none_available" };
+    await lockExternalSlotAuthority(tx, entry.userId, [command.slotId]);
+    const waiting = (
+      await tx.execute(
+        sql`select id from booking_waitlist_entries where id=${entry.id}::uuid and status='waiting' for update`,
+      )
+    ).rows[0];
+    if (!waiting) return { kind: "none_available" };
+    const admitted = await admitExternalSlot(tx, {
+      slotId: command.slotId,
+      userId: entry.userId,
+    });
+    if (!admitted) return { kind: "stale_slot" };
+    if (admitted === "full") return { kind: "slot_full" };
+    command = { ...command, now: admitted.now };
+    let reservedUntil: Date;
+    try {
+      reservedUntil = computeReservedUntil(
+        admitted.now,
+        admitted.startsAt,
+        this.confirmationBufferMs,
+      );
+    } catch {
+      return { kind: "stale_slot" };
+    }
     const bookingHandle = `bk1.${createHash("sha256")
       .update(`waitlist-booking:${entry.id}`)
       .digest("base64url")}`;

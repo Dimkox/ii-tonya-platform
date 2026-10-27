@@ -32,3 +32,14 @@ it("shows an honest empty catalogue and reserve-disabled state", () => {
   expect(renderBookingChoices([], true)).toContain("Нет доступного времени");
   expect(renderBookingChoices([card], false)).not.toContain("data-reserve");
 });
+it("uses the approved native service title while keeping the stable code as binding data", () => {
+  const native = {
+    ...card,
+    serviceCode: "resident_0123456789",
+    serviceTitle: "Разбор задач",
+  };
+  const html = renderBookingChoices([native], true);
+  expect(html).toContain("Разбор задач");
+  expect(html).not.toContain("resident_0123456789");
+  expect(html).toContain('data-reserve="0:0"');
+});

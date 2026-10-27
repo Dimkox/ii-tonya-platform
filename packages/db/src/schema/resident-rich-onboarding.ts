@@ -68,6 +68,7 @@ export const residentCardVersions = pgTable(
     draftId: uuid("draft_id").notNull(),
     revision: integer().notNull(),
     profile: jsonb(),
+    initialSchedule: jsonb("initial_schedule"),
     publicPayload: jsonb("public_payload").notNull(),
     safetyFields: jsonb("safety_fields").notNull(),
     safetyProof: jsonb("safety_proof").notNull(),
