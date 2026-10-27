@@ -186,3 +186,12 @@ Focused13/13, lint and whitespace pass; all other second fullgate checks/types
 passed. Both failed full runs and focused outputs remain in separate immutable
 archives. No runtime/classifier or test limit changes. Exact mirror review precedes
 the final justified gate rerun.
+
+## Successful final branch gate
+
+Exact84cae6400a706319bc518feaf3526d5ab01054c8 passes canonical fullgate:613/613
+repository tests, shell syntax, formatting, whitespace, evidence integrity, changed
+lint and complete tests typecheck. Both exact registry corrections are independently
+accepted. Final successful logs are archived separately; failed logs remain.
+Runtime source is still independently accepted790d308c. Root proceeds to mandatory
+push and DraftPR, then the next approved native-scheduling block.

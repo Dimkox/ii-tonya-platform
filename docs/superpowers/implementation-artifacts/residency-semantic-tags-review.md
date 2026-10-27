@@ -113,3 +113,11 @@ real failures, diagnostic harness corrections and final passing results.
 Canonical full branch gate and mandatory push remain the coordinator's final steps.
 No hosted CI, deployment or live-provider certification follows from these checks.
 Native scheduling/booking and lifecycle completion remain the next approved work.
+
+## Final-gate registration review
+
+The runtime remains790d308c. Independent gap review accepts exact registry
+ef94cd03 and mirrored strict route assertion84cae640. No classifier, negative
+check or runtime changed. First/second fullgate failures610/613 and612/613 are
+retained; focused130/130 and13/13 prove their corrections. Final canonical
+fullgate84cae640 passes613/613 and all static/type checks. No bypass is used.

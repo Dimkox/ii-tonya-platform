@@ -1,3 +1,17 @@
+# Semantic tags ready for mandatory gated push — 2026-10-27
+
+Runtime790d308c accepted by all3 reviewers, R1–R7 closed. Exact registryef94cd03
+and mirrored route inventory84cae640 separately reviewed. Fullgate84cae640 passes
+613/613 plus all static/type checks. Failed610/613 and612/613 retained with focused
+130/130 and13/13 corrections. Spec done with Suggested Review Order.
+Root owns mandatory gated push and DraftPR on codex/residency-rich-onboarding-20261026
+(PR115 OPEN/Draft at254c8c), then native scheduling S4a and lifecycle S4b.
+No active source/test jobs. Keep taskPG/parser/semantic helper for final journey.
+Do not stop at S3b or request routine approval. No provider/deployment activation.
+Prepared S4a/S4b drafts remain in /tmp; S4a now also covers exact/mirrored registry
+updates, initial schedule digest versus later immediate availability revisions,
+readable explicit timezones and mixed native/external occupancy.
+
 # Semantic tags mirrored route guard correction — 2026-10-27
 
 Runtime790d308c accepted, exact registryef94cd03 independently accepted. Second

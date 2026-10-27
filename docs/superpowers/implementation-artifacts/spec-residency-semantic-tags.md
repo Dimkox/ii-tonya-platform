@@ -2,7 +2,7 @@
 title: Local semantic hashtag recommendations and moderated selection
 created: 2026-10-27
 type: feature
-status: in-review
+status: done
 baseline_commit: 254c8c169cbb8432654a46de206bd20500cecc3f
 review_loop_iteration: 4
 context:
@@ -431,3 +431,63 @@ removing just the comma label, retaining emoji unchanged, then removing emoji, w
 old approval and financial/non-tag facts intact. Verify actual owner callbacks and
 invalid-new-label/unchanged/finalization controls. Preserve accepted SQL/state if
 its existing guard is sufficient; no unnecessary reconstruction or broad rerun.
+
+## Completion evidence
+
+Tasks1–4 and all local implementation witnesses are complete. Task5 implementation,
+three independent review lenses and canonical fullgate are complete; root performs
+mandatory push/DraftPR next, without deployment or provider activation. R1–R7 are
+closed at runtime790d308c957ca9be8ab83a18ff8f3de6642921b9. Exact boundary registry
+correctionsef94cd03 and84cae640 are separately reviewed, preserving strict checks.
+Fullgate84cae640 passes613/613 repository tests and all checks including tests
+typecheck. Two failed gates and their focused corrections remain diagnostic evidence.
+Seven implementation archives preserve313 artifacts; final schema213 tables/156
+functions/194 triggers/1449 constraints/533 indexes/2 extensions. See coordinator
+and review reports for exact source/raw/compressed pins and bounded measurements.
+S4a native scheduling/booking and S4b lifecycle/final journey remain required.
+
+## Suggested Review Order
+
+**Owner flow**
+
+- Start with ordinary owner commands and revision-bound tag interaction.
+  [expert-card-service.ts:483](../../../packages/application/src/expert-card-service.ts#L483)
+
+- Resolve canonical identity and replay before recommendation or selection mutation.
+  [expert-card-repository.ts:1808](../../../packages/db/src/repositories/expert-card-repository.ts#L1808)
+
+- Bind plain replies without duplicate or uncertain prompt sends.
+  [expert-card-tag-prompt.ts:5](../../../apps/api/src/expert-card-tag-prompt.ts#L5)
+
+**Database authority**
+
+- Enforce limits, safe partial repair and final moderation in transactions.
+  [0069_resident_semantic_tags.sql:109](../../../packages/db/migrations/0069_resident_semantic_tags.sql#L109)
+
+- Keep custom decisions immutable and bound to exact draft revisions.
+  [0069_resident_semantic_tags.sql:37](../../../packages/db/migrations/0069_resident_semantic_tags.sql#L37)
+
+**Local matching**
+
+- Publish and restore verified public vector generations atomically.
+  [resident-semantic-tags.ts:22](../../../packages/db/src/repositories/resident-semantic-tags.ts#L22)
+
+- Apply pinned local vectors, bounded tokenization and conservative semantic matching.
+  [engine.py:33](../../../runtime/semantic-tags/engine.py#L33)
+
+**Manager controls**
+
+- Recheck authoritative role and session before public catalogue export.
+  [expert-card-repository.ts:2233](../../../packages/db/src/repositories/expert-card-repository.ts#L2233)
+
+**Validation and operation**
+
+- Exercise actual owner repair, replay and security boundaries.
+  [resident-semantic-tags.test.ts:1308](../../../tests/integration/resident-semantic-tags.test.ts#L1308)
+
+- Prove pending decisions cannot become immutable approved cards.
+  [resident-rich-onboarding.test.ts:2492](../../../tests/integration/resident-rich-onboarding.test.ts#L2492)
+
+- Provision the isolated helper and recover without granting publication authority.
+  [resident-semantic-tags.md:1](../../runbooks/resident-semantic-tags.md#L1)
+
