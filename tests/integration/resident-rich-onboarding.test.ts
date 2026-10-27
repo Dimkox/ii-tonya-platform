@@ -403,7 +403,9 @@ it("preview chain binds every page, proposals require exact review token and edi
     }),
   ).rejects.toThrow("card_preview_incomplete");
 });
-it("real private photo adapter, complete owner confirmation, manager version and erasure obligations", async () => {
+async function paidVersionWitness(
+  nextDraft?: "collecting" | "changes_requested",
+) {
   const { createServer } = await import("node:http");
   const { createPrivateObjectStore, createTelegramDocumentReader } =
     await import("../../packages/integrations/src/documents/private-verification.js");
@@ -886,12 +888,17 @@ it("real private photo adapter, complete owner confirmation, manager version and
       "Предложение продления",
     );
     const bill = (await lifecycle.readLifecycle(f.work))!.bill!;
-    expect((await renew(`/renewal_accept ${bill.quoteId}`)).text).toContain(
-      "Счёт продления",
-    );
-    expect((await renew("/renewal_invoice")).text).toContain("Счёт продления");
-    const renewalOrder = (await lifecycle.readLifecycle(f.work))!.bill!
-      .orderId!;
+    let renewalOrder = "";
+    if (!nextDraft) {
+      expect((await renew(`/renewal_accept ${bill.quoteId}`)).text).toContain(
+        "Счёт продления",
+      );
+      if (!nextDraft)
+        expect((await renew("/renewal_invoice")).text).toContain(
+          "Счёт продления",
+        );
+      renewalOrder = (await lifecycle.readLifecycle(f.work))!.bill!.orderId!;
+    }
     revision = r.revision;
     revision = (
       await repo.editPublicCard({
@@ -936,10 +943,16 @@ it("real private photo adapter, complete owner confirmation, manager version and
     });
     expect(await lifecycle.readLifecycle(f.work)).toMatchObject({
       revision: approved.revision,
-      bill: { readiness: "ready", orderId: renewalOrder },
+      bill: {
+        readiness: "ready",
+        ...(nextDraft ? {} : { orderId: renewalOrder }),
+      },
     });
     expect((await renew("/renewal")).text).toContain("Счёт продления");
-    expect((await renew("/renewal_invoice")).text).toContain("Счёт продления");
+    if (!nextDraft)
+      expect((await renew("/renewal_invoice")).text).toContain(
+        "Счёт продления",
+      );
     const ownerApp = await workHttp(repo);
     try {
       const notice = await ownerApp.inject({
@@ -1070,6 +1083,78 @@ it("real private photo adapter, complete owner confirmation, manager version and
       ).rows[0]?.active,
     ).toBe(false);
     expect(await catalogName()).toBeUndefined();
+    if (nextDraft) {
+      const approvedRevision = revision;
+      revision = (
+        await repo.richAction({
+          ...event(f.work),
+          expectedRevision: revision,
+          action: "patch",
+          value: { bio: bio + " Черновик C, ещё не утверждён." },
+        })
+      ).revision;
+      expect(await lifecycle.readLifecycle(f.work)).toMatchObject({
+        revision: approvedRevision,
+        bill: { readiness: "ready" },
+      });
+      if (nextDraft === "changes_requested") {
+        let previewC = await repo.richAction({
+          ...event(f.work),
+          expectedRevision: revision,
+          action: "preview",
+        });
+        while (
+          previewC.pageText!.split("\n").at(-1)!.startsWith("/card_preview")
+        ) {
+          const c = previewC.pageText!.split("\n").at(-1)!.split(" ");
+          previewC = await repo.richAction({
+            ...event(f.work),
+            expectedRevision: revision,
+            action: "preview",
+            page: Number(c[2]),
+            token: c[3]!,
+          });
+        }
+        await repo.richAction({
+          ...event(f.work),
+          expectedRevision: revision,
+          action: "confirm",
+          token: previewC.pageText!.split(" ").at(-1)!,
+        });
+        await repo.submitDraft({
+          ...event(f.work),
+          expectedRevision: revision,
+        });
+        await repo.reviewCard({
+          ...staffCommand(),
+          action: "return_changes",
+          returnReason: "Уточните черновик C",
+        });
+      }
+      expect(await lifecycle.readLifecycle(f.work)).toMatchObject({
+        revision: approvedRevision,
+        bill: { readiness: "ready" },
+      });
+      expect((await renew("/renewal")).text).toContain("Счёт продления");
+      expect((await renew(`/renewal_quote ${tariffId} 1`)).text).toContain(
+        "Предложение продления",
+      );
+      const currentBill = (await lifecycle.readLifecycle(f.work))!.bill!;
+      expect(
+        (await renew(`/renewal_accept ${currentBill.quoteId}`)).text,
+      ).toContain("Счёт продления");
+      expect((await renew("/renewal_invoice")).text).toContain(
+        "Счёт продления",
+      );
+      renewalOrder = (await lifecycle.readLifecycle(f.work))!.bill!.orderId!;
+      expect(
+        (
+          await database.db.execute(
+            sql`select review_id from expert_card_main_orders where order_id=${renewalOrder}::uuid`,
+          )
+        ).rows[0]?.review_id,
+      ).toBe(privateApproval.reviewId);
+    }
     const renewalCash = (
       await database.db.execute<{ cash: string }>(
         sql`select cash_minor::text cash from expert_residency_orders where id=${renewalOrder}::uuid`,
@@ -1111,6 +1196,24 @@ it("real private photo adapter, complete owner confirmation, manager version and
       paid_order_id: renewalOrder,
     });
     expect(await catalogName()).toBe("Анна После Продления");
+    if (nextDraft) {
+      expect((await repo.getWorkflow(f.work))!.status).toBe(nextDraft);
+      expect(
+        (
+          await database.db.execute(
+            sql`select approved_review_id from expert_card_drafts where user_id=${f.userId}::uuid`,
+          )
+        ).rows[0]?.approved_review_id,
+      ).toBeNull();
+      expect(
+        (
+          await database.db.execute(
+            sql`select count(*)::int n from resident_card_versions where draft_id=${privateApproval.draftId!}::uuid and revision=${revision}`,
+          )
+        ).rows[0]?.n,
+      ).toBe(0);
+    }
+
     expect(
       (
         await database.db.execute(
@@ -1193,7 +1296,17 @@ it("real private photo adapter, complete owner confirmation, manager version and
   } finally {
     await new Promise<void>((r, j) => server.close((e) => (e ? j(e) : r())));
   }
-}, 45000);
+}
+it(
+  "real private photo adapter, complete owner confirmation, manager version and erasure obligations",
+  () => paidVersionWitness(),
+  45000,
+);
+it.each(["collecting", "changes_requested"] as const)(
+  "R6 second renewal restores private approved B while later C is %s",
+  (status) => paidVersionWitness(status),
+  45000,
+);
 
 const Fastify = createRequire(import.meta.url)("fastify");
 async function workHttp(
@@ -2092,4 +2205,273 @@ it("R11 disabled normal composition retains originals and truthfully declines pr
   } finally {
     await app.close();
   }
+});
+async function secondRichFixture() {
+  const f = await linked();
+  const repo = new PostgresExpertCardRepository(database.db, {
+    richOnboarding: true,
+    workBotId: workScope.botId,
+    workBotKey: workScope.botKey,
+    messagingConsentPolicyVersion: "client-messaging-v1",
+    photoCustody: {
+      read: async () => new Uint8Array([1]),
+      put: async () => true,
+      presign: async (i) => "https://example.com/private-photo/" + i.custodyId,
+    },
+  });
+  const bio =
+    "Помогаю разобраться в жизненных задачах и выбрать собственные следующие шаги без обещаний результата.";
+  const service = {
+    id: randomUUID(),
+    title: "Консультация",
+    format: "ONLINE",
+    eventDelivery: null,
+    durationMinutes: 60,
+    price: { kind: "exact", minRub: "1000.00", maxRub: null },
+    description: bio,
+    audience: "Взрослые",
+    result: "План",
+    expiryDate: null,
+    detailsUrl: null,
+    tags: ["поддержка"],
+  };
+  const workflow = () => repo.getWorkflow(f.work);
+  const revision = async () => (await workflow())!.revision;
+  const photos = async () => {
+    const ids: string[] = [];
+    for (let i = 0; i < 3; i++) {
+      const e = event(f.work),
+        reference = "telegram:file:second_" + sequence;
+      const entry = await repo.addEntry({
+        ...e,
+        expectedRevision: await revision(),
+        entry: { kind: "photo", reference },
+      });
+      ids.push(
+        (
+          await repo.ingestRichPhoto({
+            ...e,
+            expectedRevision: entry.revision,
+            reference,
+            size: 1,
+            mimeType: "image/jpeg",
+          })
+        ).id,
+      );
+    }
+    return ids;
+  };
+  const initialPhotos = await photos();
+  await repo.richAction({
+    ...event(f.work),
+    expectedRevision: await revision(),
+    action: "patch",
+    value: {
+      fullName: "Анна",
+      specialization: "Консультант",
+      bio,
+      socialLinks: ["https://example.com/profile"],
+      photos: initialPhotos,
+      onlineRoomType: "STATIC_LINK",
+      staticRoomLink: "https://example.com/room",
+      services: [service],
+    },
+  });
+  const approve = async () => {
+    let rev = await revision();
+    rev = (
+      await repo.editPublicCard({
+        sessionHash: manager.sessionHash,
+        applicationId: f.applicationId,
+        expectedRevision: rev,
+        idempotencyKey: randomUUID(),
+        publicCard: {
+          displayName: "Анна",
+          profession: "Консультант",
+          city: "Казань",
+          summary: bio,
+        },
+      })
+    ).revision;
+    let preview = await repo.richAction({
+      ...event(f.work),
+      expectedRevision: rev,
+      action: "preview",
+    });
+    while (preview.pageText!.split("\n").at(-1)!.startsWith("/card_preview")) {
+      const parts = preview.pageText!.split("\n").at(-1)!.split(" ");
+      preview = await repo.richAction({
+        ...event(f.work),
+        expectedRevision: rev,
+        action: "preview",
+        page: Number(parts[2]),
+        token: parts[3]!,
+      });
+    }
+    await repo.richAction({
+      ...event(f.work),
+      expectedRevision: rev,
+      action: "confirm",
+      token: preview.pageText!.split(" ").at(-1)!,
+    });
+    await repo.submitDraft({ ...event(f.work), expectedRevision: rev });
+    const detail = (await repo.readDraft(
+      manager.sessionHash,
+      f.applicationId,
+    ))!;
+    return repo.reviewCard({
+      sessionHash: manager.sessionHash,
+      applicationId: f.applicationId,
+      expectedRevision: rev,
+      idempotencyKey: randomUUID(),
+      action: "approve",
+      warningAcknowledgment: detail.safety.digest,
+    });
+  };
+  return { ...f, repo, service, photos, initialPhotos, revision, approve };
+}
+it("R4 second manager API exposes selected photos in order beyond ten retained historical rows", async () => {
+  const f = await secondRichFixture();
+  const all = [...f.initialPhotos];
+  let prior = [...all];
+  await f.approve();
+  for (let i = 0; i < 3; i++) {
+    await f.repo.richAction({
+      ...event(f.work),
+      expectedRevision: await f.revision(),
+      action: "patch",
+      value: { photos: [] },
+    });
+    prior = await f.photos();
+    all.push(...prior);
+    await f.approve();
+  }
+  const selected = [...all].sort().reverse().slice(0, 3);
+  await f.repo.richAction({
+    ...event(f.work),
+    expectedRevision: await f.revision(),
+    action: "patch",
+    value: { photos: selected },
+  });
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from resident_card_media m join expert_card_drafts d on d.id=m.draft_id where d.user_id=${f.userId}::uuid`,
+      )
+    ).rows[0]?.n,
+  ).toBe(12);
+  const { createExpertCardAdminService } =
+    await import("../../packages/application/src/expert-card-admin-service.js");
+  const { expertCardAdminRoutes } =
+    await import("../../apps/api/src/routes/expert-cards.js");
+  const app = Fastify({ logger: false });
+  await app.register(expertCardAdminRoutes, {
+    enabled: true,
+    service: createExpertCardAdminService({
+      enabled: true,
+      repository: f.repo,
+    }),
+  });
+  try {
+    const response = await app.inject({
+      method: "GET",
+      url: "/v1/admin/expert-cards/" + f.applicationId,
+      headers: { authorization: "Bearer " + manager.token },
+    });
+    expect(response.statusCode).toBe(200);
+    const body = response.json();
+    const detail = body.item;
+    expect(detail.media.map((m: { id: string }) => m.id)).toEqual(selected);
+    expect(detail.previousMedia.map((m: { id: string }) => m.id)).toEqual(
+      prior,
+    );
+    const links: Record<string, unknown> = {};
+    for (const mediaId of [...new Set([...selected, ...prior])]) {
+      const link = await app.inject({
+        method: "POST",
+        url: `/v1/admin/expert-cards/${f.applicationId}/media/${mediaId}/link`,
+        headers: { authorization: "Bearer " + manager.token },
+        payload: {},
+      });
+      expect(link.statusCode).toBe(200);
+      links[mediaId] = link.json();
+    }
+    const { writeFileSync, mkdirSync } = await import("node:fs");
+    mkdirSync(".superpowers/sdd/rich-onboarding-second-20261027", {
+      recursive: true,
+    });
+    writeFileSync(
+      ".superpowers/sdd/rich-onboarding-second-20261027/manager-api-fixture.json",
+      JSON.stringify({
+        detail: body,
+        links,
+        selected,
+        prior,
+        retainedRows: 12,
+      }),
+    );
+  } finally {
+    await app.close();
+  }
+}, 30000);
+it("R5 second legacy uppercase service edit removal and aliases preserve immutable approved JSON", async () => {
+  const f = await secondRichFixture();
+  const upper = f.service.id.toUpperCase();
+  const other = {
+    ...f.service,
+    id: randomUUID().toUpperCase(),
+    title: "Вторая",
+  };
+  await database.db.execute(
+    sql`update expert_card_drafts set rich_profile=jsonb_set(rich_profile,'{services}',${JSON.stringify([{ ...f.service, id: upper }, other])}::jsonb),revision=revision+1 where user_id=${f.userId}::uuid`,
+  );
+  const approved = await f.approve();
+  const immutable = (
+    await database.db.execute<{ profile: unknown }>(
+      sql`select profile from resident_card_versions where review_id=${approved.reviewId!}::uuid`,
+    )
+  ).rows[0]!.profile;
+  const edited = await f.repo.richAction({
+    ...event(f.work),
+    expectedRevision: await f.revision(),
+    action: "service",
+    value: { ...f.service, title: "Исправленная" },
+  });
+  expect(edited.revision).toBe(approved.revision + 1);
+  expect(
+    (await f.repo.readDraft(manager.sessionHash, f.applicationId))!.rich!
+      .profile!.services,
+  ).toHaveLength(2);
+  await database.db.execute(
+    sql`update expert_card_drafts set rich_profile=jsonb_set(rich_profile,'{services,0,id}',${JSON.stringify(other.id)}::jsonb),revision=revision+1 where user_id=${f.userId}::uuid`,
+  );
+  await f.repo.richAction({
+    ...event(f.work),
+    expectedRevision: await f.revision(),
+    action: "remove_service",
+    value: other.id.toLowerCase(),
+  });
+  const current = (await f.repo.readDraft(
+    manager.sessionHash,
+    f.applicationId,
+  ))!.rich!.profile!;
+  expect(current.services).toMatchObject([
+    { id: f.service.id, title: "Исправленная" },
+  ]);
+  expect(current.services).toHaveLength(1);
+  await expect(
+    f.repo.richAction({
+      ...event(f.work),
+      expectedRevision: await f.revision(),
+      action: "patch",
+      value: { services: [{ ...f.service, id: upper }, f.service] },
+    }),
+  ).rejects.toThrow();
+  expect(
+    (
+      await database.db.execute<{ profile: unknown }>(
+        sql`select profile from resident_card_versions where review_id=${approved.reviewId!}::uuid`,
+      )
+    ).rows[0]!.profile,
+  ).toEqual(immutable);
 });

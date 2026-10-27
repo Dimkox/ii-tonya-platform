@@ -1,0 +1,77 @@
+{
+  "scope": "S3a bounded second correction R4/R5/R6",
+  "baselineCommit": "be8a0c7d71cc5ed22b551cc2ce1cc6332adaed3e",
+  "sourceCommit": "Commit containing these source hashes; exact SHA reported after commit.",
+  "productionEvidence": false,
+  "independentClosure": "pending coordinator-assigned reviewers",
+  "finalBranchGate": "not run by implementer",
+  "notificationSeam": "S4 durable original-work-bot status delivery remains open",
+  "archiveManifest": "docs/test-evidence/residency-rich-onboarding-second-2026-10-27/manifest.json",
+  "archiveManifestSha256": "2cb874111133edbb6068a40e91947386638fa330131025deb4471a04c029b0ec",
+  "sourceFiles": [
+    {
+      "path": "apps/web/src/expert-card-client.test.ts",
+      "sha256": "f5fbb328927ad3573f60a7ca19e9167a179bd351d043c9dfb7f74d637569f99d"
+    },
+    {
+      "path": "apps/web/src/expert-card-client.ts",
+      "sha256": "c21191468b914cf7f53a8be836d2458a99d944ee21f0f03d18a68077f7e82b7f"
+    },
+    {
+      "path": "apps/web/src/expert-card-view.ts",
+      "sha256": "1be6771538d29e0b5eac87a9698c27d22d1a96f5831ceaa1b8e3c3cca8779c77"
+    },
+    {
+      "path": "docs/runbooks/resident-rich-onboarding.md",
+      "sha256": "28a6c3817818a20873139d95c5f08b10d3fd15fe40c155fc9340f4baac2dea75"
+    },
+    {
+      "path": "packages/db/migrations/0068_resident_latest_approved_publication.sql",
+      "sha256": "573c612c1c00841f38929ec89eee01b1e27ef6a5dab11bc4d8b032f535ca98f9"
+    },
+    {
+      "path": "packages/db/migrations/meta/0068_snapshot.json",
+      "sha256": "00a3b8600e6158f2f844daabd4779a423a58e3b9de52f73a9f9bec0a0064daab"
+    },
+    {
+      "path": "packages/db/migrations/meta/_journal.json",
+      "sha256": "24037db01ed39c5132dad22b855cf88e6bc74f65e77512a2ee86aeec1f693e29"
+    },
+    {
+      "path": "packages/db/migrations/state/0068_manifest.json",
+      "sha256": "48974d54f539dbf674604335cdc00228aa91b1b3dbb32cc55af1e40ab7304781"
+    },
+    {
+      "path": "packages/db/migrations/state/0068_sql_objects.json",
+      "sha256": "5e5c3670e3272d2b7e3eca095a200a457a28c01c6cdffe73cbcc3124a3006e3b"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-card-repository.ts",
+      "sha256": "e885f6c5832ac2b5378946f90a59559ca538aece1e081529618b831798acfcdf"
+    },
+    {
+      "path": "tests/integration/resident-rich-onboarding.test.ts",
+      "sha256": "d71c0b29ca0575f273e8a85a8e57241d668eca6c206025ee7b7d76d194956517"
+    },
+    {
+      "path": "tests/repo/expert-referral-scope-guards.test.ts",
+      "sha256": "b3d9e6ea866f2c85cd81d74d78aa6936e372774b709bf64f3ab9b4065c441bb1"
+    },
+    {
+      "path": "tests/repo/migration-history-integrity.test.ts",
+      "sha256": "14f4a3b4c5dbd3c0e50a0380c31f50dc2e01e9b120f9371ac56bc6de07374c3a"
+    },
+    {
+      "path": "tests/repo/resident-rich-onboarding-state.test.ts",
+      "sha256": "53acc0f8e6aedf7272c40b81056adbf424f23c4960182bb2b08dffa8ef7e4c08"
+    },
+    {
+      "path": "tests/repo/support/payment-scope-boundary-core.ts",
+      "sha256": "55904fe32245491a75cf0c3c516c20f62966024f90417136e0a59f79840ebecd"
+    }
+  ],
+  "focusedIntegrationPassed": 4,
+  "affectedUnitStatePassed": 55,
+  "finalStatePassed": 6,
+  "preservedArchiveCounts": [85, 125]
+}

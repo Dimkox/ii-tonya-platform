@@ -236,3 +236,25 @@ it.each(["edit", "review"] as const)(
     );
   },
 );
+
+it("bounds and validates current and approved media independently", async () => {
+  const media = [{ id, state: "verified" }];
+  const read = (previousMedia: unknown) =>
+    createExpertCardClient(async () => ({
+      kind: "ok",
+      item: { ...item, media, previousMedia },
+    })).read(id);
+  expect(await read([{ id: reviewId, state: "unavailable" }])).toMatchObject({
+    media,
+    previousMedia: [{ id: reviewId, state: "unavailable" }],
+  });
+  for (const malformed of [
+    [{ id: "not-an-id", state: "verified" }],
+    [{ id, state: "public" }],
+    Array(11).fill(media[0]),
+  ]) {
+    await expect(read(malformed)).rejects.toThrow(
+      "verification_invalid_response",
+    );
+  }
+});

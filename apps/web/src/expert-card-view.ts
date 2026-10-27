@@ -205,29 +205,42 @@ export function bindExpertCardReview(
             text(detail, `Изменено: ${key}`);
         }
       }
-      for (const m of item.media ?? []) {
-        const b = doc.createElement("button");
-        b.textContent = `Фото ${m.id}: ${m.state}`;
-        b.disabled = m.state !== "verified";
-        b.onclick = async () => {
-          const c = deps.getClient(),
-            epoch = generation,
-            id = item.applicationId;
-          if (!c?.mediaLink) return;
-          try {
-            const r = await c.mediaLink(id, m.id);
-            if (!current(c, epoch) || selected?.applicationId !== id) return;
-            const a = doc.createElement("a");
-            a.href = r.url;
-            a.textContent = "Открыть фото (ссылка действует 2 минуты)";
-            a.rel = "noreferrer noopener";
-            a.target = "_blank";
-            b.replaceWith(a);
-          } catch (e) {
-            if (current(c, epoch) && selected?.applicationId === id) failed(e);
-          }
-        };
-        detail.append(b);
+      for (const [version, label, media] of [
+        ["current", "Фото текущего черновика", item.media ?? []],
+        [
+          "approved",
+          "Фото последней одобренной версии",
+          item.previousMedia ?? [],
+        ],
+      ] as const) {
+        text(detail, label);
+        for (const [index, m] of media.entries()) {
+          const b = doc.createElement("button");
+          b.textContent = `Фото ${index + 1}${m.state === "verified" ? "" : " — недоступно"}`;
+          b.setAttribute("data-card-media-id", m.id);
+          b.setAttribute("data-card-media-version", version);
+          b.disabled = m.state !== "verified";
+          b.onclick = async () => {
+            const c = deps.getClient(),
+              epoch = generation,
+              id = item.applicationId;
+            if (!c?.mediaLink) return;
+            try {
+              const r = await c.mediaLink(id, m.id);
+              if (!current(c, epoch) || selected?.applicationId !== id) return;
+              const a = doc.createElement("a");
+              a.href = r.url;
+              a.textContent = "Открыть фото (ссылка действует 2 минуты)";
+              a.rel = "noreferrer noopener";
+              a.target = "_blank";
+              b.replaceWith(a);
+            } catch (e) {
+              if (current(c, epoch) && selected?.applicationId === id)
+                failed(e);
+            }
+          };
+          detail.append(b);
+        }
       }
     }
     if (item.returnReason)

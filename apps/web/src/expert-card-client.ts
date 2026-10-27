@@ -33,6 +33,7 @@ export interface ExpertCardDraft extends ExpertCardWorkflow {
     revision: number;
   } | null;
   media?: { id: string; state: string }[];
+  previousMedia?: { id: string; state: string }[];
   returnReason?: string | null;
   effectiveFields?: Record<string, string>;
   safety?: {
@@ -282,24 +283,26 @@ function draft(v: unknown): v is ExpertCardDraft {
       (v.rich.proposal !== null && !obj(v.rich.proposal)))
   )
     return false;
-  if (
-    v.media !== undefined &&
-    (!Array.isArray(v.media) ||
-      v.media.length > 10 ||
-      !v.media.every(
-        (m) =>
-          obj(m) &&
-          uuid(m.id) &&
-          [
-            "allocated",
-            "inflight",
-            "unknown",
-            "verified",
-            "unavailable",
-          ].includes(String(m.state)),
-      ))
-  )
-    return false;
+  for (const media of [v.media, v.previousMedia]) {
+    if (
+      media !== undefined &&
+      (!Array.isArray(media) ||
+        media.length > 10 ||
+        !media.every(
+          (m) =>
+            obj(m) &&
+            uuid(m.id) &&
+            [
+              "allocated",
+              "inflight",
+              "unknown",
+              "verified",
+              "unavailable",
+            ].includes(String(m.state)),
+        ))
+    )
+      return false;
+  }
   const m = v.materials;
   return (
     m === null ||

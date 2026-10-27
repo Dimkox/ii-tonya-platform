@@ -1394,14 +1394,17 @@ export class PostgresExpertCardRepository {
             const s = richServiceSchema.parse(raw.value);
             profile = richProfileSchema.parse({
               ...profile,
-              services: [...profile.services.filter((x) => x.id !== s.id), s],
+              services: [
+                ...profile.services.filter((x) => x.id.toLowerCase() !== s.id),
+                s,
+              ],
             });
           }
           if (raw.action === "remove_service")
             profile = richProfileSchema.parse({
               ...profile,
               services: profile.services.filter(
-                (s) => s.id !== String(raw.value).toLowerCase(),
+                (s) => s.id.toLowerCase() !== String(raw.value).toLowerCase(),
               ),
             });
           if (raw.action === "remove_photo") {
@@ -2052,7 +2055,12 @@ export class PostgresExpertCardRepository {
           ).rows[0] ?? null,
         media: (
           await tx.execute(
-            sql`select id,state from resident_card_media where draft_id=${draft.id}::uuid order by id limit 10`,
+            sql`select p.id::uuid as id,coalesce(m.state,'unavailable') as state from expert_card_drafts d cross join lateral jsonb_array_elements_text(d.rich_profile->'photos') with ordinality p(id,position) left join resident_card_media m on m.id=p.id::uuid and m.draft_id=d.id where d.id=${draft.id}::uuid order by p.position limit 10`,
+          )
+        ).rows,
+        previousMedia: (
+          await tx.execute(
+            sql`select p.id::uuid as id,coalesce(m.state,'unavailable') as state from (select draft_id,profile from resident_card_versions where draft_id=${draft.id}::uuid order by revision desc limit 1) v cross join lateral jsonb_array_elements_text(v.profile->'photos') with ordinality p(id,position) left join resident_card_media m on m.id=p.id::uuid and m.draft_id=v.draft_id order by p.position limit 10`,
           )
         ).rows,
         returnReason:

@@ -105,6 +105,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0065_resident_private_recovery_fences.sql",
   "packages/db/migrations/0066_resident_rich_onboarding.sql",
   "packages/db/migrations/0067_resident_rich_review_corrections.sql",
+  "packages/db/migrations/0068_resident_latest_approved_publication.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -903,6 +904,23 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0068_resident_latest_approved_publication.sql",
+    "573c612c1c00841f38929ec89eee01b1e27ef6a5dab11bc4d8b032f535ca98f9",
+  ],
+  [
+    "packages/db/migrations/meta/0068_snapshot.json",
+    "00a3b8600e6158f2f844daabd4779a423a58e3b9de52f73a9f9bec0a0064daab",
+  ],
+  [
+    "packages/db/migrations/state/0068_sql_objects.json",
+    "5e5c3670e3272d2b7e3eca095a200a457a28c01c6cdffe73cbcc3124a3006e3b",
+  ],
+  [
+    "packages/db/migrations/state/0068_manifest.json",
+    "48974d54f539dbf674604335cdc00228aa91b1b3dbb32cc55af1e40ab7304781",
+  ],
+
+  [
     "packages/db/migrations/0067_resident_rich_review_corrections.sql",
     "7f79f93ef2cf00a79b3740472147c0e650abf154b545fec34be9b0d443ae8422",
   ],
@@ -1539,7 +1557,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "3153806972b037474e4d7f1e3a40677890cf868bb84fa66a395bfb4428f4165d",
+    "24037db01ed39c5132dad22b855cf88e6bc74f65e77512a2ee86aeec1f693e29",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1619,7 +1637,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "3153806972b037474e4d7f1e3a40677890cf868bb84fa66a395bfb4428f4165d",
+    "24037db01ed39c5132dad22b855cf88e6bc74f65e77512a2ee86aeec1f693e29",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
