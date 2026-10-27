@@ -1,0 +1,1559 @@
+{
+  "kind": "local-synthetic-native-resident-scheduling-S4a",
+  "sourceCommit": "9ce9eb23181be0a6ee54a0920fbc952d9e5aaf3e",
+  "baselineCommit": "7243e26fb4efe452f44e251e22827f11a322006e",
+  "productionEvidence": false,
+  "hostedCiEvidence": false,
+  "capturedAtUtc": "2026-10-27T06:56:09.622623+00:00",
+  "compression": "gzip level9 mtime0; one original artifact per file; PNG stored directly",
+  "environment": {
+    "node": "24.22.1",
+    "pnpm": "11.9.0",
+    "powershell": "7.6.9",
+    "postgres": "17.5",
+    "docker": "29.9.2",
+    "compose": "5.6.1",
+    "databaseContainer": "ii-tonya-verification-form-20261026-postgres-1",
+    "databaseCpuLimit": 1,
+    "databaseMemoryBytes": 1073741824,
+    "databasePort": "127.0.0.1:55483",
+    "credentials": "Read only from protected configuration in child memory/environment; not archived or passed in process arguments."
+  },
+  "finalResults": {
+    "nativePg": {
+      "passed": 13,
+      "failed": 0,
+      "artifact": "pg-presentation-final.log.gz"
+    },
+    "strengthenedHttpImport": {
+      "passed": 1,
+      "skipped": 12,
+      "failed": 0,
+      "artifact": "pg-http-import-final.log.gz"
+    },
+    "legacyExternalPg": {
+      "passed": 37,
+      "failed": 0,
+      "artifact": "pg-external-compatibility.log.gz"
+    },
+    "staticCompatibility": {
+      "uniqueTestsCovered": 495,
+      "initialPassed": 491,
+      "initialFailed": 4,
+      "correctiveRuns": {
+        "history": 9,
+        "scopeCompanion": 13,
+        "freshness": 6
+      },
+      "note": "The original 23-file command is retained as failed. Only its three failed files were rerun after exact registrations/freshness-callsite assertions were corrected; all four failures then passed."
+    },
+    "state": {
+      "tables": 222,
+      "functions": 175,
+      "triggers": 210,
+      "constraints": 1509,
+      "indexes": 549,
+      "extensions": 2
+    },
+    "browser": "Actual headless Chrome; real manager API and protected booking choice responses replayed into production client/view code; no live deployment or production browser session.",
+    "sourceChecks": "Workspace+tests typecheck, final changed-file lint, final test lint/typecheck, formatting, whitespace and web build passed. Full workspace build passed earlier; its timing precedes final source corrections."
+  },
+  "sourceFiles": [
+    {
+      "path": "apps/api/src/expert-card-telegram-ingress.ts",
+      "sha256": "f065c1884d3194c5dc6508bd9631ad61190e938e102b8271421bcf28731aaf11",
+      "bytes": 7511
+    },
+    {
+      "path": "apps/api/src/routes/public-client-catalog.ts",
+      "sha256": "e3940fbc4a7d9fea289ae937cb22dfd5e3d92eb3658b92e2929e9b3428aa0f30",
+      "bytes": 5152
+    },
+    {
+      "path": "apps/web/src/booking-client.ts",
+      "sha256": "94155a3a5c597d9deece50045c0b1d6d9a6d0311001c735990f25c05856fe883",
+      "bytes": 6614
+    },
+    {
+      "path": "apps/web/src/booking-view.test.ts",
+      "sha256": "2355923df6caf10c32263a727f524a3a4274c4fedc3e12162c060f94d37d1387",
+      "bytes": 1706
+    },
+    {
+      "path": "apps/web/src/booking-view.ts",
+      "sha256": "5cf32afb1f96eb758e172be0fd3a7837f1a33212173e78b2fe399c6060ca136b",
+      "bytes": 12001
+    },
+    {
+      "path": "apps/web/src/catalog-client.ts",
+      "sha256": "78ac26a930a5e00f0e36a42ffee5e4080664c61b99973b2c744869122db5829f",
+      "bytes": 4065
+    },
+    {
+      "path": "apps/web/src/catalog-view.ts",
+      "sha256": "2ed65320551b1b3acee4d819fcb666e0aeceb62fb0e838f88893cb5a0b1c827b",
+      "bytes": 6812
+    },
+    {
+      "path": "apps/web/src/expert-card-client.ts",
+      "sha256": "0b428aa5aae7c67a13b52704400c37a1831fff69965368cfc4e8fd5fb711a55a",
+      "bytes": 13625
+    },
+    {
+      "path": "apps/web/src/expert-card-view.ts",
+      "sha256": "d5ef6cb84104095d978a12db61acde9de0e893b0d90c2e85162af583e11d2130",
+      "bytes": 24418
+    },
+    {
+      "path": "apps/worker/src/booking-notifications.ts",
+      "sha256": "a6ecb6451040104885a89b440b9a6f21953dd923813bb923c8698074fbd0378d",
+      "bytes": 6096
+    },
+    {
+      "path": "apps/worker/src/client-catalog-outbox.ts",
+      "sha256": "0b580995528205ef856826ee555b36e3cddd02a411a73427a4ecf3c33b723237",
+      "bytes": 16409
+    },
+    {
+      "path": "apps/worker/src/resident-native-discovery.test.ts",
+      "sha256": "cef5b3f18622b6e15a3a10fa5004b4afc95d4be72a6a3c59d04279a8dfbc8772",
+      "bytes": 1450
+    },
+    {
+      "path": "docs/operations/resident-native-scheduling.md",
+      "sha256": "ca6528aa33f654620287cc02cfa964048bf64c08fbcf52b7a17b5bcedc30b095",
+      "bytes": 6465
+    },
+    {
+      "path": "docs/spec/resident-native-scheduling-guard-registration.md",
+      "sha256": "70cf6226ae1138ff139e186d7648aec2ba96ff627a69fcf26bc3969e5e7992cc",
+      "bytes": 1319
+    },
+    {
+      "path": "packages/application/src/expert-card-service.ts",
+      "sha256": "a584cb07b0504a22273aacb45eb48c05abc7229928377464385aae85cf96caef",
+      "bytes": 53843
+    },
+    {
+      "path": "packages/contracts/package.json",
+      "sha256": "107c72668715f901d985b521260771b152b1efd78ca5f9ab9c719ca30db6d66a",
+      "bytes": 526
+    },
+    {
+      "path": "packages/contracts/src/booking-notifications.ts",
+      "sha256": "85884d51a38fe8e62b13dfd94290768a0a6b399ac899ac95bd210e3cfd008804",
+      "bytes": 6326
+    },
+    {
+      "path": "packages/contracts/src/index.ts",
+      "sha256": "66800d021c07f7c9f5e1b0fa61ecb3d378799cc1684a0c1ae45be6f78496092d",
+      "bytes": 1771
+    },
+    {
+      "path": "packages/contracts/src/resident-schedule.test.ts",
+      "sha256": "2f4ded9f579e5f981c970da5109b3a6f8e3901173656b46cccbdf1d5f180e0bb",
+      "bytes": 6008
+    },
+    {
+      "path": "packages/contracts/src/resident-schedule.ts",
+      "sha256": "891c9a52c5327cc10c0cb0136c52bbfe997f3e229dfdf2bb9071814408e7e3d0",
+      "bytes": 12095
+    },
+    {
+      "path": "packages/db/migrations/0070_resident_native_scheduling.sql",
+      "sha256": "57aa4832165fcaf88665ee6d3d9b358a05c94c8d27f1a6bc09167d0667129e75",
+      "bytes": 31491
+    },
+    {
+      "path": "packages/db/migrations/meta/0070_snapshot.json",
+      "sha256": "790760c28b969aecb1131ff8645c6a5708102318fc579b50a2e0bb778f07b220",
+      "bytes": 924975
+    },
+    {
+      "path": "packages/db/migrations/meta/_journal.json",
+      "sha256": "a85d98083e13a8cf4a419e9de94eef8fbbc3381ec8c6539030ab8b08fb352d97",
+      "bytes": 10936
+    },
+    {
+      "path": "packages/db/migrations/state/0070_manifest.json",
+      "sha256": "222b8f1e33823895774099ce115cb6475adfa2e279850e91c8a29a41b27b800e",
+      "bytes": 11821
+    },
+    {
+      "path": "packages/db/migrations/state/0070_sql_objects.json",
+      "sha256": "82fc8811b7e6c761a16a63c9fcb919d814000692c75abfdf345b9f7e5b4cfee0",
+      "bytes": 1008359
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "sha256": "dc65fa5ea4995a96c0e665b6f7d2c7ff078d62e9dc21de496d0830c902514674",
+      "bytes": 13684
+    },
+    {
+      "path": "packages/db/src/repositories/booking-notification-callback-repository.ts",
+      "sha256": "16c0f3ddb89958e618d4d4b3742b762de0fd5dfbddc50c10cf77c3a6a5d1dfcd",
+      "bytes": 14896
+    },
+    {
+      "path": "packages/db/src/repositories/booking-notification-repository.ts",
+      "sha256": "cab4d0ddf4e6c0cdc687bd146a46a379ccf3402795ae98fb3dfcc4c27f60a178",
+      "bytes": 49922
+    },
+    {
+      "path": "packages/db/src/repositories/booking-repository.ts",
+      "sha256": "5233a834fd0cccd6a0c27c351846a6daf62b19ec6c3acc58400859fb0f7b0ce4",
+      "bytes": 67250
+    },
+    {
+      "path": "packages/db/src/repositories/catalog-repository.ts",
+      "sha256": "81ba49f375581c4cbced37206805ca1482d1a5d3bb414601efd00f1c668629bb",
+      "bytes": 9758
+    },
+    {
+      "path": "packages/db/src/repositories/client-catalog-repository.ts",
+      "sha256": "54e0d6f6341997b06183421d7934117df55e4055265dfc8d2e466a077735b835",
+      "bytes": 26025
+    },
+    {
+      "path": "packages/db/src/repositories/expert-card-repository.ts",
+      "sha256": "980a5f3063d1e4623137db1020a849876cdb55b35776a50b9bfbbcb6cdba1918",
+      "bytes": 140708
+    },
+    {
+      "path": "packages/db/src/repositories/expert-telegram-query-repository.ts",
+      "sha256": "89d403dbf6a4520dd6ea81a2eb3c140f15e3e5a9b8362956d13c244f70755c35",
+      "bytes": 16621
+    },
+    {
+      "path": "packages/db/src/repositories/privacy-repository.ts",
+      "sha256": "546bdf8c492e8c9e22bbb1280a6e52b1735e6add524965c6c8cd75eecbca64a1",
+      "bytes": 59532
+    },
+    {
+      "path": "packages/db/src/repositories/resident-native-logistics.ts",
+      "sha256": "29286eb08d202a595f0f996a67cd6ff5b8561c06b2874bc353dc0fa75af92fea",
+      "bytes": 12488
+    },
+    {
+      "path": "packages/db/src/repositories/resident-schedule.ts",
+      "sha256": "09eaae1eb6d9f1d7f72a75a58a14d34aaf083756eec516373a54348455721394",
+      "bytes": 19456
+    },
+    {
+      "path": "packages/db/src/schema/expert-cards.ts",
+      "sha256": "ed633bf93561ae81cec6fe0c385672779cc26101fefd26ca92718c4a4b79515e",
+      "bytes": 17882
+    },
+    {
+      "path": "packages/db/src/schema/index.ts",
+      "sha256": "5aee7c39e247c880a929f286b94a4d42496f05e0b89bab868a1447d0c182b17f",
+      "bytes": 1334
+    },
+    {
+      "path": "packages/db/src/schema/resident-native-scheduling.ts",
+      "sha256": "e2fde075930bcd8f7e7ecdcb37aba57a6b3dc5cc43c1206f304454081310ad40",
+      "bytes": 14389
+    },
+    {
+      "path": "packages/db/src/schema/resident-rich-onboarding.ts",
+      "sha256": "75a6b3a765a7ebc2ae23c59117748dc9e15e7a86743202b9287e19b411a0e794",
+      "bytes": 2992
+    },
+    {
+      "path": "packages/worker/src/booking-notification-renderer.ts",
+      "sha256": "53dd7705a0e2f0e479c3ff89d0a37d95eeaec7ef65284a2d43f02b2c6606b2c6",
+      "bytes": 3734
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "128fc7e791a5f117b9be2d135c12d78a5a4dc2da025900e9604eafbeb1564c4b",
+      "bytes": 212113
+    },
+    {
+      "path": "tests/integration/resident-native-scheduling.test.ts",
+      "sha256": "e0fd961b46c076424135e5bcc5533c754b27231006c91289caef5b3f38297826",
+      "bytes": 63897
+    },
+    {
+      "path": "tests/repo/booking-repository-guards.test.ts",
+      "sha256": "466b32ea7189d5430f065f583671f7cc36bd651c5dc1ac6d063997d60ec45770",
+      "bytes": 4090
+    },
+    {
+      "path": "tests/repo/expert-referral-scope-guards.test.ts",
+      "sha256": "a7a6f43c3adb27118e9fc2d2f318727bb9855d7009d4641bb7daf8e72b93cdb5",
+      "bytes": 17044
+    },
+    {
+      "path": "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+      "sha256": "9ff58ea24c1e5dba5a3b1b5ed58306713ee57bef65efb4d67ba0766d743fc490",
+      "bytes": 3390
+    },
+    {
+      "path": "tests/repo/migration-history-integrity.test.ts",
+      "sha256": "a4b46adce6d3ef5c7f9cb21f3474575ce7a452848fd45559491b76dcd09e4f4a",
+      "bytes": 22392
+    },
+    {
+      "path": "tests/repo/resident-native-scheduling-state.test.ts",
+      "sha256": "7e016a1022e68d2898a234b08c2c8541ec9274766fc20a0adfa71aeadcde8904",
+      "bytes": 3270
+    },
+    {
+      "path": "tests/repo/support/payment-scope-boundary-core.ts",
+      "sha256": "2be3d44d47b4b5514af8b86198c5d87fd8b38844b92b79323aee6a70c1c80566",
+      "bytes": 98045
+    }
+  ],
+  "files": [
+    {
+      "file": "application-types.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/application-types.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "booking-api-fixture.json.gz",
+      "sha256": "84030b01bb36954fdd1b075a8102b2d2def7dc7d5c48138991f236fcf1325b62",
+      "bytes": 506,
+      "rawSha256": "537653207fbcfe9d301a2f546b17f56d241cbbaafeb7b175f5695ed9e12f25ec",
+      "rawBytes": 899,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/booking-api-fixture.json"
+    },
+    {
+      "file": "booking-choice-title-red.log.gz",
+      "sha256": "2c11cbeec819da4e8a76f84ac234a82ec3e09beeacf59a648e821d1af6093122",
+      "bytes": 913,
+      "rawSha256": "36f907d6c9eaedb4f249e784a6cd133ccd5fe91dbcf41bfb7f83b108dd7f7d30",
+      "rawBytes": 1810,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/booking-choice-title-red.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 3 passed (4)",
+        "Start at  06:38:08",
+        "Duration  633ms (transform 128ms, setup 0ms, collect 145ms, tests 35ms, environment 0ms, prepare 99ms)"
+      ],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "browser-final.log.gz",
+      "sha256": "e9e6042287937b1b3128c467ea46b70680b8e887e7cf1ffcea833145ec35ff53",
+      "bytes": 260,
+      "rawSha256": "a185d0aa80565030426061fc1454e6c86ddf826d7a50c3ddf9baffe52b2a532b",
+      "rawBytes": 368,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/browser-final.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "browser-import-final.log.gz",
+      "sha256": "67bf1052b28e1cd5428c3587533bcd6dea57e0b7649d229b365ab97563632b18",
+      "bytes": 260,
+      "rawSha256": "7f27ac16ba34dcd6091e2a13d90324539cc2e825127b96937dc315dd15253e7a",
+      "rawBytes": 368,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/browser-import-final.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "browser-initial.log.gz",
+      "sha256": "5ed0ba54692dbb2a63cb01b8f37bec6ff181bac948bb6c873189bc60e667c775",
+      "bytes": 226,
+      "rawSha256": "8737a8b690c1e24acc04413d1832ec34d69b94aa51c566017cc0063e43dae592",
+      "rawBytes": 298,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/browser-initial.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "browser-screenshots-final.log.gz",
+      "sha256": "67bf1052b28e1cd5428c3587533bcd6dea57e0b7649d229b365ab97563632b18",
+      "bytes": 260,
+      "rawSha256": "7f27ac16ba34dcd6091e2a13d90324539cc2e825127b96937dc315dd15253e7a",
+      "rawBytes": 368,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/browser-screenshots-final.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/native-scheduling-20261027/browser-witness.mjs"
+      ],
+      "exitCode": 0,
+      "recordedSummary": []
+    },
+    {
+      "file": "browser-witness.mjs.gz",
+      "sha256": "1f58297c634e6d8a44a3547cb766b74e58efb326fe781d5ea60fb71cc20e5915",
+      "bytes": 2699,
+      "rawSha256": "86abdd89a9e6dddfec2a023bfa59935b7314a54a04332cb6d7580f78f90a5a91",
+      "rawBytes": 6640,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/browser-witness.mjs"
+    },
+    {
+      "file": "build-db-final.log.gz",
+      "sha256": "ed4b7282506a71903008a9947126aac24968dce7d60846b1de9da348ffa95d45",
+      "bytes": 519,
+      "rawSha256": "730434346c76c0f3f4029bef0341ba9c7ed465f48586832a321c6e79167d6b74",
+      "rawBytes": 2824,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/build-db-final.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "build-initial.log.gz",
+      "sha256": "cd05848bd032ecdddee6c0f6c3be98abc2021a5a08977d584c0152d02768fd93",
+      "bytes": 981,
+      "rawSha256": "77d2d7dd8ce29bdb8f9f0dac87184c9dac3a37fd4ccb1b08e7b2dd24798967a0",
+      "rawBytes": 5477,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/build-initial.log",
+      "command": ["pnpm", "build"],
+      "exitCode": 0,
+      "recordedSummary": []
+    },
+    {
+      "file": "choices-browser.png",
+      "sha256": "e5b4a3ea1eaa1a6e8f5472d4e2b2e85bb2d546ed83f3e71d752dbf7dedbb2e57",
+      "bytes": 157592,
+      "rawSha256": "e5b4a3ea1eaa1a6e8f5472d4e2b2e85bb2d546ed83f3e71d752dbf7dedbb2e57",
+      "rawBytes": 157592,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/choices-browser.png"
+    },
+    {
+      "file": "contracts-build.log.gz",
+      "sha256": "595312adf87f4285ebb1fd63825d647b912e712d19b465bba2e2e2eebf83c1af",
+      "bytes": 243,
+      "rawSha256": "196f282b2d4cb36a8400024bea15d3ce59f1dd9f30474eaf84ad8909fda3a47c",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/contracts-build.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "contracts-build2.log.gz",
+      "sha256": "6f4695285ab9a15aef5b630887210baf26589c5d562755df39247bfa1e676056",
+      "bytes": 244,
+      "rawSha256": "07334defdf344ec46403145e4fe56cbf4908127516a01f1c9785dca2f4c8ec8d",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/contracts-build2.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "database-resource-final.log.gz",
+      "sha256": "ed90de18101742af524147ca101c9c08bd9aec26130bdb757e81505ce6a509e2",
+      "bytes": 57,
+      "rawSha256": "fcd9384531690663ddb3b8b0b699191024b2e98b0391cb9b25a3b4fcd82dfe63",
+      "rawBytes": 45,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/database-resource-final.log",
+      "recordedSummary": [],
+      "command": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{.Config.Image}} {{.HostConfig.NanoCpus}} {{.HostConfig.Memory}}",
+        "ii-tonya-verification-form-20261026-postgres-1"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.034,
+      "resultArtifact": "database-resource-final.result.json.gz"
+    },
+    {
+      "file": "database-resource-final.result.json.gz",
+      "sha256": "e3888d02eb9a95128c1703b33c709989372f5b11d540f781463fab182db2f577",
+      "bytes": 182,
+      "rawSha256": "e18d808fa9f5fee6a42bf4c763ab7c71890fc2afc93f257a8bf47798195b143c",
+      "rawBytes": 239,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/database-resource-final.result.json"
+    },
+    {
+      "file": "db-typecheck1.log.gz",
+      "sha256": "2fc4d4a595ab61d416318c3c620026235c4a8f39d826d858831cf23c9e0e944a",
+      "bytes": 451,
+      "rawSha256": "0040fe75364a293d1b17ac4d15398561a6845919d8b6d79736258d79d9dd72a2",
+      "rawBytes": 891,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/db-typecheck1.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "db-typecheck2.log.gz",
+      "sha256": "2c602eac15c5f2bfa4b4ee83b8ededb3731a0da0462f17d79cb61cc8f4e774ae",
+      "bytes": 306,
+      "rawSha256": "55a30f62dc58b60c38a209e8720bac25b53839a1a3c71c030d6790b48236bca6",
+      "rawBytes": 817,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/db-typecheck2.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "db-typecheck3.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/db-typecheck3.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "db-typecheck4.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/db-typecheck4.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "dependency-audit.json.gz",
+      "sha256": "7546cf8240ec83504218dd4b0ed0872a0ff00fe21a6d3eecdde298f6297d9631",
+      "bytes": 185,
+      "rawSha256": "316eca1b7a744a70f7f67619128580e4b2dfbcf0a7edd496a693e4ddc83aa869",
+      "rawBytes": 286,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/dependency-audit.json"
+    },
+    {
+      "file": "dependency-format.log.gz",
+      "sha256": "2b54068b4016ba2fff2e4b6e5969cb8919e1df12e35d112014495c2f06ba42c5",
+      "bytes": 188,
+      "rawSha256": "05580c5eb6b1cf8b4be8454680aca55fad26687b813440bb1cc1b6955040d8c6",
+      "rawBytes": 218,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/dependency-format.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "dependency-frozen-minimal.log.gz",
+      "sha256": "5150a675c11c8aaa9f27831f6d6526165e882bf0150ba1399de3cf9a10a11c79",
+      "bytes": 172,
+      "rawSha256": "fe17b5014542d2a26dbcd2f1e26c2e132d8772fb4ffae9873d362aa077d854bd",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/dependency-frozen-minimal.log",
+      "command": ["pnpm", "install", "--frozen-lockfile"],
+      "exitCode": 0,
+      "recordedSummary": []
+    },
+    {
+      "file": "dependency-frozen.log.gz",
+      "sha256": "89ff0799125845bcd7eefc25ed37b6f576057970f92d7440580f11cb8508b4a5",
+      "bytes": 171,
+      "rawSha256": "033eab709c4a93b420bc82765997b1191e75b32c1c8e8bcaf7a546a03332c936",
+      "rawBytes": 196,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/dependency-frozen.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "dependency-generation-diagnostic.diff.gz",
+      "sha256": "b7d757fefa575fcc632cfc0454e02170d97ff857c3fecbe4d158f8ec90325bcd",
+      "bytes": 70949,
+      "rawSha256": "3fed5d18088385aeacd4185956ea0b21bd4590e2e298dc8a0801e2847cd39316",
+      "rawBytes": 337788,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/dependency-generation-diagnostic.diff"
+    },
+    {
+      "file": "discovery-green.log.gz",
+      "sha256": "24aaeed6e4acae4e019a1f34acf7efbc83c548c8118e4c82a894fc2293cbb4b0",
+      "bytes": 269,
+      "rawSha256": "075f79875ae03a1ff1c127be478c952102346ff7975f9f5e6fb239b2fe1ef1ac",
+      "rawBytes": 360,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/discovery-green.log",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  1 passed (1)",
+        "Start at  05:47:42",
+        "Duration  3.22s (transform 1.27s, setup 0ms, collect 2.74s, tests 8ms, environment 0ms, prepare 116ms)"
+      ],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "discovery-red-corrected.log.gz",
+      "sha256": "09ad6d1264bfd25ed1d9c96f10d797fde73b03f08a7effb24aa0a7001d69db6b",
+      "bytes": 610,
+      "rawSha256": "fc92e4e186e6d359c33af17829b5f3a9dc733c0140539f253ff26944c87b18ee",
+      "rawBytes": 1333,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/discovery-red-corrected.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed (1)",
+        "Start at  05:44:02",
+        "Duration  3.31s (transform 1.32s, setup 0ms, collect 2.84s, tests 19ms, environment 0ms, prepare 91ms)"
+      ],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "discovery-red.log.gz",
+      "sha256": "4a47021e599312cf70e2a9a6b90c2ce4a9e5800c403ed56b8c45976e95befd61",
+      "bytes": 449,
+      "rawSha256": "25e5665bde72b7b9a31735c62c15b23073d15cb76123c7984201de3182c22b3a",
+      "rawBytes": 945,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/discovery-red.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed (1)",
+        "Start at  05:43:21",
+        "Duration  3.35s (transform 1.38s, setup 0ms, collect 2.87s, tests 8ms, environment 0ms, prepare 144ms)"
+      ],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "environment-final.log.gz",
+      "sha256": "532f262c179b98362934344837e3bfc52112651b4084c2f28173712a127eecfd",
+      "bytes": 322,
+      "rawSha256": "79a06dcd1c13332ff0a5e5789716a5ba993b771222a799b3c5ddec9dbc2596cb",
+      "rawBytes": 484,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/environment-final.log",
+      "recordedSummary": [],
+      "command": [
+        "pwsh",
+        "-File",
+        "scripts/check-development-environment.ps1",
+        "-RequireDocker"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.404,
+      "resultArtifact": "environment-final.result.json.gz"
+    },
+    {
+      "file": "environment-final.result.json.gz",
+      "sha256": "3ddcf9d4ae641c2321fb1d21e10a3ef7b5dc48efae0cf69eeaf2011870a61234",
+      "bytes": 147,
+      "rawSha256": "62631bbbcecd2d5f4708c20797240b7cbc2b4f719e2bee30cfa13aa28097e2e5",
+      "rawBytes": 163,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/environment-final.result.json"
+    },
+    {
+      "file": "focused-compatibility-and-guards.log.gz",
+      "sha256": "7fbbc1c8796e5860f782548aeec390586cb6c57c0b52577de2dc510c4e952e22",
+      "bytes": 19345,
+      "rawSha256": "7ad869cb4aae223f0859bdec8f6364bc011b4551bd4fc5c45f2e1c6c62533945",
+      "rawBytes": 102622,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/focused-compatibility-and-guards.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-schedule.test.ts",
+        "apps/worker/src/resident-native-discovery.test.ts",
+        "apps/worker/src/client-catalog-outbox.test.ts",
+        "apps/worker/src/booking-notification-runtime.test.ts",
+        "apps/worker/src/booking-notifications.test.ts",
+        "packages/worker/src/booking-notification-renderer.test.ts",
+        "packages/worker/src/booking-notification-runner.test.ts",
+        "packages/application/src/expert-card-service.test.ts",
+        "apps/api/src/routes/public-client-catalog.test.ts",
+        "apps/api/src/routes/client-catalog.test.ts",
+        "apps/api/src/public-client-catalog-composition.test.ts",
+        "apps/web/src/catalog-client.test.ts",
+        "apps/web/src/catalog-view.test.ts",
+        "apps/web/src/booking-client.test.ts",
+        "apps/web/src/booking-view.test.ts",
+        "apps/web/src/expert-card-client.test.ts",
+        "apps/web/src/expert-card-view.test.ts",
+        "tests/repo/scope-boundary.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+        "tests/repo/resident-native-scheduling-state.test.ts",
+        "tests/repo/booking-repository-guards.test.ts"
+      ],
+      "exitCode": 1,
+      "recordedSummary": [
+        "Test Files  3 failed | 20 passed (23)",
+        "Tests  4 failed | 491 passed (495)",
+        "Start at  06:41:51",
+        "Duration  8.15s (transform 9.12s, setup 0ms, collect 39.68s, tests 9.18s, environment 7ms, prepare 3.16s)"
+      ]
+    },
+    {
+      "file": "format-final.log.gz",
+      "sha256": "68e13f3c2a4b169a28fe975adcc282d41c0291c32588d727c65ff82d72e99ffb",
+      "bytes": 510,
+      "rawSha256": "723e3d9b4647723a4c96b60e7da66c46f6d5faef88238a377b17c8fa4e7d655c",
+      "rawBytes": 2125,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/format-final.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "format-review.log.gz",
+      "sha256": "483523a1f92c336f44ca789201d34a04c0d54297c8b8bfaa2f22167ab0c2fe11",
+      "bytes": 589,
+      "rawSha256": "78072c0b7f2c7d5c7a69c489830a9fb127ffd2c5c7f58b9b36b716c5b8ab6f09",
+      "rawBytes": 2461,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/format-review.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "format-source-final.log.gz",
+      "sha256": "710c63d8d40d5688a62c3b08053dd1971c4e4ee87b2297f3f20c2540d22cd94e",
+      "bytes": 82,
+      "rawSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "rawBytes": 66,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/format-source-final.log",
+      "recordedSummary": [],
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "apps/api/src/routes/public-client-catalog.ts",
+        "apps/web/src/booking-client.ts",
+        "apps/web/src/booking-view.test.ts",
+        "apps/web/src/booking-view.ts",
+        "apps/web/src/catalog-client.ts",
+        "apps/web/src/catalog-view.ts",
+        "apps/web/src/expert-card-client.ts",
+        "apps/web/src/expert-card-view.ts",
+        "apps/worker/src/booking-notifications.ts",
+        "apps/worker/src/client-catalog-outbox.ts",
+        "apps/worker/src/resident-native-discovery.test.ts",
+        "docs/operations/resident-native-scheduling.md",
+        "docs/spec/resident-native-scheduling-guard-registration.md",
+        "packages/application/src/expert-card-service.ts",
+        "packages/contracts/package.json",
+        "packages/contracts/src/booking-notifications.ts",
+        "packages/contracts/src/index.ts",
+        "packages/contracts/src/resident-schedule.test.ts",
+        "packages/contracts/src/resident-schedule.ts",
+        "packages/db/src/index.ts",
+        "packages/db/src/repositories/booking-notification-callback-repository.ts",
+        "packages/db/src/repositories/booking-notification-repository.ts",
+        "packages/db/src/repositories/booking-repository.ts",
+        "packages/db/src/repositories/catalog-repository.ts",
+        "packages/db/src/repositories/client-catalog-repository.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/db/src/repositories/expert-telegram-query-repository.ts",
+        "packages/db/src/repositories/privacy-repository.ts",
+        "packages/db/src/repositories/resident-native-logistics.ts",
+        "packages/db/src/repositories/resident-schedule.ts",
+        "packages/db/src/schema/expert-cards.ts",
+        "packages/db/src/schema/index.ts",
+        "packages/db/src/schema/resident-native-scheduling.ts",
+        "packages/db/src/schema/resident-rich-onboarding.ts",
+        "packages/worker/src/booking-notification-renderer.ts",
+        "pnpm-lock.yaml",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "tests/repo/booking-repository-guards.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/resident-native-scheduling-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 3.674,
+      "resultArtifact": "format-source-final.result.json.gz"
+    },
+    {
+      "file": "format-source-final.result.json.gz",
+      "sha256": "bc2a1e22b1b009caee018a82fdc5bd0708900415011ceb856699601cf8726ec7",
+      "bytes": 580,
+      "rawSha256": "bfacb49a8b0df16b3d1bb6fc09ca753be8d9919828718df315e209f00b955221",
+      "rawBytes": 2427,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/format-source-final.result.json"
+    },
+    {
+      "file": "format.log.gz",
+      "sha256": "1ce0a3cdc4f5615d9a6b1e561a132f79ea37bc7eda3008364e82d3fe792dae6d",
+      "bytes": 577,
+      "rawSha256": "426efcad612bfefb8bf241cf63ce2505e69ddaa09908a533601d1a44112080bf",
+      "rawBytes": 2168,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/format.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "freshness-guard-final.log.gz",
+      "sha256": "0aabd107a9a633b194f801dd4b186f8a716e703a0d82a082fb304baf3e1e2c58",
+      "bytes": 271,
+      "rawSha256": "29106f11a045ba30d37210d754e54671599bd43da731c5ecccb5ac2165137b70",
+      "rawBytes": 355,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/freshness-guard-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/booking-repository-guards.test.ts"
+      ],
+      "exitCode": 0,
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  6 passed (6)",
+        "Start at  06:47:57",
+        "Duration  4.55s (transform 2.29s, setup 0ms, collect 4.07s, tests 9ms, environment 0ms, prepare 99ms)"
+      ]
+    },
+    {
+      "file": "generator-green.log.gz",
+      "sha256": "326dedd375d9bdb793233024f6821971974e124cd6028e71df55bb40f012ad71",
+      "bytes": 275,
+      "rawSha256": "f7fc38b3226664f9493a9ba5897af1806da7b6e6ba476b919b219fae4bc582c0",
+      "rawBytes": 366,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/generator-green.log",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  14 passed (14)",
+        "Start at  05:34:21",
+        "Duration  735ms (transform 78ms, setup 0ms, collect 175ms, tests 144ms, environment 0ms, prepare 131ms)"
+      ],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "generator-red-behavior.log.gz",
+      "sha256": "2939d8f168f213f9f97b1f1d9b18222a624ba4c2a869a289ec034219e23383a5",
+      "bytes": 2014,
+      "rawSha256": "11ebfdae0e29f37b8babe9819aa8c08e8d8781eb6e5c7880156f3a969175066b",
+      "rawBytes": 9949,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/generator-red-behavior.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  14 failed (14)",
+        "Start at  05:33:28",
+        "Duration  532ms (transform 66ms, setup 0ms, collect 63ms, tests 25ms, environment 0ms, prepare 128ms)"
+      ],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "generator-red.log.gz",
+      "sha256": "642b6523d0a3e395941542bc5e07cec95193702694fd2e5388c41f4e857eda40",
+      "bytes": 612,
+      "rawSha256": "8b63553bee890ba607847e7effe7937fc568901ec541568f308f4839c28397e7",
+      "rawBytes": 1409,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/generator-red.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  no tests",
+        "Start at  05:33:17",
+        "Duration  514ms (transform 57ms, setup 0ms, collect 0ms, tests 0ms, environment 0ms, prepare 127ms)"
+      ],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "history-guard-final.log.gz",
+      "sha256": "081d912adf3443930e4973d695b43bcb208c191062fd49916fa33eff20983e5e",
+      "bytes": 270,
+      "rawSha256": "56106dd08f3a4057469c838e9deb0582ac8b4e1f36d037c24cf153371be4a384",
+      "rawBytes": 358,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/history-guard-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/migration-history-integrity.test.ts"
+      ],
+      "exitCode": 0,
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  9 passed (9)",
+        "Start at  06:48:21",
+        "Duration  541ms (transform 68ms, setup 0ms, collect 65ms, tests 39ms, environment 0ms, prepare 132ms)"
+      ]
+    },
+    {
+      "file": "introspected-schema.ts.gz",
+      "sha256": "04d7a057c9f117343d6d0065f2f731a28c4836cf0c95d3f9dee1dcc2a6b16bad",
+      "bytes": 52521,
+      "rawSha256": "81381f41b76ec24f32a011a182ac3d2f90140fd4e95c92831cea9662d8bff2f4",
+      "rawBytes": 390741,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/introspected-schema.ts"
+    },
+    {
+      "file": "introspection.log.gz",
+      "sha256": "bb60bd60dca5adcd134ca7a6e5869636a1504071c41f3400d4d735ad00736392",
+      "bytes": 3972,
+      "rawSha256": "97b384b5ec14f556188d84d2f948d095c89d49eab72108b791bfda422451826d",
+      "rawBytes": 277319,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/introspection.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "lint-final.log.gz",
+      "sha256": "bf49da63a9fcc74899aae3693cf89bfd0820c3b2d3a5c2440a971d4f47d08e25",
+      "bytes": 28,
+      "rawSha256": "3c696c094e2a1323fa00cf0974a861af0cd6824b1672248c1d12791a70a61e4e",
+      "rawBytes": 8,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/lint-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "apps/api/src/routes/public-client-catalog.ts",
+        "apps/web/src/booking-client.ts",
+        "apps/web/src/booking-view.test.ts",
+        "apps/web/src/booking-view.ts",
+        "apps/web/src/catalog-client.ts",
+        "apps/web/src/catalog-view.ts",
+        "apps/web/src/expert-card-client.ts",
+        "apps/web/src/expert-card-view.ts",
+        "apps/worker/src/booking-notifications.ts",
+        "apps/worker/src/client-catalog-outbox.ts",
+        "apps/worker/src/resident-native-discovery.test.ts",
+        "packages/application/src/expert-card-service.ts",
+        "packages/contracts/src/booking-notifications.ts",
+        "packages/contracts/src/index.ts",
+        "packages/contracts/src/resident-schedule.test.ts",
+        "packages/contracts/src/resident-schedule.ts",
+        "packages/db/src/index.ts",
+        "packages/db/src/repositories/booking-notification-callback-repository.ts",
+        "packages/db/src/repositories/booking-notification-repository.ts",
+        "packages/db/src/repositories/booking-repository.ts",
+        "packages/db/src/repositories/catalog-repository.ts",
+        "packages/db/src/repositories/client-catalog-repository.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/db/src/repositories/expert-telegram-query-repository.ts",
+        "packages/db/src/repositories/privacy-repository.ts",
+        "packages/db/src/repositories/resident-native-logistics.ts",
+        "packages/db/src/repositories/resident-schedule.ts",
+        "packages/db/src/schema/expert-cards.ts",
+        "packages/db/src/schema/index.ts",
+        "packages/db/src/schema/resident-native-scheduling.ts",
+        "packages/db/src/schema/resident-rich-onboarding.ts",
+        "packages/worker/src/booking-notification-renderer.ts",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "tests/repo/booking-repository-guards.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/resident-native-scheduling-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts"
+      ],
+      "exitCode": 0,
+      "recordedSummary": ["exit=0"]
+    },
+    {
+      "file": "lint-import-final.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/lint-import-final.log",
+      "recordedSummary": [],
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "tests/integration/resident-native-scheduling.test.ts"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.814,
+      "resultArtifact": "lint-import-final.result.json.gz"
+    },
+    {
+      "file": "lint-import-final.result.json.gz",
+      "sha256": "cfa65cdcf385b1aaf3271ee7b4dcbef7bf7bdcb4954cee35b43b77c814d1b21b",
+      "bytes": 142,
+      "rawSha256": "6b590a3ee2ea22b6c01397a5c7858ad3f43c7fac19c847ad6a4a2c7bcb10c3fd",
+      "rawBytes": 165,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/lint-import-final.result.json"
+    },
+    {
+      "file": "lint-initial.log.gz",
+      "sha256": "c589286e279ac9353036e45abedf1623b2126b5c4a5fb326c0f06ddc14b05b4c",
+      "bytes": 225,
+      "rawSha256": "49a42240644bc257d3712bc44dd7d22cbf6ee8508745e5bd7a9591ea2e93a3ed",
+      "rawBytes": 281,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/lint-initial.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "manager-api-fixture.json.gz",
+      "sha256": "1fd142ccff835c5603da7ad97981ff2b2606a7805627f4f74cf5bbb7cd3856fc",
+      "bytes": 1958,
+      "rawSha256": "c4e995db8925b490a3f8f2b5eb8f094816209f50c7e8dbf8828020745588ee1d",
+      "rawBytes": 5822,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/manager-api-fixture.json"
+    },
+    {
+      "file": "manager-browser.png",
+      "sha256": "ebdfb3b29b78a6709d0fcf92896d49afceaff16199726a18fcc5c6c068b6935d",
+      "bytes": 167056,
+      "rawSha256": "ebdfb3b29b78a6709d0fcf92896d49afceaff16199726a18fcc5c6c068b6935d",
+      "rawBytes": 167056,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/manager-browser.png"
+    },
+    {
+      "file": "package-evidence.py.gz",
+      "sha256": "f34fa8f2cd3bda20ec4657e336afece575113e19b6cb5bcfb363530161409273",
+      "bytes": 3412,
+      "rawSha256": "6006cec40983dc332a9455b21f0a2abb1667216cde36d537ad011c8e2e96ebfe",
+      "rawBytes": 8279,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/package-evidence.py"
+    },
+    {
+      "file": "pg-choice-presentation.log.gz",
+      "sha256": "25ce1bd33cb6b564fafb0040cf20a6205de7aa2fb8aa8e27cb767b84bfa21bb5",
+      "bytes": 1672,
+      "rawSha256": "55a7d07d228704e44b756d12b290e90f70898748d40a332b11744b33c407987e",
+      "rawBytes": 6286,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-choice-presentation.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  8 failed | 4 passed (12)",
+        "Start at  06:38:45",
+        "Duration  31.09s (transform 2.79s, setup 0ms, collect 5.16s, tests 25.40s, environment 0ms, prepare 128ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-composed-and-privacy.log.gz",
+      "sha256": "b3075022c66edef8b6579d9f6d37ab14eab813c7353d4ecb4482ad088434ff1d",
+      "bytes": 1867,
+      "rawSha256": "98e21ca11049d906bb881021e09517a499021faec76e4c65ba65c84845da4e71",
+      "rawBytes": 4598,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-composed-and-privacy.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 11 passed (12)",
+        "Start at  06:16:40",
+        "Duration  45.44s (transform 2.75s, setup 0ms, collect 5.09s, tests 39.77s, environment 0ms, prepare 135ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-consumers-clock-corrected.log.gz",
+      "sha256": "2c8889c472c00c265bcf061641f0e9720a2e289f215e6e92fa90351af7700745",
+      "bytes": 817,
+      "rawSha256": "759de8cff560b689b3d11cafae567e9578c5d1c5b8be55f87822c715bd7baec2",
+      "rawBytes": 1692,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-consumers-clock-corrected.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 5 passed (6)",
+        "Start at  06:07:42",
+        "Duration  24.04s (transform 2.68s, setup 0ms, collect 3.89s, tests 19.65s, environment 0ms, prepare 143ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-consumers-logistics.log.gz",
+      "sha256": "92c4277cf5ad4371aee528daed432d7fe7324fddb8c2bbb117bf03d3c8edb9c4",
+      "bytes": 1021,
+      "rawSha256": "aff5a4223738a5149ad19742048726bf5919de6ea8e14bab533c43f7d2187d53",
+      "rawBytes": 2297,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-consumers-logistics.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 5 passed (6)",
+        "Start at  06:05:25",
+        "Duration  22.26s (transform 2.61s, setup 0ms, collect 3.64s, tests 18.19s, environment 0ms, prepare 125ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-expiry-ingress-corrected.log.gz",
+      "sha256": "9cf7a14870b61d75c3bc433f7dd4f4c016a32ebea60976ffda02d80bb722c8ca",
+      "bytes": 1323,
+      "rawSha256": "f14387f8e80b5079b0105e7c88dca31e15cbaae3258715d98a32f21c4d260a5f",
+      "rawBytes": 2884,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-expiry-ingress-corrected.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 8 passed (9)",
+        "Start at  06:13:32",
+        "Duration  39.95s (transform 2.75s, setup 0ms, collect 5.05s, tests 34.43s, environment 0ms, prepare 127ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-external-compatibility.log.gz",
+      "sha256": "f9fcd6063b5660103a63118812ffacf2914fec7954e1ab34dbebbbc23358940e",
+      "bytes": 390,
+      "rawSha256": "98609b3ea1517b8e58d054f3dd2a5880b70f2930bcb7f2d991c906ce3263fa07",
+      "rawBytes": 560,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-external-compatibility.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/native-scheduling-20261027/run-files.mjs",
+        "pg-external-compatibility",
+        "tests/integration/booking-notification-wire-admission.test.ts"
+      ],
+      "exitCode": 0,
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  37 passed (37)",
+        "Start at  06:35:11",
+        "Duration  10.95s (transform 862ms, setup 0ms, collect 2.25s, tests 8.23s, environment 0ms, prepare 120ms)",
+        "exit=0"
+      ]
+    },
+    {
+      "file": "pg-final-matrix.log.gz",
+      "sha256": "4367e8b5a0b850c64d7c1282871b52d73cf94afc0f19d2669932cbab2b42207a",
+      "bytes": 2036,
+      "rawSha256": "2e6ebea075cab95ea050bca79481dac5390d3aa10990747e0dc8cc5e83a9c590",
+      "rawBytes": 5728,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-final-matrix.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  2 failed | 11 passed (13)",
+        "Start at  06:20:35",
+        "Duration  53.31s (transform 2.80s, setup 0ms, collect 5.31s, tests 47.54s, environment 0ms, prepare 108ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-http-import-final.log.gz",
+      "sha256": "2b2ddc6e9d2e9649d1d7440a51c06a396303d55221a030a1bfd3bdfa9e009588",
+      "bytes": 372,
+      "rawSha256": "740578f638815ca0878b3dd3dd11192454e7b4bc2e8a01b4d06d3f6c02fbc23a",
+      "rawBytes": 532,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-http-import-final.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/native-scheduling-20261027/run-files.mjs",
+        "pg-http-import-final",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "actual authenticated work ingress"
+      ],
+      "exitCode": 0,
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  1 passed | 12 skipped (13)",
+        "Start at  06:51:42",
+        "Duration  11.03s (transform 2.68s, setup 0ms, collect 5.12s, tests 5.43s, environment 0ms, prepare 122ms)",
+        "exit=0"
+      ]
+    },
+    {
+      "file": "pg-initial-review-corrected.log.gz",
+      "sha256": "52bfddd877b938edcc86ecbae705abd391323baf635712f2c23a2925fe9b1610",
+      "bytes": 394,
+      "rawSha256": "25339482ad28da6ab5579686bee51110c693642893d2d41f2528ffb2e149e3b2",
+      "rawBytes": 584,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-initial-review-corrected.log",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  3 passed (3)",
+        "Start at  05:47:26",
+        "Duration  8.48s (transform 1.75s, setup 0ms, collect 3.67s, tests 4.36s, environment 0ms, prepare 131ms)",
+        "exit=0"
+      ],
+      "exitCode": 0,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-initial-review-diagnostic.log.gz",
+      "sha256": "5dabddf36aaa4393cd3d3d4f599e9de19b0a81cf07469289b40d290fefe675fa",
+      "bytes": 716,
+      "rawSha256": "450d37b9868b621fb92e94bb789d53ad396c5a9b3eb961b23314f9f2077194e8",
+      "rawBytes": 1615,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-initial-review-diagnostic.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 2 passed (3)",
+        "Start at  05:44:46",
+        "Duration  8.23s (transform 1.74s, setup 0ms, collect 3.73s, tests 4.05s, environment 0ms, prepare 124ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-initial-review.log.gz",
+      "sha256": "03bd36fd0ab5dd13c5c3e6f1ab5aac98fee68e4f190958a1e199f0d5ec70490a",
+      "bytes": 668,
+      "rawSha256": "28e11c451c59ac8df53d59e89a33cf09ac3ab170940752513dbc6027e18a75ed",
+      "rawBytes": 1403,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-initial-review.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 2 passed (3)",
+        "Start at  05:42:27",
+        "Duration  8.37s (transform 1.73s, setup 0ms, collect 3.65s, tests 4.28s, environment 0ms, prepare 125ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-native-booking.log.gz",
+      "sha256": "d5fb9fa75a988f497c5e61a16996f756ad10fe900c14ac2abe2e0f2db1a3a15f",
+      "bytes": 454,
+      "rawSha256": "8e91f52f98e9c9026b98b06755f17e64d02bfa59b56e21299aa491dc89c1320c",
+      "rawBytes": 711,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-native-booking.log",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  4 passed (4)",
+        "Start at  05:48:53",
+        "Duration  11.43s (transform 1.82s, setup 0ms, collect 3.61s, tests 7.34s, environment 0ms, prepare 126ms)",
+        "exit=0"
+      ],
+      "exitCode": 0,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-native-consumers.log.gz",
+      "sha256": "cfe432082148a50bfb47061a0bff94c8ee8e4e6cceac98beff9090277bc38b3e",
+      "bytes": 717,
+      "rawSha256": "02aa1f05815b8572ac06ad3839f0a4a21b4ee20d98e883f80fce6114b9b4615a",
+      "rawBytes": 1522,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-native-consumers.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 4 passed (5)",
+        "Start at  06:03:54",
+        "Duration  15.56s (transform 2.62s, setup 0ms, collect 3.77s, tests 11.31s, environment 0ms, prepare 109ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-native-matrix.log.gz",
+      "sha256": "e00fe5c237bc104bd296aedc4a30ae567e8c0f2059b381fd9cd8eb479627037f",
+      "bytes": 1393,
+      "rawSha256": "618b404322a1309fa4ff0f27583735b552f34306cb6fe142bd1a83fefbdbafcf",
+      "rawBytes": 3369,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-native-matrix.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  2 failed | 7 passed (9)",
+        "Start at  06:11:46",
+        "Duration  35.37s (transform 2.69s, setup 0ms, collect 4.98s, tests 29.96s, environment 0ms, prepare 111ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-presentation-final.log.gz",
+      "sha256": "3682535d50b6dcdc1a0c54df7a5878a3211be45aa1ad052ba066c20109f9c01f",
+      "bytes": 845,
+      "rawSha256": "78269cac059ef40e1330e2e2c1fef3c80e4084561c1d352d415d807146d9e75b",
+      "rawBytes": 1620,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-presentation-final.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/native-scheduling-20261027/run-focused.mjs",
+        "pg-presentation-final"
+      ],
+      "exitCode": 0,
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  13 passed (13)",
+        "Start at  06:48:27",
+        "Duration  48.85s (transform 2.89s, setup 0ms, collect 5.24s, tests 43.10s, environment 0ms, prepare 124ms)",
+        "exit=0"
+      ]
+    },
+    {
+      "file": "pg-red-corrected.log.gz",
+      "sha256": "03eacf6c20c85219a0ec94a4d744e5ec3e9cdffff7a4e57f9217bbe2824aefb3",
+      "bytes": 805,
+      "rawSha256": "4dbdab30280943e1bc1c528a1db0ab051711775e3f0c91b68f5d187e42fd2315",
+      "rawBytes": 2126,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-red-corrected.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  2 failed (2)",
+        "Start at  05:37:17",
+        "Duration  6.45s (transform 1.71s, setup 0ms, collect 3.63s, tests 2.36s, environment 0ms, prepare 127ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-red.log.gz",
+      "sha256": "911e7bd5c03a51bf910f26e1551f3e0a4b6100a75e84ce152602fb2da74250e3",
+      "bytes": 924,
+      "rawSha256": "5f4f26e9bfed8f0293bca902fbc4b28dbb931eff22ac63fe823dd3ab909a09fa",
+      "rawBytes": 2491,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-red.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  2 failed (2)",
+        "Start at  05:36:53",
+        "Duration  6.28s (transform 1.55s, setup 0ms, collect 3.45s, tests 2.35s, environment 0ms, prepare 107ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-schema-owner-corrected.log.gz",
+      "sha256": "481729d008fe077aea4ab56ce196b5be0ce87cf14de7592d0c4b8569b763e022",
+      "bytes": 343,
+      "rawSha256": "08fe0e5ff175ddb0b00559eef00e3bfd117c7a00923b06e6a24f81efef559a71",
+      "rawBytes": 480,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-schema-owner-corrected.log",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  2 passed (2)",
+        "Start at  05:41:55",
+        "Duration  7.07s (transform 1.78s, setup 0ms, collect 3.67s, tests 2.96s, environment 0ms, prepare 115ms)",
+        "exit=0"
+      ],
+      "exitCode": 0,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-schema-owner-green.log.gz",
+      "sha256": "f2561ea283be2414465cc9a75a41deb1513d897cae794a4cda88e83ee5b2be2d",
+      "bytes": 1532,
+      "rawSha256": "c430c354be0f0e4cbc2bb96dc82468753e53508023bd614e5200ee09fe5a9789",
+      "rawBytes": 4600,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-schema-owner-green.log",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  2 skipped (2)",
+        "Start at  05:41:26",
+        "Duration  5.61s (transform 1.67s, setup 0ms, collect 3.56s, tests 1.56s, environment 0ms, prepare 111ms)",
+        "exit=1"
+      ],
+      "exitCode": 1,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-source-freeze.log.gz",
+      "sha256": "0d862386fcc39fa9cf7e36d418a86c9b932ae20b810c50a3f94eb6ff87d207c3",
+      "bytes": 844,
+      "rawSha256": "0aea03a8d2beead7d1fccfdf3280890c259418f994aa3ba886740e3631bc8d5f",
+      "rawBytes": 1620,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-source-freeze.log",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  13 passed (13)",
+        "Start at  06:33:42",
+        "Duration  50.82s (transform 2.91s, setup 0ms, collect 5.29s, tests 45.06s, environment 0ms, prepare 137ms)",
+        "exit=0"
+      ],
+      "exitCode": 0,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "pg-upgrade-clock-final.log.gz",
+      "sha256": "1c6aca9ea1344fb479353444fc2f551858f1a5311922013ca15249d355ca4ea4",
+      "bytes": 844,
+      "rawSha256": "a7e9ff605dab0ada116fd0811c50252f8d895bbda874bccadd54bce6945414e2",
+      "rawBytes": 1620,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/pg-upgrade-clock-final.log",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  13 passed (13)",
+        "Start at  06:25:52",
+        "Duration  46.89s (transform 2.81s, setup 0ms, collect 5.11s, tests 41.34s, environment 0ms, prepare 121ms)",
+        "exit=0"
+      ],
+      "exitCode": 0,
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "reconstruct-final.log.gz",
+      "sha256": "1bf5dee85bb7e6cfecc64202113981d9bce1cd6c48bc33171b44189513d2fca6",
+      "bytes": 197,
+      "rawSha256": "bc1faff8e8286a0b16421233febf63009cd5b11559514eb2631825091d306bdb",
+      "rawBytes": 274,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/reconstruct-final.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "reconstruct-source-freeze.log.gz",
+      "sha256": "f5d88c993a1862178787b2f73ac10450008a5c66cf1fee5e2e7212a2ded70425",
+      "bytes": 197,
+      "rawSha256": "f40f7fa02484de566972985b0943cb2e317dae8c2cb8779da96fa11025732351",
+      "rawBytes": 274,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/reconstruct-source-freeze.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        ".superpowers/sdd/native-scheduling-20261027/reconstruct.ts"
+      ],
+      "exitCode": 0,
+      "recordedSummary": []
+    },
+    {
+      "file": "reconstruct.log.gz",
+      "sha256": "dc080a761af19b9836216e62c201fce0cea537f876c1056a2d2dfa0568e5b1e8",
+      "bytes": 197,
+      "rawSha256": "7742dfb83adef38fd60cc8ca434695b353479d78dd1ffc5a161ea66a85a77122",
+      "rawBytes": 274,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/reconstruct.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "reconstruct.ts.gz",
+      "sha256": "a7379a41a72972308f92692faa61fbb93a934f2612f369d390f5bbb5571db5cb",
+      "bytes": 2231,
+      "rawSha256": "179d02efe988896acb01d0816ccbd09c5b13711b1e0ae06d5579a38947548fde",
+      "rawBytes": 5589,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/reconstruct.ts"
+    },
+    {
+      "file": "run-files.mjs.gz",
+      "sha256": "9dc59f56e0f377083c57056f6c154233b2ea8be2030329f51ec7e5d163b16d39",
+      "bytes": 533,
+      "rawSha256": "f11725f66f535b3dae778ac7a7298bec36302557fdafbb54a8850f2c55c7cc2a",
+      "rawBytes": 891,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/run-files.mjs"
+    },
+    {
+      "file": "run-focused.mjs.gz",
+      "sha256": "e7983c5929013c28ab0b189e09fb351bfc4c7efe491fc06583a8388b5adf5f95",
+      "bytes": 546,
+      "rawSha256": "9a77680df6d1e2d56df202a39274cdd6f7e1790053783da239c937a9c64b9278",
+      "rawBytes": 921,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/run-focused.mjs"
+    },
+    {
+      "file": "scope-companion-final.log.gz",
+      "sha256": "76569ced00cd6cbd616e9a6037a9400ba028ea0805cb0334c0481884e217125c",
+      "bytes": 272,
+      "rawSha256": "04957e30585acc5a85f46c4552f62a92b3c446948888dbf87785ae9c72e96df2",
+      "rawBytes": 364,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/scope-companion-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/expert-referral-scope-guards.test.ts"
+      ],
+      "exitCode": 0,
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  13 passed (13)",
+        "Start at  06:48:14",
+        "Duration  1.10s (transform 150ms, setup 0ms, collect 588ms, tests 33ms, environment 0ms, prepare 114ms)"
+      ]
+    },
+    {
+      "file": "types-final.log.gz",
+      "sha256": "fb71c548b7c458651c188de02c9fac0001d2ff93bc918326d232ce1a155c0413",
+      "bytes": 135,
+      "rawSha256": "d6a26c6889fbe26fb0803c7cdda267307876a96da590c4cd5865f71497c3e755",
+      "rawBytes": 326,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/types-final.log",
+      "command": ["pnpm", "typecheck"],
+      "exitCode": 0,
+      "recordedSummary": []
+    },
+    {
+      "file": "types-import-final.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/types-import-final.log",
+      "recordedSummary": [],
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 25.91,
+      "resultArtifact": "types-import-final.result.json.gz"
+    },
+    {
+      "file": "types-import-final.result.json.gz",
+      "sha256": "0c8f5241920de7ac3a2d0fdb3cac28b72daff87cb15e35fb02346dd5f4c3fead",
+      "bytes": 128,
+      "rawSha256": "6b074d70143c406b61a28551712a1bc74eb3d1cb168eddc9bad86cbf6c465f66",
+      "rawBytes": 155,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/types-import-final.result.json"
+    },
+    {
+      "file": "types-initial.log.gz",
+      "sha256": "b263704ed65c465ff4146e00a540e1fd0a63f6b7e10eae1c4eb9d2d578a56f6f",
+      "bytes": 569,
+      "rawSha256": "98d2b1bf19062a510dc307a5c988714131623e9de2e42a6af5450cca1cd98596",
+      "rawBytes": 1989,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/types-initial.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "types-restored.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/types-restored.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "types-second.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/types-second.log",
+      "recordedSummary": [],
+      "commandProvenance": "Historical diagnostic log; exact argv was not separately captured. Contents retained without inventing missing metadata."
+    },
+    {
+      "file": "web-build-final.log.gz",
+      "sha256": "058d7611788493eb6503ce132c2b54470e82ed07477b379f71e3663851a74840",
+      "bytes": 243,
+      "rawSha256": "454035092ad13d20617799f1fd92d9c45e442a00572684469d39076774899e76",
+      "rawBytes": 360,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/web-build-final.log",
+      "command": ["pnpm", "--filter", "@ii-tonya/web", "build"],
+      "exitCode": 0,
+      "recordedSummary": []
+    },
+    {
+      "file": "whitespace-final.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/whitespace-final.log",
+      "recordedSummary": [],
+      "command": ["git", "diff", "--check"],
+      "exitCode": 0,
+      "durationSeconds": 0.041,
+      "resultArtifact": "whitespace-final.result.json.gz"
+    },
+    {
+      "file": "whitespace-final.result.json.gz",
+      "sha256": "974a4d89c040939ea79a2b7b74ac45949314d17ae1c92f032c54c8d25f9e31d4",
+      "bytes": 102,
+      "rawSha256": "fd1d7c96868a6387e7accc28589cfb79a967054751a2c632d94a0e2aad1c45dc",
+      "rawBytes": 105,
+      "originalPath": ".superpowers/sdd/native-scheduling-20261027/whitespace-final.result.json"
+    }
+  ],
+  "limitations": [
+    "Historical diagnostic logs retain original intermediate failures; not every intermediate uncommitted source version or exact argv was captured. They are diagnostic evidence, not claimed final-source verification.",
+    "Final 13-case native run preceded the last HTTP test-only CSV strengthening; that changed case was rerun individually and passed against unchanged runtime source.",
+    "The initial combined compatibility run preceded exact guard registration corrections. Corrective individual results must be read with it, not represented as a new all-green aggregate command.",
+    "Online-window fixtures explicitly use a direct synthetic short-lead reservation for due-delivery proof; actual protected discovery retains and proves the existing 24-hour lead.",
+    "Pre-native populated upgrade seeds the historical canonical rows before migration0070. Historical rich approval is populated after only the first two additive nullable schedule columns, before any native authority/table/backfill statement; the existing approved bytes are asserted unchanged after the remainder.",
+    "Independent review, root exact-head branch gate, gated push and Draft PR are separate delivery work. S4b and production activation are outside this increment."
+  ]
+}
