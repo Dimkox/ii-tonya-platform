@@ -93,7 +93,13 @@ closing the case records that investigation but does not fabricate a receipt or
 make the attempt retryable. No force-resend control is introduced.
 
 To contain an incident, disable the new worker/delivery flags and stop accepting
-new work; shutdown attempts receipt recovery. Keep the additive tables for
+new work; normal shutdown waits for its in-flight cycle and drains retained WORK
+receipts before closing the database, using the remaining shared shutdown budget.
+The drain makes no transport calls. Existing database statement/lock timeouts
+remain unchanged. If the shared close budget expires, close reports the timeout
+and proceeds to resource cleanup; an already-started recovery can still be
+settling. Recovery is not guaranteed after budget exhaustion or process crash.
+Failed persistence keeps the attempt unknown. Keep the additive tables for
 investigation. Do not roll back historical SQL or delete immutable payment facts.
 Do not reactivate a provider, bot or production deployment through this runbook.
 
@@ -101,11 +107,13 @@ Do not reactivate a provider, bot or production deployment through this runbook.
 
 Runtime evidence belongs under route `35ab697bf43e`, package
 `20261027-task-35ab69`; it is not committed as bulk logs. The populated upgrade
-witness ran normal baseline migrations on PostgreSQL 17.5, created two actual
-published residents (one paused) and one fee-only approved card, applied normal
-0075 migration, preserved ten source tables byte-for-byte as JSON projections,
+witness used the direct Drizzle SQL migrator on PostgreSQL 17.5, created two actual
+published residents (one paused) and one fee-only approved card, applied
+0075 with that migrator, preserved ten source tables byte-for-byte as JSON projections,
 and proved observed-only baseline/resume behavior plus repeat-migrate idempotency.
-The first two harness failures remain diagnostic evidence.
+The first two harness failures remain diagnostic evidence. This proves populated
+SQL application and preservation, not execution of the repository `migrateDb`
+exact-prefix preflight. No fresh prefix-preflight execution is claimed.
 
 State reconstruction replays all hand-authored SQL on an isolated PostgreSQL17.5
 and introspects into a fresh temporary directory. `0075_snapshot.json` and the
@@ -113,7 +121,7 @@ SQL-only catalogue retain composite FK positions and deferred/validation flags.
 Do not use `drizzle-kit generate`. The split historical0074 fixture adjustment is
 only compatibility maintenance; it is not the normal migration witness.
 
-Each of the two distinct focused integration files has a maximum of three executions. Older native
+Each distinct focused integration file has a maximum of three executions. Older native
 suite evidence is reused only as historical evidence, never presented as a fresh
 run. Browser verification uses the shipped panel and real Chromium with synthetic
 loopback responses; PostgreSQL API authorization is verified separately. Neither
@@ -135,3 +143,23 @@ deadline and waits for that deadline. Before tested reads it asserts the origina
 trigger enabled state/definition, unchanged other order fields, and consistent
 creation/first-issuance/payment/provider/quote times. This is simulated elapsed
 time, not a claim that a production payment naturally expired during the test.
+
+## Review corrections
+
+Quality provenance follows a promoted reservation through immutable reschedule
+facts, including a change of expert or service. The complete ordered chain must
+start at the joined slot, connect every slot/version transition, match the owner's
+reschedule audit and version hash, and end at the current slot. Missing, wrong-owner
+or forked facts remain unproven; aggregation still counts one reservation once.
+`resident-lifecycle-reschedule-lineage.test.ts` exercises actual promotion, two
+reschedules, replay, human decline and adversarial chains. Its first run exposed
+the defect, second passed both cases, and third passed those cases but failed an
+additional experimental PG17 transaction-timeout probe: connection termination
+prevented Drizzle rollback. That timeout approach and obsolete probe were removed;
+the failed diagnostic remains retained. No new DB timeout behavior is shipped.
+
+`resident-lifecycle-shutdown.test.ts` runs the actual worker composition/runtime
+with synthetic WORK transport and a mocked lost database acknowledgement. It
+proves normal close waits for recovery, handles an in-flight receipt, preserves
+unknown on recovery failure and shares its remaining budget without resending.
+The earlier real PostgreSQL lost-acknowledgement proof remains separate evidence.

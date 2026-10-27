@@ -569,7 +569,25 @@ export class PostgresResidentLifecycleCompletionRepository {
         missing: number;
       }>(sql`
       with cohort as (select r.*,
-       (exists(select 1 from audit_events a where a.object_type='reservation' and a.object_id=r.id and a.actor_type='client' and a.actor_id=r.user_id and a.action='reservation.reserve' and a.decision='reserved' and a.reason_code='slot_selected') or exists(select 1 from booking_waitlist_entries w join booking_waitlist_command_receipts j on j.waitlist_entry_id=w.id and j.command_type='join' and j.actor_user_id=w.user_id and j.idempotency_key=w.join_idempotency_key join client_booking_receipts b on b.reservation_id=r.id and b.user_id=w.user_id and b.choice_digest=w.choice_digest where w.promoted_reservation_id=r.id and w.user_id=r.user_id and w.slot_id=r.slot_id and j.request_hash='sha256:'||encode(digest(convert_to(w.user_id::text,'UTF8')||decode('00','hex')||convert_to(w.choice_digest::text,'UTF8'),'sha256'),'hex'))) as submitted,
+       (exists(select 1 from audit_events a where a.object_type='reservation' and a.object_id=r.id and a.actor_type='client' and a.actor_id=r.user_id and a.action='reservation.reserve' and a.decision='reserved' and a.reason_code='slot_selected') or exists(select 1 from booking_waitlist_entries w join booking_waitlist_command_receipts j on j.waitlist_entry_id=w.id and j.command_type='join' and j.actor_user_id=w.user_id and j.idempotency_key=w.join_idempotency_key join client_booking_receipts b on b.reservation_id=r.id and b.user_id=w.user_id and b.choice_digest=w.choice_digest where w.promoted_reservation_id=r.id and w.user_id=r.user_id and (
+          (not exists(select 1 from booking_reschedule_facts f where f.reservation_id=r.id) and w.slot_id=r.slot_id)
+          or (select bool_and(
+            f.user_id=r.user_id and f.old_version>0 and f.new_version=f.old_version+1 and f.new_version<=r.version
+            and f.version_count=1 and f.created_at>=r.created_at and f.created_at<=${iso(clock.now)}::timestamptz
+            and (case when f.position=1 then f.old_slot_id=w.slot_id
+                 else f.old_slot_id=f.previous_slot and f.old_version>=f.previous_version end)
+            and exists(select 1 from audit_events a where a.object_type='reservation' and a.object_id=r.id
+              and a.actor_type='client' and a.actor_id=r.user_id and a.action='reservation.reschedule'
+              and a.decision='reserved' and a.reason_code='client_reschedule' and a.correlation_id=f.correlation_id
+              and a.occurred_at=f.created_at and a.metadata_hash=encode(digest(
+                '{"reservationId":"'||r.id::text||'","action":"reservation.reschedule","version":'||f.new_version::text||'}','sha256'),'hex'))
+            and (f.position<>f.total or f.new_slot_id=r.slot_id))
+            from (select f.*,row_number() over history as position,count(*) over() as total,
+                count(*) over(partition by f.old_version) as version_count,
+                lag(f.new_slot_id) over history as previous_slot,lag(f.new_version) over history as previous_version
+              from booking_reschedule_facts f where f.reservation_id=r.id
+              window history as(order by f.old_version,f.id)) f)
+        ) and j.request_hash='sha256:'||encode(digest(convert_to(w.user_id::text,'UTF8')||decode('00','hex')||convert_to(w.choice_digest::text,'UTF8'),'sha256'),'hex'))) as submitted,
        exists(select 1 from audit_events a where a.object_type='reservation' and a.object_id=r.id and a.actor_type='expert' and a.actor_id=r.expert_id and a.action='reservation.expert_cancel' and a.decision='cancelled_by_expert' and a.reason_code='expert_cancel') as human_decline
        from reservations r where r.expert_id=${expertId}::uuid and r.created_at>=${iso(clock.now)}::timestamptz-interval '30 days' and r.created_at<${iso(clock.now)}::timestamptz and r.status in('booked','completed','no_show','cancelled_by_client','cancelled_by_expert'))
       select count(*) filter(where submitted and status='cancelled_by_expert' and human_decline)::integer as numerator,count(*) filter(where submitted)::integer as denominator,count(*) filter(where not submitted)::integer as missing from cohort`)

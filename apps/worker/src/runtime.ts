@@ -85,6 +85,7 @@ export interface WorkerRuntimeDependencies {
     stopAccepting(): void;
   };
   readonly residentLifecycleCompletion?: {
+    drain(deadline: number): Promise<void>;
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
@@ -148,6 +149,7 @@ export interface ProductionWorkerRuntimeDependencies {
     stopAccepting(): void;
   };
   readonly residentLifecycleCompletion?: {
+    drain(deadline: number): Promise<void>;
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
@@ -408,6 +410,15 @@ export function createWorkerRuntime(
       try {
         await beforeDeadline(
           deps.bookingNotifications?.drain(notificationDeadline) ??
+            Promise.resolve(),
+          Math.max(1, notificationDeadline - Date.now()),
+        );
+      } catch (error) {
+        failure ??= error;
+      }
+      try {
+        await beforeDeadline(
+          deps.residentLifecycleCompletion?.drain(notificationDeadline) ??
             Promise.resolve(),
           Math.max(1, notificationDeadline - Date.now()),
         );

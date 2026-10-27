@@ -17,8 +17,9 @@ prompt context. See `docs/runbooks/resident-lifecycle-completion.md` and
 Focused new PostgreSQL file passed11/11 on invocation3; its three-run allowance is
 exhausted. Do not rerun it or the exhausted historical native file. Actual composed
 form/manager/held3000/main/WORK/native-booking/logistics/renewal/pause/return passed.
-Populated baseline74→75 normal migration witness passed on its third attempt;
-original failures retained. Real state reconstruction:232tables/180functions/
+Populated baseline74→75 direct Drizzle SQL migration witness passed on its third attempt;
+this did not execute repository `migrateDb` exact-prefix preflight.
+Original failures retained. Real state reconstruction:232tables/180functions/
 219triggers/1605constraints/580indexes on PostgreSQL17.5. Actual Chromium panel
 proof passed; full workspace build4 passed. Focused unit/state batch107/110 initially
 failed only stale migration-history inventory; correction passed10/10. Workspace
@@ -31,7 +32,13 @@ catalogue size/hash exception preserves the general1MiB inspection bound.
 
 No local pass implies release readiness. Native DraftPR119 previously passed its
 normal push gate641/641, but final Getzilla qualification FAILED and stays failed.
-Independent exact-source review and the new final qualification remain pending.
+Independent review of207 found two P2 defects: promoted waitlist reschedules lost
+quality provenance and normal shutdown skipped retained WORK receipt recovery.
+Both have targeted corrections. New lineage regression passed2/2 on invocation2;
+invocation3 passed those2 but failed an optional PG17 timeout experiment. That
+experiment and timeout change were removed; failed diagnostics remain. Final
+normal-close unit passed4/4 on invocation3. No exhausted PG rerun is permitted.
+See current package ledger. Fresh exact-source review and final qualification remain pending.
 Preserve PG17.5, private parser/semantic sockets and all prior evidence. No secrets
 in logs/argv. New manifest `residency-lifecycle-v4-manifest.json` binds current
 explanatory assets; old inactive manifests retain their original baseline hashes.

@@ -51,6 +51,14 @@ export function createResidentLifecycleCompletionWorker(
         running = false;
       }
     },
+    async drain(deadline: number) {
+      if (!Number.isSafeInteger(deadline) || deadline <= Date.now())
+        throw new Error("resident_lifecycle_shutdown_deadline");
+      if (running) throw new Error("resident_lifecycle_cycle_busy");
+      accepting = false;
+      repository.stopAccepting();
+      await repository.recoverReceipts();
+    },
     stopAccepting() {
       accepting = false;
       repository.stopAccepting();

@@ -74,7 +74,7 @@ deadline by replacing a payment link, or resend an ambiguous transport attempt.
 - [x] Durable WORK sender, source checks, bounded acquisition and quality scans.
 - [x] Protected manager API, existing UI and actual worker composition.
 - [x] Current tariff projection and current runtime/demo/WORK prompt alignment.
-- [x] Focused PG and composed journey; normal populated 74→75 migration and state.
+- [x] Focused PG and composed journey; populated 74→75 Drizzle SQL migration and state.
 - [x] Browser, types, lint and guard inventories.
 - [ ] Independent exact-source coordinator review and final integration gates.
 
@@ -119,8 +119,9 @@ successful pre-push checks are historical evidence, not new S4b qualification.
 
 New lifecycle PG invocation3 passed11/11; invocations1(2/4) and2(10/11) remain
 failed diagnostics. The composed normal journey and real original WORK delivery
-were executed. Populated74→75 normal migration witness3 passed; first two harness
-failures are retained. Real Chromium shipped-panel proof passed separately from
+were executed. Populated74→75 direct Drizzle SQL migration witness3 passed; first two harness
+failures are retained. This did not execute repository `migrateDb` exact-prefix
+preflight; no fresh proof of that wrapper is claimed. Real Chromium shipped-panel proof passed separately from
 PostgreSQL API authorization. New state reconstructs232tables/180functions/
 219triggers and keeps the original historical SQL chain unchanged.
 
