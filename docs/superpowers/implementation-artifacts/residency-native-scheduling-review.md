@@ -73,3 +73,9 @@ changed lint/format/whitespace. Native data state remains222tables/175functions/
 
 Root now owns canonical full branch gate, gated push and stacked DraftPR; no
 hostedCI or release activation is claimed. S4b remains the next sequential block.
+
+
+Final canonical gate at 586f89f06782891bf5b225cae794d362e479ea7f passes 616/616
+repository tests and all required static/type checks. Runtime b1872e94 remains
+unchanged and independently accepted. Full-gate logs archived; mandatory gated
+push and DraftPR are next, then the approved S4b block.

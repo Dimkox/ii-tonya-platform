@@ -2,7 +2,7 @@
 title: Native resident scheduling and booking
 created: 2026-10-27
 type: feature
-status: in-review
+status: done
 baseline_commit: c207735727210660ac949b78b84cf7463519fb99
 review_loop_iteration: 1
 context:
@@ -156,25 +156,25 @@ created_at cohort and final/current-outcome denominator, integer>20 and zero ski
 
 ## Tasks & Acceptance
 
-- [ ] Typed rules/generator/import and readable owner commands: timezone/DST, service
+- [x] Typed rules/generator/import and readable owner commands: timezone/DST, service
    duration+buffer, breaks, explicit horizon/count, truthful row errors, immutable
    preview pages and confirmation of all entries. Missing fields ask the owner in
    the bot, never infer host time or generate hidden recurring dates.
-- [ ] Additive schema/state for private draft schedule revisions, accepted stable
+- [x] Additive schema/state for private draft schedule revisions, accepted stable
    service mapping, confirmed native availability, busy intervals and immutable
    booked snapshots. Current financial/safety/consent/approved version remains
    publication authority; initial private preparation causes no dependency cycle.
-- [ ] Same canonical expert/slot/client locks and final DB clock for regeneration,
+- [x] Same canonical expert/slot/client locks and final DB clock for regeneration,
    reserve/confirm/import/manualbusy. Preserve held/booked customers and buffered
    expert occupancy; old external15-minute freshness remains strict. Native valid
    horizon does not masquerade as external observation and does not autoextend.
-- [ ] Native source-bound confirmation through SQL guard, callback replay, outbox,
+- [x] Native source-bound confirmation through SQL guard, callback replay, outbox,
    normal notifications and real client/expert reads. Cancellation/complete/no-show
    preserve old provider semantics. Do not populate fake Planerka proof.
-- [ ] Protected approved logistics snapshots and actual automatic client delivery;
+- [x] Protected approved logistics snapshots and actual automatic client delivery;
    online30-minute window, cancellation/consent/current recipient recheck and durable
    dedup/unknown recovery/erasure. No generic arbitraryURL notification permission.
-- [ ] Prove real normal owner ingress/private initialreview, actual duration/buffer/DST
+- [x] Prove real normal owner ingress/private initialreview, actual duration/buffer/DST
    and import boundaries, PG lockwait/regeneration/hold collisions, native older-than-
    15min versus stale external, native callback replay and worker notification/client
    reads, immutable booked logistics after profile edits, populated migration and
@@ -455,3 +455,64 @@ temporary bot throttle, immutable /client detail title, pre-confirmation cancell
 origin, actual composed native-logistics proof and clean-checkout fixture independence.
 All are within frozen acceptance; no product-intent change or source re-derivation.
 The existing implementer owns focused corrections, followed by assigned re-review.
+
+
+## Completion Evidence
+
+Implementation and independent review are complete at runtime source
+b1872e94030666bf97bb50fb366caa7d5a8906b2. All six original findings are closed by
+assigned reviewers. Initial and corrective evidence retain 86 + 66 artifacts,
+with 49/50 exact source pins and all failed predecessors honestly preserved.
+Root independently checked their hashes, preserved manifests and absence of the
+protected task credential. The actual incremental migrateDb upgrade, composed
+private delivery and clean-directory witnesses close the previously missing seams.
+
+Canonical full branch gate at 586f89f06782891bf5b225cae794d362e479ea7f passes
+616/616 repository tests, tests typecheck, changed lint, formatting, evidence
+integrity, shell syntax and whitespace. Its two logs are archived under
+residency-native-scheduling-final-gate-2026-10-27. Mandatory gated push and stacked
+DraftPR follow this documentation commit. No hosted CI, deployment or live-provider
+activation is claimed. S4b lifecycle notices, quality queue and whole journey remain.
+
+## Suggested Review Order
+
+**Owner workflow and validation**
+
+- Follow ordinary setup/import, complete preview and source-bound owner confirmation.
+  [resident-schedule.ts:50](../../../packages/db/src/repositories/resident-schedule.ts#L50)
+
+- Validate explicit zones, calendar boundaries, duration, buffer and bounded imports.
+  [resident-schedule.ts:110](../../../packages/contracts/src/resident-schedule.ts#L110)
+
+**Database and booking authority**
+
+- Inspect additive ownership, immutable source facts and historical approval backfill.
+  [0070_resident_native_scheduling.sql:1](../../../packages/db/migrations/0070_resident_native_scheduling.sql#L1)
+
+- Follow final-clock admission and shared capacity through canonical reservations.
+  [booking-repository.ts:1248](../../../packages/db/src/repositories/booking-repository.ts#L1248)
+
+**Private delivery and presentation**
+
+- Check original-recipient delivery, temporary controls, unknown outcomes and booked obligations.
+  [resident-native-logistics.ts:27](../../../packages/db/src/repositories/resident-native-logistics.ts#L27)
+
+- Confirm production composition actually runs private native delivery.
+  [booking-notifications.ts:148](../../../apps/worker/src/booking-notifications.ts#L148)
+
+- Present approved service titles in protected booking choices.
+  [booking-view.ts:41](../../../apps/web/src/booking-view.ts#L41)
+
+**Executed witnesses and recovery**
+
+- Verify normal incremental upgrade and idempotent migration application.
+  [resident-native-migration.test.ts:1](../../../tests/integration/resident-native-migration.test.ts#L1)
+
+- Trace ordinary owner/client/manager flows and production delivery regressions.
+  [resident-native-scheduling.test.ts:1](../../../tests/integration/resident-native-scheduling.test.ts#L1)
+
+- Review exact retained corrective evidence and its qualifications.
+  [README.md:1](../../test-evidence/residency-native-scheduling-corrections-2026-10-27/README.md#L1)
+
+- Read rollout limits and recovery without destroying booked authority.
+  [resident-native-scheduling.md:1](../../operations/resident-native-scheduling.md#L1)

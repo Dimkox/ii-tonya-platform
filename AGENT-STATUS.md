@@ -1,3 +1,18 @@
+# Native scheduling ready for gated push — 2026-10-27
+
+Runtime b1872e94030666bf97bb50fb366caa7d5a8906b2 accepted by all three reviewers;
+R1–R6 closed. Evidence23d722b6 retains66 corrective artifacts over original86.
+Canonical full gate586f89f0 passes616/616 and all static/type checks. Spec done
+with Suggested Review Order. No active producer/reviewer/heavy jobs remain.
+Root now runs /tmp/residency-native-scheduling-observed-push.py, verifies remote
+exact SHA/clean tree, then creates stacked DraftPR on semantic-tags branch/PR116.
+Archive push evidence in the next S4b preparation commit; avoid recursive log commits.
+Continue S4b lifecycle/quality/final journey after delivery, not whole-task completion.
+Keep taskPG/parser/semantic helper. S4b draft and final ownercoverage map remain in
+/tmp, with actual main settlement source at expert-residency-provider-inbox-repository.ts
+calling publishSettledMainCard; normal original WORK-bot producer is still required.
+No production activation or routine approval loop.
+
 # Native scheduling accepted; canonical gate next — 2026-10-27
 
 Current branch codex/residency-native-scheduling-20261027, same isolated worktree.
