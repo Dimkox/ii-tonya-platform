@@ -19,7 +19,7 @@ For an admitted small change, keep scope and acceptance in the task or PR. Do no
 
 ## Full lane
 
-1. Run `python3 scripts/getzilla_change.py start`. New packages live in `.getzilla/runtime/changes/<id>/` and are ignored by Git. Existing tracked packages remain readable history; commands copy them into runtime before new writes.
+1. Run `python3 scripts/getzilla_change.py start`. New packages live in `.getzilla/runtime/changes/<id>/` and are ignored by Git. Existing tracked packages remain readable history; commands copy them into runtime before new writes. PR-mode verification needs this package and its typed spec unless the exact diff is admitted to the light lane.
 2. Record scope, acceptance, design, tests, rollout and rollback in the package. Dispatch independent selected analyses and save concise findings in `<package>/evidence/analysis-<agent>.md`. When a named human gate lacks approval, present the concrete decision and stop before its dependent action. Existing explicit owner decisions remain valid within their scope. Record the scoped/approved lifecycle transitions with `getzilla_change.py transition`; ordinary tasks with no named gate proceed after the bounded design.
 3. The selected writer adds a failing test, implements the bounded change, and runs focused checks. Keep exact commands and outcomes in runtime evidence.
 4. Commit the source candidate and reconcile its review plan. Dispatch all selected independent reviewers against that exact HEAD/tree. Reviewers return reports out-of-band and do not modify the candidate. Save reports in the runtime package evidence directory or `.getzilla/runtime/reviews/<route-id>/`.

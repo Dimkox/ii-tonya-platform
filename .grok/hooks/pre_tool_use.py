@@ -230,9 +230,15 @@ def _root_hint(context: Any) -> str:
     for source, hint in _ROOT_HINTS:
         if source in sources:
             return hint
-    if getattr(context, 'resolution_status', '') == 'ambiguous-command-root':
+    status = getattr(context, 'resolution_status', '')
+    if status == 'ambiguous-command-root':
         return (' Use one literal directory: no $VARIABLES, globs or braces in cd, pushd or git -C, and no two '
-                'repositories in one command.')
+                'repositories in one command. Split it: one command per repository, each starting with '
+                'cd <that repository>, and write long text such as a commit message to a file first.')
+    if status == 'cross-root':
+        return (f' The command runs in {getattr(context, "effective_root", None)}, but the session is in '
+                f'{getattr(context, "session_root", None)}. Run it as its own command that starts with cd into '
+                'that repository, and record any grant from inside that repository.')
     return ''
 
 

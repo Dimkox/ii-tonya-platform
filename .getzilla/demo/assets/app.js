@@ -58,7 +58,7 @@ async function load() {
     if (!prompt.value) prompt.value = snapshot.scenario?.primary_prompt || "";
     promptCount.textContent = `${prompt.value.length} / 4000`;
     complete(snapshot, false);
-  } catch (_error) {
+  } catch {
     failed();
   }
 }
