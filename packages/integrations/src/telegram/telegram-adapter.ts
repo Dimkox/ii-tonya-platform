@@ -585,12 +585,27 @@ const logFailure = (
   url: URL,
   reasonCode: string,
 ): void => {
-  deps.logger.error({
-    provider: "telegram",
-    operation: "sendMessage",
-    reasonCode,
-    url: redactTelegramUrl(url),
-  });
+  const outcome =
+    reasonCode === "timeout_before_write"
+      ? "before_write"
+      : reasonCode === "timeout_after_write" ||
+          /^http_5\d\d_after_write$/u.test(reasonCode)
+        ? "after_write"
+        : reasonCode === "rate_limited"
+          ? "rate_limit"
+          : "unknown";
+  try {
+    deps.logger.error({
+      event: "transport_failure",
+      provider: "telegram",
+      operation: url.pathname.endsWith("/answerCallbackQuery")
+        ? "answerCallbackQuery"
+        : "sendMessage",
+      outcome,
+    });
+  } catch {
+    // Diagnostics must not replace a delivery outcome or retry delay.
+  }
 };
 
 export class TelegramAdapter
@@ -858,6 +873,7 @@ export class TelegramAdapter
     ) {
       return { kind: "applied", providerOperationId: view.callbackQueryId };
     }
+    if (response.status === 429) logFailure(this.deps, url, "rate_limited");
     return {
       kind: "not_applied",
       retryable: response.status === 429,
@@ -938,6 +954,7 @@ export class TelegramAdapter
     }
 
     if (response.status === 429) {
+      logFailure(this.deps, url, "rate_limited");
       const rateLimit = rateLimitSchema.safeParse(response.body);
       const retryAfterMs = rateLimit.success
         ? Math.min(

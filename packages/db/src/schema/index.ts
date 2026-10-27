@@ -10,3 +10,11 @@ export * from "./commercial-policy.js";
 export * from "./partner-commerce.js";
 export * from "./test-expert-trial.js";
 export * from "./lifecycle.js";
+export * from "./privacy-requests.js";
+export * from "./client-paid-orders.js";
+
+export * from "./booking-notifications.js";
+export * from "./booking-handoff-revocations.js";
+export * from "./expert-campaign-quotes.js";
+export * from "./expert-sessions.js";
+export * from "./payer-receipt-contacts.js";

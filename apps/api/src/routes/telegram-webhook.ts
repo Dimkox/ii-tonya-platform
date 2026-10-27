@@ -1,8 +1,11 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type {
+  ClientNavigationGateway,
+  ClientIngressReplayRead,
   ExpertAiIngressService,
   ExpertPrincipal,
 } from "@ii-tonya/application";
+import { clientIngressUpdateId } from "@ii-tonya/application";
 import type {
   ExpertTelegramCheckoutResult,
   TelegramSendOutcome,
@@ -12,7 +15,8 @@ type HybridGateway = {
     raw: unknown,
   ): Promise<{ readonly status: string; readonly route?: string }>;
 };
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyReply } from "fastify";
+import type { BookingCallbackService } from "../booking-callback-service.js";
 import type { RateLimitGate } from "../rate-limit.js";
 import type { WebhookInbox } from "./selarti-webhook.js";
 
@@ -167,9 +171,60 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   clientHybridRoutingEnabled: boolean | undefined;
   clientBotKey: string | undefined;
   clientGateway: HybridGateway | undefined;
+  clientNavigationEnabled?: boolean | undefined;
+  clientNavigationGateway?: Pick<ClientNavigationGateway, "handle"> | undefined;
+  clientBotId?: string | undefined;
+  clientIngressReplay?: ClientIngressReplayRead | undefined;
   testExpertPromoEnabled?: boolean;
   testExpertPromo?: TelegramTestExpertPromoIngress;
+  bookingCallbacksEnabled?: boolean;
+  bookingCallbacks?: BookingCallbackService;
 }> = async (app, deps) => {
+  if (
+    deps.bookingCallbacksEnabled === true &&
+    (!deps.bookingCallbacks || !deps.clientBotKey)
+  )
+    throw new Error("Booking callback capability is required");
+  const isBookingCallback = (body: unknown) => {
+    if (!body || typeof body !== "object") return false;
+    const callback = (body as Record<string, unknown>).callback_query;
+    return (
+      callback !== null &&
+      typeof callback === "object" &&
+      typeof (callback as Record<string, unknown>).data === "string" &&
+      ((callback as Record<string, unknown>).data as string).startsWith("ct2.")
+    );
+  };
+  const bookingCallback = async (
+    body: unknown,
+    reply: FastifyReply,
+    correlationId: string,
+  ) => {
+    if (
+      deps.bookingCallbacksEnabled !== true ||
+      !deps.bookingCallbacks ||
+      !deps.clientBotKey
+    )
+      return { accepted: true, unsupported: true };
+    try {
+      const result = await deps.bookingCallbacks.handle(
+        body,
+        deps.clientBotKey,
+        correlationId,
+      );
+      if (result.kind === "rejected")
+        return reply.code(403).send({ error: "invalid_booking_callback" });
+      if (result.kind === "busy" || result.kind === "unavailable")
+        return reply.code(503).send({ error: "booking_callback_unavailable" });
+      return {
+        accepted: true,
+        route: "booking",
+        ...(result.kind === "replayed" ? { duplicate: true } : {}),
+      };
+    } catch {
+      return reply.code(503).send({ error: "booking_callback_unavailable" });
+    }
+  };
   if (
     (deps.expertQueriesEnabled === true ||
       deps.expertCheckoutEnabled === true) &&
@@ -184,6 +239,46 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
     "/v1/webhooks/telegram/client/:botKey",
     {
       bodyLimit: 65_536,
+      // Authentication must precede JSON parsing, validation and any DB work.
+      onRequest: async (request, reply) => {
+        const header = request.headers["x-telegram-bot-api-secret-token"];
+        if (
+          !secureEqual(
+            typeof header === "string" ? header : undefined,
+            deps.secret,
+          )
+        ) {
+          const allowed = deps.rateLimiter.consume(
+            `telegram:client:unauth:${request.ip}`,
+            deps.unauthenticatedLimit ?? 100,
+            60_000,
+          );
+          return reply
+            .code(allowed ? 401 : 429)
+            .send({ error: "unauthorized" });
+        }
+        if (
+          deps.clientBotKey === undefined ||
+          !secureEqual(request.params.botKey, deps.clientBotKey)
+        )
+          return reply.send({ accepted: true, rejected: true });
+        if (
+          !deps.rateLimiter.consume(
+            `telegram:client:auth:${deps.clientBotKey}`,
+            deps.authenticatedLimit ?? 100,
+            60_000,
+          )
+        )
+          return reply.code(429).send({ error: "rate_limited" });
+      },
+      errorHandler: (error, _request, reply) => {
+        // Do not pass parser/validation/service prose or stacks to logger or response.
+        if (error.statusCode === 413)
+          return reply.code(413).send({ error: "payload_too_large" });
+        if (error.statusCode !== undefined && error.statusCode < 500)
+          return reply.code(400).send({ error: "invalid_update" });
+        return reply.code(503).send({ error: "client_gateway_unavailable" });
+      },
       schema: {
         params: {
           type: "object",
@@ -194,45 +289,56 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           type: "object",
           additionalProperties: true,
           required: ["update_id"],
-          properties: { update_id: { type: "integer", minimum: 0 } },
+          // No coercion: a string/null ID must not turn into a valid event number.
+          properties: { update_id: {} },
         },
       },
     },
     async (request, reply) => {
-      const header = request.headers["x-telegram-bot-api-secret-token"];
-      if (
-        !secureEqual(
-          typeof header === "string" ? header : undefined,
-          deps.secret,
-        )
-      ) {
-        const allowed = deps.rateLimiter.consume(
-          `telegram:client:unauth:${request.ip}`,
-          deps.unauthenticatedLimit ?? 100,
-          60_000,
-        );
-        return reply.code(allowed ? 401 : 429).send({ error: "unauthorized" });
-      }
-      if (
-        deps.clientBotKey === undefined ||
-        !secureEqual(request.params.botKey, deps.clientBotKey)
-      ) {
-        return { accepted: true, rejected: true };
-      }
-      if (
-        !deps.rateLimiter.consume(
-          `telegram:client:auth:${deps.clientBotKey}`,
-          deps.authenticatedLimit ?? 100,
-          60_000,
-        )
-      ) {
-        return reply.code(429).send({ error: "rate_limited" });
+      const updateId = clientIngressUpdateId(request.body);
+      if (updateId === undefined)
+        return reply.code(400).send({ error: "invalid_update" });
+      if (isBookingCallback(request.body))
+        return bookingCallback(request.body, reply, crypto.randomUUID());
+      if (deps.clientNavigationEnabled === true) {
+        try {
+          const result = await deps.clientNavigationGateway?.handle(
+            request.body,
+          );
+          if (result?.status === "reply")
+            return reply.type("application/json").send(result.reply);
+          if (result?.status === "duplicate")
+            return { accepted: true, duplicate: true };
+          if (result?.status === "ignored")
+            return { accepted: true, rejected: true };
+          if (result?.status === "invalid")
+            return reply.code(400).send({ error: "invalid_update" });
+        } catch {
+          /* fixed unavailable below */
+        }
+        return reply.code(503).send({ error: "client_navigation_unavailable" });
       }
       if (
         deps.clientIngressEnabled !== true ||
         deps.clientGateway === undefined
       ) {
         return reply.code(503).send({ error: "client_gateway_unavailable" });
+      }
+      // A previous navigation receipt stays terminal across mode/key changes.
+      if (deps.clientBotId !== undefined) {
+        try {
+          const terminal = await deps.clientIngressReplay?.hasReceipt({
+            botId: deps.clientBotId,
+            updateId,
+          });
+          if (terminal === true) return { accepted: true, duplicate: true };
+          if (terminal !== false)
+            return reply
+              .code(503)
+              .send({ error: "client_gateway_unavailable" });
+        } catch {
+          return reply.code(503).send({ error: "client_gateway_unavailable" });
+        }
       }
       if (deps.testExpertPromoEnabled === true && deps.testExpertPromo) {
         const root = request.body as Record<string, unknown>;
@@ -271,7 +377,7 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
             const updateId = String(root.update_id);
             try {
               const result = await deps.testExpertPromo.handle({
-                botKey: deps.clientBotKey,
+                botKey: deps.clientBotKey!,
                 telegramUserId,
                 chatId,
                 text,
@@ -313,6 +419,32 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   app.post(
     "/v1/webhooks/telegram",
     {
+      bodyLimit: 65_536,
+      onRequest: async (request, reply) => {
+        const header = request.headers["x-telegram-bot-api-secret-token"];
+        if (
+          !secureEqual(
+            typeof header === "string" ? header : undefined,
+            deps.secret,
+          )
+        ) {
+          const allowed = deps.rateLimiter.consume(
+            `telegram:unauth:${request.ip}`,
+            deps.unauthenticatedLimit ?? 100,
+            60_000,
+          );
+          return reply
+            .code(allowed ? 401 : 429)
+            .send({ error: "unauthorized" });
+        }
+      },
+      errorHandler: (error, _request, reply) => {
+        if (error.statusCode === 413)
+          return reply.code(413).send({ error: "payload_too_large" });
+        if (error.statusCode !== undefined && error.statusCode < 500)
+          return reply.code(400).send({ error: "invalid_update" });
+        return reply.code(503).send({ error: "telegram_gateway_unavailable" });
+      },
       schema: {
         body: {
           type: "object",
@@ -352,6 +484,8 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
           ? request.headers["x-correlation-id"]
           : crypto.randomUUID();
       const callback = body.callback_query;
+      if (isBookingCallback(body))
+        return bookingCallback(body, reply, correlationId);
       if (callback && typeof callback === "object") {
         const callbackRecord = callback as Record<string, unknown>;
         const callbackQueryId = callbackRecord.id;

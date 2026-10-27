@@ -143,33 +143,34 @@ export class PostgresSandboxPaymentRepository {
     };
     const digest = payloadDigest(canonicalCommand);
 
-    return withSerializableRetry(() =>
-      this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
-        const replay = await storedCommand(
-          tx,
-          "checkout",
-          parsed.idempotencyKey,
-        );
-        if (replay) {
-          return replayResult(replay, digest, (value) =>
-            sandboxCheckoutSchema.parse(value),
+    return withSerializableRetry(
+      () =>
+        this.db.transaction(async (tx) => {
+          await tx.execute(sql`set transaction isolation level serializable`);
+          const replay = await storedCommand(
+            tx,
+            "checkout",
+            parsed.idempotencyKey,
           );
-        }
+          if (replay) {
+            return replayResult(replay, digest, (value) =>
+              sandboxCheckoutSchema.parse(value),
+            );
+          }
 
-        const paymentId = opaqueId("sandbox_payment_");
-        const checkoutUrl = new URL(
-          `/sandbox/v1/payments/${paymentId}`,
-          this.#checkoutBaseUrl,
-        ).toString();
-        const result: SandboxCheckout = {
-          kind: "created",
-          paymentId,
-          checkoutUrl,
-          state: "created",
-          version: 0,
-        };
-        await tx.execute(sql`
+          const paymentId = opaqueId("sandbox_payment_");
+          const checkoutUrl = new URL(
+            `/sandbox/v1/payments/${paymentId}`,
+            this.#checkoutBaseUrl,
+          ).toString();
+          const result: SandboxCheckout = {
+            kind: "created",
+            paymentId,
+            checkoutUrl,
+            state: "created",
+            version: 0,
+          };
+          await tx.execute(sql`
           insert into sandbox_expert_residency_payments (
             payment_id, order_id, amount_minor, currency, checkout_url,
             state, version, created_at, updated_at
@@ -179,7 +180,7 @@ export class PostgresSandboxPaymentRepository {
             transaction_timestamp(), transaction_timestamp()
           )
         `);
-        await tx.execute(sql`
+          await tx.execute(sql`
           insert into sandbox_expert_residency_commands (
             command_id, payment_id, command_kind, idempotency_key,
             payload_digest, result, created_at
@@ -189,8 +190,9 @@ export class PostgresSandboxPaymentRepository {
             ${JSON.stringify(result)}::jsonb, transaction_timestamp()
           )
         `);
-        return result;
-      }),
+          return result;
+        }),
+      8,
     );
   }
 

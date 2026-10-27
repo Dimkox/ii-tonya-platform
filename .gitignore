@@ -30,3 +30,5 @@ work/
 !.getzilla/runtime/.gitignore
 .coverage
 .coverage.*
+*.bundle
+*.tar.gz

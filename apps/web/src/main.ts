@@ -9,6 +9,52 @@ const legalRoute: "oferta" | "privacy" | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
 async function initialize(): Promise<void> {
+  if (route === "/expert/account") {
+    const { renderExpertAccountPage, bindExpertAccountActions } =
+      await import("./expert-account-view.js");
+    root.innerHTML = renderExpertAccountPage();
+    bindExpertAccountActions(root);
+    document.title = "Кабинет эксперта — ии-Тоня";
+    return;
+  }
+  if (route === "/demo") {
+    const { renderDemoWalkthrough, bindDemoWalkthrough } =
+      await import("./demo-walkthrough.js");
+    root.innerHTML = renderDemoWalkthrough();
+    bindDemoWalkthrough(root);
+    document.title = "Интерактивное демо — ии-Тоня";
+    return;
+  }
+  if (route === "/catalog") {
+    const { renderCatalogPage, bindCatalogActions } =
+      await import("./catalog-view.js");
+    root.innerHTML = renderCatalogPage();
+    bindCatalogActions(root);
+    document.title = "Каталог услуг — ии-Тоня";
+    return;
+  }
+  if (route === "/consent" || route === "/my-data" || route === "/account") {
+    const {
+      renderConsentPage,
+      renderMyDataPage,
+      renderAccountPage,
+      bindPrivacyActions,
+    } = await import("./consent-view.js");
+    root.innerHTML =
+      route === "/consent"
+        ? renderConsentPage()
+        : route === "/my-data"
+          ? renderMyDataPage()
+          : renderAccountPage();
+    bindPrivacyActions(root);
+    document.title =
+      route === "/consent"
+        ? "Согласия — ии-Тоня"
+        : route === "/my-data"
+          ? "Мои данные — ии-Тоня"
+          : "Личный кабинет — ии-Тоня";
+    return;
+  }
   if (legalRoute !== undefined) {
     const { renderLegalPage } = await import("./legal-view.js");
     root.innerHTML = renderLegalPage(legalRoute);

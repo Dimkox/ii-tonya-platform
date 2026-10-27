@@ -1,8 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
+import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
+import { PostgresHybridMessageRepository } from "../../packages/db/src/repositories/hybrid-message-repository.js";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { PostgresOrderedTelegramOutboxRepository } from "../../packages/db/src/repositories/outbox-repository.js";
 import { createConsentEgressGate } from "../../packages/db/src/repositories/consent-egress-gate.js";
+import { PostgresPrivacyRepository } from "../../packages/db/src/repositories/privacy-repository.js";
 import {
   startTestPostgres,
   type TestDatabase,
@@ -73,28 +76,60 @@ const claim = (consentGate: { enabled: boolean }) =>
   );
 
 describe("egress consent barrier on the outbound queue", () => {
-  it("holds a pending client message back until the subject grants, and stops again after revocation", async () => {
+  it("never replays unstamped pregrant work and admits a newly stamped reply", async () => {
     const userId = await dialogueWithPendingSend();
 
     expect(await claim({ enabled: true })).toHaveLength(0);
 
     await decide(userId, "granted");
     const granted = await claim({ enabled: true });
-    expect(granted).toHaveLength(1);
-
+    expect(granted).toHaveLength(0);
+    await seedClientConsent(testDb!.db, userId, "client_messaging");
+    await testDb!.db.execute(
+      sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram','808','fresh-bot','808','active')`,
+    );
+    expect(
+      await new PostgresHybridMessageRepository(testDb!.db).persist({
+        updateId: 1n,
+        payloadHash: "a".repeat(64),
+        provider: "telegram",
+        botKey: "fresh-bot",
+        externalUserId: "808",
+        externalChatId: "808",
+        text: "Synthetic input",
+        route: "deterministic",
+        routingEnabled: false,
+        correlationId: "fresh",
+        locale: "ru-RU",
+        deadline: new Date(Date.now() + 60_000).toISOString(),
+        occurredAt: new Date().toISOString(),
+        messagingConsentPolicyVersion: "client-messaging-v1",
+      }),
+    ).toBe("claimed");
+    const claimed = await claim({ enabled: true });
+    expect(claimed).toHaveLength(1);
     await decide(userId, "revoked");
-    const second = await dialogueWithPendingSend();
-    await decide(second, "granted");
-    expect(await claim({ enabled: true })).toHaveLength(1);
-    await decide(second, "revoked");
-    expect(await claim({ enabled: true })).toHaveLength(0);
+    const message = claimed[0]!;
+    expect(
+      await new PostgresOrderedTelegramOutboxRepository(testDb!.db, {
+        enabled: true,
+      }).recordAttemptStarted(
+        message.id,
+        "gate-worker",
+        message.dispatchClaimToken!,
+        "withdrawn-attempt",
+        message.reconciliationKey,
+        new Date(),
+        message.attempt,
+      ),
+    ).toEqual({ kind: "blocked", reasonCode: "client_authority_invalid" });
   });
 
-  it("lets the same row through when the gate is explicitly off (control)", async () => {
+  it("cannot bypass original authority by switching the old gate flag off", async () => {
     await dialogueWithPendingSend();
     // Тот же набор данных, выключенный гейт: выдача возвращается, значит остановка выше
     // обеспечивается именно барьером, а не совпадением.
-    expect(await claim({ enabled: false })).toHaveLength(1);
+    expect(await claim({ enabled: false })).toHaveLength(0);
   });
 
   it("treats a contradicted instant as no consent, like every other reader", async () => {
@@ -158,4 +193,84 @@ describe("pre-send consent gate against the journal", () => {
     }
     expect(await gate().allowsSend(dialogue)).toBe(false);
   });
+});
+
+describe("withdrawal journal ordering after a subject-lock wait", () => {
+  for (const purpose of ["client_messaging", "expert_note"] as const) {
+    it(`orders ${purpose} withdrawal (including cascade) after a grant committed while waiting`, async () => {
+      const userId = (
+        await testDb!.db.execute<{ id: string }>(
+          sql`insert into users default values returning id`,
+        )
+      ).rows[0]!.id;
+      let release!: () => void;
+      let grant!: () => void;
+      let ready!: () => void;
+      const entered = new Promise<void>((r) => {
+        ready = r;
+      });
+      const held = testDb!.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${userId}::uuid::text,0))`,
+        );
+        ready();
+        await new Promise<void>((r) => {
+          grant = r;
+        });
+        for (const p of purpose === "expert_note"
+          ? [purpose, "expert_handoff"]
+          : [purpose]) {
+          await tx.execute(
+            sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${userId}::uuid,${p},'granted','fixture-v1',clock_timestamp())`,
+          );
+        }
+        await new Promise<void>((r) => {
+          release = r;
+        });
+      });
+      await entered;
+      const withdrawal = new PostgresPrivacyRepository(testDb!.db, {
+        privacyMutationCapability: { enabled: true },
+      }).withdrawConsentAtomically({
+        targetUserId: userId,
+        purpose,
+        policyVersion: "fixture-v1",
+        correlationId: "post-wait-order",
+      });
+      try {
+        for (let i = 0; i < 100; i++) {
+          const waiting = (
+            await testDb!.db.execute<{ n: number }>(
+              sql`select count(*)::int n from pg_stat_activity where datname=current_database() and wait_event='advisory'`,
+            )
+          ).rows[0]!.n;
+          if (waiting > 0) break;
+          await new Promise((r) => setTimeout(r, 5));
+          if (i === 99) throw new Error("withdrawal did not reach barrier");
+        }
+        grant();
+        while (!release) await new Promise((r) => setTimeout(r, 1));
+      } finally {
+        grant();
+        while (!release) await new Promise((r) => setTimeout(r, 1));
+        release();
+        await held;
+      }
+      await withdrawal;
+      const rows = (
+        await testDb!.db.execute<{ decision: string; projected: string }>(sql`
+        select c.decision,s.decision projected from consent_states s join lateral
+        (select decision from consents where user_id=s.user_id and consent_type=s.purpose order by created_at desc limit 1) c on true
+        where s.user_id=${userId}::uuid order by s.purpose`)
+      ).rows;
+      expect(rows).toEqual(
+        purpose === "expert_note"
+          ? [
+              { decision: "revoked", projected: "revoked" },
+              { decision: "revoked", projected: "revoked" },
+            ]
+          : [{ decision: "revoked", projected: "revoked" }],
+      );
+    });
+  }
 });

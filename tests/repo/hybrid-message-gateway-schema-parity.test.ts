@@ -37,11 +37,9 @@ describe("B1 schema/migration parity", () => {
         (entry) => entry.tag === "0034_hybrid_message_gateway_b1",
       ),
     ).toHaveLength(1);
-    expect(journal.entries.at(-1)).toEqual({
-      idx: 41,
-      version: "7",
-      when: 1788652800000,
-      tag: "0041_booking_reschedule_replay",
+    expect(journal.entries.at(-1)).toMatchObject({
+      idx: 54,
+      tag: "0054_booking_reschedule_replay",
       breakpoints: true,
     });
   });

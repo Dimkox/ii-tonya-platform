@@ -51,11 +51,17 @@ const payment = {
 const operationPort = (): YooKassaOperationPort => ({
   findByProviderObject: vi.fn(async () => null),
   claim: vi.fn(async () => operation),
-  bindProviderObject: vi.fn<YooKassaOperationPort["bindProviderObject"]>(async (_id, providerObjectId) => ({
-    ...operation,
-    providerObjectId,
-    status: "pending" as const,
+  claimInitialPayment: vi.fn(async () => ({
+    kind: "initial_send_admitted" as const,
+    operation: { ...operation, status: "unknown_outcome" as const },
   })),
+  bindProviderObject: vi.fn<YooKassaOperationPort["bindProviderObject"]>(
+    async (_id, providerObjectId) => ({
+      ...operation,
+      providerObjectId,
+      status: "pending" as const,
+    }),
+  ),
   markUnknown: vi.fn(async () => undefined),
   resolve: vi.fn(async () => undefined),
   claimReconciliationBatch: vi.fn(async () => []),
@@ -89,7 +95,7 @@ const contacts = (
 });
 
 describe("YooKassaExpertResidencyPaymentAdapter", () => {
-  it("protects and attaches the exact request before the first provider POST", async () => {
+  it("rejects configured exact-body checkout recovery before crypto, admission or POST", async () => {
     const events: string[] = [];
     const operations = operationPort();
     operations.attachReplaySnapshot = vi.fn(async (_id, snapshot) => {
@@ -128,9 +134,18 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       replayProtector: { protect },
       recoveryExpiresAt: () => "2030-01-01T00:00:00.000Z",
     });
-    await adapter.createCheckout(checkout);
-    expect(events).toEqual(["attach", "post"]);
-    expect(protect).toHaveBeenCalledOnce();
+    await expect(adapter.createCheckout(checkout)).rejects.toThrow(
+      "yookassa_initial_send_recovery_unsupported",
+    );
+    expect(events).toEqual([]);
+    expect(protect).not.toHaveBeenCalled();
+    expect(operations.attachReplaySnapshot).not.toHaveBeenCalled();
+    expect(operations.claimInitialPayment).not.toHaveBeenCalled();
+    expect(operations.claim).not.toHaveBeenCalled();
+    expect(provider.createPayment).not.toHaveBeenCalled();
+    expect(operations.bindProviderObject).not.toHaveBeenCalled();
+    expect(operations.resolve).not.toHaveBeenCalled();
+    expect(operations.markUnknown).not.toHaveBeenCalled();
   });
 
   it("does no replay crypto or snapshot mutation when recovery is disabled", async () => {
@@ -153,7 +168,7 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
   });
 
   it.each(["protect", "attach"] as const)(
-    "fails %s preparation without creating an unknown provider outcome",
+    "rejects unsupported recovery before failing %s preparation can mutate payment state",
     async (failurePoint) => {
       const operations = operationPort();
       operations.attachReplaySnapshot = vi.fn(async () => {
@@ -186,14 +201,19 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
         recoveryExpiresAt: () => "2030-01-01T00:00:00.000Z",
       });
 
-      await expect(adapter.createCheckout(checkout)).rejects.toThrow();
+      await expect(adapter.createCheckout(checkout)).rejects.toThrow(
+        "yookassa_initial_send_recovery_unsupported",
+      );
+      expect(operations.claimInitialPayment).not.toHaveBeenCalled();
+      expect(operations.claim).not.toHaveBeenCalled();
+      expect(operations.attachReplaySnapshot).not.toHaveBeenCalled();
       expect(provider.createPayment).not.toHaveBeenCalled();
       expect(operations.resolve).not.toHaveBeenCalled();
       expect(operations.markUnknown).not.toHaveBeenCalled();
     },
   );
 
-  it("does not terminalize a shared claim when a concurrent caller already attached recovery", async () => {
+  it("rejects concurrent unsupported recovery without sending or terminalizing shared state", async () => {
     const operations = operationPort();
     let attached = false;
     operations.attachReplaySnapshot = vi.fn(async () => {
@@ -228,18 +248,27 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       adapter.createCheckout(checkout),
     ]);
     expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(
-      1,
+      0,
     );
     expect(results.filter(({ status }) => status === "rejected")).toHaveLength(
-      1,
+      2,
     );
-    expect(provider.createPayment).toHaveBeenCalledOnce();
-    expect(operations.bindProviderObject).toHaveBeenCalledOnce();
+    for (const result of results) {
+      expect(result).toMatchObject({
+        status: "rejected",
+        reason: new Error("yookassa_initial_send_recovery_unsupported"),
+      });
+    }
+    expect(operations.claimInitialPayment).not.toHaveBeenCalled();
+    expect(operations.claim).not.toHaveBeenCalled();
+    expect(operations.attachReplaySnapshot).not.toHaveBeenCalled();
+    expect(provider.createPayment).not.toHaveBeenCalled();
+    expect(operations.bindProviderObject).not.toHaveBeenCalled();
     expect(operations.resolve).not.toHaveBeenCalled();
     expect(operations.markUnknown).not.toHaveBeenCalled();
   });
 
-  it("claims before POST and returns only the bound redirect", async () => {
+  it("obtains atomic admission before POST and returns only the bound redirect", async () => {
     const operations = operationPort();
     const provider = client();
     const adapter = new YooKassaExpertResidencyPaymentAdapter({
@@ -260,13 +289,14 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       paymentId: payment.id,
       checkoutUrl: payment.confirmation.url,
     });
-    expect(operations.claim).toHaveBeenCalledBefore(
+    expect(operations.claimInitialPayment).toHaveBeenCalledBefore(
       provider.createPayment as ReturnType<typeof vi.fn>,
     );
     expect(operations.bindProviderObject).toHaveBeenCalledWith(
       operation.id,
       payment.id,
     );
+    expect(operations.claim).not.toHaveBeenCalled();
   });
 
   it("fails before network when the server-owned receipt contact is absent", async () => {
@@ -308,6 +338,7 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
     await expect(adapter.createCheckout(checkout)).rejects.toThrow(
       "yookassa_receipt_authority_reference_invalid",
     );
+    expect(operations.claimInitialPayment).not.toHaveBeenCalled();
     expect(operations.claim).not.toHaveBeenCalled();
     expect(provider.createPayment).not.toHaveBeenCalled();
   });
@@ -545,12 +576,15 @@ describe("YooKassaExpertResidencyPaymentAdapter", () => {
       authorityReference: "consent:customer-401",
     }).createCheckout(checkout);
 
-    const emailClaim = vi.mocked(emailOperations.claim).mock.calls[0]?.[0];
-    const otherEmailClaim = vi.mocked(otherEmailOperations.claim).mock
+    const emailClaim = vi.mocked(emailOperations.claimInitialPayment!).mock
       .calls[0]?.[0];
-    const otherAuthorityClaim = vi.mocked(otherAuthorityOperations.claim).mock
+    const otherEmailClaim = vi.mocked(otherEmailOperations.claimInitialPayment!)
+      .mock.calls[0]?.[0];
+    const otherAuthorityClaim = vi.mocked(
+      otherAuthorityOperations.claimInitialPayment!,
+    ).mock.calls[0]?.[0];
+    const phoneClaim = vi.mocked(phoneOperations.claimInitialPayment!).mock
       .calls[0]?.[0];
-    const phoneClaim = vi.mocked(phoneOperations.claim).mock.calls[0]?.[0];
     expect(emailClaim?.requestDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
     expect(phoneClaim?.requestDigest).toMatch(/^sha256:[0-9a-f]{64}$/u);
     expect(JSON.stringify(emailClaim)).not.toContain(

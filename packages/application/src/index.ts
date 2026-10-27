@@ -28,3 +28,13 @@ export * from "./test-expert-warmup.js";
 export * from "./test-expert-segmentation.js";
 export * from "./test-expert-trial-metrics.js";
 export * from "./test-expert-telegram-service.js";
+export * from "./client-navigation-gateway.js";
+export * from "./erasure-request-service.js";
+export * from "./expert-session-service.js";
+export * from "./expert-campaign-service.js";
+export * from "./payer-receipt-required-campaign-service.js";
+export * from "./payer-receipt-capture-service.js";
+export {
+  payerReceiptCheckoutRequestSchema,
+  payerReceiptCaptureRequestSchema,
+} from "@ii-tonya/contracts";

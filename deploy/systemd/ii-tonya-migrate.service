@@ -4,6 +4,8 @@ After=postgresql.service
 
 [Service]
 Type=oneshot
+TimeoutStartSec=180s
+TimeoutStopSec=15s
 User=ii_tonya
 Group=ii_tonya
 WorkingDirectory=/opt/ii-tonya-platform/current/api

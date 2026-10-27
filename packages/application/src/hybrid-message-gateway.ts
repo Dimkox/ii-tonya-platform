@@ -1,4 +1,8 @@
 import { createHash } from "node:crypto";
+import {
+  clientIngressUpdateId,
+  type ClientIngressReplayRead,
+} from "./client-navigation-gateway.js";
 
 export type HybridRoute = "deterministic" | "complex_dialogue";
 export type HybridResult =
@@ -18,11 +22,14 @@ type Update = {
 export interface HybridMessageGatewayDeps {
   enabled?: boolean;
   botKey?: string;
+  botId?: string;
+  ingressReplay?: ClientIngressReplayRead;
   routingEnabled?: boolean | undefined;
   costAdmissionEnabled?: boolean | undefined;
   clock?: () => Date;
   messagingConsentPolicyVersion?: string;
   selartiConsentPolicyVersion?: string;
+  hasMessagingConsent?: (userId: string) => Promise<boolean>;
   budgetMetric?: (
     outcome: "admitted" | "warning" | "soft_stop" | "hard_stop",
   ) => void;
@@ -97,6 +104,20 @@ export class HybridMessageGateway {
   constructor(private readonly deps: HybridMessageGatewayDeps) {}
   async handle(raw: unknown): Promise<HybridResult> {
     if (this.deps.enabled !== true) return { status: "disabled" };
+    if (this.deps.botId !== undefined) {
+      const updateId = clientIngressUpdateId(raw);
+      if (updateId === undefined) return { status: "rejected" };
+      try {
+        const terminal = await this.deps.ingressReplay?.hasReceipt({
+          botId: this.deps.botId,
+          updateId,
+        });
+        if (terminal === true) return { status: "duplicate" };
+        if (terminal !== false) return { status: "unavailable" };
+      } catch {
+        return { status: "unavailable" };
+      }
+    }
     const update = parse(raw);
     if (!update || !this.deps.botKey) return { status: "rejected" };
     const canonical = JSON.stringify({
@@ -112,6 +133,18 @@ export class HybridMessageGateway {
     if (route === "complex_dialogue" && this.deps.routingEnabled !== true)
       return { status: "unavailable" };
     if (!this.deps.messagingConsentPolicyVersion) return { status: "rejected" };
+    if (route === "complex_dialogue") {
+      if (this.deps.hasMessagingConsent === undefined)
+        return { status: "rejected" };
+      try {
+        if (
+          !(await this.deps.hasMessagingConsent(String(update.message.from.id)))
+        )
+          return { status: "rejected" };
+      } catch {
+        return { status: "unavailable" };
+      }
+    }
     const occurredAt = (this.deps.clock ?? (() => new Date()))();
     const result = await this.deps.persist({
       updateId: update.update_id,

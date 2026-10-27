@@ -5,7 +5,6 @@ import type {
 import type { FastifyPluginAsync } from "fastify";
 
 import { readExactAuthorization } from "../authorization-header.js";
-import { resolveClientPrincipal } from "../client-principal-resolver.js";
 import { parseClientSessionBody } from "../client-session-body.js";
 import {
   clientSessionTokenHash,
@@ -56,10 +55,8 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
   deps,
 ) => {
   app.removeAllContentTypeParsers();
-  app.addContentTypeParser(
-    "*",
-    { parseAs: "buffer" },
-    (_request, body, done) => done(null, body),
+  app.addContentTypeParser("*", { parseAs: "buffer" }, (_request, body, done) =>
+    done(null, body),
   );
   app.setErrorHandler((error, _request, reply) => {
     const code = (error as { code?: string }).code;
@@ -161,18 +158,8 @@ export const clientSessionRoutes: FastifyPluginAsync<RouteOptions> = async (
       deps.metrics?.record({ operation: "revoke", outcome: "denied" });
       return reply.code(401).send({ error: "unauthorized" });
     }
-    const resolution = await resolveClientPrincipal(
-      deps.principals,
-      authorization,
-    );
-    if (resolution.kind === "denied") {
-      deps.metrics?.record({ operation: "revoke", outcome: "denied" });
-      return reply.code(401).send({ error: "unauthorized" });
-    }
-    if (resolution.kind === "unavailable") {
-      deps.metrics?.record({ operation: "revoke", outcome: "unavailable" });
-      return reply.code(503).send({ error: "temporarily_unavailable" });
-    }
+    // Possession of this exact bearer can revoke it even after owner deactivation.
+    // Revocation must not depend on authorization to read or mutate client data.
     const token = parseClientBearer(authorization);
     if (token === null) {
       deps.metrics?.record({ operation: "revoke", outcome: "denied" });

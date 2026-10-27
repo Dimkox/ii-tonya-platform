@@ -435,6 +435,7 @@ describe("authoritative Drizzle schema parity", () => {
       uniques: ["admin_object_assignments_scope_unique"],
     });
     expect(names(privacyDeletionJobs).uniques).toEqual([
+      "privacy_deletion_jobs_id_subject_unique",
       "privacy_deletion_jobs_subject_idempotency_unique",
     ]);
     expect(names(privacyProcessorAttempts).uniques).toEqual([

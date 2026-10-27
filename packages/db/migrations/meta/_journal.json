@@ -279,21 +279,112 @@
       "idx": 39,
       "version": "7",
       "when": 1788480000000,
-      "tag": "0039_lifecycle_scheduler_c1",
+      "tag": "0039_consent_evidence_grant",
       "breakpoints": true
     },
     {
       "idx": 40,
       "version": "7",
-      "when": 1788566400000,
-      "tag": "0040_booking_waitlist_d1",
+      "when": 1791244800000,
+      "tag": "0040_client_session_booking_grants",
       "breakpoints": true
     },
     {
       "idx": 41,
       "version": "7",
-      "when": 1788652800000,
-      "tag": "0041_booking_reschedule_replay",
+      "when": 1791504000000,
+      "tag": "0041_client_erasure_requests",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1791590400000,
+      "tag": "0042_client_paid_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1791763200000,
+      "tag": "0043_planerka_booking_operations",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1791763200001,
+      "tag": "0044_booking_notification_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1791763200002,
+      "tag": "0045_booking_notification_controls",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1791763200003,
+      "tag": "0046_booking_handoff_revocation",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1791763200004,
+      "tag": "0047_expert_campaign_quotes",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1791763200005,
+      "tag": "0048_expert_campaign_orders",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1791763200006,
+      "tag": "0049_expert_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791763200007,
+      "tag": "0050_expert_receipt_contact_bindings",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791849600000,
+      "tag": "0051_planerka_availability",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1793059200000,
+      "tag": "0052_lifecycle_scheduler_c1",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1793059200001,
+      "tag": "0053_booking_waitlist_d1",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1793059200002,
+      "tag": "0054_booking_reschedule_replay",
       "breakpoints": true
     }
   ]

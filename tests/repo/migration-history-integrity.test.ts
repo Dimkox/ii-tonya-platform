@@ -16,12 +16,12 @@ const snapshotPath = (idx: number): string =>
   `${META}/${String(idx).padStart(4, "0")}_snapshot.json`;
 
 // Migration history is hand-authored: these entries have SQL but no Drizzle
-// snapshot, so `drizzle-kit generate` diffs against the newest stored snapshot
-// (0021) and re-emits every object added after it. The list is a frozen
+// snapshot. The database-derived 0039 baseline closes only the latest gap;
+// schema-derived generate remains prohibited. The list is a frozen
 // baseline - a NEW gap fails the guard, closing one only requires shrinking it.
 const MISSING_SNAPSHOT_BASELINE = [
   14, 19, 20, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37,
-  38, 39,
+  38,
 ];
 
 // drizzle-kit 0.31.x aborts JSON.stringify on a BigInt schema default, so
@@ -37,10 +37,19 @@ const BIGINT_LITERAL_DEFAULTS_BASELINE = [
 // the migration tool cannot produce it.
 const HAND_SQL_FUNCTIONS = [
   "audit_test_expert_lifecycle_transition",
+  "booking_notification_attempt_state_valid",
+  "booking_notification_context_immutable",
+  "booking_notification_delivery_immutable",
+  "booking_notification_fact_immutable",
+  "booking_reschedule_facts_immutable",
   "client_booking_guard_privacy_completion",
   "client_commercial_policy_assignment_immutable",
   "enforce_admin_ledger_provenance",
   "enforce_admin_package_provenance",
+  "enforce_client_coupon_purchase",
+  "enforce_client_paid_settlement",
+  "enforce_expert_campaign_order_source",
+  "enforce_expert_campaign_quote_source",
   "enforce_expert_referral_admin_approval_global_unique",
   "enforce_human_escalation_transition",
   "expert_first_settlement_guard_change",
@@ -53,6 +62,11 @@ const HAND_SQL_FUNCTIONS = [
   "expert_reward_grant_require_eligible_settlement",
   "lock_and_reject_selarti_budget_policy_overlap",
   "lock_partner_policy_window",
+  "planerka_availability_mapping_invalidate",
+  "planerka_operation_guard",
+  "planerka_privacy_completion",
+  "planerka_reservation_transition",
+  "protect_expert_campaign_order_snapshot",
   "reject_append_only_change",
   "reject_expert_referral_admin_result_mutation",
   "reject_partner_commerce_mutation",
@@ -66,13 +80,33 @@ const HAND_SQL_FUNCTIONS = [
 ] as const;
 
 const HAND_SQL_TRIGGERS = [
+  "booking_reschedule_facts_immutable_guard",
   "audit_events_append_only",
+  "booking_handoff_revocation_receipts_append_only",
+  "booking_notification_attempt_delivery_state",
+  "booking_notification_attempt_immutable",
+  "booking_notification_context_immutable",
+  "booking_notification_delivery_attempt_state",
+  "booking_notification_delivery_immutable",
+  "booking_notification_fact_delivery_state",
+  "booking_notification_fact_immutable",
   "client_booking_privacy_completion_guard",
   "client_commercial_policy_assignments_no_delete",
   "client_commercial_policy_assignments_no_update",
+  "client_coupon_grants_immutable",
+  "client_coupon_grants_purchase",
+  "client_paid_bindings_immutable",
+  "client_paid_orders_immutable",
+  "client_paid_settlements_immutable",
+  "client_paid_settlements_integrity",
   "consent_document_versions_append_only",
   "consents_append_only",
   "delivery_attempts_append_only",
+  "expert_campaign_anchors_append_only",
+  "expert_campaign_order_snapshot_immutable",
+  "expert_campaign_order_source",
+  "expert_campaign_quote_source",
+  "expert_campaign_quotes_append_only",
   "expert_referral_admin_approval_global_unique",
   "expert_referral_admin_results_immutable",
   "expert_referral_admin_results_truncate_immutable",
@@ -84,6 +118,10 @@ const HAND_SQL_TRIGGERS = [
   "partner_shadow_quotes_immutable",
   "partner_tariff_policy_versions_immutable",
   "partner_tariff_policy_versions_no_overlap",
+  "planerka_availability_mapping_invalidation",
+  "planerka_operation_identity_guard",
+  "planerka_privacy_completion_guard",
+  "planerka_reservation_transition_guard",
   "prompt_versions_append_only",
   "reconciliation_mismatches_append_only",
   "safety_incidents_append_only",
@@ -157,8 +195,8 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(21);
-    expect(newest).toBeLessThan(
+    expect(newest).toBe(54);
+    expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
   });
@@ -249,6 +287,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    expect(declared.size).toBe(99);
+    // 0051 adds the durable, fenced availability refresh state.
+    expect(declared.size).toBe(127);
   });
 });

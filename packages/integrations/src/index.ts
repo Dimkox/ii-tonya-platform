@@ -9,6 +9,28 @@ export {
 } from "./http/webhook-auth.js";
 export { DisabledSelartiAdapter } from "./selarti/disabled-selarti-adapter.js";
 export { DisabledPlanerkaAdapter } from "./planerka/disabled-planerka-adapter.js";
+export { planerkaSlotsSchema } from "./planerka/contracts.js";
+export {
+  createPlanerkaClient,
+  PlanerkaClientError,
+  PlanerkaUnknownOutcomeError,
+  type PlanerkaClient,
+  type PlanerkaClientConfig,
+  type PlanerkaTransport,
+  type PlanerkaErrorCode,
+  type PlanerkaBookingLookup,
+} from "./planerka/client.js";
+export type {
+  PlanerkaProfile,
+  PlanerkaEventType,
+  PlanerkaBooking,
+  PlanerkaBookingPage,
+  PlanerkaBookingsQuery,
+  PlanerkaSlots,
+  PlanerkaSlotsQuery,
+  CreatePlanerkaBooking,
+  CancelPlanerkaBooking,
+} from "./planerka/contracts.js";
 export {
   MAX_PROVIDER_SLOT_CANDIDATES,
   normalizeProviderSlots,
@@ -57,6 +79,7 @@ export type {
 export {
   CallbackVerificationError,
   authenticateCallback,
+  authenticateCallbackToken,
   issueCallback,
   verifyCallback,
   type CallbackClaimsStore,
@@ -64,6 +87,16 @@ export {
   type ExpertBinding,
   type ExpertCallbackClaims,
 } from "./telegram/callback-token.js";
+export {
+  createBookingCallbackVault,
+  type BookingCallbackBinding,
+  type SealedBookingCallback,
+} from "./telegram/booking-callback-vault.js";
+export {
+  createBookingNotificationTransport,
+  type BookingNotificationHttpRequest,
+  type BookingNotificationHttpOutcome,
+} from "./telegram/booking-notification-transport.js";
 export {
   ClientViewCallbackVerificationError,
   authenticateClientViewCallback,
@@ -127,6 +160,7 @@ export {
 } from "./yookassa/client.js";
 export type {
   CreateYooKassaPayment,
+  CreateYooKassaPaymentOptions,
   CreateYooKassaRefund,
   YooKassaClient,
   YooKassaClientConfig,
@@ -151,6 +185,7 @@ export type {
   YooKassaOperationKind,
   YooKassaOperationPort,
   YooKassaOperationStatus,
+  YooKassaReceiptAuthority,
   YooKassaReceiptContact,
   YooKassaReceiptContactPort,
 } from "./yookassa/operation-port.js";
@@ -208,3 +243,30 @@ export {
   type ExpertTelegramCheckoutPrincipal,
   type ExpertTelegramCheckoutResult,
 } from "./telegram/expert-residency-checkout.js";
+export {
+  SelartiRestClient,
+  type SelartiExternalSend,
+  type SelartiMessagesQuery,
+  type SelartiRestSendOutcome,
+  type SelartiRestMessage,
+  type SelartiMessagesResult,
+  type SelartiRestFetch,
+} from "./selarti/rest-client.js";
+export {
+  createAuthenticatedSelartiClient,
+  type AuthenticatedSelartiClient,
+  type AuthenticatedSelartiClientOptions,
+  type AuthenticatedSelartiClientResult,
+  type AuthenticatedSelartiMessagesQuery,
+  type AuthenticatedSelartiSend,
+  type AuthenticatedSelartiUnavailableCode,
+} from "./selarti/authenticated-client.js";
+export { createClientAsyncTelegramTransport } from "./telegram/client-async-transport.js";
+export {
+  createPayerReceiptVault,
+  resolvePayerReceiptKeys,
+  type PayerReceiptVault,
+  type PayerReceiptBinding,
+  type PayerReceiptEnvelope,
+} from "./yookassa/payer-receipt-vault.js";
+export { createPayerReceiptSource } from "./yookassa/payer-receipt-source.js";

@@ -9,14 +9,7 @@ import type {
   OutboxReconciler,
 } from "./outbox-runner.js";
 
-/**
- * EGRESS-01 (приёмка T18): согласие сверяется непосредственно перед сетевым вызовом, а не
- * только при выдаче строки из очереди — иначе отзыв в окне лизинга уходит клиенту.
- */
-export type TelegramConsentGate = Readonly<{
-  allowsSend(dialogueId: string): Promise<boolean>;
-}>;
-
+/** Dispatch consumes the exact committed start receipt; a fresh grant is never send authority. */
 export type TelegramSendTextPayload = Readonly<{
   deliveryId: string;
   dialogueId: string;
@@ -24,6 +17,7 @@ export type TelegramSendTextPayload = Readonly<{
   botKey: string;
   chatId: string;
   text: string;
+  consentAuthority: ClientConsentAuthority;
 }>;
 
 const UUID =
@@ -44,6 +38,7 @@ export function decodeTelegramSendTextPayload(
     "dialogueId",
     "sequence",
     "text",
+    "consentAuthority",
   ];
   if (
     Object.keys(value).sort().join("\0") !== expected.sort().join("\0") ||
@@ -59,7 +54,8 @@ export function decodeTelegramSendTextPayload(
     typeof value.text !== "string" ||
     value.text.length < 1 ||
     value.text.length > 4_096 ||
-    CONTROL.test(value.text)
+    CONTROL.test(value.text) ||
+    !clientConsentAuthoritySchema.safeParse(value.consentAuthority).success
   )
     throw new Error("telegram_send_text_invalid_payload");
   return value as TelegramSendTextPayload;
@@ -71,10 +67,13 @@ export function createTelegramSendTextDispatcher(deps: {
   readonly sendMessageUrl: URL;
   readonly transport: TelegramTransport;
   /** Обязателен: собрать отправку без сверки согласия нельзя даже по незнанию. */
-  readonly consentGate: TelegramConsentGate;
+  readonly admissionGate: ClientDispatchAdmissionGate;
 }): OutboxDispatcher & OutboxReconciler {
   return {
-    async dispatch(message: OutboxMessage): Promise<DispatchOutcome> {
+    async dispatch(
+      message: OutboxMessage,
+      admission,
+    ): Promise<DispatchOutcome> {
       if (!deps.enabled)
         return {
           kind: "not_applied",
@@ -91,7 +90,10 @@ export function createTelegramSendTextDispatcher(deps: {
       }
       let allowed: boolean;
       try {
-        allowed = await deps.consentGate.allowsSend(payload.dialogueId);
+        allowed =
+          matchesClientDispatchAdmission(message, admission) &&
+          admission !== undefined &&
+          (await deps.admissionGate.consume(message, admission));
       } catch {
         // Неизвестный результат проверки = не отправляем (fail-closed).
         allowed = false;
@@ -125,12 +127,33 @@ export function createTelegramSendTextDispatcher(deps: {
               : {}),
           };
         }
-        if (response.status === 429)
+        if (response.status === 429) {
+          const body = response.body as {
+            ok?: unknown;
+            error_code?: unknown;
+            parameters?: { retry_after?: unknown };
+          } | null;
+          const seconds = body?.parameters?.retry_after;
+          if (
+            body?.ok !== false ||
+            body.error_code !== 429 ||
+            typeof seconds !== "number" ||
+            !Number.isSafeInteger(seconds) ||
+            seconds < 0 ||
+            seconds > 2147483647
+          )
+            return {
+              kind: "unknown_outcome",
+              reconciliationKey: message.reconciliationKey,
+              reasonCode: "transport_outcome_unknown",
+            };
           return {
             kind: "not_applied",
             retryable: true,
             reasonCode: "rate_limited",
+            retryAfterMs: seconds * 1000,
           };
+        }
         if (response.status >= 500)
           return {
             kind: "unknown_outcome",
@@ -161,3 +184,9 @@ export function createTelegramSendTextDispatcher(deps: {
     },
   };
 }
+import {
+  clientConsentAuthoritySchema,
+  matchesClientDispatchAdmission,
+  type ClientConsentAuthority,
+  type ClientDispatchAdmissionGate,
+} from "@ii-tonya/contracts";

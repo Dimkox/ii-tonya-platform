@@ -20,7 +20,23 @@ Resolution performs a fresh, uncached PostgreSQL lookup for the token digest and
 
 - the canonical internal user exists and is active;
 - the session is unexpired and not revoked;
-- the session grants the exact `client_booking:write` scope.
+- the session grants the exact `client_booking:write` scope, or is a catalog-read
+  session with a separately persisted `client_session_booking_grants` membership.
+
+## Browser booking grant amendment (2026-10-06)
+
+The owner-approved browser booking design adds explicit database authority without
+promoting read scope alone. Membership is created atomically with a fresh verified
+session and its proof-replay receipt only when the server's default-off
+`CLIENT_SESSION_BOOKING_GRANTS_ENABLED` capability is enabled. Existing sessions
+are not backfilled. Client bodies cannot request a scope or membership.
+
+The grant is keyed to the parent token digest with cascading deletion. Booking
+resolution freshly checks membership plus parent expiry/revocation and active user.
+Logout revokes the parent; subsequent authorization checks deny both accesses.
+An operation authorized before logout may still finish. Grant issuance disablement
+does not revoke existing grants and need not disable reserve-independent cancellation.
+This amendment does not activate production or supply real-login evidence.
 
 Only then may it return the minimal principal `{authenticated:true, active:true, userId}`. The
 result is the closed union `resolved | denied | unavailable`: denied credentials map to normalized
@@ -29,7 +45,7 @@ result is the closed union `resolved | denied | unavailable`: denied credentials
 
 ## Booking extension boundary
 
-Booking injects a distinct `ClientBookingPrincipalResolver`. `client_catalog:read` MUST NOT be
+Booking injects a distinct `ClientBookingPrincipalResolver`. `client_catalog:read` alone MUST NOT be
 promoted to booking-write authority, and catalog principal resolution MUST NOT be reused as an
 allow-all fallback. Default-off preflight requires the resolver capability before route
 registration; it never fabricates a principal.

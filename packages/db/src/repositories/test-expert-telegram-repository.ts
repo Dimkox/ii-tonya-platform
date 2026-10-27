@@ -3,6 +3,11 @@ import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { reserveSelartiCost } from "./selarti-budget-repository.js";
 import { hasCurrentTestExpertConsent } from "./test-expert-consent-authority.js";
+import type { ClientConsentAuthority } from "@ii-tonya/contracts";
+import {
+  captureClientConsentAuthority,
+  lockClientConsentSubject,
+} from "./client-consent-authority.js";
 
 type Executor = Pick<DrizzleDb, "execute">;
 type Scope = { botKey: string; telegramUserId: string; chatId: string };
@@ -137,16 +142,20 @@ export class PostgresTestExpertTelegramRepository {
       const identity = await this.identity(tx, input);
       if (identity.kind !== "resolved" || identity.userId !== input.userId)
         throw new Error("test_expert_identity_ambiguous");
-      await tx.execute(
-        sql`select pg_advisory_xact_lock(hashtextextended(${input.userId},0))`,
-      );
-      if (!(await this.consentGranted(tx, input.userId)))
-        throw new Error("test_expert_consent_denied");
+      await lockClientConsentSubject(tx, input.userId);
+      const consentAuthority = await captureClientConsentAuthority(tx, {
+        subjectId: input.userId,
+        botKey: input.botKey,
+        chatId: input.chatId,
+        externalUserId: input.telegramUserId,
+        messagingPolicyVersion: this.consent.messagingConsentPolicyVersion,
+      });
+      if (!consentAuthority) throw new Error("test_expert_consent_denied");
       const dialogueId = await this.ensureDialogue(tx, input, input.userId);
       const deliveryKey = `sha256:${sha256(`test-expert-delivery\0${input.botKey}\0${input.requestKey}`)}`;
       await tx.execute(sql`
         select pg_advisory_xact_lock(
-          hashtextextended(${`${input.botKey}\0${input.requestKey}`},0)
+          hashtextextended(${sha256(`${input.botKey}\0${input.requestKey}`)},0)
         )
       `);
       const existing = await tx.execute<{ requestDigest: string }>(sql`
@@ -170,6 +179,7 @@ export class PostgresTestExpertTelegramRepository {
         replyText: input.replyText,
         correlationId: input.correlationId,
         deliveryKey,
+        consentAuthority,
       });
       await tx.execute(sql`
         insert into test_expert_deterministic_requests(
@@ -209,11 +219,20 @@ export class PostgresTestExpertTelegramRepository {
         const identity = await this.identity(tx, input);
         if (identity.kind !== "resolved" || identity.userId !== input.userId)
           throw new Error("test_expert_identity_ambiguous");
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${input.userId},0))`,
-        );
-        if (!(await this.consentGranted(tx, input.userId, true)))
-          throw new Error("test_expert_consent_denied");
+        await lockClientConsentSubject(tx, input.userId);
+        const consentAuthority =
+          this.consent.selartiConsentPolicyVersion === undefined
+            ? undefined
+            : await captureClientConsentAuthority(tx, {
+                subjectId: input.userId,
+                botKey: input.botKey,
+                chatId: input.chatId,
+                externalUserId: input.telegramUserId,
+                messagingPolicyVersion:
+                  this.consent.messagingConsentPolicyVersion,
+                selartiPolicyVersion: this.consent.selartiConsentPolicyVersion,
+              });
+        if (!consentAuthority) throw new Error("test_expert_consent_denied");
         const sessionRows = await tx.execute<{
           id: string;
           version: number;
@@ -338,6 +357,7 @@ export class PostgresTestExpertTelegramRepository {
               "Сейчас расширенный ответ недоступен: безопасный бюджетный лимит не разрешил отправку.",
             correlationId: input.correlationId,
             deliveryKey: `sha256:${sha256(`test-expert-denial\0${input.requestKey}`)}`,
+            consentAuthority,
           });
           return {
             kind: "not_applied" as const,
@@ -357,6 +377,7 @@ export class PostgresTestExpertTelegramRepository {
           deadline: new Date(
             new Date(input.occurredAt).getTime() + 30_000,
           ).toISOString(),
+          consentAuthority,
         };
         await tx.execute(sql`
           insert into integration_outbox(idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash)
@@ -556,6 +577,7 @@ export class PostgresTestExpertTelegramRepository {
       replyText: string;
       correlationId: string;
       deliveryKey: string;
+      consentAuthority: ClientConsentAuthority;
     },
   ) {
     const sequence = await executor.execute<{ sequence: bigint }>(sql`
@@ -571,6 +593,7 @@ export class PostgresTestExpertTelegramRepository {
       botKey: input.botKey,
       chatId: input.chatId,
       text: input.replyText,
+      consentAuthority: input.consentAuthority,
     };
     const payloadHash = sha256(JSON.stringify(payload));
     await executor.execute(sql`

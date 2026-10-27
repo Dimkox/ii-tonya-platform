@@ -4,6 +4,7 @@ import {
   boolean,
   char,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -58,6 +59,22 @@ export const clientSessions = pgTable(
       sql`${table.expiresAt} > ${table.createdAt} and (${table.revokedAt} is null or ${table.revokedAt} >= ${table.createdAt})`,
     ),
     index("client_sessions_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+export const clientSessionBookingGrants = pgTable(
+  "client_session_booking_grants",
+  {
+    sessionTokenDigest: char("session_token_digest", {
+      length: 71,
+    }).primaryKey(),
+  },
+  (table) => [
+    foreignKey({
+      name: "client_session_booking_grants_session_fk",
+      columns: [table.sessionTokenDigest],
+      foreignColumns: [clientSessions.tokenDigest],
+    }).onDelete("cascade"),
   ],
 );
 

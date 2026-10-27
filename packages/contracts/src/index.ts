@@ -1,4 +1,15 @@
 export { brandId } from "./ids.js";
+export * from "./booking-notifications.js";
+export * from "./client-consent-authority.js";
+export {
+  backupVerificationBindingSchema,
+  backupVerificationEvidenceSchema,
+  backupScheduleSchema,
+  requireBackupVerificationEvidence,
+  type BackupVerificationBinding,
+  type BackupVerificationEvidence,
+  type BackupSchedule,
+} from "./backup-erasure.js";
 export type { EventId, ReservationId, UserId } from "./ids.js";
 export { eventEnvelopeSchema } from "./events.js";
 export type { EventEnvelope } from "./events.js";
@@ -28,3 +39,6 @@ export {
   EXPERT_RESIDENCY_V2_TARIFFS,
   type ExpertResidencyV2TariffKey,
 } from "./expert-residency-tariffs.js";
+export * from "./client-account-packages.js";
+export { serializeBookingNotificationWire } from "./booking-notification-wire.js";
+export * from "./expert-campaign-quotes.js";

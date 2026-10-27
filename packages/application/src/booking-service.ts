@@ -39,7 +39,15 @@ export type ReserveResult =
       readonly reason: string;
     };
 
+export interface TelegramBookingCallbackContext {
+  botKey: string;
+  telegramUserId: string;
+  chatId: string;
+  messageId: number;
+  deliveryId: string;
+}
 export interface ExpertDecisionCommand {
+  readonly telegramContext?: TelegramBookingCallbackContext;
   readonly reservationId: string;
   readonly expertId: string;
   readonly callbackTokenHash: string;
@@ -62,6 +70,8 @@ export interface ExpireReservationCommand {
 }
 
 export interface BookingResult {
+  readonly replayed?: true;
+  // Expert approval remains reserved; only provider completion can return booked.
   readonly reservationId: string;
   readonly status: ReservationStatus;
   readonly version: number;
@@ -123,6 +133,7 @@ export interface BookingWorkflowRepository {
     readonly correlationId: string;
   }): Promise<BookingResult>;
   transitionFromTelegramCallback(command: {
+    readonly telegramContext?: TelegramBookingCallbackContext;
     readonly tokenHash: string;
     readonly reservationId: string;
     readonly expertId: string;
@@ -217,6 +228,9 @@ export const createBookingService = (
       version: command.expectedVersion,
       now: deps.clock.now(),
       correlationId: command.correlationId,
+      ...(command.telegramContext === undefined
+        ? {}
+        : { telegramContext: command.telegramContext }),
     });
     if (result === null || result.reservationId !== command.reservationId) {
       throw new Error("Invalid, stale, or consumed expert callback");

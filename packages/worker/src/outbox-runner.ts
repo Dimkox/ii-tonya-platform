@@ -42,7 +42,8 @@ export interface OutboxRepository {
     attemptId: string,
     reconciliationKey: string,
     startedAt: Date,
-  ): Promise<void>;
+    expectedAttempt?: number,
+  ): Promise<void | DispatchStartResult>;
   markUnknownOutcome(
     id: string,
     owner: string,
@@ -102,7 +103,12 @@ export interface OutboxRepository {
 
 export type DispatchOutcome =
   | { kind: "applied"; providerOperationId?: string }
-  | { kind: "not_applied"; retryable: boolean; reasonCode: string }
+  | {
+      kind: "not_applied";
+      retryable: boolean;
+      reasonCode: string;
+      retryAfterMs?: number;
+    }
   | { kind: "unknown_outcome"; reconciliationKey: string; reasonCode: string }
   | {
       kind: "terminal";
@@ -110,7 +116,10 @@ export type DispatchOutcome =
     };
 
 export interface OutboxDispatcher {
-  dispatch(message: OutboxMessage): Promise<DispatchOutcome>;
+  dispatch(
+    message: OutboxMessage,
+    admission?: ClientDispatchAdmission,
+  ): Promise<DispatchOutcome>;
 }
 
 export interface OutboxReconciler {
@@ -120,7 +129,8 @@ export interface OutboxReconciler {
     | "still_unknown"
     | {
         kind: "terminal";
-        reasonCode: "invalid_payload" | "local_source_invalid";
+        reasonCode:
+          "invalid_payload" | "local_source_invalid" | "provider_not_applied";
       }
   >;
 }
@@ -144,12 +154,14 @@ export type OutboxMetricTopic =
   | "safety_operator_escalation"
   | "admin_negative_feedback"
   | "catalog_show"
+  | "selarti_request"
   | "telegram_send_text";
 export type OutboxMetricPhase =
   "claim" | "dispatch" | "reconciliation" | "lease_recovery";
 export type OutboxMetricOutcome =
   "applied" | "retry" | "unknown" | "terminal" | "dead_letter" | "no_op";
 export type OutboxMetricReasonClass =
+  | "client_authority_invalid"
   | "invalid_payload"
   | "local_source_invalid"
   | "attempts_exhausted"
@@ -170,12 +182,14 @@ export interface OutboxRecoveryCount {
     | "safety.operator_escalation"
     | "admin.negative_feedback"
     | "catalog.show"
+    | "selarti.request.v1"
     | "telegram.send_text.v1";
   readonly count: number;
 }
 export interface OutboxClaimBatch {
   readonly messages: readonly OutboxMessage[];
   readonly exhausted: readonly OutboxRecoveryCount[];
+  readonly authorityInvalid?: readonly OutboxRecoveryCount[];
 }
 
 export interface OutboxRunResult {
@@ -212,6 +226,31 @@ function retryAt(deps: OutboxRunnerDeps, now: Date, attempt: number): Date {
   return new Date(now.getTime() + deps.retryDelayMs(attempt));
 }
 
+function providerRetryAt(
+  deps: OutboxRunnerDeps,
+  now: Date,
+  attempt: number,
+  retryAfterMs?: number,
+): Date {
+  if (retryAfterMs === undefined) return retryAt(deps, now, attempt);
+  // Provider seconds are bounded at the transport boundary; defend other injected dispatchers too.
+  const backoff = deps.retryDelayMs(attempt);
+  const current = deps.now().getTime();
+  const timestamp = current + Math.max(backoff, retryAfterMs);
+  if (
+    !Number.isSafeInteger(retryAfterMs) ||
+    retryAfterMs < 0 ||
+    retryAfterMs > 2147483647000 ||
+    !Number.isFinite(backoff) ||
+    backoff < 0 ||
+    !Number.isSafeInteger(current) ||
+    !Number.isSafeInteger(timestamp) ||
+    Math.abs(timestamp) > 8640000000000000
+  )
+    throw new Error("outbox_retry_delay_invalid");
+  return new Date(timestamp);
+}
+
 function dispatchToken(message: OutboxMessage): string {
   if (message.dispatchClaimToken === null) {
     throw new Error("outbox_dispatch_claim_token_missing");
@@ -233,6 +272,7 @@ function metricTopic(topic: string): OutboxMetricTopic {
   if (topic === "admin.negative_feedback") return "admin_negative_feedback";
   if (topic === "catalog.show") return "catalog_show";
   if (topic === "telegram.send_text.v1") return "telegram_send_text";
+  if (topic === "selarti.request.v1") return "selarti_request";
   throw new Error("worker_outbox_metric_topic_unregistered");
 }
 
@@ -426,18 +466,44 @@ async function dispatchPending(
   now: Date,
 ): Promise<void> {
   const attemptId = deps.newAttemptId();
-  await deps.repository.recordAttemptStarted(
+  const admission = await deps.repository.recordAttemptStarted(
     message.id,
     deps.workerId,
     dispatchToken(message),
     attemptId,
     message.reconciliationKey,
     now,
+    message.attempt,
   );
+  if (isClientAsyncTopic(message.topic) && admission?.kind === "deferred") {
+    // No durable start or provider outcome: temporary lock contention is not terminal/retry/unknown.
+    record(deps, message.topic, "dispatch", "no_op", "internal");
+    return;
+  }
+  if (
+    isClientAsyncTopic(message.topic) &&
+    (admission?.kind !== "admitted" ||
+      !matchesClientDispatchAdmission(message, admission))
+  ) {
+    record(
+      deps,
+      message.topic,
+      "dispatch",
+      "terminal",
+      admission?.kind === "blocked" &&
+        admission.reasonCode === "client_authority_invalid"
+        ? "client_authority_invalid"
+        : "local_source_invalid",
+    );
+    return;
+  }
 
   let outcome: DispatchOutcome;
   try {
-    outcome = await deps.dispatcher.dispatch(message);
+    outcome = await deps.dispatcher.dispatch(
+      message,
+      admission?.kind === "admitted" ? admission : undefined,
+    );
   } catch {
     await deps.repository.markUnknownOutcome(
       message.id,
@@ -493,7 +559,7 @@ async function dispatchPending(
       message.id,
       deps.workerId,
       dispatchToken(message),
-      retryAt(deps, now, message.attempt),
+      providerRetryAt(deps, now, message.attempt, outcome.retryAfterMs),
       outcome.reasonCode,
     );
     record(deps, message.topic, "dispatch", "retry", "internal");
@@ -588,6 +654,15 @@ export async function runOutboxBatch(
     );
     messages = batch.messages;
     recordExhaustion(deps, batch.exhausted, "attempts_exhausted");
+    for (const count of batch.authorityInvalid ?? [])
+      record(
+        deps,
+        count.topic,
+        "claim",
+        "dead_letter",
+        "client_authority_invalid",
+        count.count,
+      );
   }
   for (const message of messages) {
     record(deps, message.topic, "claim", "no_op", "internal");
@@ -596,3 +671,9 @@ export async function runOutboxBatch(
 
   return { reconciled: unknown.length, dispatched: messages.length };
 }
+import {
+  isClientAsyncTopic,
+  matchesClientDispatchAdmission,
+  type ClientDispatchAdmission,
+  type DispatchStartResult,
+} from "@ii-tonya/contracts";

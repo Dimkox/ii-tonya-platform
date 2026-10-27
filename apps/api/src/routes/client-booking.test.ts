@@ -52,7 +52,12 @@ const appFor = async (input?: {
         },
       }),
     },
-    bookings: { reserve, cancel, reschedule },
+    bookings: {
+      reserve,
+      cancel,
+      reschedule,
+      list: async () => ({ bookings: [], nextCursor: null }),
+    },
     ...(input?.provideWaitlist === false ? {} : { waitlist: { join, leave } }),
     reserveEnabled: input?.reserveEnabled ?? true,
     waitlistEnabled: input?.waitlistEnabled ?? true,

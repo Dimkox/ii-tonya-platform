@@ -40,9 +40,10 @@ export function renderLegalPage(code: LegalDocumentCode): string {
   return `<a class="skip-link" href="#legal-content">Перейти к документу</a>
     <header class="site-header legal-header">
       <a class="brand" href="/" aria-label="ии-Тоня — на главную"><span>ии-</span>Тоня</a>
+      <a class="header-action" href="/account">Личный кабинет</a>
       <a class="header-action" href="/">← Вернуться на главную</a>
     </header>
-    <main id="legal-content" class="legal-page">
+    <main id="legal-content" class="legal-page" tabindex="-1">
       <p class="eyebrow">Юридическая информация</p>
       <h1>${document.title}</h1>
       <article class="legal-document">${renderDocumentBody(document.text, document.title)}</article>

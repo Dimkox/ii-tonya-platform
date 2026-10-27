@@ -237,6 +237,65 @@ describe("test expert trial PostgreSQL authority", () => {
     ).rejects.toThrow();
   });
 
+  it("captures original messaging authority in the real trial producer before session persistence", async () => {
+    const userId = await database.createUser();
+    await database.db.execute(
+      sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram','919','trial-fence','919','active')`,
+    );
+    const authority = await seedClientConsent(
+      database.db,
+      userId,
+      "client_messaging",
+    );
+    const producer = new PostgresTestExpertTelegramRepository(database.db, {
+      messagingConsentPolicyVersion: "client-messaging-v1",
+    });
+    const input = {
+      botKey: "trial-fence",
+      telegramUserId: "919",
+      chatId: "919",
+      userId,
+      expectedSessionVersion: null,
+      nextSession: { version: 1, state: "awaiting_name" as const },
+      replyText: "Synthetic reply",
+      copyVersion: "fixture-v1",
+      sellingActivation: "inactive" as const,
+      trialUnits: 0 as const,
+      requestKey: "trial-fence-request",
+      requestDigest: "6".repeat(64),
+      correlationId: "trial-fence",
+      occurredAt: new Date().toISOString(),
+    };
+    expect(await producer.deliverDeterministic(input)).toMatchObject({
+      kind: "applied",
+    });
+    expect(
+      (
+        await database.db.execute<{ payload: unknown }>(
+          sql`select payload from integration_outbox where correlation_id='trial-fence'`,
+        )
+      ).rows[0]!.payload,
+    ).toMatchObject({
+      consentAuthority: {
+        v: 1,
+        subjectId: userId,
+        purposes: { client_messaging: authority },
+      },
+    });
+    await database.db.execute(
+      sql`delete from consent_states where user_id=${userId}::uuid`,
+    );
+    await expect(
+      producer.deliverDeterministic({ ...input, requestKey: "blocked" }),
+    ).rejects.toThrow("test_expert_consent_denied");
+    expect(
+      (
+        await database.db.execute<{ n: number }>(
+          sql`select count(*)::int n from test_expert_sessions where user_id=${userId}::uuid`,
+        )
+      ).rows[0]!.n,
+    ).toBe(1);
+  });
   it("converges a trial reservation only with the durable B2 response and same-dialogue delivery", async () => {
     const userId = await database.createUser();
     const campaignId = "00000000-0000-4000-8000-000000000386";
@@ -271,7 +330,28 @@ describe("test expert trial PostgreSQL authority", () => {
       requestId: providerRequestId,
       dialogueId,
       deadline,
+      userId,
+      text: "Synthetic request",
+      consentAuthority: {
+        v: 1,
+        subjectId: userId,
+        purposes: {
+          client_messaging: await seedClientConsent(
+            database.db,
+            userId,
+            "client_messaging",
+          ),
+          selarti_ai_processing: await seedClientConsent(
+            database.db,
+            userId,
+            "selarti_ai_processing",
+          ),
+        },
+      },
     };
+    await database.db.execute(
+      sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram','909','bot-trial-b2','909','active')`,
+    );
     await database.db.execute(sql`
       insert into integration_outbox(
         idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash
@@ -280,6 +360,7 @@ describe("test expert trial PostgreSQL authority", () => {
         'external-b2',${providerRequestId},${"4".repeat(64)}
       )`);
     const proposals = new PostgresSelartiProposalRepository(database.db);
+    await seedClientRequestStarted(database.db, providerRequestId);
     await expect(
       proposals.accept({
         requestId: providerRequestId,
@@ -301,3 +382,8 @@ describe("test expert trial PostgreSQL authority", () => {
     expect(delivery.rows[0]!.count).toBe("1");
   });
 });
+import {
+  seedClientConsent,
+  seedClientRequestStarted,
+} from "../../packages/db/src/testkit/client-consent.js";
+import { PostgresTestExpertTelegramRepository } from "../../packages/db/src/repositories/test-expert-telegram-repository.js";

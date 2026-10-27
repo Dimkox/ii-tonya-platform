@@ -55,6 +55,7 @@ describe("worker outbox metrics", () => {
       claimWithMetrics: vi.fn(async () => ({
         messages: pending,
         exhausted: [],
+        authorityInvalid: [{ topic: "telegram.send_text.v1", count: 3 }],
       })),
       recordAttemptStarted: vi.fn(async () => undefined),
       markUnknownOutcome: vi.fn(async () => undefined),
@@ -67,6 +68,7 @@ describe("worker outbox metrics", () => {
       deadLetterAfterReconciliationAndAlert: vi.fn(async () => undefined),
     } as unknown as OutboxRepository;
     const records: unknown[] = [];
+    const cleanupCounts: number[] = [];
 
     await runOutboxBatch({
       repository,
@@ -97,7 +99,13 @@ describe("worker outbox metrics", () => {
             : "still_unknown";
         },
       },
-      metrics: { record: (labels) => records.push(labels) },
+      metrics: {
+        record: (labels, count) => {
+          records.push(labels);
+          if (labels.reasonClass === "client_authority_invalid")
+            cleanupCounts.push(count!);
+        },
+      },
       now: () => new Date("2026-08-14T08:00:00.000Z"),
       retryDelayMs: () => 1_000,
       maxAttempts: 3,
@@ -112,6 +120,13 @@ describe("worker outbox metrics", () => {
       repository.recoverExpiredReconciliationLeases,
     ).not.toHaveBeenCalled();
     expect(records.length).toBeGreaterThanOrEqual(12);
+    expect(cleanupCounts).toEqual([3]);
+    expect(records).toContainEqual({
+      topic: "telegram_send_text",
+      phase: "claim",
+      outcome: "dead_letter",
+      reasonClass: "client_authority_invalid",
+    });
     for (const record of records as Record<string, unknown>[]) {
       expect(Object.keys(record).sort()).toEqual(
         ["outcome", "phase", "reasonClass", "topic"].sort(),
@@ -119,6 +134,7 @@ describe("worker outbox metrics", () => {
       expect([
         "safety_operator_escalation",
         "admin_negative_feedback",
+        "telegram_send_text",
       ]).toContain(record.topic);
       expect([
         "claim",
@@ -137,6 +153,7 @@ describe("worker outbox metrics", () => {
       expect([
         "invalid_payload",
         "local_source_invalid",
+        "client_authority_invalid",
         "attempts_exhausted",
         "reconciliation_exhausted",
         "lease_expired",

@@ -93,9 +93,10 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
   "packages/db/migrations/0037_partner_commerce_a.sql",
   "packages/db/migrations/0038_test_expert_trial.sql",
-  "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
-  "packages/db/migrations/0040_booking_waitlist_d1.sql",
-  "packages/db/migrations/0041_booking_reschedule_replay.sql",
+  "packages/db/migrations/0052_lifecycle_scheduler_c1.sql",
+  "packages/db/migrations/0053_booking_waitlist_d1.sql",
+  "packages/db/migrations/0054_booking_reschedule_replay.sql",
+  "packages/db/migrations/0039_consent_evidence_grant.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
@@ -252,13 +253,15 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
+  // Security patch only: Fastify >=5.12.5 closes the reviewed September 2026
+  // advisories. Dependency names and payment integration boundaries are unchanged.
   [
     "apps/sandbox-api/package.json",
-    "10d849ade54b15694f30f477c4911acbb2e0a2750fb7cec617339cb23f26f1f2",
+    "449a71ee2e260137f66e409824c7b940503a5227ddb2838b793ae2959eca555d",
   ],
   [
     "apps/api/package.json",
-    "82e0499817addb7236e92216b60592618b4e03cc0c60acc1c24c0dedbdb42b3e",
+    "612edab1de19229840f06fe1cead61134e8ba5bba085bfb5a41a43540c68a51b",
   ],
   [
     "apps/web/package.json",
@@ -270,9 +273,9 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    // Re-registered: verify:deploy now syntax-checks each script separately (a multi-file
-    // `bash -n` validated only the first operand), and the pre-push gate scripts are wired in.
-    "a876cdc0275f096e74209dbf94da4d689d1d28cb7d5fb82bbd4b6f22a0530665",
+    // Reviewed navigation increment: add the native Nginx proof entrypoint and
+    // invoke it from verify:deploy. Existing scripts and dependency graph remain.
+    "db3bc1f5f1d61883a1dfde9374f1411694c4746c5a0ed7f6dc28a153f80fcc02",
   ],
   [
     "packages/application/package.json",
@@ -337,7 +340,7 @@ const approvedAutomationArtifactHashes = new Map([
     // truncated, and wrapped the release gate body in step() so the artifact build is
     // recorded with an exit code and a duration. Registered in the same change as the runner.
     "scripts/run-claw-ci.sh",
-    "0151459fce14199efb65e25e71025ba9c4cbcf6023aa7639436cae994082812a",
+    "99d14383600ee43346e237fbf7f31e04cba4ebce780669df3f28385f29329677",
   ],
   [
     "scripts/build-native-release.sh",
@@ -580,7 +583,7 @@ const approvedDependencySpecifiers = new Map([
   ["drizzle-orm", "^0.45.2"],
   ["eslint", "^9.31.0"],
   ["fast-check", "^4.2.0"],
-  ["fastify", "^5.5.0"],
+  ["fastify", "^5.12.5"],
   ["globals", "^14.0.0"],
   ["pg", "^8.16.3"],
   ["pino", "^9.7.0"],
@@ -595,6 +598,50 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0041_client_erasure_requests.sql",
+    "2e54f405b3a15acccf8c5cafd88dc385ccba5a0b5b287e8e0e5c8cd1c04a18ee",
+  ],
+  [
+    "packages/db/migrations/meta/0041_snapshot.json",
+    "365c054817f116f51c3e8b548a18191e9041700617e117b0222f2a7e98e33941",
+  ],
+  [
+    "packages/db/migrations/state/0041_manifest.json",
+    "34d68756512bf30eefa1fe3a0ad1bbbf0a2ca1150ab59a86cfd2a4bb305ae952",
+  ],
+  [
+    "packages/db/migrations/state/0041_sql_objects.json",
+    "be90ac47a3012b04af76ac275893e303cb48849716f2f47b299047433e9d2d25",
+  ],
+  [
+    "packages/db/migrations/0040_client_session_booking_grants.sql",
+    "abd7de7b230598e2f63309c660c98de4d1812e87737dcefbfe0e8a15f2f32979",
+  ],
+  [
+    "packages/db/migrations/meta/0039_snapshot.json",
+    "b7dbbb1318fa677e2f43e0975a6f858dae9fab00ff3863899cfd5e7baca8cdc1",
+  ],
+  [
+    "packages/db/migrations/meta/0040_snapshot.json",
+    "7f6d547793b02b9da77a5daa584a70bb10e0239e2bbef1169d1e9a7c7d1ca411",
+  ],
+  [
+    "packages/db/migrations/state/0039_manifest.json",
+    "db670f20b5f7c44e5a2c2590945f24f133456c5e11415a9b9451a3abc8bac9de",
+  ],
+  [
+    "packages/db/migrations/state/0039_sql_objects.json",
+    "1723fa6d795402eca56b42708a2ecc69f280574a273b9056f42fa901d1a2ef49",
+  ],
+  [
+    "packages/db/migrations/state/0040_manifest.json",
+    "0286858c8df2db68231d611be308f3fba7599a1820637476ce0c3e3351c6d730",
+  ],
+  [
+    "packages/db/migrations/state/0040_sql_objects.json",
+    "013d69c02997e3bf2fc097c9050b52603c9b62e54d293191c3dd44757ad03ebf",
+  ],
   [
     "packages/sandbox-payments/migrations/0000_sandbox_expert_residency.sql",
     "495e8b352021c1fb6d0fc027e1621df6137d0d15c4a54cff5ce975cb2c318e0a",
@@ -756,20 +803,24 @@ const approvedMigrationHashes = new Map([
     "beb9358660e430821ea3881d7bd301310bcd239688e11970fe3cc07b5ee3c957",
   ],
   [
-    "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+    "packages/db/migrations/0052_lifecycle_scheduler_c1.sql",
     "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
   ],
   [
-    "packages/db/migrations/0040_booking_waitlist_d1.sql",
+    "packages/db/migrations/0053_booking_waitlist_d1.sql",
     "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
   ],
   [
-    "packages/db/migrations/0041_booking_reschedule_replay.sql",
+    "packages/db/migrations/0054_booking_reschedule_replay.sql",
     "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed",
   ],
   [
+    "packages/db/migrations/0039_consent_evidence_grant.sql",
+    "1da4691ba27f4e22bc84346cc367b820d4f12280fcb1f04077f75111bc5b2e0f",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
+    "af0940cd57866575d96f36c9911d7c42c8fb1e1d0234ab09965d1929a01343f3",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -849,7 +900,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
+    "af0940cd57866575d96f36c9911d7c42c8fb1e1d0234ab09965d1929a01343f3",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -871,8 +922,10 @@ const approvedDatabaseRelations = new Set([
   "client_catalog_snapshots",
   "client_catalog_tombstones",
   "client_identity_proof_receipts",
+  "client_erasure_requests",
   "expert_telegram_residency_callbacks",
   "client_profiles",
+  "client_session_booking_grants",
   "client_sessions",
   "consent_document_versions",
   "consent_presentations",

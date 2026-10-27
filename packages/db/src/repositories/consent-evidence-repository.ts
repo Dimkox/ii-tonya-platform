@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
+import { currentConsentGrantedSql } from "./consent-current.js";
 
 /**
  * Серверный путь согласия по ТЗ по ПД от 2026-09-21 (EVID-01…05, CONS-01/02).
@@ -25,18 +26,30 @@ export type ConsentChannel = "web" | "telegram";
 
 const PURPOSES = new Set<string>(CONSENT_PURPOSES);
 const DEFAULT_PRESENTATION_TTL_MS = 24 * 60 * 60 * 1_000;
+const POLICY_PREFIX: Record<ConsentPurpose, string> = {
+  client_profile: "profile",
+  client_messaging: "client-messaging",
+  expert_note: "note",
+  expert_handoff: "handoff",
+  follow_up: "follow-up",
+  selarti_ai_processing: "selarti-ai",
+};
 
 export interface ApprovedDocument {
   readonly id: string;
   readonly documentKey: string;
   readonly version: number;
   readonly textSha256: string;
+  readonly title: string;
+  readonly body: string;
 }
 
 export interface IssuedPresentation {
   readonly presentationId: string;
   readonly token: string;
   readonly expiresAt: string;
+  readonly document: ApprovedDocument;
+  readonly policyVersion: string;
 }
 
 export interface ConsentDecisionReceipt {
@@ -74,8 +87,23 @@ export class PostgresConsentEvidenceRepository {
     private readonly options: {
       consentMutationCapability?: { enabled: boolean };
       presentationTtlMs?: number;
+      requiredPolicyVersions?: Partial<Record<ConsentPurpose, string>>;
     } = {},
   ) {}
+
+  private policyVersion(purpose: ConsentPurpose, version: number): string {
+    const configured = this.options.requiredPolicyVersions?.[purpose];
+    const canonical = `${POLICY_PREFIX[purpose]}-v${version}`;
+    if (configured === undefined) return canonical;
+    // The legacy messaging gate uses messaging-vN. Bind only this known alias,
+    // never an arbitrary configured label or a different document revision.
+    if (
+      configured === canonical ||
+      (purpose === "client_messaging" && configured === `messaging-v${version}`)
+    )
+      return configured;
+    throw new ConsentGrantInvariantError("consent_document_version_missing");
+  }
 
   private assertEnabled(): void {
     if (!this.options.consentMutationCapability?.enabled)
@@ -114,7 +142,7 @@ export class PostgresConsentEvidenceRepository {
           ${command.approvedBy}
         from consent_document_versions
         where document_key = ${command.documentKey}
-        returning id, document_key as "documentKey", version, text_sha256 as "textSha256"
+        returning id, document_key as "documentKey", version, text_sha256 as "textSha256", title, body
       `),
       "document_version",
     );
@@ -132,39 +160,57 @@ export class PostgresConsentEvidenceRepository {
   }): Promise<IssuedPresentation> {
     this.assertEnabled();
     PostgresConsentEvidenceRepository.assertPurpose(command.purpose);
+    if (command.documentKey !== `consent.${command.purpose}`)
+      throw new ConsentGrantInvariantError("consent_command_incomplete");
     const ttlMs = this.options.presentationTtlMs ?? DEFAULT_PRESENTATION_TTL_MS;
     const token = randomBytes(32).toString("base64url");
-    const stored = single<{
-      presentationId: string;
-      documentVersionId: string;
-      expiresAt: string;
-    }>(
-      await this.db.execute(sql`
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`set local statement_timeout='2000ms'`);
+      await tx.execute(sql`set local lock_timeout='1000ms'`);
+      // Serializes document publication/retirement with presentation issuance.
+      await tx.execute(sql`lock table consent_document_versions in share mode`);
+      const document = single<ApprovedDocument>(
+        await tx.execute(sql`
+      select id, document_key as "documentKey", version, title, body, text_sha256 as "textSha256"
+      from consent_document_versions
+      where document_key=${command.documentKey} and status='approved'
+        and effective_at <= clock_timestamp()
+      order by version desc limit 1
+    `),
+        "document_version",
+      );
+      const stored = single<{
+        presentationId: string;
+        documentVersionId: string;
+        expiresAt: string;
+      }>(
+        await tx.execute(sql`
         insert into consent_presentations
           (user_id, purpose, document_version_id, token_digest, channel, expires_at)
         select
           ${command.userId}::uuid,
           ${command.purpose},
-          d.id,
+          ${document.id}::uuid,
           ${digestOf(token)},
           ${command.channel},
-          now() + (${ttlMs}::double precision * interval '1 millisecond')
-        from lateral (
-          select id from consent_document_versions
-          where document_key = ${command.documentKey} and status = 'approved'
-          order by version desc
-          limit 1
-        ) d
+          clock_timestamp() + (${ttlMs}::double precision * interval '1 millisecond')
+        from users where id=${command.userId}::uuid and active=true
         returning id as "presentationId", document_version_id as "documentVersionId",
                   expires_at as "expiresAt"
       `),
-      "presentation",
-    );
-    return {
-      presentationId: stored.presentationId,
-      token,
-      expiresAt: stored.expiresAt,
-    };
+        "presentation",
+      );
+      return {
+        presentationId: stored.presentationId,
+        token,
+        expiresAt: stored.expiresAt,
+        document,
+        policyVersion: this.policyVersion(
+          command.purpose as ConsentPurpose,
+          document.version,
+        ),
+      };
+    });
   }
 
   /**
@@ -190,34 +236,62 @@ export class PostgresConsentEvidenceRepository {
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
+        await tx.execute(sql`set local statement_timeout='2000ms'`);
+        await tx.execute(sql`set local lock_timeout='1000ms'`);
+        await tx.execute(
+          sql`lock table consent_document_versions in share mode`,
+        );
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.userId}, 0))`,
         );
+        if (command.decision === "denied") {
+          const active = single<{ granted: boolean }>(
+            await tx.execute(sql`
+            select ${currentConsentGrantedSql({ userExpression: sql`${command.userId}::uuid`, purpose: command.purpose })} as granted
+          `),
+            "state",
+          );
+          if (active.granted)
+            throw new ConsentGrantInvariantError("consent_withdrawal_required");
+        }
 
         const redeemed = rows<{
           presentationId: string;
           documentVersionId: string;
           textSha256: string;
+          version: number;
         }>(
           await tx.execute(sql`
             update consent_presentations p
-            set consumed_at = now()
+            set consumed_at = clock_timestamp()
             from consent_document_versions d
             where p.document_version_id = d.id
               and p.token_digest = ${digestOf(command.token)}
               and p.user_id = ${command.userId}::uuid
               and p.purpose = ${command.purpose}
+              and d.document_key = ${`consent.${command.purpose}`}
+              and d.status = 'approved' and d.effective_at <= clock_timestamp()
+              and d.version = (select max(current_doc.version) from consent_document_versions current_doc
+                where current_doc.document_key=d.document_key and current_doc.status='approved'
+                  and current_doc.effective_at <= clock_timestamp())
+              and exists (select 1 from users where id=p.user_id and active=true)
               and p.consumed_at is null
               and p.invalidated_at is null
-              and p.expires_at > now()
+              and p.expires_at > clock_timestamp()
             returning p.id as "presentationId",
                       d.id as "documentVersionId",
-                      d.text_sha256 as "textSha256"
+                      d.text_sha256 as "textSha256", d.version
           `),
         );
         if (redeemed.length !== 1)
           throw new ConsentGrantInvariantError("consent_presentation_invalid");
         const presentation = redeemed[0] as (typeof redeemed)[number];
+        const policyVersion = this.policyVersion(
+          command.purpose as ConsentPurpose,
+          presentation.version,
+        );
+        if (command.policyVersion !== policyVersion)
+          throw new ConsentGrantInvariantError("consent_presentation_invalid");
 
         const prior = rows<{ lastDecisionId: string | null }>(
           await tx.execute(sql`
@@ -235,7 +309,7 @@ export class PostgresConsentEvidenceRepository {
                reservation_id, text_sha256, basis)
             select
               ${command.userId}::uuid, ${command.purpose}, ${command.decision},
-              ${command.policyVersion},
+              ${policyVersion},
               (select channel from consent_presentations where id = ${presentation.presentationId}::uuid),
               ${JSON.stringify(command.scopeFields ?? {})}::jsonb,
               ${presentation.documentVersionId}::uuid,
@@ -279,7 +353,7 @@ export class PostgresConsentEvidenceRepository {
              ${sha256(
                JSON.stringify({
                  purpose: command.purpose,
-                 policyVersion: command.policyVersion,
+                 policyVersion,
                  documentVersionId: presentation.documentVersionId,
                  textSha256: presentation.textSha256,
                }),

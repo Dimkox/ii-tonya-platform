@@ -90,9 +90,9 @@ describe("promotional landing view", () => {
       expect(html).toContain(`id="${heading}"`);
     }
     expect(html).toContain('class="hero-proof"');
-    expect(html).toContain("Один диалог");
-    expect(html).toContain("Подбор по запросу");
-    expect(html).toContain("На связи 24/7");
+    expect(html).toContain("Открытый каталог");
+    expect(html).toContain("Личный кабинет");
+    expect(html).toContain("Навигация в Telegram");
   });
 
   it("provides visible keyboard focus and reduced-motion fallbacks", () => {
@@ -121,16 +121,19 @@ describe("promotional landing view", () => {
     );
   });
 
-  it("keeps every action inside the messenger boundary", () => {
+  it("separates current account navigation from expert promo links", () => {
     const actionLinks = [
       ...html.matchAll(/data-messenger-action href="([^"]+)"/gu),
     ];
-    expect(actionLinks.length).toBeGreaterThanOrEqual(7);
+    expect(actionLinks).toHaveLength(6);
     for (const [, href] of actionLinks) {
       const target = new URL(href!);
       expect(target.origin).toBe("https://t.me");
       expect([...target.searchParams.keys()]).toEqual(["start"]);
+      expect(target.searchParams.get("start")).toMatch(/^expert(?:_|$)/u);
     }
+    expect(html).toContain('href="/account"');
+    expect(html).toContain('href="/catalog"');
   });
 
   it("maps rendered CTAs to the intended bot and start payloads", () => {
@@ -142,16 +145,12 @@ describe("promotional landing view", () => {
       targets.map(() => "/ii_tonya_bot"),
     );
     expect(targets.map((target) => target.searchParams.get("start"))).toEqual([
-      "client",
-      "client",
       "expert",
-      "client",
       "expert",
       "expert_base",
       "expert_exclusive",
       "expert_event",
       "expert",
-      "client",
     ]);
   });
 
@@ -159,7 +158,7 @@ describe("promotional landing view", () => {
     expect(html).toContain(
       "Я помогу тебе найти того, кто поможет на твоём пути развития",
     );
-    expect(html).toContain("Попробовать бесплатно");
+    expect(html).toContain("Открыть личный кабинет");
     expect(
       html.match(/Твой персональный навигатор по миру саморазвития/gu),
     ).toHaveLength(1);
@@ -167,7 +166,7 @@ describe("promotional landing view", () => {
       "Какой бы ни был твой запрос — я помогу найти того, кто сможет помочь.",
     );
     expect(html).toContain("психологи, коучи, терапевты");
-    expect(html).toContain("тест клиент");
+    expect(html).not.toContain("тест клиент");
     expect(html).toContain("тест эксперт");
     expect(html).toContain("срок их действия составит 45 дней");
     expect(html).toContain("начисление и использование купонов в V2 отключены");
@@ -194,6 +193,33 @@ describe("promotional landing view", () => {
     expect(html).toMatch(/<button[^>]+disabled/iu);
     expect(html).not.toMatch(/mc\.yandex|google-analytics|fonts\.googleapis/iu);
     expect(html).not.toMatch(/<input[^>]*(?:card|cvv)/iu);
-    expect(html).toContain("тест клиент");
+    expect(html).not.toContain("тест клиент");
+  });
+
+  it("shows current navigation and planned package terms without inviting personal content", () => {
+    const clientSections = html.slice(
+      0,
+      html.indexOf('<section class="section expert-path"'),
+    );
+    expect(clientSections).not.toMatch(
+      /живой диалог|Расскажи, что|Задам несколько вопросов|Ты покупаешь пакет|Открыть диалог|Попробовать бесплатно/iu,
+    );
+    expect(clientSections).toContain("Покупка пакетов пока недоступна");
+    expect(clientSections).toContain("Планируемые пакеты сообщений");
+    expect(clientSections).toContain("Не присылай личную историю");
+    expect(clientSections).toContain("Каталог услуг");
+    expect(clientSections).toContain("Личный кабинет");
+    expect(clientSections).toContain("если вход включён");
+  });
+  it("directs support to existing email and phone rather than the account or bot chat", () => {
+    const contacts = html.slice(
+      html.indexOf('<section class="section contact"'),
+      html.indexOf("<footer"),
+    );
+    expect(contacts).toContain('href="mailto:ii-tonya@yandex.ru"');
+    expect(contacts).toContain('href="tel:+79204742866"');
+    expect(contacts).not.toContain('href="/account"');
+    expect(contacts).not.toMatch(/через чат|Опишите.*ситуацию/iu);
+    expect(contacts).toContain("Не отправляйте личную историю");
   });
 });
