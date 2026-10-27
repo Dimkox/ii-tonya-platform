@@ -97,6 +97,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0075_resident_lifecycle_completion.sql",
   "packages/db/migrations/0074_resident_native_scheduling.sql",
   "packages/db/migrations/0070_planerka_availability.sql",
   "packages/db/migrations/0069_resident_semantic_tags.sql",
@@ -147,6 +148,12 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "resident_lifecycle_subjects",
+  "resident_lifecycle_cases",
+  "resident_work_notices",
+  "resident_work_notice_attempts",
+  "resident_work_bot_state",
+
   "resident_schedule_state",
   "resident_schedule_previews",
   "resident_service_mappings",
@@ -341,6 +348,10 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/admin/expert-cards/lifecycle",
+  "/v1/admin/expert-cards/lifecycle/:caseId",
+  "/v1/admin/expert-cards/lifecycle/:caseId/close",
+
   "/v1/admin/expert-verification/private-recovery",
   "/v1/admin/expert-verification/private-recovery/:custodyId",
   "/v1/admin/expert-verification/:applicationId/private-evidence",
@@ -440,15 +451,15 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "2785cdbf845c7b68c695d855127ac0edee2ae0a90904f1e6c32e1599c8d3628f",
+    "adacae9eb0c2ada1e1bdc9a3abf8e142f73af0b2edf4c89a819748b94c70b119",
   ],
   [
     "packages/contracts/src/index.ts",
-    "66800d021c07f7c9f5e1b0fa61ecb3d378799cc1684a0c1ae45be6f78496092d",
+    "b26ce919866a6b94ba398bfff3b1a9f8a46e4cac4829e81c9ee4437da960f10c",
   ],
   [
     "packages/db/src/schema/index.ts",
-    "c7d85fe5ddd7e7701ff47459fc720ef2a2f61f70200728380928cd181d760c5d",
+    "5e32828912caf3a71658e0163fa2849daa049d234347401e3b2e41a50979f319",
   ],
   [
     "apps/api/src/routes/public-client-catalog.ts",
@@ -607,6 +618,10 @@ const approvedPackageManifestHashes = new Map([
 // This exception covers unresolved loader names only, never internal mint access.
 const reviewedDomHarnessHashes = new Map([
   [
+    "scripts/verify-resident-lifecycle-browser.mjs",
+    "d555549822084538af96023f6a7a1abe6f13549b7610cec24a5ac3b00cc1167f",
+  ],
+  [
     "scripts/verify-resident-review-browser.mjs",
     "3ec062ea1c7b511a6a209ac24c95e22db51fbcc2dc1791c4bd44a19acd634be3",
   ],
@@ -665,15 +680,15 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "tests/acceptance/private-verification/make-parser-fixtures.py",
-    "22491e04222bc5be599ab20e22a7dc073ba4b79f44c23518114c816d27a20746",
+    "8f7227dab0409024f43609cf55e9dd3cbc6c3133f0e6b5964ff125280f8cdf30",
   ],
   [
     "tests/acceptance/private-verification/sandbox-probe.py",
-    "271a3b646dfe5e8a8f0a9ef3b96b07ade0c10cca8799e07c6a6fac5eb9a93d53",
+    "72b32159bdeb7b8d376700efcd8618e15c6baa471de7d748845bb6ac2cf93219",
   ],
   [
     "tests/acceptance/private-verification/socket-denial-probe.py",
-    "5b14f07f9b4eac0b4825a589c438bc52308f33932ba12400685687d899e84ab2",
+    "cef2796c060a34323c7ea38fb2bc6f135330b49641504c6fc44639497866c295",
   ],
   // Exact core stabilization artifacts; no adjacent namespace exemption.
   [
@@ -979,6 +994,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0075_resident_lifecycle_completion.sql",
+    "3fe2e53365eedb359d2912fe1b26962aeea520008a29d4e810456b67c3ddbda8",
+  ],
+  [
+    "packages/db/migrations/meta/0075_snapshot.json",
+    "7ae2df88f63b3a56802eaf72ccb4b544d76c1ecf0c6221a2dbee7541e84cf57a",
+  ],
+  [
+    "packages/db/migrations/state/0075_manifest.json",
+    "ce7082df4b3d7a4351774f2aafb789901c5d9d25038afdd30c6b395d3ea592af",
+  ],
+  [
+    "packages/db/migrations/state/0075_sql_objects.json",
+    "686d0d154b0c0897cbf57b321e2cca55d3355ab9082aac8cd5e1d57e8a83d80f",
+  ],
+
   [
     "packages/db/migrations/0074_resident_native_scheduling.sql",
     "7ad346d5b1601d517173b03d1de7d020c8368ea195cc36e0facb2bb4cdd1fc53",
@@ -1779,7 +1811,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "8953ec42b629f280f8b04b8c744a019e0252d31ea6bf67d5a220dc4cab1397ff",
+    "cd945edf6146c9c82545521800c0756947708b1ae4030bb14dda028cff067e21",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1859,7 +1891,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "8953ec42b629f280f8b04b8c744a019e0252d31ea6bf67d5a220dc4cab1397ff",
+    "cd945edf6146c9c82545521800c0756947708b1ae4030bb14dda028cff067e21",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -2978,3 +3010,24 @@ export const classifyApprovedTrackedScopeContent = ({
     ? []
     : [`approved tracked scope hash mismatch: ${actualHash}`];
 };
+
+/** Full PG75 catalogue crossed 1 MiB; never broaden the general inspection bound.
+ * Read callback is invoked only for this exact path and observed byte count;
+ * original exact artifact hash still owns admission. */
+export function isApprovedLargeScopeArtifact(
+  path: string,
+  bytes: number,
+  read: () => string,
+): boolean {
+  if (
+    path !== "packages/db/migrations/state/0075_sql_objects.json" ||
+    bytes !== 1064832
+  )
+    return false;
+  const content = read();
+  return (
+    Buffer.byteLength(content, "utf8") === bytes &&
+    createHash("sha256").update(content).digest("hex") ===
+      approvedMigrationHashes.get(path)
+  );
+}

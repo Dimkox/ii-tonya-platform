@@ -142,6 +142,7 @@ const HAND_SQL_FUNCTIONS = [
   "resident_card_version_source",
   "resident_financial_attempt_source",
   "resident_initial_schedule_guard",
+  "resident_lifecycle_source_guard",
   "resident_materialize_approved_services",
   "resident_native_admission",
   "resident_native_confirmation_source",
@@ -204,6 +205,8 @@ const HAND_SQL_FUNCTIONS = [
   "resident_verification_version_valid",
   "resident_verification_write_guard",
   "resident_version_schedule_source",
+  "resident_waitlist_join_immutable",
+  "resident_work_delivery_consistent",
   "retain_resident_private_deletion",
   "validate_and_consume_selarti_budget_approval",
   "validate_test_expert_campaign_prompt",
@@ -350,6 +353,8 @@ const HAND_SQL_TRIGGERS = [
   "resident_card_version_source",
   "resident_financial_attempt_source",
   "resident_initial_schedule_guard",
+  "resident_lifecycle_case_guard",
+  "resident_lifecycle_subject_guard",
   "resident_message_templates_immutable",
   "resident_native_confirmation_immutable",
   "resident_native_confirmation_source",
@@ -396,6 +401,11 @@ const HAND_SQL_TRIGGERS = [
   "resident_verification_stage_projection",
   "resident_verification_write_guard",
   "resident_version_schedule_source",
+  "resident_waitlist_join_guard",
+  "resident_work_attempt_delivery_guard",
+  "resident_work_attempt_guard",
+  "resident_work_notice_delivery_guard",
+  "resident_work_notice_guard",
   "safety_incidents_append_only",
   "security_logs_immutable",
   "selarti_budget_policy_approval",
@@ -483,7 +493,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(74);
+    expect(newest).toBe(75);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -598,7 +608,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // Canonical main through0073 plus native0074.
-    expect(declared.size).toBe(227);
+    // Canonical main through0073, native0074 and lifecycle0075.
+    expect(declared.size).toBe(232);
   });
 });

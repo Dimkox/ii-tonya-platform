@@ -26,7 +26,7 @@ export function formatPersonalOfferMoney(minor: string): string {
 }
 export function renderPersonalOffer(view: PersonalOfferView): string {
   if (view.selected_locked_total && view.selected_locked_term)
-    return `Мой актуальный тариф. Постоянная стоимость выбранного периода: ${formatPersonalOfferMoney(view.selected_locked_total)} за ${view.selected_locked_term} мес. Эти условия сохраняются для первого основного платежа и продлений. Основная оплата и доступ зависят от подтверждения карточки, промо и отдельного платежа.`;
+    return `Мой актуальный тариф. Постоянная стоимость выбранного периода: ${formatPersonalOfferMoney(view.selected_locked_total)} за ${view.selected_locked_term} мес. Эти условия сохраняются для первого основного платежа и продлений. Основная оплата и доступ зависят от подтверждения карточки, промо и отдельного платежа.${view.readiness === "ready" && view.payment_url ? " Оплатить: " + view.payment_url : ""}`;
   return `Мой актуальный тариф. Месяц: ${formatPersonalOfferMoney(view.locked_price_monthly)}; пакет 3 месяца: ${view.locked_price_package === null ? "недоступен" : formatPersonalOfferMoney(view.locked_price_package)}. Первое предложение: ${view.offer_start_date}. Скидка: ${view.discount_percent}%. Осталось: ${Math.max(0, view.remaining_seconds)} сек.; срок ссылки: ${view.payment_link_expires_at}. ${view.readiness === "select_one_month" ? "Пакет истёк. Выберите один месяц явно." : view.readiness === "ready" && view.payment_url ? "Оплатить: " + view.payment_url : "Основная оплата станет доступна после подтверждения онбординга, промо и карточки."}`;
 }
 export interface ScheduledOfferFinancial {

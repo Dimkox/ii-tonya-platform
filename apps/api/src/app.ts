@@ -1,3 +1,4 @@
+import { residentLifecycleRoutes } from "./routes/resident-lifecycle.js";
 import {
   expertManagerTelegramRoutes,
   type ExpertManagerTelegramCapability,
@@ -666,6 +667,12 @@ export async function buildApp(
       },
     },
     rateLimiter: deps.rateLimiter,
+  });
+  await app.register(residentLifecycleRoutes, {
+    enabled: deps.config.residentLifecycleCompletion?.enabled === true,
+    ...(deps.expertCard?.lifecycle
+      ? { repository: deps.expertCard.lifecycle }
+      : {}),
   });
   await app.register(expertCardAdminRoutes, {
     enabled: deps.config.features.expertCard === true,

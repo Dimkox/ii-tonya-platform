@@ -194,6 +194,7 @@ export interface ExpertCardFinancial {
     input: ExpertCardEvent & { revision: number },
     orderId: string,
     paymentId: string,
+    verifiedUrl?: string,
   ): Promise<boolean>;
   quoteMain(
     input: ExpertCardEvent & {
@@ -1162,6 +1163,7 @@ export function createExpertCardService(deps: {
                 frame,
                 result.orderId,
                 outcome.paymentId,
+                url.toString(),
               )) !== true
             )
               return pending("unavailable");

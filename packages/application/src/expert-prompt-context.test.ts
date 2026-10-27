@@ -53,7 +53,7 @@ describe("expert prompt context", () => {
 
     expect(result.kind === "ready" && result.context).toHaveProperty(
       "runtimeInstructions.version",
-      "residency_offer_v2",
+      "residency_offer_v3",
     );
     expect(result).toEqual({
       kind: "ready",
@@ -355,5 +355,44 @@ it("snapshots the principal and offer reader before asynchronous ownership check
   expect(result.kind === "ready" && result.context).toHaveProperty(
     "currentOffer.locked_price_monthly",
     "540000",
+  );
+});
+
+it("keeps validated permanent terms and permitted link in the actual runtime model context", async () => {
+  const locked = {
+    ...personalOffer,
+    current_discount_stage: 4,
+    discount_percent: 40,
+    selected_locked_total: "599400",
+    selected_locked_term: 1 as const,
+    remaining_seconds: 0,
+    readiness: "ready" as const,
+    payment_url: "https://yookassa.ru/checkout/current",
+  };
+  const result = await buildExpertPromptContext({
+    ...promptDeps(),
+    personalOffers: { readOwned: async () => locked },
+  });
+  expect(result.kind === "ready" && result.context).toHaveProperty(
+    "currentOffer",
+    locked,
+  );
+  expect(EXPERT_OFFER_RUNTIME_INSTRUCTIONS.text).toContain(
+    "после утверждения текущей карточки менеджером",
+  );
+  expect(EXPERT_OFFER_RUNTIME_INSTRUCTIONS.text).toContain(
+    "selected_locked_total",
+  );
+  expect(EXPERT_OFFER_RUNTIME_INSTRUCTIONS.text).not.toContain(
+    "параллельную подготовку общих материалов",
+  );
+});
+
+it("explains calendar coverage using server dates rather than fixed thirty/ninety-day promises", () => {
+  expect(EXPERT_OFFER_RUNTIME_INSTRUCTIONS.text).toContain(
+    "1 или 3 календарных месяца",
+  );
+  expect(EXPERT_OFFER_RUNTIME_INSTRUCTIONS.text).not.toContain(
+    "сроки 30/90 дней",
   );
 });

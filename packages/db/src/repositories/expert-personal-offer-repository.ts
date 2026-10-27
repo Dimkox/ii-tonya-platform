@@ -1,3 +1,4 @@
+import { recordResidentMainInvoice } from "./resident-lifecycle-completion-repository.js";
 import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { expireLockedExpertResidencyOrder } from "./expert-residency-repository.js";
@@ -77,6 +78,23 @@ export class PostgresExpertPersonalOfferRepository {
     for (const c of candidates)
       await this.db.transaction(async (tx) => {
         await lockClientConsentSubject(tx, c.userId);
+        // Lifetime sales own their verified checkout. The legacy campaign scheduler
+        // must not erase it merely because the resident is outside that campaign.
+        if (
+          (
+            await tx.execute(
+              sql`select 1 from expert_sales_bases where user_id=${c.userId}::uuid`,
+            )
+          ).rows.length
+        ) {
+          await tx.execute(
+            sql`update expert_personal_offer_notices set status='cancelled' where user_id=${c.userId}::uuid and status='pending'`,
+          );
+          await tx.execute(
+            sql`update expert_personal_offer_state set next_refresh_at=clock_timestamp()+interval '15 minutes' where user_id=${c.userId}::uuid`,
+          );
+          return;
+        }
         if (
           !(
             await tx.execute<{ ok: boolean }>(
@@ -206,6 +224,8 @@ export class PostgresExpertPersonalOfferRepository {
         await tx.execute(
           sql`insert into expert_personal_offer_notices(user_id,quote_id,stage_deadline,lead_hours) select st.user_id,st.quote_id,q.expires_at,0 from expert_personal_offer_state st join expert_campaign_quotes q on q.id=st.quote_id where st.user_id=${owner.userId}::uuid on conflict(user_id,stage_deadline,lead_hours) do nothing`,
         );
+      if (saved.rows.length === 1)
+        await recordResidentMainInvoice(tx, owner.userId, input.orderId);
       return saved.rows.length === 1;
     });
   }
@@ -252,7 +272,15 @@ export class PostgresExpertPersonalOfferRepository {
   ): Promise<PersonalOfferProjection | null> {
     const row = (
       await tx.execute<PersonalOfferProjection>(
-        sql`select l.final_locked_price::text selected_locked_total,l.term_months selected_locked_term,b.base_offer_shown_at::text offer_start_date,4 current_discount_stage,s.energy_discount_bps/100 discount_percent,s.monthly_price_minor::text locked_price_monthly,case when l.term_months=3 then l.final_locked_price::text end locked_price_package,l.locked_at::text payment_link_expires_at,0 remaining_seconds,'pending_gates'::text readiness,null::text payment_url from expert_sales_paid_locks l join expert_sales_selections s on s.id=l.selection_id join expert_sales_bases b on b.id=s.base_id join users u on u.id=l.user_id and u.active where l.user_id=${userId}::uuid and b.consent_version is not null and expert_card_current_messaging_authority(l.user_id,b.consent_version)`,
+        sql`select l.final_locked_price::text selected_locked_total,l.term_months selected_locked_term,b.base_offer_shown_at::text offer_start_date,4 current_discount_stage,s.energy_discount_bps/100 discount_percent,s.monthly_price_minor::text locked_price_monthly,case when l.term_months=3 then l.final_locked_price::text end locked_price_package,coalesce(link.deadline,l.locked_at)::text payment_link_expires_at,0 remaining_seconds,case when link.url is not null then 'ready' else 'pending_gates' end readiness,link.url payment_url from expert_sales_paid_locks l join expert_sales_selections s on s.id=l.selection_id join expert_sales_bases b on b.id=s.base_id join users u on u.id=l.user_id and u.active left join lateral (
+          select st.payment_url as url,o.payment_deadline as deadline from expert_personal_offer_state st
+          join expert_residency_orders o on o.id=st.order_id and o.status='payment_pending' and o.payment_deadline>clock_timestamp()
+          join expert_card_main_orders m on m.order_id=o.id and m.user_id=l.user_id
+          join expert_residency_provider_operations op on op.order_id=o.id and op.operation_kind='create_payment' and op.provider_object_id=st.payment_id and op.amount_minor=o.cash_minor and op.currency=o.currency and op.status in('pending','unknown_outcome','succeeded')
+          where st.user_id=l.user_id and st.quote_id=o.campaign_quote_id and st.payment_url is not null
+          and expert_card_activation_gate_valid(m.user_id,m.review_id) and expert_campaign_current_profile_valid(m.user_id,o.campaign_quote_id)
+          order by op.created_at desc limit 1
+        ) link on true where l.user_id=${userId}::uuid and b.consent_version is not null and expert_card_current_messaging_authority(l.user_id,b.consent_version)`,
       )
     ).rows[0];
     return row ?? null;

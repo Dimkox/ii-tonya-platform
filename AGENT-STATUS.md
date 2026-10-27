@@ -1,3 +1,41 @@
+# S4b residency lifecycle completion — candidate for independent review 2026-10-27
+
+Current branch `codex/residency-lifecycle-completion-20261027`, isolated candidate
+under `.getzilla/runtime/worktrees/residency-lifecycle-completion-20261027`.
+Baseline native integration is `117af4a74b104bb0f0967868a8d7e46894b05c7b`.
+Use Git HEAD for the exact source; historical status sections below are superseded.
+Active route `35ab697bf43e`, package `.getzilla/runtime/changes/20261027-task-35ab69/`.
+One integration implementer owns source; coordinator owns independent review,
+final qualification and push. No deployment/provider/feature activation is authorized.
+
+Implemented additive0075 lifecycle state, source-bound WORK review/first-activation
+notices, fee-only acquisition/quality cases, fresh-MFA staff API and existing panel,
+separate default-off normal worker, verified permanent-tariff link and runtime
+prompt context. See `docs/runbooks/resident-lifecycle-completion.md` and
+`docs/superpowers/implementation-artifacts/spec-resident-lifecycle-completion.md`.
+
+Focused new PostgreSQL file passed11/11 on invocation3; its three-run allowance is
+exhausted. Do not rerun it or the exhausted historical native file. Actual composed
+form/manager/held3000/main/WORK/native-booking/logistics/renewal/pause/return passed.
+Populated baseline74→75 normal migration witness passed on its third attempt;
+original failures retained. Real state reconstruction:232tables/180functions/
+219triggers/1605constraints/580indexes on PostgreSQL17.5. Actual Chromium panel
+proof passed; full workspace build4 passed. Focused unit/state batch107/110 initially
+failed only stale migration-history inventory; correction passed10/10. Workspace
+types and scoped lint passed. Separate authority file covers source/identity wait
+fences, expiry/replacement and current-gate privacy suppression; its bounded run
+ledger records final4/4 on invocation3; no further PG reruns. Final scope140/140,
+lifecycle state5/5, calendar prompt33/33, types, scoped lint and formatting passed.
+The exact PG75
+catalogue size/hash exception preserves the general1MiB inspection bound.
+
+No local pass implies release readiness. Native DraftPR119 previously passed its
+normal push gate641/641, but final Getzilla qualification FAILED and stays failed.
+Independent exact-source review and the new final qualification remain pending.
+Preserve PG17.5, private parser/semantic sockets and all prior evidence. No secrets
+in logs/argv. New manifest `residency-lifecycle-v4-manifest.json` binds current
+explanatory assets; old inactive manifests retain their original baseline hashes.
+
 # Native scheduling/main integration — candidate for independent review 2026-10-27
 
 Current source branch `codex/residency-native-scheduling-20261027`, existing worktree.

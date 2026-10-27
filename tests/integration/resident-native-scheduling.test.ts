@@ -260,6 +260,18 @@ beforeAll(async () => {
       "utf8",
     ).split("--> statement-breakpoint");
     await db.execute(sql.raw(migration.slice(0, 2).join(";")));
+    // Current source producers require their additive private lifecycle tables.
+    // 0075 depends on pre-0074 financial/card sources, not native backfill objects.
+    // This split fixture still proves 0074 backfill only; normal 74→75 upgrade
+    // evidence is captured separately with genuine baseline source and migrator.
+    await db.execute(
+      sql.raw(
+        readFileSync(
+          "packages/db/migrations/0075_resident_lifecycle_completion.sql",
+          "utf8",
+        ),
+      ),
+    );
   });
   await database.enableExpertReferralCommands();
   expect(

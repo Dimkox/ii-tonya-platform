@@ -106,7 +106,9 @@ export function readExpertCardConfig(
   const delivery = source.EXPERT_CARD_MATERIAL_DELIVERY_ENABLED || "false";
   const lifecycle = source.EXPERT_RESIDENCY_LIFECYCLE_ENABLED === "true",
     commands = source.EXPERT_RESIDENCY_LIFECYCLE_COMMANDS_ENABLED === "true",
-    notice = source.EXPERT_RESIDENCY_NOTICE_DELIVERY_ENABLED === "true";
+    notice =
+      source.EXPERT_RESIDENCY_NOTICE_DELIVERY_ENABLED === "true" ||
+      source.RESIDENT_WORK_NOTICE_DELIVERY_ENABLED === "true";
   const checkout = source.EXPERT_CARD_MAIN_CHECKOUT_ENABLED || "false";
   const tags = source.EXPERT_DRAFT_TAGS_ENABLED || "false";
   const workspace = source.RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED || "false";

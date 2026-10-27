@@ -1,4 +1,8 @@
 import {
+  readResidentLifecycleCompletionConfig,
+  type ResidentLifecycleCompletionConfig,
+} from "./resident-lifecycle-completion-config.js";
+import {
   readClientAccountQueriesConfig,
   type ClientAccountQueriesConfig,
 } from "./client-account-queries-config.js";
@@ -439,6 +443,7 @@ export type RuntimeConfig = {
     vkTokenKind?: "user" | "service";
   };
   expertVerification?: ExpertVerificationConfig;
+  residentLifecycleCompletion?: ResidentLifecycleCompletionConfig;
   expertCard?: ExpertCardConfig;
   expertResidencyLifecycle?: ExpertResidencyLifecycleConfig;
   bookingNotifications?: {
@@ -743,6 +748,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const clientAccountQueries = readClientAccountQueriesConfig(source);
   const expertResidencyLifecycle = readExpertResidencyLifecycleConfig(source);
   const expertCard = readExpertCardConfig(source);
+  const residentLifecycleCompletion =
+    readResidentLifecycleCompletionConfig(source);
   let expertSession: RuntimeConfig["expertSession"];
   if (source.EXPERT_SESSION_ENABLED === "true") {
     const botToken = source.EXPERT_TELEGRAM_BOT_TOKEN ?? "",
@@ -898,6 +905,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(expertApplicant ? { expertApplicant } : {}),
     ...(expertVerification ? { expertVerification } : {}),
     ...(expertCard ? { expertCard } : {}),
+    ...(residentLifecycleCompletion ? { residentLifecycleCompletion } : {}),
     ...(expertResidencyLifecycle ? { expertResidencyLifecycle } : {}),
     ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
     bookingNotifications,

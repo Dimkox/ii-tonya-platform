@@ -53,3 +53,5 @@ export * from "./resident-rich-profile.js";
 export * from "./resident-semantic-tags.js";
 
 export * from "./resident-schedule.js";
+
+export * from "./resident-lifecycle-completion.js";

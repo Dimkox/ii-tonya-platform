@@ -374,6 +374,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
             sql`update expert_residency_lifecycle_notices set status='cancelled' where user_id=${command.targetUserId}::uuid and status<>'delivered'`,
           );
           await tx.execute(
+            sql`update resident_work_notices set state='cancelled' where user_id=${command.targetUserId}::uuid and state<>'delivered'`,
+          );
+          await tx.execute(
             sql`update experts_published set active=false,updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid and active=true`,
           );
           await tx.execute(
@@ -974,6 +977,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         }
         await tx.execute(
           sql`delete from resident_native_confirmations c using reservations r where c.reservation_id=r.id and r.user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from resident_lifecycle_subjects where user_id=${command.targetUserId}::uuid`,
         );
         // Manifests exist before any deletable local mapping/content is cleared.
         // Lifecycle routing/schedules are not financial retention data. Immutable

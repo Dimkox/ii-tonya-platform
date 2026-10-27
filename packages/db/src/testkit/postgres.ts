@@ -355,7 +355,7 @@ const defaultDependencies: TestPostgresDependencies = {
     const adminUrl = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
     return adminUrl
       ? startExternalPostgresDatabase(adminUrl)
-      : new PostgreSqlContainer("postgres:16-alpine").start();
+      : new PostgreSqlContainer("postgres:17.5-bookworm").start();
   },
   createPool: (connectionString) =>
     trackPoolClientClosures(new Pool({ connectionString })),

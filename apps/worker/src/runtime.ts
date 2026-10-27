@@ -16,6 +16,7 @@ export interface WorkerCycleReport {
   readonly residentWorkspaceNotifications?: unknown;
   readonly residentReviewNotifications?: unknown;
   readonly residentPrivateJobs?: unknown;
+  readonly residentLifecycleCompletion?: unknown;
   readonly expertResidencyLifecycle?: unknown;
   readonly expertPersonalOffers?: unknown;
   readonly expertSeparatedSales?: unknown;
@@ -83,6 +84,10 @@ export interface WorkerRuntimeDependencies {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
+  readonly residentLifecycleCompletion?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly expertResidencyLifecycle?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
@@ -139,6 +144,10 @@ export interface ProductionWorkerRuntimeDependencies {
     stopAccepting(): void;
   };
   readonly expertPersonalOffers?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly residentLifecycleCompletion?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
@@ -284,6 +293,9 @@ export function createWorkerRuntime(
       const expertPersonalOffers = acceptingClaims
         ? await deps.expertPersonalOffers?.runOnce()
         : undefined;
+      const residentLifecycleCompletion = acceptingClaims
+        ? await deps.residentLifecycleCompletion?.runOnce()
+        : undefined;
       const expertResidencyLifecycle = acceptingClaims
         ? await deps.expertResidencyLifecycle?.runOnce()
         : undefined;
@@ -338,6 +350,9 @@ export function createWorkerRuntime(
           : { residentWorkspaceNotifications }),
         ...(expertSeparatedSales === undefined ? {} : { expertSeparatedSales }),
         ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
+        ...(residentLifecycleCompletion === undefined
+          ? {}
+          : { residentLifecycleCompletion }),
         ...(expertResidencyLifecycle === undefined
           ? {}
           : { expertResidencyLifecycle }),
@@ -378,6 +393,7 @@ export function createWorkerRuntime(
     deps.residentWorkspaceNotifications?.stopAccepting();
     deps.expertSeparatedSales?.stopAccepting();
     deps.expertPersonalOffers?.stopAccepting();
+    deps.residentLifecycleCompletion?.stopAccepting();
     deps.expertResidencyLifecycle?.stopAccepting();
     const notificationDeadline = Date.now() + shutdownTimeoutMs;
     closePromise = (async () => {
@@ -455,6 +471,9 @@ export function createProductionWorkerRuntime(
     ...(deps.expertPersonalOffers === undefined
       ? {}
       : { expertPersonalOffers: deps.expertPersonalOffers }),
+    ...(deps.residentLifecycleCompletion === undefined
+      ? {}
+      : { residentLifecycleCompletion: deps.residentLifecycleCompletion }),
     ...(deps.expertResidencyLifecycle === undefined
       ? {}
       : { expertResidencyLifecycle: deps.expertResidencyLifecycle }),

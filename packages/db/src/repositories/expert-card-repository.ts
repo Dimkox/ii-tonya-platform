@@ -1,3 +1,4 @@
+import { enqueueResidentWorkNotice } from "./resident-lifecycle-completion-repository.js";
 import { ownerSchedule } from "./resident-schedule.js";
 import { lockCatalogueAuthority } from "./catalogue-authority.js";
 import {
@@ -2877,6 +2878,12 @@ export class PostgresExpertCardRepository {
         }
         await tx.execute(
           sql`update expert_card_drafts set assistance_resolved_at=clock_timestamp() where id=${draft.id}::uuid and assistance_requested_at is not null and assistance_resolved_at is null`,
+        );
+        await enqueueResidentWorkNotice(
+          tx,
+          draft.userId,
+          input.action === "approve" ? "card_approved" : "card_returned",
+          review.id,
         );
         return review.id;
       },

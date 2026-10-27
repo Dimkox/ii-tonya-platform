@@ -1,3 +1,4 @@
+import type { ResidentLifecycleCase } from "../../../packages/contracts/src/resident-lifecycle-completion.js";
 export interface ExpertPublicCard {
   displayName: string;
   profession: string;
@@ -87,6 +88,18 @@ export interface CardRevisionCommand {
   idempotencyKey: string;
 }
 export interface ExpertCardAdminClient {
+  lifecycle?: {
+    list(): Promise<ResidentLifecycleCase[]>;
+    read(id: string): Promise<ResidentLifecycleCase>;
+    close(
+      id: string,
+      input: {
+        expectedRevision: number;
+        idempotencyKey: string;
+        resolution: string;
+      },
+    ): Promise<unknown>;
+  };
   exportTags?(): Promise<string>;
   decideTag?(
     id: string,
@@ -393,7 +406,62 @@ export function createExpertCardClient(
       return invalid();
     return { ...v, replay: v.replay };
   };
+  const lifecycleCase = (v: unknown): v is ResidentLifecycleCase =>
+    obj(v) &&
+    uuid(v.id) &&
+    uuid(v.residentId) &&
+    typeof v.sourceId === "string" &&
+    v.sourceId.length > 0 &&
+    [
+      "materials_missing",
+      "promotion_overdue",
+      "main_payment_overdue",
+      "payment_reconciliation",
+      "quality_window",
+      "notice_unknown",
+    ].includes(String(v.kind)) &&
+    ["open", "resolved", "no_action"].includes(String(v.status)) &&
+    integer(v.revision, 0) &&
+    typeof v.createdAt === "string" &&
+    Number.isFinite(Date.parse(v.createdAt)) &&
+    ["dueAt", "windowStart", "windowEnd", "resolvedAt"].every(
+      (k) =>
+        v[k] === null ||
+        (typeof v[k] === "string" &&
+          Number.isFinite(Date.parse(v[k] as string))),
+    ) &&
+    ["numerator", "denominator", "missingProvenance"].every(
+      (k) => v[k] === null || integer(v[k], 0),
+    ) &&
+    (v.applicationId === null || uuid(v.applicationId)) &&
+    (v.resolution === null || typeof v.resolution === "string");
   return {
+    lifecycle: {
+      async list() {
+        const r = await request("/lifecycle");
+        if (
+          !Array.isArray(r.items) ||
+          r.items.length > 50 ||
+          !r.items.every(lifecycleCase)
+        )
+          return invalid();
+        return r.items;
+      },
+      async read(id) {
+        if (!uuid(id)) return invalid();
+        const r = await request(`/lifecycle/${id}`);
+        if (!lifecycleCase(r.item) || r.item.id !== id) return invalid();
+        return r.item;
+      },
+      async close(id, input) {
+        if (!uuid(id)) return invalid();
+        return request(`/lifecycle/${id}/close`, {
+          expectedRevision: input.expectedRevision,
+          idempotencyKey: input.idempotencyKey,
+          resolution: input.resolution,
+        });
+      },
+    },
     async exportTags() {
       const r = await request("/catalogue-export");
       if (!Array.isArray(r.items) || r.items.length > 512) return invalid();
