@@ -97,6 +97,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0070_resident_native_scheduling.sql",
   "packages/db/migrations/0069_resident_semantic_tags.sql",
   "packages/db/migrations/0060_separated_sales_review_corrections.sql",
   "packages/db/migrations/0061_resident_content_safety.sql",
@@ -142,6 +143,16 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "resident_schedule_state",
+  "resident_schedule_previews",
+  "resident_service_mappings",
+  "resident_service_versions",
+  "resident_schedule_versions",
+  "resident_native_slots",
+  "resident_schedule_busy",
+  "resident_native_confirmations",
+  "resident_native_logistics",
+
   "forbidden_patterns",
   "resident_card_corrections",
   "resident_card_proposal_changes",
@@ -417,6 +428,32 @@ const approvedPaymentBoundaryPaths = new Set([
   ...YOOKASSA_PAYMENT_ALLOWED_PATHS,
 ]);
 const approvedPaymentBoundaryHashes = new Map([
+  // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
+  [
+    "packages/db/src/index.ts",
+    "dc65fa5ea4995a96c0e665b6f7d2c7ff078d62e9dc21de496d0830c902514674",
+  ],
+  [
+    "packages/contracts/src/index.ts",
+    "66800d021c07f7c9f5e1b0fa61ecb3d378799cc1684a0c1ae45be6f78496092d",
+  ],
+  [
+    "packages/db/src/schema/index.ts",
+    "5aee7c39e247c880a929f286b94a4d42496f05e0b89bab868a1447d0c182b17f",
+  ],
+  [
+    "apps/api/src/routes/public-client-catalog.ts",
+    "e3940fbc4a7d9fea289ae937cb22dfd5e3d92eb3658b92e2929e9b3428aa0f30",
+  ],
+  [
+    "apps/api/src/expert-card-telegram-ingress.ts",
+    "f065c1884d3194c5dc6508bd9631ad61190e938e102b8271421bcf28731aaf11",
+  ],
+  [
+    "apps/worker/src/booking-notifications.ts",
+    "a6ecb6451040104885a89b440b9a6f21953dd923813bb923c8698074fbd0378d",
+  ],
+
   [
     "packages/integrations/src/yookassa/held-onboarding.ts",
     "f938a376d3cb0bfde235a619c4be9db6b27b8c531eee699dd1fd13f15cc66182",
@@ -530,7 +567,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/contracts/package.json",
-    "a516d484080039198439e6d4f035900b2d23252356d55896c4f63a36f5924eed",
+    "107c72668715f901d985b521260771b152b1efd78ca5f9ab9c719ca30db6d66a",
   ],
   [
     "packages/db/package.json",
@@ -840,7 +877,10 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
     new Set(["@ii-tonya/contracts", "@ii-tonya/domain"]),
   ],
   ["packages/config/package.json", new Set(["zod"])],
-  ["packages/contracts/package.json", new Set(["zod"])],
+  [
+    "packages/contracts/package.json",
+    new Set(["zod", "@js-temporal/polyfill"]),
+  ],
   [
     "packages/db/package.json",
     new Set([
@@ -890,6 +930,7 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   ],
 ]);
 const approvedDependencySpecifiers = new Map([
+  ["@js-temporal/polyfill", "0.5.1"],
   ["@eslint/js", "^9.31.0"],
   ["@fastify/rate-limit", "^10.3.0"],
   ["@ii-tonya/application", "workspace:*"],
@@ -929,6 +970,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0070_resident_native_scheduling.sql",
+    "57aa4832165fcaf88665ee6d3d9b358a05c94c8d27f1a6bc09167d0667129e75",
+  ],
+  [
+    "packages/db/migrations/meta/0070_snapshot.json",
+    "790760c28b969aecb1131ff8645c6a5708102318fc579b50a2e0bb778f07b220",
+  ],
+  [
+    "packages/db/migrations/state/0070_sql_objects.json",
+    "82fc8811b7e6c761a16a63c9fcb919d814000692c75abfdf345b9f7e5b4cfee0",
+  ],
+  [
+    "packages/db/migrations/state/0070_manifest.json",
+    "222b8f1e33823895774099ce115cb6475adfa2e279850e91c8a29a41b27b800e",
+  ],
+
   [
     "packages/db/migrations/0069_resident_semantic_tags.sql",
     "a5c787fb5e784b5cde3c8aa8f19d6f43e916b25c3587d5ed61b72490ff78d4d2",
@@ -1600,7 +1658,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "927e46e4f69f1cccc4c65e1600a228c0a1bd093a5a703997c674c1f174c62414",
+    "a85d98083e13a8cf4a419e9de94eef8fbbc3381ec8c6539030ab8b08fb352d97",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1680,7 +1738,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "927e46e4f69f1cccc4c65e1600a228c0a1bd093a5a703997c674c1f174c62414",
+    "a85d98083e13a8cf4a419e9de94eef8fbbc3381ec8c6539030ab8b08fb352d97",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

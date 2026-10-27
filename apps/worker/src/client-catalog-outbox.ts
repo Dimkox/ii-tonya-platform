@@ -23,6 +23,7 @@ type PublicService = Readonly<{
   sourceKey: string;
   displayName: string;
   serviceCode: string;
+  serviceTitle?: string;
   language: string;
 }>;
 
@@ -38,7 +39,8 @@ type AvailabilitySlot = Readonly<{
   localSlotId?: string;
   sourceOrder: string;
   startsAt: Date;
-  observedAt: Date;
+  observedAt: Date | null;
+  nativeValidUntil?: Date;
   remainingCapacity: number | null;
 }>;
 
@@ -176,6 +178,7 @@ function catalogOnly(service: PublicService): ClientCatalogCard {
   return {
     displayName: service.displayName,
     serviceCode: service.serviceCode,
+    ...(service.serviceTitle ? { serviceTitle: service.serviceTitle } : {}),
     language: service.language,
     availability: "catalog_only",
     slots: [],
@@ -187,6 +190,9 @@ function publicService(value: PublicService): PublicService {
     sourceKey: boundedString(value.sourceKey, 128),
     displayName: boundedString(value.displayName, 120),
     serviceCode: boundedString(value.serviceCode, 64),
+    ...(value.serviceTitle === undefined
+      ? {}
+      : { serviceTitle: boundedString(value.serviceTitle, 160) }),
     language: boundedString(value.language, 32),
   };
 }
@@ -209,12 +215,18 @@ function freshSlots(
     if (
       typeof slot !== "object" ||
       slot === null ||
-      !finiteDate(slot.observedAt) ||
+      (slot.nativeValidUntil === undefined
+        ? !slot.observedAt || !finiteDate(slot.observedAt)
+        : !finiteDate(slot.nativeValidUntil) ||
+          slot.nativeValidUntil.getTime() <= databaseNow.getTime() ||
+          slot.startsAt.getTime() >= slot.nativeValidUntil.getTime()) ||
       !finiteDate(slot.startsAt) ||
       typeof slot.sourceOrder !== "string" ||
       slot.sourceOrder.length < 1 ||
-      slot.observedAt.getTime() < earliestObserved ||
-      slot.observedAt.getTime() > databaseNow.getTime() ||
+      (slot.nativeValidUntil === undefined &&
+        (!slot.observedAt ||
+          slot.observedAt.getTime() < earliestObserved ||
+          slot.observedAt.getTime() > databaseNow.getTime())) ||
       slot.startsAt.getTime() < earliestStart ||
       !Number.isSafeInteger(slot.remainingCapacity) ||
       (slot.remainingCapacity as number) < 1
@@ -294,6 +306,9 @@ export function createClientCatalogSourceReader(
             : {
                 displayName: service.displayName,
                 serviceCode: service.serviceCode,
+                ...(service.serviceTitle
+                  ? { serviceTitle: service.serviceTitle }
+                  : {}),
                 language: service.language,
                 availability: "fresh_slots",
                 slots,
@@ -358,7 +373,8 @@ export function createClientCatalogSourceReader(
             const expiresAt = new Date(
               Math.min(
                 input.requestExpiresAt.getTime(),
-                sourceSlot.observedAt.getTime() + SLOT_FRESHNESS_MS,
+                sourceSlot.nativeValidUntil?.getTime() ??
+                  sourceSlot.observedAt!.getTime() + SLOT_FRESHNESS_MS,
                 sourceSlot.startsAt.getTime() - SLOT_LEAD_MS,
               ),
             );
@@ -372,6 +388,9 @@ export function createClientCatalogSourceReader(
           return {
             displayName: service.displayName,
             serviceCode: service.serviceCode,
+            ...(service.serviceTitle
+              ? { serviceTitle: service.serviceTitle }
+              : {}),
             language: service.language,
             availability: "fresh_slots",
             slots,

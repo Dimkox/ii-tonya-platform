@@ -972,6 +972,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           values (${job.id}::uuid, ${manifest.processor}, 'pending', ${idempotencyKey})
         `);
         }
+        await tx.execute(
+          sql`delete from resident_native_confirmations c using reservations r where c.reservation_id=r.id and r.user_id=${command.targetUserId}::uuid`,
+        );
         // Manifests exist before any deletable local mapping/content is cleared.
         // Lifecycle routing/schedules are not financial retention data. Immutable
         // renewal attempts retain only the canonical financial UUID bindings.
@@ -1004,6 +1007,9 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         );
         await tx.execute(
           sql`delete from resident_safety_outcomes where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_services es set name='Удалённая услуга',code=null,language=null,active=false from resident_service_mappings m join expert_card_drafts d on d.id=m.draft_id where m.expert_service_id=es.id and d.user_id=${command.targetUserId}::uuid`,
         );
         await tx.execute(
           sql`delete from expert_card_drafts where user_id=${command.targetUserId}::uuid`,

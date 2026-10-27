@@ -171,6 +171,8 @@ type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
   : never;
 
 type SlotRow = {
+  native?: boolean;
+  scheduleBusy?: boolean;
   slotId: string;
   expertId: string;
   expertServiceId: string;
@@ -538,10 +540,7 @@ export class PostgresBookingRepository {
         and es.language is not null
         and (${serviceCode}::text is null or es.code = ${serviceCode})
         and (${language}::text is null or es.language = ${language})
-        and s.observed_at >= ${new Date(
-          command.now.getTime() - SLOT_FRESHNESS_MS,
-        )}
-        and s.observed_at <= ${command.now}
+        and resident_slot_fresh(s.id,${command.now})
         and s.starts_at >= ${earliest}
         and s.starts_at < ${command.to}
         and (
@@ -622,7 +621,7 @@ export class PostgresBookingRepository {
         case
           when r.status = 'booked'
             and s.starts_at - ${MEETING_URL_DISCLOSURE_LEAD_MS} * interval '1 millisecond' <= clock_timestamp()
-          then r.meeting_url
+          then coalesce((select snapshot->'logistics'->>'room' from resident_native_confirmations where reservation_id=r.id),r.meeting_url)
           else null
         end as "meetingUrl"
       from experts e
@@ -647,7 +646,7 @@ export class PostgresBookingRepository {
         })}
       ) handoff_consent on true
       where e.id = ${command.expertId}::uuid
-        and e.active
+        and (e.active or resident_native_obligation(e.id))
         and e.verified
         and r.status in ('reserved', 'booked')
         and (r.status = 'booked' or r.reserved_until > ${command.from})
@@ -664,7 +663,7 @@ export class PostgresBookingRepository {
           join users expert_user on expert_user.id = e.user_id and expert_user.active
           join channel_identities ci on ci.user_id = e.user_id
           where e.id = ${command.expertId}::uuid
-            and e.active
+            and (e.active or resident_native_obligation(e.id))
             and e.verified
             and ci.provider = 'telegram'
             and ci.external_id = ${command.telegramUserId}
@@ -758,10 +757,7 @@ export class PostgresBookingRepository {
                 and r.status = 'reserved'
                 and r.reserved_until > ${command.now}
                 and s.starts_at > ${command.now}
-                and s.observed_at >= ${new Date(
-                  command.now.getTime() - SLOT_FRESHNESS_MS,
-                )}
-                and s.observed_at <= ${command.now}
+                and resident_slot_fresh(s.id,${command.now})
                 and es.active
               )
               or (
@@ -867,8 +863,18 @@ export class PostgresBookingRepository {
       const action =
         command.action === "confirm" ? "expert_confirm" : "expert_cancel";
       const version = command.version + 1;
+      const native =
+        (
+          await tx.execute(
+            sql`select reservation_id from resident_native_confirmations where reservation_id=${command.reservationId}::uuid and reservation_version=${version}`,
+          )
+        ).rows.length === 1;
       const status =
-        command.action === "confirm" ? "reserved" : "cancelled_by_expert";
+        command.action === "confirm"
+          ? native
+            ? "booked"
+            : "reserved"
+          : "cancelled_by_expert";
       const audit = (
         await tx.execute(sql`select a.id from audit_events a join notifications n on n.id=${credential.id}::uuid
         where a.object_type='reservation' and a.object_id=${command.reservationId}::uuid and a.actor_type='expert' and a.actor_id=${command.expertId}::uuid
@@ -909,6 +915,9 @@ export class PostgresBookingRepository {
       now,
       correlationId: command.correlationId,
     });
+    await tx.execute(
+      sql`update notifications n set callback_consumed_at=r.updated_at,updated_at=r.updated_at from reservations r where n.id=${credential.id}::uuid and r.id=${command.reservationId}::uuid`,
+    );
     await tx.execute(
       sql`update booking_notification_callbacks set callback_token_ciphertext=null,encryption_key_id=null where delivery_id=${context.deliveryId}::uuid`,
     );
@@ -1273,6 +1282,8 @@ export class PostgresBookingRepository {
         s.starts_at as "startsAt",
         s.ends_at as "endsAt",
         s.observed_at as "observedAt",
+        (s.provider='resident_native') as native,
+        exists(select 1 from resident_schedule_busy busy where busy.expert_id=e.id and busy.starts_at<s.ends_at and busy.ends_at>s.starts_at) as "scheduleBusy",
         s.capacity,
         (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})) as "expertActive",
         e.verified as "expertVerified",
@@ -1330,7 +1341,7 @@ export class PostgresBookingRepository {
               and c.slot_id=${command.slotId}::uuid
               and cr.user_id=${command.userId}::uuid and u.active and cr.state='ready'
               and c.expires_at>current_clock.at and cr.expires_at>current_clock.at) as "choiceValid",
-          (s.observed_at between current_clock.at-interval '15 minutes' and current_clock.at) as "slotFresh",
+          resident_slot_fresh(s.id,current_clock.at) as "slotFresh",
           (s.starts_at>=current_clock.at+${command.minimumLeadMs}::bigint*interval '1 millisecond') as "leadValid",
           (s.starts_at-${command.confirmationBufferMs}::bigint*interval '1 millisecond'>current_clock.at) as "deadlineValid"
         from slots s cross join current_clock where s.id=${command.slotId}::uuid
@@ -1355,7 +1366,18 @@ export class PostgresBookingRepository {
       command = { ...command, now: protectedTiming.databaseNow };
     }
 
-    if (!isFresh(slot.observedAt, command.now)) {
+    if (slot.scheduleBusy)
+      return { kind: "unavailable", reason: "expert_ineligible" };
+    if (slot.native && !protectedTiming) {
+      const current = (
+        await tx.execute<{ now: Date | string; valid: boolean }>(
+          sql`select clock_timestamp() as now,resident_native_slot_valid(${slot.slotId}::uuid,clock_timestamp()) as valid`,
+        )
+      ).rows[0]!;
+      command = { ...command, now: new Date(current.now) };
+      if (!current.valid) return { kind: "unavailable", reason: "stale_slot" };
+    }
+    if (!slot.native && !isFresh(slot.observedAt, command.now)) {
       return { kind: "unavailable", reason: "stale_slot" };
     }
     if (!slot.expertActive || !slot.expertVerified || !slot.serviceActive) {
@@ -1527,6 +1549,8 @@ export class PostgresBookingRepository {
         s.starts_at as "startsAt",
         s.ends_at as "endsAt",
         s.observed_at as "observedAt",
+        (s.provider='resident_native') as native,
+        exists(select 1 from resident_schedule_busy busy where busy.expert_id=e.id and busy.starts_at<s.ends_at and busy.ends_at>s.starts_at) as "scheduleBusy",
         s.capacity,
         (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})) as "expertActive",
         e.verified as "expertVerified",
@@ -1545,14 +1569,28 @@ export class PostgresBookingRepository {
       throw new Error("Stale reservation version");
     }
 
+    if (reservation.native) {
+      const current = (
+        await tx.execute<{ now: Date | string; valid: boolean }>(
+          sql`select clock_timestamp() as now,resident_native_slot_valid(${reservation.slotId}::uuid,clock_timestamp()) as valid`,
+        )
+      ).rows[0]!;
+      command = { ...command, now: new Date(current.now) };
+      if (command.action === "expert_confirm" && !current.valid)
+        throw Error("Native slot authority expired");
+    }
     await this.assertTransitionEligibility(tx, reservation, command);
     if (command.action === "expert_confirm") {
-      await enqueuePlanerkaBooking(tx, reservation.reservationId);
+      if (reservation.native)
+        await tx.execute(sql`insert into resident_native_confirmations(reservation_id,slot_id,service_version_id,reservation_version,snapshot)
+        select r.id,s.id,v.id,r.version+1,jsonb_build_object('serviceId',v.expert_service_id,'title',v.title,'durationMinutes',v.duration_minutes,'bufferMinutes',n.buffer_minutes,'timezone',n.timezone,'localStart',n.local_start,'startsAt',s.starts_at,'endsAt',s.ends_at,'format',v.format,'logistics',v.logistics)
+        from reservations r join slots s on s.id=r.slot_id join resident_native_slots n on n.slot_id=s.id join resident_service_versions v on v.id=n.service_version_id where r.id=${reservation.reservationId}::uuid`);
+      else await enqueuePlanerkaBooking(tx, reservation.reservationId);
     }
-    const nextStatus = transitionReservation(
-      reservation.status,
-      command.action,
-    );
+    const nextStatus =
+      reservation.native && command.action === "expert_confirm"
+        ? "booked"
+        : transitionReservation(reservation.status, command.action);
     const updated =
       command.action === "expert_confirm"
         ? (
@@ -1574,8 +1612,7 @@ export class PostgresBookingRepository {
             and es.id = r.expert_service_id
             and r.reserved_until > ${command.now}
             and s.starts_at > ${command.now}
-            and s.observed_at >= ${new Date(command.now.getTime() - SLOT_FRESHNESS_MS)}
-            and s.observed_at <= ${command.now}
+            and resident_slot_fresh(s.id,${command.now})
             and e.active = true
             and e.verified = true
             and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
@@ -1612,6 +1649,7 @@ export class PostgresBookingRepository {
       correlationId: command.correlationId,
       occurredAt: command.now,
       version: updated.version,
+      native: reservation.native === true,
     });
     return updated;
   }
@@ -1642,7 +1680,10 @@ export class PostgresBookingRepository {
         if (reservation.startsAt.getTime() <= command.now.getTime()) {
           throw new Error("Slot is no longer confirmable");
         }
-        if (!isFresh(reservation.observedAt, command.now)) {
+        if (
+          !reservation.native &&
+          !isFresh(reservation.observedAt, command.now)
+        ) {
           throw new Error("Slot observation is stale");
         }
         if (
@@ -1711,7 +1752,7 @@ export class PostgresBookingRepository {
     tx: Transaction,
     actor: "client" | "expert",
     actorId: string,
-    slot: Pick<SlotRow, "startsAt" | "endsAt">,
+    slot: Pick<SlotRow, "startsAt" | "endsAt"> & { slotId?: string },
     excludedReservationId?: string,
   ): Promise<boolean> {
     const excluded =
@@ -1730,8 +1771,8 @@ export class PostgresBookingRepository {
         where ${actorPredicate}
           and r.status in ('reserved', 'booked')
           and ${excluded}
-          and occupied.starts_at < ${slot.endsAt}
-          and occupied.ends_at > ${slot.startsAt}
+          and occupied.starts_at < ${actor === "expert" ? sql`coalesce((select occupied_until from resident_native_slots where slot_id=${slot.slotId ?? null}::uuid),${slot.endsAt})` : sql`${slot.endsAt}`}
+          and ${actor === "expert" ? sql`coalesce((select occupied_until from resident_native_slots where slot_id=occupied.id),occupied.ends_at)` : sql`occupied.ends_at`} > ${slot.startsAt}
       ) as exists
     `);
     return result.rows[0]?.exists ?? false;
@@ -1740,6 +1781,7 @@ export class PostgresBookingRepository {
   private async auditAndOutbox(
     tx: Transaction,
     event: {
+      native?: boolean;
       actorType: string;
       actorId: string;
       action: BookingAuditAction;
@@ -1769,13 +1811,19 @@ export class PostgresBookingRepository {
         ${event.occurredAt}, ${metadataHash}
       )
     `);
-    for (const topic of outboxTopicsFor(event.action)) {
+    for (const topic of event.native &&
+    event.action === "reservation.expert_confirm"
+      ? ["client.booking_confirmed"]
+      : outboxTopicsFor(event.action)) {
       const payload = {
         reservationId: event.reservationId,
         action: event.action.replace(/^reservation\./, ""),
         decision: event.decision,
         version: event.version,
         charge: 0,
+        ...(event.native && event.action === "reservation.expert_confirm"
+          ? { source: "resident_native" }
+          : {}),
       };
       const source = await tx.execute<{ id: string }>(sql`
         insert into integration_outbox (
@@ -1858,7 +1906,7 @@ export async function readOwnedActiveBookingsInTransaction(
         select b.booking_handle,b.created_at,
           case when o.cancel_requested and o.state not in ('cancelled','rejected') then 'cancellation_pending'
             when l.reservation_id is not null and l.resolved_at is null and r.status in ('cancelled_by_client','cancelled_by_expert','expired') then 'cancellation_pending'
-            when r.status='booked' and o.provider_uid is null then 'confirmation_unverified'
+            when r.status='booked' and o.provider_uid is null and not exists(select 1 from resident_native_confirmations nc where nc.reservation_id=r.id and nc.slot_id=r.slot_id) then 'confirmation_unverified'
             when r.status='reserved' and o.id is not null then 'calendar_pending'
             else r.status::text end as status,s.starts_at,r.reserved_until
         from client_booking_receipts b

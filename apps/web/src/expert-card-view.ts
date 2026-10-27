@@ -231,6 +231,7 @@ export function bindExpertCardReview(
       detail.append(container);
       const pages = richReadablePages({
         Профиль: item.rich.profile,
+        "Подтверждённое расписание": item.rich.schedule ?? null,
         "Предложенные изменения": item.rich.proposal,
         "Предыдущая утверждённая версия": item.previousVersion ?? null,
       });

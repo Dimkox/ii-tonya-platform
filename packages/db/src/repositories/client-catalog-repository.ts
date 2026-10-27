@@ -11,6 +11,7 @@ export type ClientCatalogSlot =
 export type ClientCatalogCard = Readonly<{
   displayName: string;
   serviceCode: string;
+  serviceTitle?: string;
   language: string;
   availability: "catalog_only" | "fresh_slots";
   slots: readonly ClientCatalogSlot[];
@@ -124,11 +125,12 @@ export const validateClientCatalogCards = (
       typeof card !== "object" ||
       card === null ||
       Array.isArray(card) ||
-      Object.keys(card).length !== 5 ||
+      Object.keys(card).length !== (card.serviceTitle === undefined ? 5 : 6) ||
       !Object.keys(card).every((key) =>
         [
           "displayName",
           "serviceCode",
+          "serviceTitle",
           "language",
           "availability",
           "slots",
@@ -138,6 +140,11 @@ export const validateClientCatalogCards = (
       card.displayName.length < 1 ||
       card.displayName.length > 120 ||
       CONTROL_PATTERN.test(card.displayName) ||
+      (card.serviceTitle !== undefined &&
+        (typeof card.serviceTitle !== "string" ||
+          card.serviceTitle.length < 1 ||
+          card.serviceTitle.length > 160 ||
+          CONTROL_PATTERN.test(card.serviceTitle))) ||
       typeof card.serviceCode !== "string" ||
       optionalFilter(card.serviceCode, 64) === undefined ||
       typeof card.language !== "string" ||

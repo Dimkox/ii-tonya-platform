@@ -59,6 +59,9 @@ export interface DraftTagPage {
   tags_array: readonly string[];
 }
 export interface ExpertCardRepository {
+  scheduleAction?(
+    input: ExpertCardEvent & { text: string },
+  ): Promise<ExpertCardWorkflow & { replay: boolean; pageText: string }>;
   tagAction?(
     input: ExpertCardEvent & {
       action: "recommend" | "toggle" | "confirm" | "custom" | "custom_start";
@@ -736,12 +739,12 @@ export function createExpertCardService(deps: {
           });
           if (redeemed.kind === "duplicate") return { status: "duplicate" };
           return reply(
-            "Рабочий бот подключён. Мой актуальный тариф: /my_tariff. Интервью: /card_mode — начать; /card_checklist — мастер-чек-лист. Отправляйте текст, фото или документ. /card — состояние; /card_answers — ответы и исправления; /card_submit НОМЕР_РЕВИЗИИ — отправить на проверку.",
+            "Рабочий бот подключён. Мой актуальный тариф: /my_tariff. Расписание: /slots_setup — обновить слоты; /slots_card — расписание для новой проверки карточки; /slots_import — импорт; /slots_busy — занятое время. Интервью: /card_mode — начать; /card_checklist — мастер-чек-лист. Отправляйте текст, фото или документ. /card — состояние; /card_answers — ответы и исправления; /card_submit НОМЕР_РЕВИЗИИ — отправить на проверку.",
           );
         }
         if (
           text.startsWith("/") &&
-          !/^\/(?:card|card_mode|card_service_add|card_photo_remove|card_manager|card_checklist|card_geocode|card_answer|card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm|card_answers|card_correct|card_document|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
+          !/^\/(?:slots_setup|slots_card|slots_answer|slots_import|slots_preview|slots_page|slots_confirm|slots_busy|card|card_mode|card_service_add|card_photo_remove|card_manager|card_checklist|card_geocode|card_answer|card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm|card_answers|card_correct|card_document|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
             text,
           )
         )
@@ -752,6 +755,22 @@ export function createExpertCardService(deps: {
         }
         const current = await deps.repository.getWorkflow(s);
         if (!current) return { status: "unhandled" };
+        if (
+          (/^\/slots_(?:setup|card|answer|import|preview|page|confirm|busy)(?:\s|$)/u.test(
+            text,
+          ) ||
+            text === "Обновить слоты" ||
+            text.startsWith("Убери слот ")) &&
+          deps.repository.scheduleAction
+        ) {
+          const result = await deps.repository.scheduleAction({
+            ...event,
+            text,
+          });
+          return result.replay
+            ? { status: "duplicate" }
+            : reply(result.pageText);
+        }
         if (text === "/card_checklist") return reply(richChecklist());
         const removePhoto =
           /^\/card_photo_remove (0|[1-9][0-9]{0,5}) ([1-9]|10)$/u.exec(text);

@@ -1,3 +1,4 @@
+import { ownerSchedule } from "./resident-schedule.js";
 import { lockCatalogueAuthority } from "./catalogue-authority.js";
 import {
   tagCatalogue,
@@ -1132,6 +1133,36 @@ export class PostgresExpertCardRepository {
     });
   }
 
+  async scheduleAction(raw: ExpertCardEvent & { text: string }) {
+    if (typeof raw.text !== "string" || raw.text.length > 4000)
+      fail("card_invalid_entry");
+    let pageText = "";
+    const result = await this.ownerAction(
+      raw,
+      "entry",
+      { schedule: raw.text },
+      async (tx, draft) => {
+        try {
+          pageText = await ownerSchedule(tx, draft, raw.text);
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            !("query" in error) &&
+            !("code" in error)
+          )
+            throw new ExpertCardError(
+              "card_fields:" +
+                (error.name === "ZodError"
+                  ? "Проверьте даты, часовой пояс, часы и перерывы. /slots_setup"
+                  : error.message),
+            );
+          throw error;
+        }
+      },
+    );
+    return { ...result, pageText };
+  }
+
   async richAction(
     raw: ExpertCardEvent & {
       expectedRevision: number;
@@ -1198,8 +1229,9 @@ export class PostgresExpertCardRepository {
           token: string | null;
           digest: string | null;
           currentDigest: string;
+          schedule: unknown;
         }>(
-          sql`select rich_profile as profile,rich_guided as guided,rich_pending_services as pending,rich_proposal as proposal,preview_page as page,preview_token_digest as token,preview_content_digest as digest,resident_rich_digest(expert_card_drafts) as "currentDigest" from expert_card_drafts where id=${d.id}::uuid`,
+          sql`select initial_schedule as schedule,rich_profile as profile,rich_guided as guided,rich_pending_services as pending,rich_proposal as proposal,preview_page as page,preview_token_digest as token,preview_content_digest as digest,resident_rich_digest(expert_card_drafts) as "currentDigest" from expert_card_drafts where id=${d.id}::uuid`,
         )
       ).rows[0]!;
       let profile = row.profile ?? emptyRichProfile();
@@ -1270,6 +1302,11 @@ export class PostgresExpertCardRepository {
           ? richReadablePages(row.proposal)
           : [
               ...richPreviewPages(profile, d.publicCard),
+              ...(row.schedule
+                ? richReadablePages({
+                    "Подтверждённое расписание": row.schedule,
+                  })
+                : []),
               ...(pending.length || Object.keys(guided).length
                 ? richReadablePages({
                     partialServices: [
@@ -2548,19 +2585,20 @@ export class PostgresExpertCardRepository {
         rich: (
           await tx.execute<{
             enabled: boolean;
+            schedule: unknown;
             profile: RichProfile | null;
             proposal: RichProposal | null;
             pending: GuidedService[];
             guided: GuidedService;
             confirmed: boolean | null;
           }>(
-            sql`select rich_mode as enabled,rich_profile as profile,rich_guided as guided,rich_pending_services as pending,rich_proposal as proposal,owner_confirmed_digest=resident_rich_digest(expert_card_drafts) as confirmed from expert_card_drafts where id=${draft.id}::uuid`,
+            sql`select initial_schedule as schedule,rich_mode as enabled,rich_profile as profile,rich_guided as guided,rich_pending_services as pending,rich_proposal as proposal,owner_confirmed_digest=resident_rich_digest(expert_card_drafts) as confirmed from expert_card_drafts where id=${draft.id}::uuid`,
           )
         ).rows[0],
         previousVersion:
           (
             await tx.execute(
-              sql`select profile,public_payload as "publicCard",revision from resident_card_versions where draft_id=${draft.id}::uuid order by revision desc limit 1`,
+              sql`select initial_schedule as schedule,profile,public_payload as "publicCard",revision from resident_card_versions where draft_id=${draft.id}::uuid order by revision desc limit 1`,
             )
           ).rows[0] ?? null,
         media: (

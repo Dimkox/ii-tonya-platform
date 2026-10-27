@@ -117,7 +117,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
         r.id as "reservationId",
         r.version,
         s.starts_at as "startsAt",
-        es.name as "serviceName"
+        coalesce((select snapshot->>'title' from resident_native_confirmations where reservation_id=r.id),es.name) as "serviceName"
       from experts e
       join users u on u.id = e.user_id and u.active
       join channel_identities ci
@@ -130,7 +130,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
         on es.id = r.expert_service_id
         and es.expert_id = r.expert_id
       where e.id = ${command.expertId}::uuid
-        and e.active
+        and (e.active or resident_native_obligation(e.id))
         and e.verified
         and r.status in ('reserved', 'booked')
         and (r.status = 'booked' or r.reserved_until > ${command.now})
@@ -196,7 +196,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
       left join reservations r on r.expert_id = e.id
       left join slots s on s.id = r.slot_id
       where e.id = ${command.expertId}::uuid
-        and e.active
+        and (e.active or resident_native_obligation(e.id))
         and e.verified
     `);
     const row = result.rows[0];
@@ -253,7 +253,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
         and r.status in ('reserved', 'booked')
         and (r.status = 'booked' or r.reserved_until > clock_timestamp())
         and s.starts_at >= clock_timestamp()
-        and e.active and e.verified and u.active
+        and (e.active or resident_native_obligation(e.id)) and e.verified and u.active
         and to_timestamp(${claims.expiresAtEpochSeconds}) > clock_timestamp()
         and to_timestamp(${claims.expiresAtEpochSeconds}) <= clock_timestamp() + interval '10 minutes'
       returning id
@@ -371,7 +371,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
           and r.status in ('reserved', 'booked')
           and (r.status = 'booked' or r.reserved_until > ${command.now})
           and s.starts_at >= ${command.now}
-          and e.active and e.verified
+          and (e.active or resident_native_obligation(e.id)) and e.verified
           and n.callback_claims::jsonb @> jsonb_build_object(
             'reservationId', r.id::text,
             'expertId', r.expert_id::text,
@@ -460,7 +460,7 @@ export class PostgresExpertTelegramQueryRepository implements ClientViewCallback
           and ci.provider = 'telegram'
           and ci.external_id = ${command.telegramUserId}
         where e.id = ${command.expertId}::uuid
-          and e.active and e.verified
+          and (e.active or resident_native_obligation(e.id)) and e.verified
       ) as authorized
     `);
     return result.rows[0]?.authorized === true;

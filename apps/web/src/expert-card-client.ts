@@ -28,6 +28,7 @@ export interface ExpertCardDraft extends ExpertCardWorkflow {
     resolvedAt: string | null;
   };
   rich?: {
+    schedule?: unknown;
     enabled: boolean;
     profile: Record<string, unknown> | null;
     proposal: Record<string, unknown> | null;

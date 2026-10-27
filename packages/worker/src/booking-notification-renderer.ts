@@ -6,6 +6,8 @@ import {
 
 function calendarText(calendar: BookingCalendarCancellation): string {
   switch (calendar) {
+    case "native_cancelled":
+      return "Запись отменена.";
     case "not_created":
       return "Запись в календаре не создавалась.";
     case "cancelled":
@@ -60,12 +62,16 @@ export function renderBookingNotification(
     case "telegram.booking_cancelled":
       return result(
         "expert",
-        `Локальная запись отменена клиентом. ${calendarText(view.calendar)} Время: ${time}.`,
+        view.calendar === "native_cancelled"
+          ? `Запись отменена клиентом. Время: ${time}.`
+          : `Локальная запись отменена клиентом. ${calendarText(view.calendar)} Время: ${time}.`,
       );
     case "client.booking_cancelled":
       return result(
         "client",
-        `Локальная запись отменена экспертом. ${calendarText(view.calendar)} Время: ${time}.`,
+        view.calendar === "native_cancelled"
+          ? `Запись отменена экспертом. Время: ${time}.`
+          : `Локальная запись отменена экспертом. ${calendarText(view.calendar)} Время: ${time}.`,
       );
     case "client.reservation_expired":
       return result(

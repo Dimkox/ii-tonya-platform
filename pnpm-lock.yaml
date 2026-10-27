@@ -163,6 +163,9 @@ importers:
 
   packages/contracts:
     dependencies:
+      "@js-temporal/polyfill":
+        specifier: 0.5.1
+        version: 0.5.1
       zod:
         specifier: ^4.3.6
         version: 4.4.3
@@ -265,6 +268,14 @@ importers:
         version: link:../integrations
 
 packages:
+  "@js-temporal/polyfill@0.5.1":
+    resolution:
+      integrity: sha512-hloP58zRVCRSpgDxmqCWJNlizAlUgJFqG2ypq79DCvyv9tHjRYMDOcPFjzfl/A1/YxDvRCZz8wvZvmapQnKwFQ==
+    engines:
+      node: ">=12"
+  jsbi@4.3.2:
+    resolution:
+      integrity: sha512-9fqMSQbhJykSeii05nxKl4m6Eqn2P6rOlYiS+C5Dr/HPIU/7yZxu5qzbs40tgaFORiw2Amd0mirjxatXYMkIew==
   "@ampproject/remapping@2.3.0":
     resolution:
       {
@@ -4923,6 +4934,10 @@ packages:
       integrity: sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==
 
 snapshots:
+  "@js-temporal/polyfill@0.5.1":
+    dependencies:
+      jsbi: 4.3.2
+  jsbi@4.3.2: {}
   "@ampproject/remapping@2.3.0":
     dependencies:
       "@jridgewell/gen-mapping": 0.3.13

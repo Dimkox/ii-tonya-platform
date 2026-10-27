@@ -322,7 +322,7 @@ export async function approvalClock(tx: Tx, reservationId: string) {
       eligible: boolean;
     }>(sql`with t as materialized(select clock_timestamp() as now)
     select t.now,r.version,floor(extract(epoch from least(r.reserved_until,s.starts_at)))::text as expires,
-    (r.status='reserved' and r.reserved_until>t.now and s.starts_at>t.now and s.observed_at between t.now-interval '15 minutes' and t.now and es.active and not exists(select 1 from planerka_booking_operations where reservation_id=r.id)) as eligible
+    (r.status='reserved' and r.reserved_until>t.now and s.starts_at>t.now and resident_slot_fresh(s.id,t.now) and es.active and not exists(select 1 from planerka_booking_operations where reservation_id=r.id)) as eligible
     from reservations r join slots s on s.id=r.slot_id and s.expert_service_id=r.expert_service_id join expert_services es on es.id=r.expert_service_id and es.expert_id=r.expert_id cross join t where r.id=${reservationId}::uuid`)
   ).rows[0];
 }

@@ -10,10 +10,24 @@ describe("booking SQL mutation guards", () => {
       "utf8",
     );
 
-    expect(repository).toContain(
-      "and s.observed_at >= ${new Date(command.now.getTime() - SLOT_FRESHNESS_MS)}",
+    const migration = readFileSync(
+      "packages/db/migrations/0070_resident_native_scheduling.sql",
+      "utf8",
     );
-    expect(repository).toContain("and s.observed_at <= ${command.now}");
+    // Both search/callback time and the protected final database clock use the
+    // same source-aware guard; external observations still have both bounds.
+    expect(repository).toContain(
+      "and resident_slot_fresh(s.id,${command.now})",
+    );
+    expect(repository).toContain(
+      'resident_slot_fresh(s.id,current_clock.at) as "slotFresh"',
+    );
+    expect(migration).toContain(
+      "CASE WHEN s.provider='resident_native' THEN resident_native_slot_valid(s.id,at_time) ELSE s.observed_at BETWEEN at_time-interval '15 minutes' AND at_time",
+    );
+    expect(migration).toContain("CREATE FUNCTION resident_native_slot_valid(");
+    expect(migration).toContain("n.withdrawn_at IS NULL");
+    expect(migration).toContain("v.valid_until>at_time");
   });
 
   it("rejects malformed callback UUIDs before touching PostgreSQL", async () => {

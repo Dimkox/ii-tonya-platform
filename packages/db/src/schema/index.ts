@@ -44,3 +44,5 @@ export * from "./resident-review.js";
 export * from "./resident-private-jobs.js";
 
 export * from "./resident-rich-onboarding.js";
+
+export * from "./resident-native-scheduling.js";

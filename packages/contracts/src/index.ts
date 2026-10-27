@@ -51,3 +51,5 @@ export { canonicalPrivateProfile } from "./private-profile-key.js";
 
 export * from "./resident-rich-profile.js";
 export * from "./resident-semantic-tags.js";
+
+export * from "./resident-schedule.js";
