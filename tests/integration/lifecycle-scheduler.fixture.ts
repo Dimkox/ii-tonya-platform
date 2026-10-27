@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 
 import { PostgresLifecycleSchedulerRepository } from "../../packages/db/src/repositories/lifecycle-scheduler-repository.js";
 import type { TestDatabase } from "../../packages/db/src/testkit/postgres.js";
+import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 
 export interface LifecycleFixture {
   readonly userId: string;
@@ -19,6 +20,9 @@ export async function seedLifecycleFixture(
   database: TestDatabase,
 ): Promise<LifecycleFixture> {
   const userId = await database.createUser();
+  const chatId = (
+    BigInt(`0x${randomUUID().replaceAll("-", "").slice(0, 12)}`) + 1n
+  ).toString();
   const expertUserId = await database.createUser();
   const expertId = (
     await database.db.execute<{ id: string }>(sql`
@@ -69,14 +73,15 @@ export async function seedLifecycleFixture(
     insert into client_profiles(user_id,display_name,timezone)
     values(${userId}::uuid,'Lifecycle client','Europe/Moscow')
   `);
+  await seedClientConsent(database.db, userId, "client_messaging");
   await database.db.execute(sql`
-    insert into consents(user_id,consent_type,decision,policy_version)
-    values(${userId}::uuid,'client_messaging','granted','client-messaging-v1')
+    insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status)
+    values(${userId}::uuid,'telegram',${chatId},'client-test',${chatId},'active')
   `);
   const dialogueId = (
     await database.db.execute<{ id: string }>(sql`
       insert into dialogues(tenant_key,user_id,provider,bot_key,external_chat_id)
-      values('client-test',${userId}::uuid,'telegram','client-test','801234567')
+      values('client-test',${userId}::uuid,'telegram','client-test',${chatId})
       returning id
     `)
   ).rows[0]!.id;

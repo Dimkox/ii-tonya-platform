@@ -1,3 +1,4 @@
+import { loadEnv } from "@ii-tonya/config";
 import { getEventListeners } from "node:events";
 import { describe, expect, it, vi } from "vitest";
 
@@ -73,11 +74,12 @@ describe("worker main", () => {
     } as never);
 
     await expect(
-      factory.create({
-        databaseUrl:
-          "postgresql://worker:worker@localhost/worker?sslmode=require",
-        features: { workerOutboxDelivery: false },
-      } as never),
+      factory.create(
+        loadEnv({
+          DATABASE_URL:
+            "postgresql://worker:worker@localhost/worker?sslmode=require",
+        }),
+      ),
     ).resolves.toBeDefined();
     expect(registryFactory).not.toHaveBeenCalled();
   });
@@ -98,14 +100,20 @@ describe("worker main", () => {
 
     await expect(
       factory.create({
-        databaseUrl:
-          "postgresql://worker:worker@localhost/worker?sslmode=require",
+        ...loadEnv({
+          DATABASE_URL:
+            "postgresql://worker:worker@localhost/worker?sslmode=require",
+        }),
         clientBookingConfirmationBufferMs: confirmationBufferMs,
         features: {
           workerOutboxDelivery: false,
+          clientCatalog: false,
+          expertReferral: false,
+          expertReferralMaturityWorker: false,
+          expertResidencyBilling: false,
           clientWaitlist: true,
         },
-      } as never),
+      }),
     ).resolves.toBeDefined();
     expect(waitlistRepositoryFactory).toHaveBeenCalledWith(
       expect.any(Object),
@@ -113,7 +121,7 @@ describe("worker main", () => {
     );
   });
 
-  it("accepts an injected YooKassa reader only with complete enabled metadata", async () => {
+  it("rejects an unguarded injected YooKassa reader even with complete enabled metadata", async () => {
     const { selectExpertResidencyProviderReader } = await import("./main.js");
     const reader = {
       readPayments: vi.fn(async () => ({ kind: "disabled" as const })),
@@ -133,11 +141,12 @@ describe("worker main", () => {
       },
     };
 
-    expect(selectExpertResidencyProviderReader(enabled as never, reader)).toBe(
-      reader,
-    );
-    expect(() => selectExpertResidencyProviderReader(enabled as never)).toThrow(
-      "yookassa_worker_capability_unavailable",
+    expect(() =>
+      selectExpertResidencyProviderReader(enabled as never, reader),
+    ).toThrow("yookassa_unguarded_reader_rejected");
+    const { disabledExpertResidencyProviderReader } = await import("./main.js");
+    expect(selectExpertResidencyProviderReader(enabled as never)).toBe(
+      disabledExpertResidencyProviderReader,
     );
     expect(() =>
       selectExpertResidencyProviderReader(

@@ -1,0 +1,1113 @@
+{
+  "kind": "local-synthetic-rich-onboarding-verification-only",
+  "implementationCommit": "5602413c7dca6809569d788b9d8254df80846cc8",
+  "baseline": "07782bcef41d565b6b39bbd335f5437150eaebd9",
+  "packagingOnly": true,
+  "newTestsOrBuildsRun": false,
+  "compression": "gzip level9, mtime0; one original file per archive",
+  "files": [
+    {
+      "file": "api-types-final.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/api-types-final.log",
+      "recordedResult": "api-types-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/api",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "file": "api-types-final.result.json.gz",
+      "sha256": "eac4b44fde6bd07ecef0da2ce7ac46cdd5af13fd16808a167dffeb4fe2e8c652",
+      "bytes": 157,
+      "rawSha256": "bee9f79bafd1cb4c16ead5ccb92962a28c808bd8c22f17a560f262393796dd6c",
+      "rawBytes": 160,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/api-types-final.result.json"
+    },
+    {
+      "file": "api-types1.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/api-types1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "not-inferred"
+    },
+    {
+      "file": "application-types-final.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/application-types-final.log",
+      "recordedResult": "application-types-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/application",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "file": "application-types-final.result.json.gz",
+      "sha256": "684838ba12f908a37474de82419e6697eb737b5a3ace22160c8d88f14824a34a",
+      "bytes": 162,
+      "rawSha256": "b07975486a84ef120367c62b7ee70197edc751ad0a90e96d026a4be4dbb75b28",
+      "rawBytes": 168,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/application-types-final.result.json"
+    },
+    {
+      "file": "application-types1.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/application-types1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "not-inferred"
+    },
+    {
+      "file": "browser-witness.mjs.gz",
+      "sha256": "c38cf7418cc647f62e141aabca2fcb5583a5ab0c7e025e70b2fe0fcc6fed814d",
+      "bytes": 3127,
+      "rawSha256": "664f03e9f37734d7f2ffb645c3b6c037f68b24e6a48ac94ecf26ae23dbbe28a7",
+      "rawBytes": 7471,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/browser-witness.mjs"
+    },
+    {
+      "file": "browser1.log.gz",
+      "sha256": "ba919e7920999f19d18abe27c0c43adbee1bf31339e642993fcfcd2dfe80501c",
+      "bytes": 500,
+      "rawSha256": "5ba35a501378cbe37ca213e5554d9409484ad96f80ac0f9a699c07b8388836d6",
+      "rawBytes": 771,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/browser1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "browser2.log.gz",
+      "sha256": "cf58bfbf075bd7d07553d0caea76b4f8e47416a337c78c2264e2c7dea75c343f",
+      "bytes": 157,
+      "rawSha256": "5c8454c66fff20ad7fe36242d4584c7cfe420e09cf1b36c3661ae10cd71b6ad2",
+      "rawBytes": 213,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/browser2.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-20261027/browser-witness.mjs"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "file": "config-geocode-final.log.gz",
+      "sha256": "7e7e23ada9d9e61306ec5bbadd38fea23b2a19f8c5ac966888320a8cd8e0a7a4",
+      "bytes": 274,
+      "rawSha256": "c2aab763c355cb2848285816be38668143811119968ec7b9123cc162611a5001",
+      "rawBytes": 363,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/config-geocode-final.log",
+      "recordedResult": "config-geocode-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/config/src/expert-card-config.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "c2aab763c355cb2848285816be38668143811119968ec7b9123cc162611a5001"
+    },
+    {
+      "file": "config-geocode-final.result.json.gz",
+      "sha256": "6c0c332ea232565975fce935f6a523b6c449b3a3f822c9e218cc03010f42000d",
+      "bytes": 173,
+      "rawSha256": "51a8a21b053dd4dbedcf02f79de42bab6846f9ac81192545a9ff1dd1d0541c6d",
+      "rawBytes": 193,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/config-geocode-final.result.json"
+    },
+    {
+      "file": "contracts-build.log.gz",
+      "sha256": "065597fbb3b4ffd928e729d458428c80862b0b1b176f65d4aa4ccab53db7bb2c",
+      "bytes": 243,
+      "rawSha256": "90389c56950a67174b0d98d1e5fc6d7ab06f6512c9357456067e09b52dee6600",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/contracts-build.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "contracts-build2.log.gz",
+      "sha256": "f5caab609398bf97ad4f722f8e83756a2cfb9f2d19eb40aa3d0545db1b51a0f9",
+      "bytes": 243,
+      "rawSha256": "4ad08ab648f8d0b772c753414df89218a1f61a2618e4065361009e5d3f6a9a76",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/contracts-build2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "contracts-green.log.gz",
+      "sha256": "66b04131b268a5cac3d2d0578ac04be643edcd82b828ced56d5821dd3e359d4c",
+      "bytes": 652,
+      "rawSha256": "cfaad32b682636e248853bd810b5e840450a7a483014bdd6a83ea092723a6067",
+      "rawBytes": 1313,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/contracts-green.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "contracts-green2.log.gz",
+      "sha256": "a52124617d94212067d666912307f9bca2b55ead30ad3736f69f533e35891b94",
+      "bytes": 275,
+      "rawSha256": "f5d81916396dd551d57022e800a15914e98bc0d41eee350c0dae36bbd4241143",
+      "rawBytes": 368,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/contracts-green2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-rich-profile.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "file": "contracts-red.log.gz",
+      "sha256": "d6868a828db14d8866355f0fc6f8534ea1323cede1cc5014c72bd0425fe56608",
+      "bytes": 518,
+      "rawSha256": "1c66faa941675652d004d2866364be278b661bc8b1ca0440edd3757a0f423b8f",
+      "rawBytes": 1254,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/contracts-red.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "db-types-final.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/db-types-final.log",
+      "recordedResult": "db-types-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/db",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "file": "db-types-final.result.json.gz",
+      "sha256": "0880f2fb797c76366fdf9ce68a0652f767b49d78486279575898de595b60f35a",
+      "bytes": 155,
+      "rawSha256": "601353ee178af16cab05e0fbf951befc1c32a257bbece5cb375c22c1b22e8f69",
+      "rawBytes": 159,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/db-types-final.result.json"
+    },
+    {
+      "file": "db-types1.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/db-types1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "not-inferred"
+    },
+    {
+      "file": "dependencies-build1.log.gz",
+      "sha256": "1c366d28cdbf8c26e211449286b181b739c6c4de0106ffae2f2ef22e7db5fd5c",
+      "bytes": 339,
+      "rawSha256": "2b6e311045c0f9714a509fd3d9d9ea9cef1f81163167926d366a48fd81ac82f3",
+      "rawBytes": 1551,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/dependencies-build1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "deps-build2.log.gz",
+      "sha256": "144a31380ba07316b6639f0cd3c6ba60cb80414db203d6b4d9f9eb1959fdf378",
+      "bytes": 362,
+      "rawSha256": "f83f133754ad5a0e1fb5f59d03c596128624e9f864d74d31874bc6b3d658ae91",
+      "rawBytes": 1931,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/deps-build2.log",
+      "command": [
+        "pnpm",
+        "--workspace-concurrency=1",
+        "--filter",
+        "@ii-tonya/contracts",
+        "--filter",
+        "@ii-tonya/config",
+        "--filter",
+        "@ii-tonya/integrations",
+        "--filter",
+        "@ii-tonya/db",
+        "--filter",
+        "@ii-tonya/application",
+        "-r",
+        "--sort",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "file": "docs-format.log.gz",
+      "sha256": "736c9d5a92e71256314d1fe079e09a941c4103141af90293a94ae345eef4a105",
+      "bytes": 125,
+      "rawSha256": "710f3476d16f8145457460fbc5aebbe53578dda5f453a95de0e4ba2ed11498ff",
+      "rawBytes": 138,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/docs-format.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "env2.log.gz",
+      "sha256": "28869fccac835bfd346a7546443edf018fa6fc5b3cdbf4c6211d4a2ed8726615",
+      "bytes": 259,
+      "rawSha256": "2b66aefae4c5913ca367cfe733513ec9be715ef904b313252ee3a8a6c4d1dd37",
+      "rawBytes": 341,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/env2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/env-policy.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "file": "focused-regressions1.log.gz",
+      "sha256": "878e424b91ec3142de2a47565797fe65e51f3aa76712639429c4bdbac75b8cc7",
+      "bytes": 3788,
+      "rawSha256": "121d1b2aebfce83771182ea4d22fbb853f46bddf11bd1e67e2c78a40a643f4be",
+      "rawBytes": 20957,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/focused-regressions1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "format-final.log.gz",
+      "sha256": "4ea7aa0c4489640b5f856ae7ff60ed7eb895cd4159a465a2bfa6c93f76ee8cc1",
+      "bytes": 488,
+      "rawSha256": "4248a131aab9c2014ac834620b75a09207189a7b35650ee4e23adbeeb560e9a5",
+      "rawBytes": 1820,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/format-final.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "format-last-test.log.gz",
+      "sha256": "40c40837fd70572cc918c037aea5d9dbf5960574916da3e35cddc33ddd8ed45e",
+      "bytes": 76,
+      "rawSha256": "d273e69b3468811384b8fd2d170016c825f9e2d53748459a4d6e5a26565dd367",
+      "rawBytes": 57,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/format-last-test.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "not-inferred"
+    },
+    {
+      "file": "format1.log.gz",
+      "sha256": "0ceb97e90190734a9a3cd5958ed9c5389c9cdb711836ebcfdbf87ad1f8f4de74",
+      "bytes": 452,
+      "rawSha256": "a3b6e883a21508982e4b4d02aa656431a189864dc49d9dbe75334970199653f4",
+      "rawBytes": 1440,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/format1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "format2.log.gz",
+      "sha256": "d50704bfff03be3c6bad0993874e41b91b47edf56ed898cb1d7bdfcf2c889831",
+      "bytes": 477,
+      "rawSha256": "1cdc0c084144b29a28ee90909e0a9627c9082a7dd409d070b26bd6f3ff692989",
+      "rawBytes": 1664,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/format2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "geocode-green.log.gz",
+      "sha256": "83d113bfc57bf76a594e23d435dedf5bfe5c5d273f3bd775bef7022487ff722e",
+      "bytes": 279,
+      "rawSha256": "db89d9176e25f2742b2dbaa21e38082fb832b3ba8bd2ca1fbb1c1f2d6dcf2071",
+      "rawBytes": 372,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/geocode-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/integrations/src/documents/resident-geocode.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "file": "geocode-red.log.gz",
+      "sha256": "bb03614ec85eb74263a45b2cb9dc64f70f758d1b3de6251aa0d19bd67a126467",
+      "bytes": 524,
+      "rawSha256": "eec18be04503da120872a5373afac891ccc042f9b0f81a1070b6ad6a41a4f8da",
+      "rawBytes": 1279,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/geocode-red.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "guard-order-corrected.log.gz",
+      "sha256": "f81b90f15e7e17bec3eaccbf22f5dc54fc616c154d00c64899346e52d7381aa8",
+      "bytes": 282,
+      "rawSha256": "0923dd3196ee5e2a3393bfe3f016bd2310e32f152342cf4691cdcc499580064f",
+      "rawBytes": 386,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/guard-order-corrected.log",
+      "recordedResult": "guard-order-corrected.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "-t",
+        "registers exactly"
+      ],
+      "exitCode": 0,
+      "logSha256": "0923dd3196ee5e2a3393bfe3f016bd2310e32f152342cf4691cdcc499580064f"
+    },
+    {
+      "file": "guard-order-corrected.result.json.gz",
+      "sha256": "53f57b68ad27caa49d051d03fd90d65e0b0bd62d25d95d683fed5399ac375e79",
+      "bytes": 191,
+      "rawSha256": "d59a9c86a2c3886f89ae22146372a68d714023a22b6636fc183f2104c62b6660",
+      "rawBytes": 221,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/guard-order-corrected.result.json"
+    },
+    {
+      "file": "guards-final.log.gz",
+      "sha256": "c3c5e01f1296650a9881f5c69770fb8cb6b15a8904d6c43b480821b6c974e286",
+      "bytes": 981,
+      "rawSha256": "55fe7eeda413615e304c0db023ab38798eac5a567976509d092557e42e1a7a9c",
+      "rawBytes": 2930,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/guards-final.log",
+      "recordedResult": "guards-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/expert-referral-scope-guards.test.ts"
+      ],
+      "exitCode": 1,
+      "logSha256": "55fe7eeda413615e304c0db023ab38798eac5a567976509d092557e42e1a7a9c"
+    },
+    {
+      "file": "guards-final.result.json.gz",
+      "sha256": "2dc232386613b9ace9959fd71323d298a254b11e04c68431282be35fcb1c366a",
+      "bytes": 175,
+      "rawSha256": "f7b6ab014013be2e726b8f78a1ce9d193ef20461919518bc858e92ce240e14c3",
+      "rawBytes": 194,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/guards-final.result.json"
+    },
+    {
+      "file": "guided-green.log.gz",
+      "sha256": "9104821b1a7c2ea9cb3993401d1d0de51d7fecbb85879df1606995c0b3f4f999",
+      "bytes": 277,
+      "rawSha256": "c678c933101a67cb9ab2ef194e17b2a4349e599a94bc5db8d66cbc5210f01e8a",
+      "rawBytes": 368,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/guided-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-rich-profile.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "file": "guided-red.log.gz",
+      "sha256": "936ee2f51fea83594c0caf4aea4cdb9d9f81dd3eea6794adab05d489f0e6ca1f",
+      "bytes": 776,
+      "rawSha256": "24df499c9e4f2dc937cf74af8ebf948904572a6a9b11644cb84b544fed85237a",
+      "rawBytes": 2364,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/guided-red.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "integrations-build.log.gz",
+      "sha256": "19f695b7f471a08f7a4f776679780a84e7f82844fa1217983cdbffbd236341cf",
+      "bytes": 244,
+      "rawSha256": "f2510225614575d7db81f95b592766a6b47bf51b043e1941aa533925627e1d93",
+      "rawBytes": 380,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/integrations-build.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "introspected-schema.ts.gz",
+      "sha256": "6e3a6028f930b242e418a5975de2cb683988077ee6ed2b2af438a2cbc70beae7",
+      "bytes": 50427,
+      "rawSha256": "0efa8e7d48a20951e98b0084629f4126d547252af5e573e9cdd80d28f717c677",
+      "rawBytes": 375400,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/introspected-schema.ts"
+    },
+    {
+      "file": "introspection.log.gz",
+      "sha256": "358055bab0451173672a81620eee666dd36baa684379838bd851e9fe366b200a",
+      "bytes": 3687,
+      "rawSha256": "e1397e63426d6ec40a5ec5b8cbe53e467081c6f1828cbc8374bf11141f637506",
+      "rawBytes": 256475,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/introspection.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "not-inferred"
+    },
+    {
+      "file": "labelled.docx.gz",
+      "sha256": "ac13fbcd4ac46eff4c18edf9ec8856c2b3741e0d4f1f85652908ad8a89c32714",
+      "bytes": 548,
+      "rawSha256": "a9fe25bdf9b321db1414f90b83a4b2cbd6b84a69603e9e8b3f503d77c6287f01",
+      "rawBytes": 1305,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/labelled.docx",
+      "contentDescription": "Synthetic labelled document fixture; portable generator is committed at tests/support/resident-rich-document-fixtures.ts."
+    },
+    {
+      "file": "labelled.pdf.gz",
+      "sha256": "c8adef310b334a13170b466bd7c7b67dfe2666cfda109456579b7fbf10bb6df4",
+      "bytes": 413,
+      "rawSha256": "578d9ac47ef885df39d43180f2f277b3213fdd0113249e3e63d72839b048607c",
+      "rawBytes": 733,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/labelled.pdf",
+      "contentDescription": "Synthetic labelled document fixture; portable generator is committed at tests/support/resident-rich-document-fixtures.ts."
+    },
+    {
+      "file": "lint-final.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/lint-final.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "not-inferred"
+    },
+    {
+      "file": "lint-last-diff.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/lint-last-diff.log",
+      "recordedResult": "lint-last-diff.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/application/src/expert-card-service.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "lint-last-diff.result.json.gz",
+      "sha256": "499ba90de56f266536ee69e09e908c3f4bd464e6e960e11417972f326c08e0cc",
+      "bytes": 278,
+      "rawSha256": "4c39521fcadbe3f5d64c4badea01645a809799741cfd5d9aff4500f4ecb2b199",
+      "rawBytes": 456,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/lint-last-diff.result.json"
+    },
+    {
+      "file": "lint1.log.gz",
+      "sha256": "92af92d5c67afd55dcf055304176340c50b7e3a76fbf4cfacca034d79ddf1fb4",
+      "bytes": 376,
+      "rawSha256": "e323bc613fc4226bcad57d7f6b7958f795e66d25f5d538c5acad5520fa3786b2",
+      "rawBytes": 968,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/lint1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "manager-browser.png.gz",
+      "sha256": "b593a69456eacbe5668403c08767dbea4cf6a4020cbd0e485a8ff19a1e1a5b30",
+      "bytes": 135392,
+      "rawSha256": "b6264da39ccdbeeb3acef5a545712723a6f044b928809d48f9de3a7ed1009f79",
+      "rawBytes": 142073,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/manager-browser.png",
+      "contentDescription": "Synthetic local Chrome card-review screenshot, not a production account."
+    },
+    {
+      "file": "migration-guards2.log.gz",
+      "sha256": "d4ba85d159df8d92032a0102a6bbe22ce4df6b0cbf98e8060b4d3e83bc6355f1",
+      "bytes": 269,
+      "rawSha256": "d9abef979a4641a03e92932480e1dff2d531425e8c05d5901d5884fd34fa34de",
+      "rawBytes": 358,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/migration-guards2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/migration-history-integrity.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "file": "pg-complete1.log.gz",
+      "sha256": "00f39192818a8507ea59e90dcfd098f083c7388954f8174ab8dc2298b3be7c86",
+      "bytes": 734,
+      "rawSha256": "91b169c3e07254505fec5fdd2865a2dce341dc88e36f0eb200b540c355581b84",
+      "rawBytes": 1233,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-complete1.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "Protected local PG config; parser socket explicitly set for parser cases."
+    },
+    {
+      "file": "pg-guided1.log.gz",
+      "sha256": "5d72719f4dfdf50addd5dc2609489f5316361f3aef566f080668f179d115d464",
+      "bytes": 358,
+      "rawSha256": "40477bfc4faa14dcbed37fb51b568f47adb15656988765dd642f08fdcc4d4ce4",
+      "rawBytes": 491,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-guided1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "pg-ingress-media2.log.gz",
+      "sha256": "14e3a6d974e998b85879e6add3783349a6f52b25c6275b552d8d601e8c88b9fc",
+      "bytes": 773,
+      "rawSha256": "66535d8b0ec2e4e070de8c21868f8257477a5068a419a4e4def3fe5be742bdeb",
+      "rawBytes": 1556,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-ingress-media2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "pg-ingress3.log.gz",
+      "sha256": "56a04ab4c54ba5fcec7efe31fa41c9b77594c8062b4fc48d0f1c866a12b4516a",
+      "bytes": 365,
+      "rawSha256": "341207b9719287b51418127b69ea5c5466b16e53ffc27d66e9414e07564d50b4",
+      "rawBytes": 517,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-ingress3.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "pg-media1.log.gz",
+      "sha256": "6b2244f22e1ff5f5e2e79e77be04315822b6587b24bf47b70204977830916523",
+      "bytes": 1336,
+      "rawSha256": "ebbc83b2a0f92b6aac7d3b7c6585a7d7554b723aaefc498cf096d272416e84e6",
+      "rawBytes": 3231,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-media1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "pg-owner-photos.log.gz",
+      "sha256": "226e00914c9d440a68b234692acdba1f1b9d1bb702cf4faadbd4ffa777f809b0",
+      "bytes": 355,
+      "rawSha256": "432dd4f4212f07ea2d3198f25bf2f2fe2a850e9e3c13b2a0380f0faf43017a8f",
+      "rawBytes": 503,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-owner-photos.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "pg-paid-privacy-final.log.gz",
+      "sha256": "8dcf22c4a794b3b2846636a8ab3d1f513f1bf41b42b09af2b1b8b05c808a55a4",
+      "bytes": 355,
+      "rawSha256": "bd028f556cd815fa0133ce041f0fa0c95eb560b12e8214680add799b05468942",
+      "rawBytes": 503,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-privacy-final.log",
+      "recordedResult": "pg-paid-privacy-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo"
+      ],
+      "exitCode": 0,
+      "logSha256": "bd028f556cd815fa0133ce041f0fa0c95eb560b12e8214680add799b05468942"
+    },
+    {
+      "file": "pg-paid-privacy-final.result.json.gz",
+      "sha256": "f9fa4ecf5bef9f912e64ae9effe0547865399777fd4dd9bfbf0d2a59ae997b79",
+      "bytes": 193,
+      "rawSha256": "0ab20ce5b555dd94fe56d3630df01677f5de5d1bc82698fc364652118f3fd930",
+      "rawBytes": 225,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-privacy-final.result.json"
+    },
+    {
+      "file": "pg-paid-update1.log.gz",
+      "sha256": "70894c212c03493bcfacf9c31ca2cd12ecd9c633c20d32aaad923b58d1f1810d",
+      "bytes": 1139,
+      "rawSha256": "a55f9e9de1b9f6b3dc8359a8cc52fe2f4589ef4eb1ce1998756e57401c3dbbf5",
+      "rawBytes": 2492,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-update1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "pg-paid-update2.log.gz",
+      "sha256": "3e0a5da03386fa31aaa5d4259ffb38ba166da019dcab4fef0ba2216bff75af52",
+      "bytes": 1880,
+      "rawSha256": "9beecb91c12e7d6d8339abc20d63ae8460de70940da0fc6c37f4ff9bba4f6dcf",
+      "rawBytes": 5497,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-update2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "pg-paid-update3.log.gz",
+      "sha256": "5595ece47770660e22722f99f3cd7c8c20455e69c32bde0486383e9c28c8e695",
+      "bytes": 352,
+      "rawSha256": "ef8ff531f7e4773db63ff5b18cc2be3560ec37ea085f85e7deee1b92d7d0a245",
+      "rawBytes": 503,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-update3.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "pg-parser1.log.gz",
+      "sha256": "84972793d392991ff5e55885f6c866081253677c976f4495f13a34d33765eabf",
+      "bytes": 364,
+      "rawSha256": "cf1b75819bd963f23ef7c83b29ec72c9e4e181f98d57626d5db9f573c2dcc521",
+      "rawBytes": 512,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-parser1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "pg-privacy-parser.log.gz",
+      "sha256": "0a829f2e4f9b456f7e9f0816aee3d7936bfc2ab9e5bf0c3af77912f56b6b90f7",
+      "bytes": 487,
+      "rawSha256": "35b55984e2ca90b4b638589c549b6c98ec2fd77506abcf141f088b7b01628199",
+      "rawBytes": 738,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-privacy-parser.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo|original-bot PDF|blocks nested"
+      ],
+      "exitCode": 0,
+      "environment": "Protected local PG config; parser socket explicitly set for parser cases."
+    },
+    {
+      "file": "pg-red.log.gz",
+      "sha256": "b1ecaaed5f9a869b0f5aeaae1041b0f1094ebca51ad620720c87e2d1f1ca8183",
+      "bytes": 2653,
+      "rawSha256": "99f82613738f01d694f692889426b1e2afdb2f3e6d6ee8f8c3757384be86cc98",
+      "rawBytes": 9415,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-red.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "pg-red2.log.gz",
+      "sha256": "41db65a1a33adf30a482c400146852922da0ead9bb274209ccc70b503dd2847b",
+      "bytes": 499,
+      "rawSha256": "22db1d033e4ce1d58fad9ee78c6e2730f10b17da4d4831e09349a67f8fed7448",
+      "rawBytes": 771,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/pg-red2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "reconstruct-final.log.gz",
+      "sha256": "32c0e8d3abf978883b03830679730d6bfca6c9c56eb8b17332c33d5f2dc1e3c8",
+      "bytes": 193,
+      "rawSha256": "7075ff72e410a6623941dccc96d83b46a4372440f4947114317426a5147750c5",
+      "rawBytes": 272,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/reconstruct-final.log",
+      "recordedResult": "reconstruct-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        ".superpowers/sdd/rich-onboarding-20261027/reconstruct.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "7075ff72e410a6623941dccc96d83b46a4372440f4947114317426a5147750c5"
+    },
+    {
+      "file": "reconstruct-final.result.json.gz",
+      "sha256": "aedbae2dc1bbd73d8bdc72348d40df99629379bb9e196c03c39ecca04b5c9c69",
+      "bytes": 178,
+      "rawSha256": "9e440f42c98640fb908421a24c2b4852f6429c14c746b913623c0f141d192e3b",
+      "rawBytes": 193,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/reconstruct-final.result.json"
+    },
+    {
+      "file": "reconstruct.ts.gz",
+      "sha256": "1dc4b98c7abd3823903d70d33ba0eb755edb3c51585e47c6e4c8a20b764f7e25",
+      "bytes": 2220,
+      "rawSha256": "7b6e4bae4b7281cb14c628286f02358458c68da54e39782767915d8090fe84e5",
+      "rawBytes": 5595,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/reconstruct.ts"
+    },
+    {
+      "file": "reconstruct1.log.gz",
+      "sha256": "19f1d8a6f3c3ed41ca38e1ff1d0de98dd07f97121af5facbeb00a743454b0460",
+      "bytes": 194,
+      "rawSha256": "397862ad4be1157bcf93ad040884518f8d9b6dcb8cd0153b85d0ebb4cfda0a71",
+      "rawBytes": 272,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/reconstruct1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "reconstruct2.log.gz",
+      "sha256": "32c0e8d3abf978883b03830679730d6bfca6c9c56eb8b17332c33d5f2dc1e3c8",
+      "bytes": 193,
+      "rawSha256": "7075ff72e410a6623941dccc96d83b46a4372440f4947114317426a5147750c5",
+      "rawBytes": 272,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/reconstruct2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "rich-state2.log.gz",
+      "sha256": "931aeeefeeae3dadc741b5a3245981a0df254747e4144133cc8b1de01634e854",
+      "bytes": 329,
+      "rawSha256": "8a61487ce64264cc426d8679e4ace24ded1ae4e732d65e8591551f24e03f70bc",
+      "rawBytes": 469,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/rich-state2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "rotation.log.gz",
+      "sha256": "eee598b7f33612679ca826a9508e33d920c8b9d37aff17c984e0e27932eedef3",
+      "bytes": 150,
+      "rawSha256": "5d431489043b69ce73b15298d43bea6162f0e9f019e8f5876a83cdae3914808a",
+      "rawBytes": 159,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/rotation.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "success-output"
+    },
+    {
+      "file": "run.py.gz",
+      "sha256": "4bdbca342057a031e651849de5a28119de5b5f8d508968dc7301e3fe7c99ea56",
+      "bytes": 508,
+      "rawSha256": "5841c9a7be2bb7afe62c2bd0a8d951d14ed4e253590ad9c4f35526e0f4bb566f",
+      "rawBytes": 867,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/run.py"
+    },
+    {
+      "file": "scope2.log.gz",
+      "sha256": "340fd3beef0dc4e027da188918251c1550355d6d801b92d6bd44b31a66765c4e",
+      "bytes": 2526,
+      "rawSha256": "ce3fdbb2300e19b49b874446e813fdd586826284221c1e5e854fb056f40b3ed4",
+      "rawBytes": 16357,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/scope2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "scope3.log.gz",
+      "sha256": "ee9fb14033e7839cdb5f2b647fd4f8f4f162d7f1b9e85a88e310fe68471abaa1",
+      "bytes": 360,
+      "rawSha256": "3645c993bdf3e2739cea4ad1746e409485a7970e440e302baaff814ec6caea94",
+      "rawBytes": 535,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/scope3.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/scope-boundary.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "file": "state-final.log.gz",
+      "sha256": "cc94a916c3d0b02502f69c9aad460c6620c7ed192b215d2ec48916b5299e1f54",
+      "bytes": 329,
+      "rawSha256": "313a17f0c599bae24263f5b3e828efed97807afefbb97fac83771db7ca1ed655",
+      "rawBytes": 469,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/state-final.log",
+      "recordedResult": "state-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/resident-rich-onboarding-state.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "313a17f0c599bae24263f5b3e828efed97807afefbb97fac83771db7ca1ed655"
+    },
+    {
+      "file": "state-final.result.json.gz",
+      "sha256": "bb6df19b308f9043384955d5b567b7db320916661b0457da86acd2604f71e60e",
+      "bytes": 176,
+      "rawSha256": "b495f6a34143d35f8b57e5cb27aef118d3dc2b81141889b0ca17b0d9ae324dd7",
+      "rawBytes": 196,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/state-final.result.json"
+    },
+    {
+      "file": "tests-types-final.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/tests-types-final.log",
+      "recordedResult": "tests-types-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "tests-types-final.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/tests-types-final.result.json"
+    },
+    {
+      "file": "types-last-source.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/types-last-source.log",
+      "recordedResult": "types-last-source.result.json.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "types-last-source.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/types-last-source.result.json"
+    },
+    {
+      "file": "types-tests1.log.gz",
+      "sha256": "4b7cca36200c92750c278a9efe0a3ae4bdb735acfbf7bf35aac0742a496232e3",
+      "bytes": 1049,
+      "rawSha256": "4c67e3b59436ba3d1c1499a15296846f996a14c16af4b524aa04c618973bf92a",
+      "rawBytes": 10740,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/types-tests1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "types-tests2.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/types-tests2.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "not-inferred"
+    },
+    {
+      "file": "web-types-final.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/web-types-final.log",
+      "recordedResult": "web-types-final.result.json.gz",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/web",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "file": "web-types-final.result.json.gz",
+      "sha256": "7b69c99a6b18cab9187b1cc36b28e17b351f63d4453b98c5efe1ba1fbabddc56",
+      "bytes": 157,
+      "rawSha256": "59624d29ca605a874484f2e4790a88bb0b2bea9f87c77018a6734d6d6f67669f",
+      "rawBytes": 160,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/web-types-final.result.json"
+    },
+    {
+      "file": "web-types1.log.gz",
+      "sha256": "d2f8132202e8a91c247f9a59b6882eae02aa6d3b24fbdabfbc661ad08aee7f87",
+      "bytes": 553,
+      "rawSha256": "1075016abe4ee44ce3c006bf7619df015ea0f829a35c475558a72f86c21b3bf8",
+      "rawBytes": 2493,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/web-types1.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "No contemporaneous command/exit-code sidecar retained; raw output preserved without inventing execution metadata.",
+      "observedLogOutcome": "failure"
+    },
+    {
+      "file": "whitespace-final.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/whitespace-final.log",
+      "recordedResult": "whitespace-final.result.json.gz",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "whitespace-final.result.json.gz",
+      "sha256": "40ea006f471eb799cd3d2ed7504fa1f444bbdfb87a13d9e50241b8a82cb60d7d",
+      "bytes": 137,
+      "rawSha256": "e3b9db95b0bd75d85eed2989d2b622082fdb471c5a0b78a7037b9a03038a167f",
+      "rawBytes": 136,
+      "originalPath": ".superpowers/sdd/rich-onboarding-20261027/whitespace-final.result.json"
+    }
+  ],
+  "excluded": [
+    "rotate-local.ts",
+    "all credentials/environment/database configuration",
+    "node_modules and tool/model/binary runtimes"
+  ],
+  "privacyScan": {
+    "currentProtectedCredentialAbsent": true,
+    "literalCredentialBearingPostgresUrlsAbsent": true,
+    "rawOutputsRedactedDuringPackaging": false
+  },
+  "limits": [
+    "Earlier development logs without execution sidecars retain null command/exitCode; outcome text is not promoted to a recorded process exit code.",
+    "Final sidecars and previously recorded command ledger retain their actual commands, exit codes and log hashes.",
+    "reconstruct.ts needs an operator-provided protected local PG config and repository dependencies; no database configuration is archived.",
+    "No production/provider activation or hosted CI evidence.",
+    "Unsolicited owner review-status delivery remains assigned to S4."
+  ]
+}

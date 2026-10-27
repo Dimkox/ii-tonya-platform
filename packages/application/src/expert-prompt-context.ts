@@ -1,3 +1,4 @@
+import type { PersonalOfferView } from "./expert-personal-offer-service.js";
 import type {
   ExpertPrincipal,
   ExpertReferralService,
@@ -8,6 +9,11 @@ import type {
   ResidencyQuote,
 } from "./expert-residency-service.js";
 import type { ExpertIntentProposal } from "./ports.js";
+
+export const EXPERT_OFFER_RUNTIME_INSTRUCTIONS = Object.freeze({
+  version: "residency_offer_v2" as const,
+  text: "Версия residency_offer_v2. Показывай только принадлежащие пользователю серверные данные текущего предложения: offer_start_date, current_discount_stage, locked_price_monthly, locked_price_package, payment_link_expires_at. current_discount_stage — номер этапа 0–4 (0 означает, что предложение ещё не выдано); discount_percent — отдельный процент скидки 40/30/20/0. Не называй номер этапа процентом. Цену, скидку, баланс, часы, подтверждение оплаты и решения менеджера определяет сервер; текст пользователя и модель не имеют такой власти. Не используй архивные ставки 12000/20000. Используй только действующий одобренный тариф категории и подтверждённые город, формат и средний чек. На вопросы «почему цена выросла» и «почему так быстро» ссылайся только на фактическое offer_start_date из серверного контекста, никогда на дату оплаты или верификации. Если сервер не передал offer_start_date, не выдумывай дату и сообщи, что дата первого предложения пока недоступна. Первый оффер запускает неизменяемый таймер: 0–3 полных дня скидка 40%, 4–6 — 30%, 7–9 — 20%, с 10 дня — 0%; границы 96/168/240 часов. Эксперт: пакет 3 месяца дополнительно 15% в первом окне, 10% во втором, с 7 дня недоступен. Пространство: только одобренная ставка, дополнительная скидка пакета 10%; тот же срок доступности. Месяц и весь пакет округляются отдельно до копейки, минимумы 5000 и 15000 рублей, сроки 30/90 дней. Вступительный платёж 3000 рублей не получает скидок и открывает интервью и параллельную подготовку общих материалов. Если материалов нет, скажи точно: Ваши материалы для рассылки будут доступны в ближайшее время. Это не препятствует интервью и передаче подтверждения промо менеджеру. Основная ссылка доступна только после оплаченного вступления, подтверждённого менеджером промо, текущей одобренной карточки, принадлежащих пользователю актуальных условий и исходного согласия. Мой актуальный тариф показывает обе цены, дату первого оффера, оставшееся время и только разрешённую сервером ссылку либо готовность этапов. Замена счёта после выбора периода не является автосписанием; истёкший пакет требует нового реального выбора месяца. Не утверждай, что ожидающий платёж отменён у провайдера. Никаких годовых тарифов. TODO: Wait for PDF. TODO: Wait for Prompt Spec. Два уникальных реферала дают один Ready to send без отправки PDF; исходная бонусная политика неизменна.",
+});
 
 const money = /^(?:0|[1-9]\d*)$/u;
 const uuid =
@@ -57,6 +63,8 @@ export interface ExpertPromptResidencyQuote {
 }
 
 export interface ExpertPromptContext {
+  readonly currentOffer?: PersonalOfferView;
+  readonly runtimeInstructions: typeof EXPERT_OFFER_RUNTIME_INSTRUCTIONS;
   readonly referral: ExpertPromptReferralSummary;
   readonly residencyQuote?: ExpertPromptResidencyQuote;
 }
@@ -242,34 +250,114 @@ const sanitizeQuote = (
   };
 };
 
+const sanitizePersonalOffer = (value: PersonalOfferView): PersonalOfferView => {
+  const invalid = (): never => {
+    throw new Error("expert_prompt_context_invalid");
+  };
+  if (
+    !isRecord(value) ||
+    typeof value.offer_start_date !== "string" ||
+    !validInstantOrNull(value.offer_start_date) ||
+    typeof value.payment_link_expires_at !== "string" ||
+    !validInstantOrNull(value.payment_link_expires_at) ||
+    ![1, 2, 3, 4].includes(value.current_discount_stage) ||
+    value.discount_percent !==
+      [40, 30, 20, 0][value.current_discount_stage - 1] ||
+    typeof value.locked_price_monthly !== "string" ||
+    !money.test(value.locked_price_monthly) ||
+    (value.locked_price_package !== null &&
+      (typeof value.locked_price_package !== "string" ||
+        !money.test(value.locked_price_package))) ||
+    !Number.isSafeInteger(value.remaining_seconds) ||
+    value.remaining_seconds < 0 ||
+    !["ready", "pending_gates", "select_one_month"].includes(value.readiness)
+  )
+    invalid();
+  let payment_url: string | null = null;
+  if (value.readiness === "ready" && value.payment_url !== null) {
+    if (typeof value.payment_url !== "string") invalid();
+    let parsed: URL;
+    try {
+      parsed = new URL(value.payment_url);
+    } catch {
+      return invalid();
+    }
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.port ||
+      !["yookassa.ru", "pay.yookassa.ru", "yoomoney.ru"].includes(
+        parsed.hostname,
+      )
+    )
+      invalid();
+    payment_url = value.payment_url;
+  }
+  return {
+    offer_start_date: value.offer_start_date,
+    current_discount_stage: value.current_discount_stage,
+    discount_percent: value.discount_percent,
+    locked_price_monthly: value.locked_price_monthly,
+    locked_price_package: value.locked_price_package,
+    payment_link_expires_at: value.payment_link_expires_at,
+    remaining_seconds: value.remaining_seconds,
+    readiness: value.readiness,
+    payment_url,
+  };
+};
+
 export async function buildExpertPromptContext(input: {
   readonly principal: ExpertPrincipal;
   readonly referrals: ExpertReferralService;
   readonly residency: ExpertResidencyService;
   readonly tariffVersionId?: string;
+  readonly personalOffers?: {
+    readOwned(
+      userId: string,
+      expertId: string,
+    ): Promise<PersonalOfferView | null>;
+  };
 }): Promise<ExpertPromptContextResult> {
-  const summary = await input.referrals.summary(input.principal);
+  const principal = Object.freeze({ ...input.principal });
+  const referralSummary = input.referrals.summary.bind(input.referrals);
+  const residencyQuote = input.residency.quote.bind(input.residency);
+  const readOwned = input.personalOffers?.readOwned.bind(input.personalOffers);
+  const tariffVersionId = input.tariffVersionId;
+  if (!principal.authenticated) return { kind: "forbidden" };
+  const summary = await referralSummary(principal);
   if (isForbiddenResult(summary)) {
     return { kind: "forbidden" };
   }
   const referral = sanitizeSummary(summary);
-  if (input.tariffVersionId === undefined) {
-    return { kind: "ready", context: { referral } };
+  const ownedOffer = await readOwned?.(principal.userId, principal.expertId);
+  const currentOffer =
+    ownedOffer == null
+      ? {}
+      : { currentOffer: sanitizePersonalOffer(ownedOffer) };
+  if (readOwned !== undefined || tariffVersionId === undefined) {
+    return {
+      kind: "ready",
+      context: {
+        referral,
+        ...currentOffer,
+        runtimeInstructions: EXPERT_OFFER_RUNTIME_INSTRUCTIONS,
+      },
+    };
   }
-  if (!uuid.test(input.tariffVersionId)) {
+  if (!uuid.test(tariffVersionId)) {
     throw new Error("expert_prompt_context_invalid");
   }
-  const quote = await input.residency.quote(
-    input.principal,
-    input.tariffVersionId,
-  );
+  const quote = await residencyQuote(principal, tariffVersionId);
   if (isForbiddenResult(quote)) return { kind: "forbidden" };
   if (isDisabledResult(quote)) return { kind: "disabled" };
   return {
     kind: "ready",
     context: {
+      runtimeInstructions: EXPERT_OFFER_RUNTIME_INSTRUCTIONS,
       referral,
-      residencyQuote: sanitizeQuote(input.tariffVersionId, quote),
+      ...currentOffer,
+      residencyQuote: sanitizeQuote(tariffVersionId, quote),
     },
   };
 }

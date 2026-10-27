@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/integration/expert-separated-sales-state.test.ts (19 tests | 16 skipped) 2895ms
+   ✓ review R3 supplemental answers preserve the submitted approval and capture authority  645ms
+   ✓ review R4 quarter to month before first manager approval uses the new explicit period  359ms
+
+ Test Files  1 passed (1)
+      Tests  3 passed | 16 skipped (19)
+   Start at  18:32:30
+   Duration  6.26s (transform 1.27s, setup 0ms, collect 2.90s, tests 2.90s, environment 0ms, prepare 121ms)
+
+
+[END OF RAW CAPTURE]

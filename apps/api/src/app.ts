@@ -1,3 +1,39 @@
+import {
+  expertManagerTelegramRoutes,
+  type ExpertManagerTelegramCapability,
+} from "./routes/expert-manager-telegram.js";
+import {
+  assertClientBotAccountCapability,
+  type ClientBotAccountCapability,
+} from "./client-bot-account-composition.js";
+import {
+  assertExpertResidencyLifecycleCapability,
+  type ExpertResidencyLifecycleCapability,
+} from "./expert-residency-lifecycle-composition.js";
+import { expertCardAdminRoutes } from "./routes/expert-cards.js";
+import {
+  assertExpertCardCapability,
+  type ExpertCardCapability,
+} from "./expert-card-composition.js";
+import { expertVerificationRoutes } from "./routes/expert-verification.js";
+import {
+  assertExpertVerificationCapability,
+  type ExpertVerificationCapability,
+} from "./expert-verification-composition.js";
+import {
+  expertApplicantTelegramRoutes,
+  type ExpertApplicantTelegramCapability,
+} from "./routes/expert-applicant-telegram.js";
+import { assertExpertApplicantCapability } from "./expert-applicant-composition.js";
+import type { TelegramDeletionCapability } from "./telegram-deletion.js";
+import { createRequire } from "node:module";
+import { expertSessionRoutes } from "./routes/expert-sessions.js";
+import {
+  expertBrowserSessionRoutes,
+  type ExpertBrowserOptions,
+} from "./routes/expert-browser-session.js";
+import type { BookingCallbackService } from "./booking-callback-service.js";
+import type { ClientAccountPackagesRepository } from "../../../packages/contracts/src/client-account-packages.js";
 import type {
   AdminService,
   BookingService,
@@ -7,23 +43,38 @@ import type {
   ClientPrincipalResolver,
   ClientSessionService,
   WaitlistService,
+  ClientNavigationGateway,
+  ClientIngressReplayRead,
   ConversationService,
   ExpertAiIngressService,
   ExpertCodeKeyring,
   ExpertReferralAdminService,
   OperatorCaseService,
   PrivacyService,
+  ErasureRequestService,
   SelartiProposalAcceptResult,
 } from "@ii-tonya/application";
-import type { RuntimeConfig } from "@ii-tonya/config";
+import {
+  assertClientNavigationConfig,
+  clientTelegramBotId,
+  type RuntimeConfig,
+} from "@ii-tonya/config";
 import type { PostgresAdminApprovalRepository } from "@ii-tonya/db";
 import type { SelartiPort } from "@ii-tonya/integrations";
 import {
   createLogger,
+  classifyFailure,
+  httpErrorStatus,
+  httpRetryAfter,
   recordClientSessionMetric,
+  recordClientBookingMetric,
   type Logger,
 } from "@ii-tonya/observability";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, {
+  LogController,
+  type FastifyInstance,
+  type FastifyReply,
+} from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
 import { operatorCaseRoutes } from "./routes/operator-cases.js";
@@ -54,11 +105,23 @@ import {
 } from "./routes/yookassa-webhook.js";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { clientCatalogRoutes } from "./routes/client-catalog.js";
+import {
+  publicClientCatalogRoutes,
+  type PublicCatalogRead,
+  type PublicCatalogLoadState,
+} from "./routes/public-client-catalog.js";
 import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { clientPrivacyRoutes } from "./routes/client-privacy.js";
+import { browserAccountRoutes } from "./routes/browser-account.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { selartiResponseRoutes } from "./routes/selarti-response.js";
+
+// Fastify exposes no public distinction between implicit and explicit 200.
+// Use its installed status-set marker, guarded by the differential tests.
+const { kReplyHasStatusCode } = createRequire(import.meta.url)(
+  "fastify/lib/symbols.js",
+) as { kReplyHasStatusCode: symbol };
 
 type ApprovalPort = Pick<
   PostgresAdminApprovalRepository,
@@ -70,11 +133,38 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  expertManagerTelegram?: ExpertManagerTelegramCapability;
+  clientAccountQueries?: ClientBotAccountCapability;
+  expertResidencyLifecycle?: ExpertResidencyLifecycleCapability;
+  expertCard?: ExpertCardCapability;
+  expertVerification?: ExpertVerificationCapability;
+  expertApplicantTelegram?: ExpertApplicantTelegramCapability;
+  expertSession?: ExpertBrowserOptions;
   config: RuntimeConfig;
   conversationService: ConversationService;
   bookingService: BookingService;
   catalogService: CatalogService;
   privacyService: PrivacyService;
+  erasureRequests?: ErasureRequestService;
+  telegramDeletion?: TelegramDeletionCapability | undefined;
+  consentEvidence?:
+    | {
+        issuePresentation(command: {
+          userId: string;
+          purpose: string;
+          channel: "web" | "telegram";
+          documentKey: string;
+        }): Promise<unknown>;
+        recordDecision(command: {
+          token: string;
+          userId: string;
+          purpose: string;
+          decision: "granted" | "denied";
+          policyVersion: string;
+          correlationId: string;
+        }): Promise<unknown>;
+      }
+    | undefined;
   adminService: AdminService;
   selarti: SelartiPort;
   telegramCallbacks: TelegramCallbackService;
@@ -83,6 +173,9 @@ export interface AppDependencies {
   inbox: WebhookInbox;
   rateLimiter: RateLimitGate;
   clientIngressEnabled?: boolean | undefined;
+  clientNavigationGateway?: Pick<ClientNavigationGateway, "handle">;
+  clientBotId?: string;
+  clientIngressReplay?: ClientIngressReplayRead;
   clientHybridRoutingEnabled?: boolean | undefined;
   clientBotKey?: string | undefined;
   clientGateway?:
@@ -93,6 +186,7 @@ export interface AppDependencies {
       }
     | undefined;
   telegramWebhookSecret: string;
+  bookingCallbacks?: BookingCallbackService;
   selartiResponseSharedSecret?: string;
   selartiResponses?: {
     handle(raw: unknown): Promise<{
@@ -111,7 +205,10 @@ export interface AppDependencies {
   expertAiTelegramPrincipal?: Pick<TelegramExpertAiIngress, "resolvePrincipal">;
   yookassaWebhook?: YooKassaWebhookDependencies;
   clientCatalogService?: ClientCatalogService;
+  publicCatalog?: PublicCatalogRead;
+  publicCatalogLoadState?: PublicCatalogLoadState;
   clientSessionService?: ClientSessionService;
+  clientAccountPackages?: ClientAccountPackagesRepository;
   clientSessionRepository?: ClientSessionRevocation;
   clientPrincipal?: ClientPrincipalResolver;
   clientBookingService?: ClientBookingService;
@@ -130,10 +227,128 @@ const assertDisabled = (config: RuntimeConfig): void => {
   )
     throw new Error("Live provider activation is prohibited");
 };
+
+const diagnostic = (write: () => void): void => {
+  try {
+    write();
+  } catch {
+    /* A broken logger cannot alter the HTTP outcome. */
+  }
+};
+
+function terminalErrorReply(
+  reply: FastifyReply,
+  statusCode: number,
+): FastifyReply {
+  const payload = JSON.stringify({
+    error:
+      statusCode >= 500
+        ? "internal_error"
+        : statusCode === 413
+          ? "body_too_large"
+          : "invalid_request",
+  });
+  // The root error boundary is terminal: re-entering serialization/onSend lets
+  // a second failure reach Fastify's prose-bearing parent fallback. onError has
+  // already run; raw.end still triggers onResponse. Route-local handlers remain.
+  reply.hijack();
+  if (reply.raw.headersSent) {
+    reply.raw.destroy();
+    return reply;
+  }
+  const fixedHeaders = {
+    "content-type": "application/json; charset=utf-8",
+    "content-length": String(Buffer.byteLength(payload)),
+  };
+  const body = reply.request.method === "HEAD" ? undefined : payload;
+  try {
+    // Preserve headers deliberately set by trusted routes (auth/cookies/CORS),
+    // not error.headers. Replace framing left over from the failed response.
+    reply.removeHeader("content-encoding");
+    reply.removeHeader("transfer-encoding");
+    reply.raw.removeHeader("content-encoding");
+    reply.raw.removeHeader("transfer-encoding");
+    const headers: Record<string, string | number | string[] | undefined> =
+      reply.getHeaders();
+    reply.raw.writeHead(statusCode, { ...headers, ...fixedHeaders });
+    reply.raw.end(body);
+  } catch {
+    // Invalid preselected headers must not send us back into error serialization.
+    if (!reply.raw.headersSent) {
+      for (const key of reply.raw.getHeaderNames()) reply.raw.removeHeader(key);
+      try {
+        reply.raw.writeHead(statusCode, fixedHeaders);
+        reply.raw.end(body);
+      } catch {
+        reply.raw.destroy();
+      }
+    } else reply.raw.destroy();
+  }
+  return reply;
+}
+
 export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertClientBotAccountCapability(deps.config, deps.clientAccountQueries);
+  if (
+    deps.config.features.clientAccountQueries === true &&
+    (deps.telegramWebhookSecret !== deps.config.telegramWebhookSecret ||
+      deps.clientBotId !== deps.clientAccountQueries?.botId ||
+      deps.clientBotKey !== deps.clientAccountQueries?.botKey)
+  )
+    throw new Error("client_account_queries_webhook_scope_conflict");
+  assertExpertResidencyLifecycleCapability(
+    deps.config,
+    deps.expertResidencyLifecycle,
+  );
+  if (
+    deps.config.features.expertResidencyLifecycleCommands === true &&
+    deps.expertResidencyLifecycle?.webhookSecret !== deps.telegramWebhookSecret
+  )
+    throw new Error("expert_residency_lifecycle_webhook_scope_conflict");
+  assertExpertCardCapability(deps.config, deps.expertCard);
+  if (
+    deps.config.features.expertCard === true &&
+    deps.expertCard?.webhookSecret !== deps.telegramWebhookSecret
+  )
+    throw new Error("expert_card_webhook_scope_conflict");
+  assertExpertVerificationCapability(deps.config, deps.expertVerification);
+  assertExpertApplicantCapability(deps.config, deps.expertApplicantTelegram);
+  if (
+    deps.config.features.expertSession === true &&
+    (!deps.expertSession?.sessions ||
+      !deps.expertSession.lookup ||
+      !deps.expertSession.principals ||
+      !deps.expertSession.origin ||
+      !deps.expertSession.botUsername)
+  )
+    throw new Error("expert_session_capability_unavailable");
+  const expertSession =
+    deps.config.features.expertSession === true ? deps.expertSession! : {};
+  assertClientNavigationConfig(deps.config);
+  if (
+    deps.config.features.clientTelegramNavigation === true &&
+    (typeof deps.clientNavigationGateway?.handle !== "function" ||
+      typeof deps.clientIngressReplay?.hasReceipt !== "function" ||
+      deps.clientBotId !==
+        clientTelegramBotId(deps.config.clientTelegramBotToken) ||
+      deps.clientBotKey !== deps.config.clientTelegramBotKey ||
+      deps.telegramWebhookSecret !== deps.config.telegramWebhookSecret ||
+      deps.clientIngressEnabled === true ||
+      deps.clientHybridRoutingEnabled === true)
+  )
+    throw new Error("client_navigation_capability_unavailable");
+  const clientBotId = clientTelegramBotId(deps.config.clientTelegramBotToken);
+  if (
+    (deps.config.features.clientTelegramIngress === true ||
+      deps.clientIngressEnabled === true) &&
+    (clientBotId === undefined ||
+      deps.clientBotId !== clientBotId ||
+      typeof deps.clientIngressReplay?.hasReceipt !== "function")
+  )
+    throw new Error("client_ingress_replay_capability_unavailable");
   const sessionCapability =
     deps.clientSessionService !== undefined &&
     deps.clientSessionRepository !== undefined &&
@@ -221,6 +436,25 @@ export async function buildApp(
       deps.config.features.b2SensitiveRetention !== true)
   )
     throw new Error("Test expert residual runtime capability is required");
+  if (
+    deps.config.expertVerification?.paymentVerificationEnabled &&
+    (!deps.config.features.yookassa ||
+      !deps.expertVerification?.onboardingWebhook ||
+      deps.yookassaWebhook?.onboarding !==
+        deps.expertVerification.onboardingWebhook)
+  )
+    throw new Error("expert_verification_merchant_callback_required");
+  if (
+    deps.config.features.expertCard === true &&
+    deps.config.expertCard?.mainCheckoutEnabled &&
+    (!deps.config.features.yookassa || !deps.yookassaWebhook)
+  )
+    throw new Error("expert_card_merchant_callback_required");
+  if (
+    deps.config.expertResidencyLifecycle?.renewalCheckoutEnabled &&
+    (!deps.config.features.yookassa || !deps.yookassaWebhook)
+  )
+    throw new Error("expert_residency_lifecycle_merchant_callback_required");
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -231,13 +465,82 @@ export async function buildApp(
   }
   const app = Fastify({
     loggerInstance: deps.logger,
+    logController: new LogController({ disableRequestLogging: true }),
+    frameworkErrors(error, request, reply: FastifyReply) {
+      // Router decoding errors precede normal error handlers and otherwise echo paths.
+      const statusCode = httpErrorStatus(
+        error,
+        reply.statusCode,
+        Object.getOwnPropertyDescriptor(reply, kReplyHasStatusCode)?.value ===
+          true,
+      );
+      diagnostic(() =>
+        request.log.error({
+          event: "http_request_failed",
+          method: request.method,
+          statusCode,
+          failureClass:
+            statusCode >= 500 ? "internal_error" : "invalid_request",
+        }),
+      );
+      return terminalErrorReply(reply, statusCode);
+    },
     bodyLimit: 64_000,
     ajv: { customOptions: { removeAdditional: false } },
+  });
+  // Register at the root so plugins inherit this boundary and can retain their
+  // stricter local status contracts (notably session/booking oversized 400s).
+  app.setNotFoundHandler((request, reply) => {
+    diagnostic(() =>
+      request.log.info({
+        event: "http_not_found",
+        method: request.method,
+        statusCode: 404,
+      }),
+    );
+    return reply.code(404).send({ error: "not_found" });
+  });
+  app.setErrorHandler((error, request, reply) => {
+    const statusCode = httpErrorStatus(
+      error,
+      reply.statusCode,
+      Object.getOwnPropertyDescriptor(reply, kReplyHasStatusCode)?.value ===
+        true,
+    );
+    const retryAfter = httpRetryAfter(error);
+    if (retryAfter !== undefined) reply.header("retry-after", retryAfter);
+    diagnostic(() =>
+      request.log.error({
+        event: "http_request_failed",
+        method: request.method,
+        statusCode,
+        failureClass: classifyFailure(error),
+      }),
+    );
+    return terminalErrorReply(reply, statusCode);
+  });
+  app.addHook("onResponse", async (request, reply) => {
+    diagnostic(() =>
+      request.log.info({
+        event: "http_request_completed",
+        method: request.method,
+        statusCode: reply.statusCode,
+        durationMs: reply.elapsedTime,
+      }),
+    );
   });
   if (deps.expertCodeKeyring !== undefined) {
     app.decorate("expertCodeKeyring", deps.expertCodeKeyring);
   }
   await app.register(healthRoutes, { readiness: deps.readiness });
+  await app.register(publicClientCatalogRoutes, {
+    ...(deps.publicCatalog === undefined
+      ? {}
+      : { catalog: deps.publicCatalog }),
+    ...(deps.publicCatalogLoadState === undefined
+      ? {}
+      : { loadState: deps.publicCatalogLoadState }),
+  });
   if (
     deps.config.features.clientSession === true &&
     deps.clientSessionService !== undefined &&
@@ -274,6 +577,15 @@ export async function buildApp(
       bookings: deps.clientBookingService,
       principals: deps.clientBookingPrincipal,
       reserveEnabled: deps.config.features.clientBookingReserve === true,
+      metrics: {
+        record: (labels) => {
+          if (labels.operation === "reserve" || labels.operation === "cancel")
+            recordClientBookingMetric({
+              ...labels,
+              operation: labels.operation,
+            });
+        },
+      },
       waitlistEnabled: deps.config.features.clientWaitlist === true,
       ...(deps.clientWaitlistService === undefined
         ? {}
@@ -287,8 +599,52 @@ export async function buildApp(
     await app.register(clientPrivacyRoutes, {
       privacy: deps.privacyService,
       principals: deps.clientPrincipal,
+      // Erasure remains uncomposed until content, processor and backup coverage is verified.
+      ...(deps.consentEvidence === undefined
+        ? {}
+        : { consentEvidence: deps.consentEvidence }),
     });
   }
+  await app.register(browserAccountRoutes, {
+    ...(deps.config.features.clientSession === true &&
+    deps.clientAccountPackages
+      ? { clientAccountPackages: deps.clientAccountPackages }
+      : {}),
+    logLevel: "silent",
+    ...(deps.config.clientWeb === undefined
+      ? {}
+      : {
+          origin: deps.config.clientWeb.origin,
+          botUsername: deps.config.clientWeb.botUsername,
+        }),
+    widgetEnabled: deps.config.clientWeb?.widgetEnabled === true,
+    privacyEnabled: deps.config.features.clientPrivacy === true,
+    erasureRequestsEnabled: deps.config.features.clientErasureRequests === true,
+    ...(deps.erasureRequests ? { erasureRequests: deps.erasureRequests } : {}),
+    bookingEnabled:
+      deps.config.features.clientBooking === true &&
+      deps.clientBookingService !== undefined,
+    bookingReserveEnabled: deps.config.features.clientBookingReserve === true,
+    catalogEnabled:
+      deps.config.features.clientCatalog === true &&
+      deps.clientCatalogService !== undefined,
+    ...(deps.clientBookingPrincipal === undefined
+      ? {}
+      : { bookingPrincipals: deps.clientBookingPrincipal }),
+    ...(deps.config.features.clientSession !== true ||
+    !deps.clientSessionService ||
+    !deps.clientSessionRepository ||
+    !deps.clientPrincipal
+      ? {}
+      : {
+          sessions: {
+            issue: (proof, signal) =>
+              deps.clientSessionService!.issue(proof, signal),
+            revoke: (digest) => deps.clientSessionRepository!.revoke(digest),
+          },
+          principals: deps.clientPrincipal,
+        }),
+  });
   if (deps.yookassaWebhook !== undefined) {
     await app.register(yookassaWebhookRoutes, deps.yookassaWebhook);
   }
@@ -311,9 +667,81 @@ export async function buildApp(
     },
     rateLimiter: deps.rateLimiter,
   });
+  await app.register(expertCardAdminRoutes, {
+    enabled: deps.config.features.expertCard === true,
+    ...(deps.expertCard ? { service: deps.expertCard.admin } : {}),
+  });
+  if (deps.expertManagerTelegram) {
+    const manager = deps.expertManagerTelegram.service;
+    let managerTimer: ReturnType<typeof setInterval> | undefined;
+    let managerRunning = false;
+    const drainManager = async () => {
+      if (managerRunning) return;
+      managerRunning = true;
+      try {
+        await manager.tick();
+      } catch {
+        /* retain durable pending/quarantined work */
+      } finally {
+        managerRunning = false;
+      }
+    };
+    app.addHook("onReady", async () => {
+      await drainManager();
+      managerTimer = setInterval(() => {
+        void drainManager();
+      }, 15 * 60_000);
+      managerTimer.unref();
+    });
+    app.addHook("onClose", async () => {
+      if (managerTimer) clearInterval(managerTimer);
+    });
+  }
+  await app.register(expertManagerTelegramRoutes, {
+    ...(deps.expertManagerTelegram
+      ? { capability: deps.expertManagerTelegram }
+      : {}),
+  });
+  await app.register(expertVerificationRoutes, {
+    enabled: deps.config.features.expertVerification === true,
+    ...(deps.expertVerification
+      ? { service: deps.expertVerification.service }
+      : {}),
+  });
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: deps.config.features.expertApplicant === true,
+    ...(deps.expertApplicantTelegram
+      ? { capability: deps.expertApplicantTelegram }
+      : {}),
+  });
   await app.register(telegramWebhookRoutes, {
+    clientAccountQueriesEnabled:
+      deps.config.features.clientAccountQueries === true,
+    ...(deps.clientAccountQueries
+      ? { clientAccountQueries: deps.clientAccountQueries }
+      : {}),
+    expertResidencyLifecycleEnabled:
+      deps.config.features.expertResidencyLifecycleCommands === true,
+    ...(deps.expertResidencyLifecycle
+      ? { expertResidencyLifecycle: deps.expertResidencyLifecycle }
+      : {}),
+    expertCardEnabled: deps.config.features.expertCard === true,
+    ...(deps.expertCard ? { expertCard: deps.expertCard } : {}),
+    ...(deps.config.features.clientPrivacy === true &&
+    deps.config.features.clientErasureRequests === true &&
+    deps.telegramDeletion
+      ? { deletion: deps.telegramDeletion }
+      : {}),
+    bookingCallbacksEnabled: deps.config.features.bookingCallbacks === true,
+    ...(deps.bookingCallbacks === undefined
+      ? {}
+      : { bookingCallbacks: deps.bookingCallbacks }),
     secret: deps.telegramWebhookSecret,
     clientIngressEnabled: deps.clientIngressEnabled,
+    clientNavigationEnabled: deps.config.features.clientTelegramNavigation,
+    clientNavigationGateway: deps.clientNavigationGateway,
+    clientBotId: deps.clientBotId,
+    clientIngressReplay: deps.clientIngressReplay,
     clientHybridRoutingEnabled: deps.clientHybridRoutingEnabled,
     clientBotKey: deps.clientBotKey,
     clientGateway: deps.clientGateway,
@@ -404,6 +832,22 @@ export async function buildApp(
         approvals: deps.adminApprovals,
         cases: deps.operatorCases,
       });
+    for (const path of [
+      "/v1/admin/expert-residency/late-payments",
+      "/v1/admin/expert-residency/late-payments/:errorId",
+    ])
+      app.get(path, async (request, reply) => {
+        const response = await admin.inject({
+          method: "GET",
+          url: request.url,
+          headers: request.headers,
+        });
+        reply.code(response.statusCode);
+        for (const [name, value] of Object.entries(response.headers))
+          if (name !== "content-length" && value !== undefined)
+            reply.header(name, value);
+        return reply.send(response.rawPayload);
+      });
     app.post("/v1/admin/*", async (request, reply) => {
       const expertAction =
         /^\/v1\/admin\/actions\/(?:expert_referral|expert_residency)\./u.test(
@@ -431,6 +875,18 @@ export async function buildApp(
       await expertAdmin?.close();
     });
   }
+  await app.register(expertSessionRoutes, expertSession);
+  await app.register(expertBrowserSessionRoutes, {
+    ...expertSession,
+    receiptCapture: deps.expertApi?.receiptCapture,
+    // The browser facade must not activate billing or fall back to legacy pricing.
+    campaign:
+      deps.config.features.expertSession === true &&
+      deps.config.features.expertResidencyBilling &&
+      deps.expertApi?.residency.kind === "campaign"
+        ? deps.expertApi.residency
+        : undefined,
+  });
   return app as unknown as FastifyInstance;
 }
 
@@ -466,6 +922,7 @@ export type TestApp = FastifyInstance & {
 };
 export async function buildTestApp(
   options: {
+    telegramDeletion?: TelegramDeletionCapability;
     callbackVerified?: boolean;
     authorizedIdentity?: boolean;
     telegramFailOnce?: boolean;
@@ -483,7 +940,10 @@ export async function buildTestApp(
     >;
     yookassaWebhook?: YooKassaWebhookDependencies;
     clientCatalogService?: ClientCatalogService;
+    publicCatalog?: PublicCatalogRead;
+    publicCatalogLoadState?: PublicCatalogLoadState;
     clientSessionService?: ClientSessionService;
+    clientAccountPackages?: ClientAccountPackagesRepository;
     clientSessionRepository?: ClientSessionRevocation;
     clientPrincipal?: ClientPrincipalResolver;
     features?: Partial<RuntimeConfig["features"]>;
@@ -570,6 +1030,9 @@ export async function buildTestApp(
         throw new Error("disabled");
       },
     },
+    ...(options.telegramDeletion
+      ? { telegramDeletion: options.telegramDeletion }
+      : {}),
     telegramCallbacks: telegram,
     readiness: {
       check: async () => ({
@@ -628,6 +1091,16 @@ export async function buildTestApp(
     ...(options.clientCatalogService === undefined
       ? {}
       : { clientCatalogService: options.clientCatalogService }),
+    ...(options.publicCatalog === undefined
+      ? {}
+      : { publicCatalog: options.publicCatalog }),
+    publicCatalogLoadState: options.publicCatalogLoadState ?? {
+      limiter: createWindowedRateLimiter(),
+      inFlight: 0,
+    },
+    ...(options.clientAccountPackages === undefined
+      ? {}
+      : { clientAccountPackages: options.clientAccountPackages }),
     ...(options.clientSessionService === undefined
       ? {}
       : { clientSessionService: options.clientSessionService }),

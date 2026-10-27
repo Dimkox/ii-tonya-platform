@@ -1,0 +1,1678 @@
+{
+  "kind": "local-synthetic-rich-onboarding-review-corrections",
+  "controlCommit": "a41652c684f79263350cd2cc2d5573c8f98ec71f",
+  "reviewedRuntimeCommit": "5602413c7dca6809569d788b9d8254df80846cc8",
+  "historicalFixtureCommit": "219f8e0c9d0938fccb4188cf0081f71b3f8b2db9",
+  "historicalEvidenceManifest": "docs/test-evidence/residency-rich-onboarding-2026-10-27/manifest.json",
+  "historicalEvidenceManifestSha256": "60a8a5a176560f98318545aa010f435e1e8eaa63251d1d19bf542ad4fbe20cc3",
+  "compression": "gzip level9 mtime0; one original artifact per file",
+  "productionEvidence": false,
+  "files": [
+    {
+      "file": "affected-unit-proof.log.gz",
+      "sha256": "5acd82bdaad4fb5206a80e29b60c74bc836aee56e2ea7ad1a3509a1fff33b7a3",
+      "bytes": 356,
+      "rawSha256": "b947414cd1c2898192fe705fe910d87f5b82a5e94e563c8c207c50e989787c14",
+      "rawBytes": 621,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/affected-unit-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "apps/api/src/expert-card-composition.test.ts",
+        "packages/application/src/expert-card-service.test.ts",
+        "packages/db/src/repositories/expert-residency-main-projection.test.ts",
+        "packages/db/src/repositories/expert-residency-lifecycle-repository.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "b947414cd1c2898192fe705fe910d87f5b82a5e94e563c8c207c50e989787c14",
+      "recordedResult": "affected-unit-proof.result.json.gz"
+    },
+    {
+      "file": "affected-unit-proof.result.json.gz",
+      "sha256": "d5f89facc047e744b381b5f060dc18b798615d5d6f9583a42f0ad415448ba411",
+      "bytes": 245,
+      "rawSha256": "2f4675eafbb813e01fdaef7cebf28171fc421715e4a3529d539c40a86adaa9d3",
+      "rawBytes": 398,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/affected-unit-proof.result.json"
+    },
+    {
+      "file": "bootstrap-notes.md.gz",
+      "sha256": "dc51ce10a627d2ab7e77ffe1fbe2eed4215ed252ee3837a36a3394093d9bc97c",
+      "bytes": 1325,
+      "rawSha256": "169e40e46e3c1e522463d05c866fc52305e3a8c04ca25c52af065df46013e02c",
+      "rawBytes": 2557,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/bootstrap-notes.md"
+    },
+    {
+      "file": "contract-correction-build.log.gz",
+      "sha256": "8f2dc8447c9770a70b8223c75f1d842d6ded025c78b0bb6d86d5eda0fd5200a3",
+      "bytes": 964,
+      "rawSha256": "508fc75452e6852031cdc5303dda98352982404b1804520a7c62ac8a95cec0ce",
+      "rawBytes": 2074,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/contract-correction-build.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/contracts",
+        "build"
+      ],
+      "exitCode": 1,
+      "logSha256": "508fc75452e6852031cdc5303dda98352982404b1804520a7c62ac8a95cec0ce",
+      "recordedResult": "contract-correction-build.result.json.gz"
+    },
+    {
+      "file": "contract-correction-build.result.json.gz",
+      "sha256": "97fdf3b9d23ef02ef3bf8b5735e777c460889224676e7d477e8b617592b3055a",
+      "bytes": 158,
+      "rawSha256": "6ee0c9f862d190d30b73549151753fbf6d6f8ae73a3bd4a2f55f79f9766be47a",
+      "rawBytes": 162,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/contract-correction-build.result.json"
+    },
+    {
+      "file": "contract-correction-build2.log.gz",
+      "sha256": "3b6ef244e72f0143fb8a09ff70881b47131e895dfd4e4bffcec4d161ef48f631",
+      "bytes": 244,
+      "rawSha256": "aa8627e67c8d701f4d3ffec0f404827037d7091c321d0b13f9acce38a9e7b2a0",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/contract-correction-build2.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/contracts",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "aa8627e67c8d701f4d3ffec0f404827037d7091c321d0b13f9acce38a9e7b2a0",
+      "recordedResult": "contract-correction-build2.result.json.gz"
+    },
+    {
+      "file": "contract-correction-build2.result.json.gz",
+      "sha256": "2f8db96bad3e597b9e2b2873f94c78187b2c9c8156f76296c7291d0b38515d23",
+      "bytes": 157,
+      "rawSha256": "c3047555620dc3b215f195bcc489d9300606043e139049bc9a82e2af6b567916",
+      "rawBytes": 162,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/contract-correction-build2.result.json"
+    },
+    {
+      "file": "contract-red.log.gz",
+      "sha256": "977b2572b1924d173da0468e835b8bf25500d4ed930a9effcaf0fbd04dd89f5f",
+      "bytes": 1406,
+      "rawSha256": "65f0100a72ccf7c85ba2334d58ecf97678a724d2c350590a294fbf2b86a75757",
+      "rawBytes": 4130,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/contract-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-rich-profile.test.ts",
+        "-t",
+        "R5|R10"
+      ],
+      "exitCode": 1,
+      "logSha256": "65f0100a72ccf7c85ba2334d58ecf97678a724d2c350590a294fbf2b86a75757",
+      "recordedResult": "contract-red.result.json.gz"
+    },
+    {
+      "file": "contract-red.result.json.gz",
+      "sha256": "f5515d85bf94310d0d5b94d01e78de8b395e9254a7684061f6abcdd397061927",
+      "bytes": 189,
+      "rawSha256": "90d263ab9db52f49b5e3b89d7303f7c31580acb23fa1d82d7bd96eb138b06e9c",
+      "rawBytes": 215,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/contract-red.result.json"
+    },
+    {
+      "file": "contracts-identity-partial-proof.log.gz",
+      "sha256": "25d0225837064f1b0528244bea1a303878ba939bd5c475ad8e7e2dacbc14e12d",
+      "bytes": 289,
+      "rawSha256": "e74dcd38452811dcc89b2ebed7aceb5824f086492164b0ba5fca712420ccbb36",
+      "rawBytes": 394,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/contracts-identity-partial-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-rich-profile.test.ts",
+        "-t",
+        "R5|R10"
+      ],
+      "exitCode": 0,
+      "logSha256": "e74dcd38452811dcc89b2ebed7aceb5824f086492164b0ba5fca712420ccbb36",
+      "recordedResult": "contracts-identity-partial-proof.result.json.gz"
+    },
+    {
+      "file": "contracts-identity-partial-proof.result.json.gz",
+      "sha256": "1174976d4eee0a92adc82d652aeea3b55f9cf67193627dea1f65b323a123cd18",
+      "bytes": 189,
+      "rawSha256": "00afc55c71814bb4cdf0fd4a7b6a6e5fbfd5bef47a87a13b8974466b7086754f",
+      "rawBytes": 215,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/contracts-identity-partial-proof.result.json"
+    },
+    {
+      "file": "corrected-contracts-final.log.gz",
+      "sha256": "53e9acfbcae6e430bd430da550c4d2b6b5347c98a3653294266cac57360e985d",
+      "bytes": 276,
+      "rawSha256": "7cb8430be96e4280c5491c5eb2b410945ebdef6f0977a40b10a482d33a1e73c0",
+      "rawBytes": 369,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrected-contracts-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-rich-profile.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "7cb8430be96e4280c5491c5eb2b410945ebdef6f0977a40b10a482d33a1e73c0",
+      "recordedResult": "corrected-contracts-final.result.json.gz"
+    },
+    {
+      "file": "corrected-contracts-final.result.json.gz",
+      "sha256": "4de3248cbfb068395a2b4c9a79ee71a6429b50f78c50909a349a64e186fd59b0",
+      "bytes": 180,
+      "rawSha256": "a0cb042887bd08b605aaceb44dd9002d4c75b9ed9641784cc86e046d664a1e45",
+      "rawBytes": 199,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrected-contracts-final.result.json"
+    },
+    {
+      "file": "corrected-custody-materials-proof.log.gz",
+      "sha256": "2e62e7da27a525b4b20049f92e6f7b71e2d07902d5f47b0440b61ced68f784b2",
+      "bytes": 420,
+      "rawSha256": "42317c1a82accde8bf9066c2b44e1953ad2a1f7f3f6353a4d9fe98ad7d91c075",
+      "rawBytes": 620,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrected-custody-materials-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R4 numbered|R8 actual"
+      ],
+      "exitCode": 0,
+      "logSha256": "42317c1a82accde8bf9066c2b44e1953ad2a1f7f3f6353a4d9fe98ad7d91c075",
+      "recordedResult": "corrected-custody-materials-proof.result.json.gz"
+    },
+    {
+      "file": "corrected-custody-materials-proof.result.json.gz",
+      "sha256": "aecfc82f717b2c96d3d58afe02dde51777bea93ea3c864752535e0302f7ffa66",
+      "bytes": 200,
+      "rawSha256": "fa67931b279cb87479e1d17e572971427779d12083ce72675c55e6b62f33998f",
+      "rawBytes": 228,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrected-custody-materials-proof.result.json"
+    },
+    {
+      "file": "corrected-rich-integration-final.log.gz",
+      "sha256": "9e806fa7451ad76fc87234961b7f8d39e35b14e46fa475f8bdcae481a4d6cb0a",
+      "bytes": 1024,
+      "rawSha256": "4db1f853c7f844987453b62dd12e5875f1b97d1cd8d0bbe97da372c5e2b26e66",
+      "rawBytes": 1927,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrected-rich-integration-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "4db1f853c7f844987453b62dd12e5875f1b97d1cd8d0bbe97da372c5e2b26e66",
+      "recordedResult": "corrected-rich-integration-final.result.json.gz"
+    },
+    {
+      "file": "corrected-rich-integration-final.result.json.gz",
+      "sha256": "dd657b56056f586998a2d22dd3f8c96424ac1342e751eb9d9fdc296cb0dbaa98",
+      "bytes": 177,
+      "rawSha256": "1a46abe6bc660911681188895b84b3cb3dfcdb187f939393dc398bb30eb6a864",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrected-rich-integration-final.result.json"
+    },
+    {
+      "file": "correction-digest-compatibility.log.gz",
+      "sha256": "4737a75d05594406e48440e227bbdd124b6e55e345864f37a86e019acac1ae27",
+      "bytes": 343,
+      "rawSha256": "2558002b121f6a78120e14e13a78308619d12d61b4b64753c41958ad6b79f2a6",
+      "rawBytes": 485,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/correction-digest-compatibility.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R7 SQL"
+      ],
+      "exitCode": 0,
+      "logSha256": "2558002b121f6a78120e14e13a78308619d12d61b4b64753c41958ad6b79f2a6",
+      "recordedResult": "correction-digest-compatibility.result.json.gz"
+    },
+    {
+      "file": "correction-digest-compatibility.result.json.gz",
+      "sha256": "83ac3817f06afdd4f6139aa839f499a526fb1d7a5086c3f2dd191d26b4ec7054",
+      "bytes": 188,
+      "rawSha256": "7967762eda05ae38f9e1676d7aee8b4a9d175270a9e7794a6bbe115526e5ec40",
+      "rawBytes": 213,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/correction-digest-compatibility.result.json"
+    },
+    {
+      "file": "correction-environment.log.gz",
+      "sha256": "532f262c179b98362934344837e3bfc52112651b4084c2f28173712a127eecfd",
+      "bytes": 322,
+      "rawSha256": "79a06dcd1c13332ff0a5e5789716a5ba993b771222a799b3c5ddec9dbc2596cb",
+      "rawBytes": 484,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/correction-environment.log",
+      "command": [
+        "pwsh",
+        "-File",
+        "scripts/check-development-environment.ps1",
+        "-RequireDocker"
+      ],
+      "exitCode": 0,
+      "logSha256": "79a06dcd1c13332ff0a5e5789716a5ba993b771222a799b3c5ddec9dbc2596cb",
+      "recordedResult": "correction-environment.result.json.gz"
+    },
+    {
+      "file": "correction-environment.result.json.gz",
+      "sha256": "2ba830933f5b2329adcc0718a03d526c023bee66050bad0c29356585fff00024",
+      "bytes": 178,
+      "rawSha256": "ff803fe9f220ad0f70f0cdd0f728220310e7bdc47b77d74e641dabd374a43c1f",
+      "rawBytes": 190,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/correction-environment.result.json"
+    },
+    {
+      "file": "correction-reconstruction.log.gz",
+      "sha256": "4b2139b5865e53da0f1079c519c274bfdf8b5403d041dfd3c153a0c7d0d838f5",
+      "bytes": 198,
+      "rawSha256": "d8a598b7fd7c07571926a6bbcc3951277f0acbc219833430672aaa7585e4e9c3",
+      "rawBytes": 274,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/correction-reconstruction.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/reconstruct.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "d8a598b7fd7c07571926a6bbcc3951277f0acbc219833430672aaa7585e4e9c3",
+      "recordedResult": "correction-reconstruction.result.json.gz"
+    },
+    {
+      "file": "correction-reconstruction.result.json.gz",
+      "sha256": "47112143c3979d6a775ea97b0604466015953db09b31d49d52b595648a4e4404",
+      "bytes": 185,
+      "rawSha256": "c488fdd724ea414f3d248d376ef737aa72f4224bebfa79d1cd72a1514623eea4",
+      "rawBytes": 205,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/correction-reconstruction.result.json"
+    },
+    {
+      "file": "corrective-application-build.log.gz",
+      "sha256": "99ed707e37c24b5f888ec1e49b730d4d4f65e63b7c8807e3ef531e915c14c734",
+      "bytes": 245,
+      "rawSha256": "6980911ec46651543bf7c200bb1705230d3804a52452698dc46ddd7bec947563",
+      "rawBytes": 381,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-application-build.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/application",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "6980911ec46651543bf7c200bb1705230d3804a52452698dc46ddd7bec947563",
+      "recordedResult": "corrective-application-build.result.json.gz"
+    },
+    {
+      "file": "corrective-application-build.result.json.gz",
+      "sha256": "fee9c2bf8f4402c1cf584bb6bd3ca1b2a60974dbcd69c9473b2d1966c47da378",
+      "bytes": 158,
+      "rawSha256": "0936c38303f60238aa89d95c5515344fb7bb5f49b145ee8e8c528bc73fd83360",
+      "rawBytes": 164,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-application-build.result.json"
+    },
+    {
+      "file": "corrective-db-build.log.gz",
+      "sha256": "53fe11c57e7b55fdc32e63dd9fb1282dff63df54f17d4b37fe65e1c8c9fba515",
+      "bytes": 242,
+      "rawSha256": "2327571f696f3e390b58e6fa5628a065174887af0a34db707710d10733110e9c",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-db-build.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/db",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "2327571f696f3e390b58e6fa5628a065174887af0a34db707710d10733110e9c",
+      "recordedResult": "corrective-db-build.result.json.gz"
+    },
+    {
+      "file": "corrective-db-build.result.json.gz",
+      "sha256": "8476acf4089fe0f954119deb49106d13b6251c992a2577fc43e0db0c734e68fa",
+      "bytes": 153,
+      "rawSha256": "c2a51b893b3d00a8bf55ee1b4eee089e1defa06c0eaaef98841d4736d2b6e513",
+      "rawBytes": 155,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-db-build.result.json"
+    },
+    {
+      "file": "corrective-db-types.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-db-types.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/db",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "recordedResult": "corrective-db-types.result.json.gz"
+    },
+    {
+      "file": "corrective-db-types.result.json.gz",
+      "sha256": "0880f2fb797c76366fdf9ce68a0652f767b49d78486279575898de595b60f35a",
+      "bytes": 155,
+      "rawSha256": "601353ee178af16cab05e0fbf951befc1c32a257bbece5cb375c22c1b22e8f69",
+      "rawBytes": 159,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-db-types.result.json"
+    },
+    {
+      "file": "corrective-final-format.log.gz",
+      "sha256": "528c3aa0e351b36484e6383705b83a77cdeed79a9597db9e6fad1fe3e0d0522d",
+      "bytes": 351,
+      "rawSha256": "60b3945f720114a725d5c602472f3c5c7efbde1d4a29a7bb624f7dd1eab09f11",
+      "rawBytes": 1067,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-final-format.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--write",
+        "apps/api/src/expert-card-composition.ts",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "packages/application/src/expert-card-service.ts",
+        "packages/contracts/src/resident-rich-profile.ts",
+        "packages/contracts/src/resident-rich-profile.test.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/db/src/repositories/expert-application-materials.ts",
+        "packages/db/src/repositories/expert-residency-lifecycle-repository.ts",
+        "packages/db/src/repositories/expert-residency-main-projection.ts",
+        "packages/db/src/schema/expert-cards.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/support/resident-rich-document-fixtures.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "docs/runbooks/resident-rich-onboarding.md"
+      ],
+      "exitCode": 0,
+      "logSha256": "60b3945f720114a725d5c602472f3c5c7efbde1d4a29a7bb624f7dd1eab09f11",
+      "recordedResult": "corrective-final-format.result.json.gz"
+    },
+    {
+      "file": "corrective-final-format.result.json.gz",
+      "sha256": "68c060eb7357b961a2a8df1c20b6ec184a7cab789b4a9e02e7b08083ad64a2d0",
+      "bytes": 409,
+      "rawSha256": "3f90b924d4aaf767c5f6c72d12123c9f0e2327799dd23d86a4788a9ca6d5d044",
+      "rawBytes": 1011,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-final-format.result.json"
+    },
+    {
+      "file": "corrective-format.log.gz",
+      "sha256": "15cfcbaf1a3114738080ecf7017663c8b8db20aa42807d27467f3037873fbf92",
+      "bytes": 302,
+      "rawSha256": "be4896840bfa530ddc0bedbb1a14c433b75cbab960ef5a4e632a3b34c308eec0",
+      "rawBytes": 783,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-format.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--write",
+        "apps/api/src/expert-card-composition.ts",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "packages/application/src/expert-card-service.ts",
+        "packages/contracts/src/resident-rich-profile.ts",
+        "packages/contracts/src/resident-rich-profile.test.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/db/src/repositories/expert-application-materials.ts",
+        "packages/db/src/repositories/expert-residency-lifecycle-repository.ts",
+        "packages/db/src/repositories/expert-residency-main-projection.ts",
+        "packages/db/src/schema/expert-cards.ts",
+        "packages/db/migrations/meta/_journal.json",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/support/resident-rich-document-fixtures.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "be4896840bfa530ddc0bedbb1a14c433b75cbab960ef5a4e632a3b34c308eec0",
+      "recordedResult": "corrective-format.result.json.gz"
+    },
+    {
+      "file": "corrective-format.result.json.gz",
+      "sha256": "325cfcb84260ae9b1b259c2616184e3c0940d42aab58c2614c89c76caffd6d88",
+      "bytes": 362,
+      "rawSha256": "f8e87653593c8fbd13eb430475c6c5e4d85eb13386ef3b63968dfc27f72be816",
+      "rawBytes": 854,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-format.result.json"
+    },
+    {
+      "file": "corrective-scope-state-proof.log.gz",
+      "sha256": "c0c1c1bad9b4a5cf2463a453f65a8c859f5176eba52e57eabf0b089fe21acc83",
+      "bytes": 1031,
+      "rawSha256": "e1b79a9782939357cb62f1a1ee832b77a9aa5305086264f9a1a930fe9424a230",
+      "rawBytes": 2502,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-scope-state-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/scope-boundary.test.ts"
+      ],
+      "exitCode": 1,
+      "logSha256": "e1b79a9782939357cb62f1a1ee832b77a9aa5305086264f9a1a930fe9424a230",
+      "recordedResult": "corrective-scope-state-proof.result.json.gz"
+    },
+    {
+      "file": "corrective-scope-state-proof.result.json.gz",
+      "sha256": "3aefa9fe6971008aa730a459e2c68fe94d7b1962af6ecfe12512d655431abf3e",
+      "bytes": 232,
+      "rawSha256": "0da7bc6299c18f9d0c203bd9bbcfcb882fe1c6be1d5a153319b7de75ca42b251",
+      "rawBytes": 334,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-scope-state-proof.result.json"
+    },
+    {
+      "file": "corrective-test-types.log.gz",
+      "sha256": "fc99be88de179e896fadbb1fa4d410bf64c1ae29af725962023abcafe340ab44",
+      "bytes": 449,
+      "rawSha256": "e47bf3e395e2b9e78de216388603268f805527d184929c3b68292c85028bffc4",
+      "rawBytes": 1058,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-test-types.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 2,
+      "logSha256": "e47bf3e395e2b9e78de216388603268f805527d184929c3b68292c85028bffc4",
+      "recordedResult": "corrective-test-types.result.json.gz"
+    },
+    {
+      "file": "corrective-test-types.result.json.gz",
+      "sha256": "6cf3aada6fcd3eba0d1459cbb86612c2d06b7166e151541b009bf5c0bbd800fd",
+      "bytes": 161,
+      "rawSha256": "1257a770a8bda9024b8a53b6e8853524c4e25cd362ae1df7ee5c003243414a76",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/corrective-test-types.result.json"
+    },
+    {
+      "file": "custody-partial-proof.log.gz",
+      "sha256": "701421b3945a4e431a090909019ed5df24761b856d41fe3acb205681be03d272",
+      "bytes": 1159,
+      "rawSha256": "89ed85fc8434e3f710ff78895cb8968f2f2f5eceb69ea63edb386530d37b6059",
+      "rawBytes": 2510,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/custody-partial-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R3 legacy|R4 numbered|R10 multiple"
+      ],
+      "exitCode": 1,
+      "logSha256": "89ed85fc8434e3f710ff78895cb8968f2f2f5eceb69ea63edb386530d37b6059",
+      "recordedResult": "custody-partial-proof.result.json.gz"
+    },
+    {
+      "file": "custody-partial-proof.result.json.gz",
+      "sha256": "adbc8dabfb1f85c650b9513a17093fe710899417a17e16d3f75948b15bf30f49",
+      "bytes": 209,
+      "rawSha256": "54d66b5c52ef445c9e5f979635a1325a2db16aa807ca9537a14b056cd4761722",
+      "rawBytes": 241,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/custody-partial-proof.result.json"
+    },
+    {
+      "file": "final-api-types.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-api-types.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/api",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "recordedResult": "final-api-types.result.json.gz"
+    },
+    {
+      "file": "final-api-types.result.json.gz",
+      "sha256": "eac4b44fde6bd07ecef0da2ce7ac46cdd5af13fd16808a167dffeb4fe2e8c652",
+      "bytes": 157,
+      "rawSha256": "bee9f79bafd1cb4c16ead5ccb92962a28c808bd8c22f17a560f262393796dd6c",
+      "rawBytes": 160,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-api-types.result.json"
+    },
+    {
+      "file": "final-contract-build.log.gz",
+      "sha256": "d09a3066c6b771f240024bb8e0dc5542ac0fe52d3abaa0d0f585cb3f609be6b2",
+      "bytes": 243,
+      "rawSha256": "42866aaf5015ea2b95baf8567e9d76706fe267f0ea18fa199ac03a531b11b692",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-contract-build.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/contracts",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "42866aaf5015ea2b95baf8567e9d76706fe267f0ea18fa199ac03a531b11b692",
+      "recordedResult": "final-contract-build.result.json.gz"
+    },
+    {
+      "file": "final-contract-build.result.json.gz",
+      "sha256": "38f842d1739f803aabb418bc07ec7b392be724dac272bcba056d359066af9086",
+      "bytes": 157,
+      "rawSha256": "73283e9cbbb6dfed444a0af86582983438cd3323ada77a217fbe746844742de9",
+      "rawBytes": 162,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-contract-build.result.json"
+    },
+    {
+      "file": "final-db-build.log.gz",
+      "sha256": "74b890bf28d110b19437331360e67458b8ee38b3acef978f80f4f97147a59a94",
+      "bytes": 242,
+      "rawSha256": "f6795e5b8c65bb96b39e16986727bee633b3e9a4250f61b40207adb88039a675",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-db-build.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/db",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "f6795e5b8c65bb96b39e16986727bee633b3e9a4250f61b40207adb88039a675",
+      "recordedResult": "final-db-build.result.json.gz"
+    },
+    {
+      "file": "final-db-build.result.json.gz",
+      "sha256": "fdcb47935824af0a1b777668b4d5dabcab30292d2315b29c16bc5200b64f2501",
+      "bytes": 152,
+      "rawSha256": "984ce2f796fd980414bcfd37f42ef47a57ce01d6d14833fdcace2f7504d86c26",
+      "rawBytes": 155,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-db-build.result.json"
+    },
+    {
+      "file": "final-evidence-format.log.gz",
+      "sha256": "9e774faecc3fc7f0321a84df2acd7d71ff2d2e701a074d99b3fad9a75a6dd493",
+      "bytes": 173,
+      "rawSha256": "acd8a5e9b0cf941efa446228a9d0bbb7764b6aa52d8dc8ab19a8e5b08ed0e114",
+      "rawBytes": 389,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-evidence-format.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--write",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "docs/runbooks/resident-rich-onboarding.md",
+        "docs/test-evidence/residency-rich-onboarding-implementation-2026-10-27.md",
+        "docs/test-evidence/residency-rich-onboarding-corrections-2026-10-27.md",
+        "docs/test-evidence/residency-rich-onboarding-corrections-2026-10-27/README.md"
+      ],
+      "exitCode": 0,
+      "logSha256": "acd8a5e9b0cf941efa446228a9d0bbb7764b6aa52d8dc8ab19a8e5b08ed0e114",
+      "recordedResult": "final-evidence-format.result.json.gz"
+    },
+    {
+      "file": "final-evidence-format.result.json.gz",
+      "sha256": "b6a0f61a9191f7c680f1de605a24889f0b70f9c495dcdb5e12242843c96494ab",
+      "bytes": 255,
+      "rawSha256": "91144f5a230b537ca931df1dcc281fc7cf61f0abc244c7d6c84a779063c267de",
+      "rawBytes": 480,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-evidence-format.result.json"
+    },
+    {
+      "file": "final-financial-authority.log.gz",
+      "sha256": "2c391b18ba6f244916710208435500197e3af742b477f708ec6f5a84b0a72348",
+      "bytes": 356,
+      "rawSha256": "1fe64ef3625d760dd8afee32826b21cfd785966742fb9aa8210be0e876ec8a50",
+      "rawBytes": 511,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-financial-authority.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo"
+      ],
+      "exitCode": 0,
+      "logSha256": "1fe64ef3625d760dd8afee32826b21cfd785966742fb9aa8210be0e876ec8a50",
+      "recordedResult": "final-financial-authority.result.json.gz"
+    },
+    {
+      "file": "final-financial-authority.result.json.gz",
+      "sha256": "c5b7eb0c1da6554ad80c120f1e7b002ec2249af74d7f9ad2376a1cf507c9a2f8",
+      "bytes": 194,
+      "rawSha256": "d641e124a571afb3440aa2921e4caf5cec64bf31344cbbe8d566287f6ab9b4a9",
+      "rawBytes": 225,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-financial-authority.result.json"
+    },
+    {
+      "file": "final-migration-head-proof.log.gz",
+      "sha256": "bb05a5d286ced106d03b467978cae614cb729e7cf554dc2ae45322b6415a096d",
+      "bytes": 280,
+      "rawSha256": "47854a9d355d23c40db88b7b68c4204b43851b0957d60c4fb0dc2150e152b90c",
+      "rawBytes": 380,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-migration-head-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/migration-history-integrity.test.ts",
+        "-t",
+        "pins the newest snapshot"
+      ],
+      "exitCode": 0,
+      "logSha256": "47854a9d355d23c40db88b7b68c4204b43851b0957d60c4fb0dc2150e152b90c",
+      "recordedResult": "final-migration-head-proof.result.json.gz"
+    },
+    {
+      "file": "final-migration-head-proof.result.json.gz",
+      "sha256": "0338c634597b2907696af920e61a9402538c7b4f42eea8d503e5bc181e1e5341",
+      "bytes": 196,
+      "rawSha256": "a16fae8ebba2d517afdb87b1df79373a895b295db9f4aafb0d6b06046ef54f5e",
+      "rawBytes": 227,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-migration-head-proof.result.json"
+    },
+    {
+      "file": "final-owned-format-proof.log.gz",
+      "sha256": "710c63d8d40d5688a62c3b08053dd1971c4e4ee87b2297f3f20c2540d22cd94e",
+      "bytes": 82,
+      "rawSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "rawBytes": 66,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-owned-format-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "apps/api/src/expert-card-composition.ts",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "packages/application/src/expert-card-service.ts",
+        "packages/contracts/src/resident-rich-profile.ts",
+        "packages/contracts/src/resident-rich-profile.test.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/db/src/repositories/expert-application-materials.ts",
+        "packages/db/src/repositories/expert-residency-lifecycle-repository.ts",
+        "packages/db/src/repositories/expert-residency-main-projection.ts",
+        "packages/db/src/schema/expert-cards.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/support/resident-rich-document-fixtures.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "docs/runbooks/resident-rich-onboarding.md"
+      ],
+      "exitCode": 0,
+      "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "recordedResult": "final-owned-format-proof.result.json.gz"
+    },
+    {
+      "file": "final-owned-format-proof.result.json.gz",
+      "sha256": "b67b9e0b41a4f86fa47dc1e0e47e8e656c60381fd13d181615f1b0f3b29d602d",
+      "bytes": 424,
+      "rawSha256": "288bedc7b1fabc9671630a607a4c2baed7afc5e277ea68c3bb58fddfbfa79bf2",
+      "rawBytes": 1061,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-owned-format-proof.result.json"
+    },
+    {
+      "file": "final-owned-lint.log.gz",
+      "sha256": "37f05183cfd7719214d8c942fc330eedd8ee650bf237836225d4d5f3f1930132",
+      "bytes": 265,
+      "rawSha256": "1432639d798dd2db6e264de3778663c62efde3bec9c7ae6f00e76a5c71bcb0a4",
+      "rawBytes": 425,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-owned-lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "apps/api/src/expert-card-composition.ts",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "packages/application/src/expert-card-service.ts",
+        "packages/contracts/src/resident-rich-profile.ts",
+        "packages/contracts/src/resident-rich-profile.test.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/db/src/repositories/expert-application-materials.ts",
+        "packages/db/src/repositories/expert-residency-lifecycle-repository.ts",
+        "packages/db/src/repositories/expert-residency-main-projection.ts",
+        "packages/db/src/schema/expert-cards.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/support/resident-rich-document-fixtures.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts"
+      ],
+      "exitCode": 1,
+      "logSha256": "1432639d798dd2db6e264de3778663c62efde3bec9c7ae6f00e76a5c71bcb0a4",
+      "recordedResult": "final-owned-lint.result.json.gz"
+    },
+    {
+      "file": "final-owned-lint.result.json.gz",
+      "sha256": "f801913581ea778d250fae35bcb9f730a3921b110b7292d97ec7f16d84444559",
+      "bytes": 384,
+      "rawSha256": "50b161c6705f5ca65590c5c54a866a9259b19db723cb3f2fc23f27da5f0b8dfd",
+      "rawBytes": 953,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-owned-lint.result.json"
+    },
+    {
+      "file": "final-test-lint-correction.log.gz",
+      "sha256": "9b50e82bd032312b800d3ebbe13d20240222935f794bd4bd91baf648061b381d",
+      "bytes": 244,
+      "rawSha256": "bf5b9cc8def732c7aeb9c8a957cca785dfe7505b851993ba7d9c58040562f7df",
+      "rawBytes": 304,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-test-lint-correction.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/repo/migration-history-integrity.test.ts"
+      ],
+      "exitCode": 1,
+      "logSha256": "bf5b9cc8def732c7aeb9c8a957cca785dfe7505b851993ba7d9c58040562f7df",
+      "recordedResult": "final-test-lint-correction.result.json.gz"
+    },
+    {
+      "file": "final-test-lint-correction.result.json.gz",
+      "sha256": "98ff87f93a0af066e20ba3fb087b0fe4859eb01fea8bc82d86090af40a6082e3",
+      "bytes": 198,
+      "rawSha256": "1c90f0875997ce8b2fc437283113918f1e0a249855f6fc2a0afe371f36127802",
+      "rawBytes": 240,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-test-lint-correction.result.json"
+    },
+    {
+      "file": "final-test-lint-correction2.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-test-lint-correction2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/repo/migration-history-integrity.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "final-test-lint-correction2.result.json.gz"
+    },
+    {
+      "file": "final-test-lint-correction2.result.json.gz",
+      "sha256": "3e70375cda6a77fa1cbd9fb7c156590c810e484214d3a968fdc7f9be5920e200",
+      "bytes": 197,
+      "rawSha256": "28e06809a5a49c105ef68b79d18cc3a3ec1792650165ec21d9180c8a500352ca",
+      "rawBytes": 240,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-test-lint-correction2.result.json"
+    },
+    {
+      "file": "final-tests-types.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-tests-types.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "final-tests-types.result.json.gz"
+    },
+    {
+      "file": "final-tests-types.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-tests-types.result.json"
+    },
+    {
+      "file": "final-whitespace.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-whitespace.log",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "final-whitespace.result.json.gz"
+    },
+    {
+      "file": "final-whitespace.result.json.gz",
+      "sha256": "40ea006f471eb799cd3d2ed7504fa1f444bbdfb87a13d9e50241b8a82cb60d7d",
+      "bytes": 137,
+      "rawSha256": "e3b9db95b0bd75d85eed2989d2b622082fdb471c5a0b78a7037b9a03038a167f",
+      "rawBytes": 136,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/final-whitespace.result.json"
+    },
+    {
+      "file": "historical-preservation-audit.log.gz",
+      "sha256": "4c90e7d9fc376ea9464257ae48a6bbce075150662fd4249d4311d47fdbf821bf",
+      "bytes": 199,
+      "rawSha256": "733a392ec272b6ac32b2bf696ee474ad01a6a58bb78674900edcef962fdb4d2e",
+      "rawBytes": 222,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/historical-preservation-audit.log",
+      "command": [
+        "python3",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/preservation-audit.py"
+      ],
+      "exitCode": 0,
+      "logSha256": "733a392ec272b6ac32b2bf696ee474ad01a6a58bb78674900edcef962fdb4d2e",
+      "recordedResult": "historical-preservation-audit.result.json.gz"
+    },
+    {
+      "file": "historical-preservation-audit.result.json.gz",
+      "sha256": "0b36da7f09bd898473dfdb3af10708d48f936fdad52f9cd0b4e949ca2a73d1cb",
+      "bytes": 184,
+      "rawSha256": "e4d1f5743772846b0f4448b599b4510c2f586b6e24e767b1b698146d7e7f4ad4",
+      "rawBytes": 200,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/historical-preservation-audit.result.json"
+    },
+    {
+      "file": "identity-null-partial-proof.log.gz",
+      "sha256": "4d441f4d20fc5d72d1fda855843a923b1a43717e5e80526c00ddfee3d0118013",
+      "bytes": 361,
+      "rawSha256": "0038018ad5db1b4179c0dcde9fd3a21e0014c9420783b74d3cbe0e914e463a45",
+      "rawBytes": 502,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/identity-null-partial-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R1/R2|R7"
+      ],
+      "exitCode": 0,
+      "logSha256": "0038018ad5db1b4179c0dcde9fd3a21e0014c9420783b74d3cbe0e914e463a45",
+      "recordedResult": "identity-null-partial-proof.result.json.gz"
+    },
+    {
+      "file": "identity-null-partial-proof.result.json.gz",
+      "sha256": "d65420efa804cade6a1167929dd5f654efa43bf0fa9b18067a624eb7088d5f88",
+      "bytes": 188,
+      "rawSha256": "a119ef8f1d277a9211bfc3fe1def89c17df44e2227d53f2d7086e2c0e54c0dca",
+      "rawBytes": 215,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/identity-null-partial-proof.result.json"
+    },
+    {
+      "file": "ingress-sql-red.log.gz",
+      "sha256": "a4407eaa931eefd49c0af913e47bfe2c4dc4648d81426a134f09d8b2b5ce8892",
+      "bytes": 1198,
+      "rawSha256": "4506532d5668509dad4cf30c9c1e66ba4f3dc710efec6181a6e03174e7f1fcae",
+      "rawBytes": 3082,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/ingress-sql-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R1/R2|R7 SQL"
+      ],
+      "exitCode": 1,
+      "logSha256": "4506532d5668509dad4cf30c9c1e66ba4f3dc710efec6181a6e03174e7f1fcae",
+      "recordedResult": "ingress-sql-red.result.json.gz"
+    },
+    {
+      "file": "ingress-sql-red.result.json.gz",
+      "sha256": "f494c14a384e8d1a9d701a5293abb1e0f20375c3abf8d41872c10a1f97035ffd",
+      "bytes": 192,
+      "rawSha256": "d17dc48563b2fdfa64d973683806fc48ce11fd629b2e1f8940a59a4f45d2e051",
+      "rawBytes": 219,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/ingress-sql-red.result.json"
+    },
+    {
+      "file": "introspected-schema.ts.gz",
+      "sha256": "788b7516dfe68ce4e024ed8b6345a593a0841a0985d0daca7bd4e64b3dfd14ef",
+      "bytes": 50496,
+      "rawSha256": "fc652c22ca41ffb348e8827c0ef86cfa37fd9a32b4777e1a86f9dd9d514a86d2",
+      "rawBytes": 375696,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/introspected-schema.ts"
+    },
+    {
+      "file": "introspection.log.gz",
+      "sha256": "c4ca0db69a12bdc203678cfb49e0eb6f7cba8df4d0337a15d06ef07cce0555a1",
+      "bytes": 3774,
+      "rawSha256": "3d811a1cdd5ea84d8b61340a289ce3a2fa18f8ef69cd0738e5d97ad09e0559d6",
+      "rawBytes": 256325,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/introspection.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "Generated introspection output; parent reconstruction command has the recorded exit code."
+    },
+    {
+      "file": "normal-composition-financial-proof3.log.gz",
+      "sha256": "1ef163055fe421d3fccf22e02e0c8e8e94d1b52eab275e2eb1f8b59fa7e7c03b",
+      "bytes": 1289,
+      "rawSha256": "0685513a50039bf0f43180b3fad29f3174c5f01c93e93c63c39a9d0c124cd275",
+      "rawBytes": 2799,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-financial-proof3.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo"
+      ],
+      "exitCode": 1,
+      "logSha256": "0685513a50039bf0f43180b3fad29f3174c5f01c93e93c63c39a9d0c124cd275",
+      "recordedResult": "normal-composition-financial-proof3.result.json.gz"
+    },
+    {
+      "file": "normal-composition-financial-proof3.result.json.gz",
+      "sha256": "242ea8c1609c40bae3c3bf091fcf319a2db6d7ecaaebe2f5a589bb5b7805c460",
+      "bytes": 197,
+      "rawSha256": "3bd598e7352f53f82b0afac6d6e413765d02f2bd250725a64f7097302af67b7e",
+      "rawBytes": 225,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-financial-proof3.result.json"
+    },
+    {
+      "file": "normal-composition-financial-proof4.log.gz",
+      "sha256": "d7cfe8f16fe84bc210834c74ab09928e92453b9728a70f1f54703bbb8bd37d17",
+      "bytes": 1760,
+      "rawSha256": "517d3c6d5ac0a1e806e35e3ddc8ad317a8b8e7f1470c93154da083c3236e83a9",
+      "rawBytes": 4617,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-financial-proof4.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo"
+      ],
+      "exitCode": 1,
+      "logSha256": "517d3c6d5ac0a1e806e35e3ddc8ad317a8b8e7f1470c93154da083c3236e83a9",
+      "recordedResult": "normal-composition-financial-proof4.result.json.gz"
+    },
+    {
+      "file": "normal-composition-financial-proof4.result.json.gz",
+      "sha256": "8a653c39f6e41cfbc9599ca231530d8ae4e1bba1f1fa24eb243fe0a6f13b683c",
+      "bytes": 193,
+      "rawSha256": "6139f74613be890b2d870e3f82bf26dad8a3171ff1ef9caa6c0ee6f7119cf2bc",
+      "rawBytes": 225,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-financial-proof4.result.json"
+    },
+    {
+      "file": "normal-composition-financial-proof5.log.gz",
+      "sha256": "846c37f10889be93816572999226071d306e967a4837e5946b74d7aa699a2711",
+      "bytes": 358,
+      "rawSha256": "397fb0a6d7fd8c44782ed325a37e1006f2b58c1ea8004f0ac0c7ed0702fd875e",
+      "rawBytes": 511,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-financial-proof5.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo"
+      ],
+      "exitCode": 0,
+      "logSha256": "397fb0a6d7fd8c44782ed325a37e1006f2b58c1ea8004f0ac0c7ed0702fd875e",
+      "recordedResult": "normal-composition-financial-proof5.result.json.gz"
+    },
+    {
+      "file": "normal-composition-financial-proof5.result.json.gz",
+      "sha256": "a88fde8cecca8142f5a891e5ad338acb5d073f21390974efd6313eab13f1d24e",
+      "bytes": 194,
+      "rawSha256": "4b65df15a5f44d14fc9220364918057698738bffc9946a58425cd27355885f9b",
+      "rawBytes": 225,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-financial-proof5.result.json"
+    },
+    {
+      "file": "normal-composition-renewal-proof.log.gz",
+      "sha256": "d5b96305629c260c72bce7d24e5b0976f7173be45c13270321df9fc338892108",
+      "bytes": 1317,
+      "rawSha256": "4d213e8b9440fda62ae43e11542462848bef8537cb5185dbabfc4dfd7013efc2",
+      "rawBytes": 3547,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-renewal-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo|original-bot PDF"
+      ],
+      "exitCode": 1,
+      "logSha256": "4d213e8b9440fda62ae43e11542462848bef8537cb5185dbabfc4dfd7013efc2",
+      "recordedResult": "normal-composition-renewal-proof.result.json.gz"
+    },
+    {
+      "file": "normal-composition-renewal-proof.result.json.gz",
+      "sha256": "b7d8a8414550e6391a2ad5d5abb3275ca08bda4ddb22ba1209933b79ed0aa775",
+      "bytes": 210,
+      "rawSha256": "0afffa766a095f91604d3eacb9adaaeb2c5bff287890c7f09d72d36d493f305d",
+      "rawBytes": 242,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-renewal-proof.result.json"
+    },
+    {
+      "file": "normal-composition-renewal-proof2.log.gz",
+      "sha256": "9da77639f6989952491ef5fe670bedd7e8d038a8f4668bc64ef37afa27eafd29",
+      "bytes": 1265,
+      "rawSha256": "75faea767d113419e4d4d66a0bd0298c9abcadc19d28fd68bff732363a9c7bfe",
+      "rawBytes": 2675,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-renewal-proof2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo|original-bot PDF"
+      ],
+      "exitCode": 1,
+      "logSha256": "75faea767d113419e4d4d66a0bd0298c9abcadc19d28fd68bff732363a9c7bfe",
+      "recordedResult": "normal-composition-renewal-proof2.result.json.gz"
+    },
+    {
+      "file": "normal-composition-renewal-proof2.result.json.gz",
+      "sha256": "f454449dc9f043dd48b09260f4f74982ccf8f58bc6c8d805d360a256ec7d4e41",
+      "bytes": 210,
+      "rawSha256": "656967e652f1529f2357853b27fec1daf282b52124daf09ba7236702e69ae310",
+      "rawBytes": 242,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/normal-composition-renewal-proof2.result.json"
+    },
+    {
+      "file": "package-evidence.py.gz",
+      "sha256": "a08fa91d8a3b81b04e3d43081b3ac5b7c3891ef8a2751a6059bf86eab788138d",
+      "bytes": 1307,
+      "rawSha256": "c8e48df2f44e81309c3a8650a27d51d98838afa8958ee7376e8590cad5c6684a",
+      "rawBytes": 2590,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/package-evidence.py"
+    },
+    {
+      "file": "populated-driver-prepare.log.gz",
+      "sha256": "6e666c216366e40e1d3a98bf882ecc14d054c598935f80d8186ad0a858803dcc",
+      "bytes": 366,
+      "rawSha256": "707cb25f3b0590c484070d5449077497dcc8170bd7d35b64a8f6aa1393ef8add",
+      "rawBytes": 749,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.mjs"
+      ],
+      "exitCode": 1,
+      "logSha256": "707cb25f3b0590c484070d5449077497dcc8170bd7d35b64a8f6aa1393ef8add",
+      "recordedResult": "populated-driver-prepare.result.json.gz"
+    },
+    {
+      "file": "populated-driver-prepare.result.json.gz",
+      "sha256": "bcf5dd96d3a52235feeb7df964aa4c8bcb5d7c3d3c8e3f124446541bd28c3be7",
+      "bytes": 185,
+      "rawSha256": "e5979403b6b173c05ad805aa6c3ed4faf3368ae61b998705aeda8b07edd725d0",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare.result.json"
+    },
+    {
+      "file": "populated-driver-prepare2.log.gz",
+      "sha256": "e97fc70de8a820cc7360320acf00e4a6aac4478d0bf704c1f3f2d3caa5c9cf81",
+      "bytes": 239,
+      "rawSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "rawBytes": 472,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare2.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.mjs"
+      ],
+      "exitCode": 0,
+      "logSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "recordedResult": "populated-driver-prepare2.result.json.gz"
+    },
+    {
+      "file": "populated-driver-prepare2.result.json.gz",
+      "sha256": "58bb454f6e6d9065952b4b10ea39ef9c53b06dd13ad91ad524839546ba8a4ef8",
+      "bytes": 182,
+      "rawSha256": "724ff753570fa809b5169311d50a198c145ee9d793471ecdf70a5819f1d33246",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare2.result.json"
+    },
+    {
+      "file": "populated-driver-prepare3.log.gz",
+      "sha256": "e97fc70de8a820cc7360320acf00e4a6aac4478d0bf704c1f3f2d3caa5c9cf81",
+      "bytes": 239,
+      "rawSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "rawBytes": 472,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare3.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.mjs"
+      ],
+      "exitCode": 0,
+      "logSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "recordedResult": "populated-driver-prepare3.result.json.gz"
+    },
+    {
+      "file": "populated-driver-prepare3.result.json.gz",
+      "sha256": "58bb454f6e6d9065952b4b10ea39ef9c53b06dd13ad91ad524839546ba8a4ef8",
+      "bytes": 182,
+      "rawSha256": "724ff753570fa809b5169311d50a198c145ee9d793471ecdf70a5819f1d33246",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare3.result.json"
+    },
+    {
+      "file": "populated-driver-prepare4.log.gz",
+      "sha256": "e97fc70de8a820cc7360320acf00e4a6aac4478d0bf704c1f3f2d3caa5c9cf81",
+      "bytes": 239,
+      "rawSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "rawBytes": 472,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare4.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.mjs"
+      ],
+      "exitCode": 0,
+      "logSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "recordedResult": "populated-driver-prepare4.result.json.gz"
+    },
+    {
+      "file": "populated-driver-prepare4.result.json.gz",
+      "sha256": "58bb454f6e6d9065952b4b10ea39ef9c53b06dd13ad91ad524839546ba8a4ef8",
+      "bytes": 182,
+      "rawSha256": "724ff753570fa809b5169311d50a198c145ee9d793471ecdf70a5819f1d33246",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare4.result.json"
+    },
+    {
+      "file": "populated-driver-prepare5.log.gz",
+      "sha256": "e97fc70de8a820cc7360320acf00e4a6aac4478d0bf704c1f3f2d3caa5c9cf81",
+      "bytes": 239,
+      "rawSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "rawBytes": 472,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare5.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.mjs"
+      ],
+      "exitCode": 0,
+      "logSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "recordedResult": "populated-driver-prepare5.result.json.gz"
+    },
+    {
+      "file": "populated-driver-prepare5.result.json.gz",
+      "sha256": "58bb454f6e6d9065952b4b10ea39ef9c53b06dd13ad91ad524839546ba8a4ef8",
+      "bytes": 182,
+      "rawSha256": "724ff753570fa809b5169311d50a198c145ee9d793471ecdf70a5819f1d33246",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare5.result.json"
+    },
+    {
+      "file": "populated-driver-prepare6.log.gz",
+      "sha256": "e97fc70de8a820cc7360320acf00e4a6aac4478d0bf704c1f3f2d3caa5c9cf81",
+      "bytes": 239,
+      "rawSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "rawBytes": 472,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare6.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.mjs"
+      ],
+      "exitCode": 0,
+      "logSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "recordedResult": "populated-driver-prepare6.result.json.gz"
+    },
+    {
+      "file": "populated-driver-prepare6.result.json.gz",
+      "sha256": "58bb454f6e6d9065952b4b10ea39ef9c53b06dd13ad91ad524839546ba8a4ef8",
+      "bytes": 182,
+      "rawSha256": "724ff753570fa809b5169311d50a198c145ee9d793471ecdf70a5819f1d33246",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare6.result.json"
+    },
+    {
+      "file": "populated-driver-prepare7.log.gz",
+      "sha256": "e97fc70de8a820cc7360320acf00e4a6aac4478d0bf704c1f3f2d3caa5c9cf81",
+      "bytes": 239,
+      "rawSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "rawBytes": 472,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare7.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.mjs"
+      ],
+      "exitCode": 0,
+      "logSha256": "69cc489b559030744652f7e43754e5054f7cb35f1f6b1e14e89342d1bfafb3a9",
+      "recordedResult": "populated-driver-prepare7.result.json.gz"
+    },
+    {
+      "file": "populated-driver-prepare7.result.json.gz",
+      "sha256": "58bb454f6e6d9065952b4b10ea39ef9c53b06dd13ad91ad524839546ba8a4ef8",
+      "bytes": 182,
+      "rawSha256": "724ff753570fa809b5169311d50a198c145ee9d793471ecdf70a5819f1d33246",
+      "rawBytes": 197,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-driver-prepare7.result.json"
+    },
+    {
+      "file": "populated-upgrade-diagnostic.log.gz",
+      "sha256": "933d0259c644ba4df5f45f43dcd3ea0cf8e62554e974f3006089241c240b5290",
+      "bytes": 737,
+      "rawSha256": "348ecd5cc88a8d4ae4a0d1b4396ba917c2cbabeb3376cf5afccaa7fc5421ac05",
+      "rawBytes": 2236,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-diagnostic.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts",
+        "-t",
+        "R13"
+      ],
+      "exitCode": 1,
+      "logSha256": "348ecd5cc88a8d4ae4a0d1b4396ba917c2cbabeb3376cf5afccaa7fc5421ac05",
+      "recordedResult": "populated-upgrade-diagnostic.result.json.gz"
+    },
+    {
+      "file": "populated-upgrade-diagnostic.result.json.gz",
+      "sha256": "32ab99b8c1af099ffdb4717164810afb747b4729b55b68a95386bd15beb975ca",
+      "bytes": 214,
+      "rawSha256": "4ab74eee3a87a19d2460931444945fcd1e242f9c0a007d7f53ce60ae1d3bbd81",
+      "rawBytes": 253,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-diagnostic.result.json"
+    },
+    {
+      "file": "populated-upgrade-final.log.gz",
+      "sha256": "1aafdef59af1760d880286f5ee064215004987b73fd0247517bb7249974adf4a",
+      "bytes": 508,
+      "rawSha256": "877e01ffc3a94bd828d643e310facf0529796d25611d67487986dc06f06f7797",
+      "rawBytes": 1022,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts",
+        "-t",
+        "R13"
+      ],
+      "exitCode": 0,
+      "logSha256": "877e01ffc3a94bd828d643e310facf0529796d25611d67487986dc06f06f7797",
+      "recordedResult": "populated-upgrade-final.result.json.gz"
+    },
+    {
+      "file": "populated-upgrade-final.result.json.gz",
+      "sha256": "6a6b04dae0058a67193fe5199cc05cc9562cb9b1ab320780a6ddc8d475f3a136",
+      "bytes": 214,
+      "rawSha256": "0195760e9d6d6872b453a907a7ed8c7ae8be51e72f80286d6eae012da4090ad3",
+      "rawBytes": 253,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-final.result.json"
+    },
+    {
+      "file": "populated-upgrade-proof.log.gz",
+      "sha256": "7348027eccaf9637031974a1ecbadedcaf2e09124f27e87a9b7d6c7d46a75c82",
+      "bytes": 747,
+      "rawSha256": "d487f3bfd292ae02269afc499d6025086a18f0768fd76dad70072e700ef976d3",
+      "rawBytes": 3533,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts",
+        "-t",
+        "R13"
+      ],
+      "exitCode": 1,
+      "logSha256": "d487f3bfd292ae02269afc499d6025086a18f0768fd76dad70072e700ef976d3",
+      "recordedResult": "populated-upgrade-proof.result.json.gz"
+    },
+    {
+      "file": "populated-upgrade-proof.result.json.gz",
+      "sha256": "ce07b04fc7d14b99de07ba3c565d9e307c1fa661a00d81d516cc12a25a4c169e",
+      "bytes": 213,
+      "rawSha256": "c477576d98256a5ae31cca7fdbf83360f9313e4b9de363efe57195bdf69a2fc3",
+      "rawBytes": 253,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof.result.json"
+    },
+    {
+      "file": "populated-upgrade-proof2.log.gz",
+      "sha256": "4c58d369a0e11a07a3d6c406ef565c7d5812854796b0ddd964a31d0880dc8b8e",
+      "bytes": 1030,
+      "rawSha256": "86e2dd29a137d5bd90b7ce8b9e4d449806b81a6cb96d3addd03647f257cf0549",
+      "rawBytes": 3039,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts",
+        "-t",
+        "R13"
+      ],
+      "exitCode": 1,
+      "logSha256": "86e2dd29a137d5bd90b7ce8b9e4d449806b81a6cb96d3addd03647f257cf0549",
+      "recordedResult": "populated-upgrade-proof2.result.json.gz"
+    },
+    {
+      "file": "populated-upgrade-proof2.result.json.gz",
+      "sha256": "1b2310a63614ae256cabbe73ecc7c2d3d2933b3d477280a5f776649d203e9ac9",
+      "bytes": 215,
+      "rawSha256": "dd820107585aee9153909ec9987d1034ad46a6bedb0314e4df1ceaab92e8ec9e",
+      "rawBytes": 253,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof2.result.json"
+    },
+    {
+      "file": "populated-upgrade-proof3.log.gz",
+      "sha256": "34f504e32b448637e893bcf71054348e9242b22f2101b860e862e302c1b95f32",
+      "bytes": 691,
+      "rawSha256": "d05629a4b657fc1cdcf87dabd635ceb7841792cfdd07bc88fa6b811837651204",
+      "rawBytes": 1908,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof3.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts",
+        "-t",
+        "R13"
+      ],
+      "exitCode": 1,
+      "logSha256": "d05629a4b657fc1cdcf87dabd635ceb7841792cfdd07bc88fa6b811837651204",
+      "recordedResult": "populated-upgrade-proof3.result.json.gz"
+    },
+    {
+      "file": "populated-upgrade-proof3.result.json.gz",
+      "sha256": "d066d400083deef61f88ac3d348e995cf104abaa837d7abf4cb9d77dc42b75f9",
+      "bytes": 215,
+      "rawSha256": "c07adefa1bf9775f54f2fa446482554134f93ad74ac0a2bed8f4bd78f7d37312",
+      "rawBytes": 253,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof3.result.json"
+    },
+    {
+      "file": "populated-upgrade-proof4.log.gz",
+      "sha256": "0718c3933da65a501a8ca7395b1883f5beb10826d6a133a031c0a8abd6f725b3",
+      "bytes": 893,
+      "rawSha256": "e9bd563fb4bfcaa46caf7eb7e80ea36c3681cccb7385dba3bd89f2a6929f311c",
+      "rawBytes": 2201,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof4.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts",
+        "-t",
+        "R13"
+      ],
+      "exitCode": 1,
+      "logSha256": "e9bd563fb4bfcaa46caf7eb7e80ea36c3681cccb7385dba3bd89f2a6929f311c",
+      "recordedResult": "populated-upgrade-proof4.result.json.gz"
+    },
+    {
+      "file": "populated-upgrade-proof4.result.json.gz",
+      "sha256": "93fd489ae76381dee6a5440b4c50281697220fc3a4f213ca618af04f2485354b",
+      "bytes": 215,
+      "rawSha256": "dd7592fde99600c908a581bd27fb98ae302fdb7c11d0367e4975ee1d01f76d13",
+      "rawBytes": 253,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof4.result.json"
+    },
+    {
+      "file": "populated-upgrade-proof5.log.gz",
+      "sha256": "c212c4405bb7339eb69fb805602a468563569d83b087ca3a66163de1cf805b33",
+      "bytes": 509,
+      "rawSha256": "be6500fd5308b51ff8d5633864f2cfd7376d013008f686760c7b785e9c75217c",
+      "rawBytes": 1022,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof5.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts",
+        "-t",
+        "R13"
+      ],
+      "exitCode": 0,
+      "logSha256": "be6500fd5308b51ff8d5633864f2cfd7376d013008f686760c7b785e9c75217c",
+      "recordedResult": "populated-upgrade-proof5.result.json.gz"
+    },
+    {
+      "file": "populated-upgrade-proof5.result.json.gz",
+      "sha256": "b8532d78309a80bc5859d4f1526e2e640692c4a49ccb97759d171c8a33d9a6d9",
+      "bytes": 214,
+      "rawSha256": "470112721ec02c8224abadaa44ec69a132a8d0044b0b98e386fa99196f6cc8b0",
+      "rawBytes": 253,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade-proof5.result.json"
+    },
+    {
+      "file": "populated-upgrade.config.ts.gz",
+      "sha256": "549ae5fb0a9f3bded33e6bc8d8a454c4169cf39a694a9f028e480306f0777e13",
+      "bytes": 236,
+      "rawSha256": "836c3ec6ef29e58726f527cdcbc72896e3d3d06caea0ee8d33ea5511cfeb49b7",
+      "rawBytes": 413,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts"
+    },
+    {
+      "file": "populated-upgrade.mjs.gz",
+      "sha256": "0dd14f316f8ef0e3574933acd303ac304ae2ac05e1f1e698043726029bab2c5b",
+      "bytes": 2348,
+      "rawSha256": "3cdb9ee49ebacd1142d4652bfca6d34f98d483760bccf67152b5163cd7da5279",
+      "rawBytes": 5590,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.mjs"
+    },
+    {
+      "file": "preservation-audit.py.gz",
+      "sha256": "bc30fcc3255e6ae78ad89005757548c4c6a8488415a640cf1ed7284590b83d2f",
+      "bytes": 535,
+      "rawSha256": "ee8cb4fa26957819f57ee8d41413e32b935504cbe0def67271d59bcf3b12d528",
+      "rawBytes": 893,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/preservation-audit.py"
+    },
+    {
+      "file": "reconstruct.ts.gz",
+      "sha256": "682284544ba630c8fe96a6507c8f2f2360155309e21a00485ac6b539779972f5",
+      "bytes": 2194,
+      "rawSha256": "f20c25b9760b6c99d6a1f81fbb3c26ba153c1421d69a9b722ff83a454dd574ea",
+      "rawBytes": 5527,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/reconstruct.ts"
+    },
+    {
+      "file": "replacement-materials-proof.log.gz",
+      "sha256": "47ccc7cc424cf38c89cec8d72e8f1d5349f48b670cc13dd0391955c1eabf0142",
+      "bytes": 1383,
+      "rawSha256": "4ed6e3d3f2e34784e91acd30ba8268f7ded8ba6139c2f235e95a98a0822b1742",
+      "rawBytes": 3310,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/replacement-materials-proof.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R4 numbered|R8 actual"
+      ],
+      "exitCode": 1,
+      "logSha256": "4ed6e3d3f2e34784e91acd30ba8268f7ded8ba6139c2f235e95a98a0822b1742",
+      "recordedResult": "replacement-materials-proof.result.json.gz"
+    },
+    {
+      "file": "replacement-materials-proof.result.json.gz",
+      "sha256": "04c15042cd670128ad8c6091c1c8be0cc2ac14fcfa6faf1e2ca4c1ca580485e3",
+      "bytes": 197,
+      "rawSha256": "28a593c47d7f24e84cfe1f802daffc557b03a6ad3b37d0ab372ef43bb75002df",
+      "rawBytes": 228,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/replacement-materials-proof.result.json"
+    },
+    {
+      "file": "replay-identity-green.log.gz",
+      "sha256": "7c6f88dc50321fa3b126bb0390c6e2ab174be6a20b815b5dcbc54277368e0604",
+      "bytes": 1196,
+      "rawSha256": "349e5f1a73d1d67bec3711fc67ec8c568d62f9a9d8988a343c9442eb7a748bbe",
+      "rawBytes": 3082,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/replay-identity-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R1/R2|R7 SQL"
+      ],
+      "exitCode": 1,
+      "logSha256": "349e5f1a73d1d67bec3711fc67ec8c568d62f9a9d8988a343c9442eb7a748bbe",
+      "recordedResult": "replay-identity-green.result.json.gz"
+    },
+    {
+      "file": "replay-identity-green.result.json.gz",
+      "sha256": "6024ba892df282eea4d60be03bdaa26bb7f5ff87d09554802be43be2ce7bb7cc",
+      "bytes": 192,
+      "rawSha256": "bd42234b66fef06723d571ec022e11ce1b905670f6d42c26578a413e719a2c40",
+      "rawBytes": 219,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/replay-identity-green.result.json"
+    },
+    {
+      "file": "review-baseline.config.ts.gz",
+      "sha256": "dcfe8d22aba41782c01e3bb2b880594e9936f8bbc94b63c4cf1286f4aadccf18",
+      "bytes": 747,
+      "rawSha256": "2b116c941ce7fb5bdb43c39249d6a62ba8d4fe9c367ae9a9521acfb4f206d678",
+      "rawBytes": 1421,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/review-baseline.config.ts"
+    },
+    {
+      "file": "reviewed-random-import-red.log.gz",
+      "sha256": "cc4c7dafd6f4da037e222cbb339cc3804684313d06e7f81011a0bfff3fb7f29a",
+      "bytes": 1307,
+      "rawSha256": "97a69efebc17e5f738608d6c66ca6b5c312965ff39347e2eafabac8b0edd6889",
+      "rawBytes": 2777,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/reviewed-random-import-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/review-baseline.config.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R2 full Russian"
+      ],
+      "exitCode": 1,
+      "logSha256": "97a69efebc17e5f738608d6c66ca6b5c312965ff39347e2eafabac8b0edd6889",
+      "recordedResult": "reviewed-random-import-red.result.json.gz"
+    },
+    {
+      "file": "reviewed-random-import-red.result.json.gz",
+      "sha256": "6320af2b339d509da8ae6cd9335b0ab96ad580be283882d91c1227b5b05e940b",
+      "bytes": 246,
+      "rawSha256": "f6e7479020c0ad52b8fb2a00643be76fe8795a0a483f429605fdfb50f6ca6490",
+      "rawBytes": 317,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/reviewed-random-import-red.result.json"
+    },
+    {
+      "file": "reviewed-runtime-regressions-red.log.gz",
+      "sha256": "9a5738e5ac989b320b520a5e5e77cbb3db8a41956fb9b19dd3244a10357e1716",
+      "bytes": 1997,
+      "rawSha256": "8f37fd81f789c0f14acb84be04844f711b4b9a95660dba3d0243848fa48f6dfc",
+      "rawBytes": 6015,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/reviewed-runtime-regressions-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/review-baseline.config.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R1/R2|R3 legacy|R4 numbered|R7 SQL|R8 actual|R10 multiple"
+      ],
+      "exitCode": 1,
+      "logSha256": "8f37fd81f789c0f14acb84be04844f711b4b9a95660dba3d0243848fa48f6dfc",
+      "recordedResult": "reviewed-runtime-regressions-red.result.json.gz"
+    },
+    {
+      "file": "reviewed-runtime-regressions-red.result.json.gz",
+      "sha256": "24a2f1bf3fee3540dd780a49a6c0caaf167d98f2831cb8294c4c83f89d3e3de0",
+      "bytes": 279,
+      "rawSha256": "542c71b7cbe226863cf771c47f89539fe33298b8554d12847436bf5451438ea2",
+      "rawBytes": 359,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/reviewed-runtime-regressions-red.result.json"
+    },
+    {
+      "file": "run.py.gz",
+      "sha256": "617f559b5f5b995e90c2391e97d383740fe372d9a40d0fcbb5029866451aa1f3",
+      "bytes": 591,
+      "rawSha256": "9ddf8d8e2b6c3dbd5d644b85d60a7a59ce33cd54ec03e31cb923ac5fc9f2e3f1",
+      "rawBytes": 1085,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/run.py"
+    },
+    {
+      "file": "populated-rich-upgrade.test.ts.gz",
+      "sha256": "48ae7fef6dc790e5aacfae61747d1f187dd81b5ff04c71dc88f2da98f2311b93",
+      "bytes": 11686,
+      "rawSha256": "7f580d743a29738a40f10451c246c48d145c5a60a51006304a20d429139054d0",
+      "rawBytes": 47143,
+      "originalPath": ".superpowers/sdd/rich-onboarding-corrections-20261027/baseline/tests/integration/populated-rich-upgrade.test.ts"
+    }
+  ]
+}

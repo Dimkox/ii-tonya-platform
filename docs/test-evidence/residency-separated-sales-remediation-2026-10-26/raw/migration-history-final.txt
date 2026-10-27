@@ -1,0 +1,57 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ tests/repo/migration-history-integrity.test.ts (9 tests | 1 failed) 41ms
+   ✓ migration history integrity > keeps journal entries contiguous and ordered 3ms
+   ✓ migration history integrity > keeps every journal entry and migration file paired 1ms
+   ✓ migration history integrity > keeps snapshot gaps inside the frozen hand-authored baseline 1ms
+   ✓ migration history integrity > pins the newest snapshot as the drizzle-kit generate diff base 1ms
+   ✓ migration history integrity > pins additive offer metadata to the replayed SQL and normalized snapshot 7ms
+   ✓ migration history integrity > pins bigint defaults that break drizzle-kit generate 2ms
+   ✓ migration history integrity > keeps the hand-authored migration policy documented 0ms
+   × migration history integrity > pins the SQL objects that drizzle-kit cannot reproduce 19ms
+     → expected [ 'audit_events_append_only', …(142) ] to deeply equal [ 'audit_events_append_only', …(142) ]
+   ✓ migration history integrity > keeps declared tables and migrated tables identical 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/repo/migration-history-integrity.test.ts > migration history integrity > pins the SQL objects that drizzle-kit cannot reproduce
+AssertionError: expected [ 'audit_events_append_only', …(142) ] to deeply equal [ 'audit_events_append_only', …(142) ]
+
+- Expected
++ Received
+
+@@ -92,13 +92,13 @@
+    "expert_sales_form_erasure",
+    "expert_sales_identity_erasure",
+    "expert_sales_identity_revocation",
+    "expert_sales_invoice_source",
+    "expert_sales_observation_immutable",
+-   "expert_sales_paid_lock_immutable",
+    "expert_sales_operator_recovery_immutable",
+    "expert_sales_operator_recovery_source",
++   "expert_sales_paid_lock_immutable",
+    "expert_sales_paid_lock_source",
+    "expert_sales_provider_request_guard",
+    "expert_sales_provider_request_no_delete",
+    "expert_sales_quote_source",
+    "expert_sales_recovery_immutable",
+
+ ❯ tests/repo/migration-history-integrity.test.ts:423:7
+    421|     expect(
+    422|       collect(/create\s+(?:constraint\s+)?trigger\s+([a-z_][a-z0-9_]*)…
+    423|     ).toEqual([...HAND_SQL_TRIGGERS]);
+       |       ^
+    424|     expect(collect(/create\s+(?:or replace\s+)?view\s+([a-z_.]+)/gi)).…
+    425|       ...HAND_SQL_VIEWS,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+   Start at  18:46:17
+   Duration  555ms (transform 65ms, setup 0ms, collect 61ms, tests 41ms, environment 0ms, prepare 123ms)
+
+
+[END OF RAW CAPTURE]

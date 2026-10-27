@@ -36,7 +36,7 @@ missing_git_object="$(git -C "$source_root" rev-list --objects --all --missing=p
   exit 1
 }
 
-compose_root=/home/pall/app-stack
+compose_root="${CLAW_COMPOSE_ROOT:-/home/pall/app-stack}"
 claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store
 test_image=29993b4fe96facf8c07781833dc7f2d5f560aa7e
 test_image_ref="ii-tonya-test:$test_image"
@@ -311,4 +311,3 @@ cat > "$evidence_dir/${mode}.md" <<EOF
 EOF
 
 claw_seal_bundle "$evidence_dir" 0
-

@@ -7,12 +7,12 @@ describe("lifecycle scheduler migration", () => {
       "packages/db/migrations/meta/_journal.json",
       "utf8",
     );
-    expect(journal).toContain('"tag": "0039_lifecycle_scheduler_c1"');
+    expect(journal).toContain('"tag": "0071_lifecycle_scheduler_c1"');
   });
 
   it("defines bounded, fenced, deduplicated UTC lifecycle jobs", () => {
     const migration = readFileSync(
-      "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+      "packages/db/migrations/0071_lifecycle_scheduler_c1.sql",
       "utf8",
     );
     expect(migration).toContain("CREATE TABLE lifecycle_jobs");
@@ -29,7 +29,7 @@ describe("lifecycle scheduler migration", () => {
 
   it("lists the complete lifecycle contract", () => {
     const migration = readFileSync(
-      "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+      "packages/db/migrations/0071_lifecycle_scheduler_c1.sql",
       "utf8",
     );
     for (const jobType of [

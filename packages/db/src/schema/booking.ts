@@ -297,3 +297,82 @@ export const bookingRescheduleFacts = pgTable(
     ),
   ],
 );
+
+export const planerkaServiceMappings = pgTable("planerka_service_mappings", {
+  expertServiceId: uuid("expert_service_id")
+    .primaryKey()
+    .references(() => expertServices.id),
+  accountId: integer("account_id").notNull(),
+  eventTypeId: integer("event_type_id").notNull(),
+  durationMinutes: integer("duration_minutes").notNull(),
+  timeZone: text("time_zone").notNull(),
+  enabled: boolean("enabled").notNull().default(false),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+});
+export const planerkaBookingOperations = pgTable(
+  "planerka_booking_operations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    reservationId: uuid("reservation_id")
+      .notNull()
+      .unique()
+      .references(() => reservations.id),
+    accountId: integer("account_id").notNull(),
+    eventTypeId: integer("event_type_id").notNull(),
+    request: jsonb("request").notNull(),
+    requestFingerprint: text("request_fingerprint").notNull(),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    state: text("state").notNull().default("pending"),
+    providerUid: text("provider_uid").unique(),
+    cancelRequested: boolean("cancel_requested").notNull().default(false),
+    sendAdmittedAt: timestamp("send_admitted_at", { withTimezone: true }),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    recoveryCount: integer("recovery_count").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    reasonCode: text("reason_code"),
+    ...mutableTimestamps,
+  },
+);
+export const planerkaAccountRequests = pgTable("planerka_account_requests", {
+  accountId: integer("account_id").primaryKey(),
+  nextRequestAt: timestamp("next_request_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+export const planerkaAvailabilityRefreshes = pgTable(
+  "planerka_availability_refreshes",
+  {
+    expertServiceId: uuid("expert_service_id")
+      .primaryKey()
+      .references(() => expertServices.id),
+    accountId: integer("account_id").notNull(),
+    eventTypeId: integer("event_type_id").notNull(),
+    durationMinutes: integer("duration_minutes").notNull(),
+    timeZone: text("time_zone").notNull(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull(),
+    windowEnd: timestamp("window_end", { withTimezone: true }).notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", {
+      withTimezone: true,
+    }).notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    reasonCode: text("reason_code"),
+  },
+);
+export const planerkaLegacyBookingReviews = pgTable(
+  "planerka_legacy_booking_reviews",
+  {
+    reservationId: uuid("reservation_id")
+      .primaryKey()
+      .references(() => reservations.id),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    evidenceReference: text("evidence_reference"),
+  },
+);

@@ -129,7 +129,8 @@ describe("client principal security review remediation", () => {
     await new Promise((resolve) => output.once("data", resolve));
     const line = Buffer.concat(chunks).toString("utf8");
     expect(line).not.toContain(bearer);
-    expect(line).toContain("safe-correlation");
+    expect(line).not.toContain("safe-correlation");
+    expect(line).toContain("telemetry_unclassified");
   });
 
   it("cannot bypass client preflight with a lifecycle missing the hook", async () => {
@@ -157,9 +158,11 @@ describe("client principal security review remediation", () => {
     } finally {
       if (previous.database === undefined) delete process.env.DATABASE_URL;
       else process.env.DATABASE_URL = previous.database;
-      if (previous.session === undefined) delete process.env.CLIENT_SESSION_ENABLED;
+      if (previous.session === undefined)
+        delete process.env.CLIENT_SESSION_ENABLED;
       else process.env.CLIENT_SESSION_ENABLED = previous.session;
-      if (previous.catalog === undefined) delete process.env.CLIENT_CATALOG_ENABLED;
+      if (previous.catalog === undefined)
+        delete process.env.CLIENT_CATALOG_ENABLED;
       else process.env.CLIENT_CATALOG_ENABLED = previous.catalog;
     }
   });

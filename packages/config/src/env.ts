@@ -1,4 +1,29 @@
+import {
+  readClientAccountQueriesConfig,
+  type ClientAccountQueriesConfig,
+} from "./client-account-queries-config.js";
+import {
+  readExpertResidencyLifecycleConfig,
+  assertExpertResidencyLifecycleConfig,
+  type ExpertResidencyLifecycleConfig,
+} from "./expert-residency-lifecycle-config.js";
+import {
+  readExpertCardConfig,
+  type ExpertCardConfig,
+} from "./expert-card-config.js";
+import {
+  readExpertVerificationConfig,
+  type ExpertVerificationConfig,
+} from "./expert-verification-config.js";
+import {
+  readExpertApplicantConfig,
+  type ExpertApplicantConfig,
+} from "./expert-applicant-config.js";
 import { z } from "zod";
+import {
+  readPayerReceiptConfig,
+  type PayerReceiptConfig,
+} from "./payer-receipt-config.js";
 
 const optionalNonEmptyString = z.preprocess(
   (value) => (value === "" ? undefined : value),
@@ -50,6 +75,14 @@ const schema = z
     SELARTI_ENABLED: z.literal("false").default("false"),
     SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
     PLANERKA_ENABLED: z.literal("false").default("false"),
+    PLANERKA_CREATE_ENABLED: z.enum(["true", "false"]).default("false"),
+    PLANERKA_RECOVERY_ENABLED: z.enum(["true", "false"]).default("false"),
+    PLANERKA_AVAILABILITY_ENABLED: z.enum(["true", "false"]).default("false"),
+    PLANERKA_API_KEY: z
+      .string()
+      .regex(/^cal_[A-Za-z0-9_-]{1,252}$/u)
+      .optional(),
+    PLANERKA_ACCOUNT_ID: z.coerce.number().int().positive().safe().optional(),
     TELEGRAM_ENABLED: z.literal("false").default("false"),
     LLM_ENABLED: z.literal("false").default("false"),
     MAKE_PROJECTION_ENABLED: z.literal("false").default("false"),
@@ -76,12 +109,43 @@ const schema = z
       .default("false"),
     WORKER_OUTBOX_DELIVERY_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_SESSION_ENABLED: z.enum(["true", "false"]).default("false"),
+    EXPERT_SESSION_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_SESSION_BOOKING_GRANTS_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     CLIENT_CATALOG_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_BOOKING_RESERVE_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_WAITLIST_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_PRIVACY_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_ERASURE_REQUESTS_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_WEB_ORIGIN: z
+      .string()
+      .refine((value) => {
+        try {
+          const url = new URL(value);
+          return url.protocol === "https:" && url.origin === value;
+        } catch {
+          return false;
+        }
+      }, "client_web_origin_must_be_exact_https_origin")
+      .optional(),
+    CLIENT_TELEGRAM_LOGIN_BOT_USERNAME: z
+      .string()
+      .regex(/^[A-Za-z0-9_]{2,29}bot$/iu)
+      .optional(),
+    CLIENT_TELEGRAM_WIDGET_LOGIN_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    TELEGRAM_BOT_TOKEN: optionalNonEmptyString,
+    TELEGRAM_EGRESS_CONSENT_GATE_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     CLIENT_FREE_ACCESS_V2_ENABLED: z.enum(["true", "false"]).default("false"),
     CLIENT_TELEGRAM_INGRESS_ENABLED: z.enum(["true", "false"]).default("false"),
+    CLIENT_TELEGRAM_NAVIGATION_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
     CLIENT_HYBRID_ROUTING_ENABLED: z.enum(["true", "false"]).default("false"),
     SELARTI_COST_ADMISSION_ENABLED: z.enum(["true", "false"]).default("false"),
     SELARTI_RESPONSE_INGRESS_ENABLED: z
@@ -195,6 +259,19 @@ const schema = z
   .passthrough()
   .superRefine((value, context) => {
     if (
+      ((value.PLANERKA_CREATE_ENABLED === "true" ||
+        value.PLANERKA_AVAILABILITY_ENABLED === "true") &&
+        value.PLANERKA_RECOVERY_ENABLED !== "true") ||
+      (value.PLANERKA_RECOVERY_ENABLED === "true" &&
+        (!value.PLANERKA_API_KEY || !value.PLANERKA_ACCOUNT_ID))
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["PLANERKA_RECOVERY_ENABLED"],
+        message: "planerka_workflow_configuration_incomplete",
+      });
+    }
+    if (
       !isPostgresUrl(
         value.DATABASE_URL,
         value.ALLOW_INSECURE_LOCAL_DATABASE === "true",
@@ -266,6 +343,17 @@ const schema = z
         message: "client_booking_configuration_incomplete",
       });
     }
+    if (
+      value.CLIENT_SESSION_BOOKING_GRANTS_ENABLED === "true" &&
+      (value.CLIENT_SESSION_ENABLED !== "true" ||
+        value.CLIENT_BOOKING_ENABLED !== "true")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["CLIENT_SESSION_BOOKING_GRANTS_ENABLED"],
+        message: "client_booking_grants_require_session_and_booking",
+      });
+    }
     const activationRequested =
       value.YOOKASSA_ENABLED === "true" ||
       value.PAYMENTS_ENABLED === "true" ||
@@ -333,6 +421,52 @@ const schema = z
   });
 
 export type RuntimeConfig = {
+  clientAccountQueries?: ClientAccountQueriesConfig;
+  payerReceipt?: PayerReceiptConfig;
+  expertApplicant?: ExpertApplicantConfig;
+  residentSemanticSocket?: string;
+  residentGeocode?: { key: string };
+  privateVerification?: {
+    bucket: string;
+    region: string;
+    endpoint: string;
+    credentials: { accessKeyId: string; secretAccessKey: string };
+    dedicatedNonVersionedVerified: boolean;
+    parserSocket?: string;
+    ocr: boolean;
+    telegramPreview: boolean;
+    vkToken?: string;
+    vkTokenKind?: "user" | "service";
+  };
+  expertVerification?: ExpertVerificationConfig;
+  expertCard?: ExpertCardConfig;
+  expertResidencyLifecycle?: ExpertResidencyLifecycleConfig;
+  bookingNotifications?: {
+    admissionEnabled: boolean;
+    sendEnabled: boolean;
+    recoveryEnabled: boolean;
+  };
+  bookingCallbacks?: {
+    hmacKey: Uint8Array;
+    activeKeyId: string;
+    keys: ReadonlyMap<string, Uint8Array>;
+  };
+  planerkaWorkflow?: {
+    createEnabled: boolean;
+    availabilityEnabled?: true;
+    apiKey: string;
+    accountId: number;
+  };
+  clientNavigation?: { origin: string };
+  clientTelegramBotToken?: string;
+  clientWeb?: { origin: string; botUsername: string; widgetEnabled: boolean };
+  expertSession?: {
+    botToken: string;
+    botKey: string;
+    origin: string;
+    botUsername: string;
+    widgetEnabled: boolean;
+  };
   databaseUrl: string;
   integrations: {
     selarti: false;
@@ -352,14 +486,35 @@ export type RuntimeConfig = {
   telegramWebhookSecret?: string;
   selartiResponseSharedSecret?: string;
   features: {
+    clientAccountQueries?: boolean;
+    expertApplicant?: boolean;
+    expertVerificationForm?: boolean;
+    expertSeparatedSales?: boolean;
+    expertHeldOnboarding?: boolean;
+    expertVerification?: boolean;
+    expertCard?: boolean;
+    expertCardMaterialDelivery?: boolean;
+    expertDraftTags?: boolean;
+    residentWorkspaceNotifications?: boolean;
+    residentReviewNotifications?: boolean;
+    residentPrivateJobs?: boolean;
+    expertResidencyLifecycle?: boolean;
+    expertResidencyLifecycleCommands?: boolean;
+    expertResidencyNoticeDelivery?: boolean;
+    bookingCallbacks?: boolean;
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
+    expertSession?: boolean;
+    clientSessionBookingGrants?: boolean;
     clientCatalog: boolean;
     clientBooking?: boolean;
     clientBookingReserve?: boolean;
     clientWaitlist?: boolean;
+    clientPrivacy?: boolean;
+    clientErasureRequests?: boolean;
     clientFreeAccessV2?: boolean;
     clientTelegramIngress?: boolean;
+    clientTelegramNavigation?: boolean;
     clientHybridRouting?: boolean;
     selartiCostAdmission?: boolean;
     selartiResponseIngress?: boolean;
@@ -413,7 +568,242 @@ export type RuntimeConfig = {
       };
 };
 
+export function clientTelegramBotId(
+  token: string | undefined,
+): string | undefined {
+  if (
+    !token ||
+    !/^[1-9][0-9]{4,15}:[A-Za-z0-9_-]{30,64}$/u.test(token) ||
+    /placeholder/iu.test(token)
+  )
+    return undefined;
+  const id = token.split(":")[0]!;
+  return Number.isSafeInteger(Number(id)) ? id : undefined;
+}
+
+// Also called on manually supplied runtime configs, before composing an app.
+export function assertClientNavigationConfig(config: RuntimeConfig): void {
+  if (config.features.clientTelegramNavigation !== true) return;
+  const f = config.features;
+  // The production booking registry processes only local operator cases and
+  // catalogue materialization. It does not own Telegram/provider delivery.
+  const localBookingWorker =
+    f.clientSession === true &&
+    f.clientCatalog === true &&
+    f.clientBooking === true;
+  if (
+    (f.workerOutboxDelivery === true && !localBookingWorker) ||
+    [
+      f.clientTelegramIngress,
+      f.clientHybridRouting,
+      f.testExpertPromo,
+      f.testExpertDeterministicFlow,
+      f.testExpertSelarti,
+      f.testExpertReconciliation,
+      f.b2TelegramDispatch,
+      f.selartiCostAdmission,
+      f.selartiResponseIngress,
+    ].some((enabled) => enabled === true)
+  )
+    throw new Error("client_navigation_exclusive_mode_required");
+  let originValid = false;
+  try {
+    const url = new URL(config.clientNavigation?.origin ?? "");
+    originValid =
+      url.protocol === "https:" &&
+      url.origin === config.clientNavigation?.origin;
+  } catch {
+    /* fixed error below */
+  }
+  if (
+    !originValid ||
+    clientTelegramBotId(config.clientTelegramBotToken) === undefined ||
+    !/^[A-Za-z0-9_-]{32,256}$/u.test(config.telegramWebhookSecret ?? "") ||
+    /placeholder/iu.test(config.telegramWebhookSecret ?? "") ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/u.test(
+      config.clientTelegramBotKey ?? "",
+    ) ||
+    /placeholder/iu.test(config.clientTelegramBotKey ?? "")
+  )
+    throw new Error("client_navigation_configuration_incomplete");
+}
+
+const bookingCallbackKeyId = /^[A-Za-z0-9_-]{1,64}$/u;
+const invalidBookingCallbacks = () =>
+  new Error("booking_callbacks_configuration_invalid");
+
+function decodeBookingCallbackKey(raw: string | undefined): Uint8Array {
+  if (typeof raw !== "string" || !/^[A-Za-z0-9_-]{43}$/u.test(raw))
+    throw invalidBookingCallbacks();
+  const bytes = Buffer.from(raw, "base64url");
+  if (bytes.length !== 32 || bytes.toString("base64url") !== raw)
+    throw invalidBookingCallbacks();
+  return Uint8Array.from(bytes);
+}
+
+function bookingCallbackKeys(
+  raw: string | undefined,
+): ReadonlyMap<string, Uint8Array> {
+  if (typeof raw !== "string") throw invalidBookingCallbacks();
+  // Validate JSON syntax first, then scan the required flat string dictionary.
+  // JSON.parse alone silently overwrites duplicate IDs, including escaped aliases.
+  JSON.parse(raw);
+  const input = raw.trim();
+  if (!input.startsWith("{") || !input.endsWith("}"))
+    throw invalidBookingCallbacks();
+  const member = /("(?:\\.|[^"\\])*")\s*:\s*("(?:\\.|[^"\\])*")/y;
+  const keys = new Map<string, Uint8Array>();
+  let offset = 1;
+  while (offset < input.length - 1) {
+    while (/\s/u.test(input[offset] ?? "")) offset++;
+    member.lastIndex = offset;
+    const match = member.exec(input);
+    if (!match) throw invalidBookingCallbacks();
+    const id: unknown = JSON.parse(match[1]!);
+    const value: unknown = JSON.parse(match[2]!);
+    if (
+      typeof id !== "string" ||
+      !bookingCallbackKeyId.test(id) ||
+      keys.has(id) ||
+      keys.size >= 8 ||
+      typeof value !== "string"
+    )
+      throw invalidBookingCallbacks();
+    keys.set(id, decodeBookingCallbackKey(value));
+    offset = member.lastIndex;
+    while (/\s/u.test(input[offset] ?? "")) offset++;
+    if (input[offset] === "}") break;
+    if (input[offset] !== ",") throw invalidBookingCallbacks();
+    offset++;
+  }
+  if (!keys.size || offset !== input.length - 1)
+    throw invalidBookingCallbacks();
+  return keys;
+}
+
+function readBookingCallbacks(
+  source: NodeJS.ProcessEnv,
+): RuntimeConfig["bookingCallbacks"] {
+  const enabled = source.BOOKING_CALLBACKS_ENABLED;
+  if (enabled === undefined || enabled === "false") return undefined;
+  if (enabled !== "true") throw invalidBookingCallbacks();
+  try {
+    // Intersection of existing client identity syntax and the reviewed vault AAD
+    // syntax. Disabled callbacks retain the broader existing legacy validation.
+    if (
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u.test(
+        source.CLIENT_TELEGRAM_BOT_KEY ?? "",
+      ) ||
+      /placeholder/iu.test(source.CLIENT_TELEGRAM_BOT_KEY ?? "") ||
+      !/^[A-Za-z0-9_-]{32,256}$/u.test(source.TELEGRAM_WEBHOOK_SECRET ?? "") ||
+      /placeholder/iu.test(source.TELEGRAM_WEBHOOK_SECRET ?? "") ||
+      clientTelegramBotId(source.TELEGRAM_BOT_TOKEN) === undefined
+    )
+      throw invalidBookingCallbacks();
+    const hmacKey = decodeBookingCallbackKey(source.BOOKING_CALLBACK_HMAC_KEY);
+    const activeKeyId = source.BOOKING_CALLBACK_VAULT_ACTIVE_KEY_ID;
+    if (
+      typeof activeKeyId !== "string" ||
+      !bookingCallbackKeyId.test(activeKeyId)
+    )
+      throw invalidBookingCallbacks();
+    const keys = bookingCallbackKeys(source.BOOKING_CALLBACK_VAULT_KEYS);
+    if (!keys.has(activeKeyId)) throw invalidBookingCallbacks();
+    return { hmacKey, activeKeyId, keys };
+  } catch {
+    // Never expose raw JSON, encoded keys, bot tokens or parser input/cause.
+    throw invalidBookingCallbacks();
+  }
+}
+
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
+  const payerReceipt = readPayerReceiptConfig(source);
+  const expertApplicant = readExpertApplicantConfig(source);
+  const verificationFormFlag =
+    source.EXPERT_VERIFICATION_FORM_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(verificationFormFlag) ||
+    (verificationFormFlag === "true" && !expertApplicant)
+  )
+    throw new Error("resident_verification_configuration_required");
+  const separatedSalesFlag = source.EXPERT_SEPARATED_SALES_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(separatedSalesFlag) ||
+    (separatedSalesFlag === "true" && verificationFormFlag !== "true")
+  )
+    throw new Error("expert_sales_configuration_required");
+  const expertVerification = readExpertVerificationConfig(source);
+  const heldFlag = source.EXPERT_ONBOARDING_HELD_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(heldFlag) ||
+    (heldFlag === "true" &&
+      (separatedSalesFlag !== "true" || !expertVerification?.checkoutEnabled))
+  )
+    throw new Error("held_onboarding_configuration_required");
+  const clientAccountQueries = readClientAccountQueriesConfig(source);
+  const expertResidencyLifecycle = readExpertResidencyLifecycleConfig(source);
+  const expertCard = readExpertCardConfig(source);
+  let expertSession: RuntimeConfig["expertSession"];
+  if (source.EXPERT_SESSION_ENABLED === "true") {
+    const botToken = source.EXPERT_TELEGRAM_BOT_TOKEN ?? "",
+      botKey = source.EXPERT_TELEGRAM_BOT_KEY ?? "",
+      origin = source.EXPERT_WEB_ORIGIN ?? "",
+      botUsername = source.EXPERT_TELEGRAM_LOGIN_BOT_USERNAME ?? "";
+    let originValid = false;
+    try {
+      const url = new URL(origin);
+      originValid = url.protocol === "https:" && url.origin === origin;
+    } catch {
+      /* fail closed */
+    }
+    if (
+      !originValid ||
+      /^[1-9][0-9]{4,15}:[A-Za-z0-9_-]{30,64}$/u.exec(botToken)?.[0] !==
+        botToken ||
+      /^[A-Za-z0-9_-]{1,64}$/u.exec(botKey)?.[0] !== botKey ||
+      /placeholder/iu.test(botKey) ||
+      /^[A-Za-z0-9_]{2,29}bot$/iu.exec(botUsername)?.[0] !== botUsername ||
+      ![undefined, "true", "false"].includes(
+        source.EXPERT_TELEGRAM_WIDGET_LOGIN_ENABLED,
+      )
+    )
+      throw new Error("expert_session_configuration_required");
+    expertSession = {
+      botToken,
+      botKey,
+      origin,
+      botUsername,
+      widgetEnabled: source.EXPERT_TELEGRAM_WIDGET_LOGIN_ENABLED === "true",
+    };
+  }
+  const bookingCallbacks = readBookingCallbacks(source);
+  const notificationFlag = (name: string): boolean => {
+    const flag = source[name];
+    if (flag === undefined || flag === "false") return false;
+    if (flag === "true") return true;
+    throw new Error("booking_notifications_configuration_invalid");
+  };
+  const bookingNotifications = {
+    admissionEnabled: notificationFlag(
+      "BOOKING_NOTIFICATION_ADMISSION_ENABLED",
+    ),
+    sendEnabled: notificationFlag("BOOKING_NOTIFICATION_SEND_ENABLED"),
+    recoveryEnabled: notificationFlag("BOOKING_NOTIFICATION_RECOVERY_ENABLED"),
+  };
+  if (
+    (bookingNotifications.recoveryEnabled &&
+      (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/u.test(
+        source.CLIENT_TELEGRAM_BOT_KEY ?? "",
+      ) ||
+        /placeholder/iu.test(source.CLIENT_TELEGRAM_BOT_KEY ?? ""))) ||
+    ((bookingNotifications.sendEnabled ||
+      bookingNotifications.admissionEnabled) &&
+      (!bookingNotifications.recoveryEnabled || !bookingCallbacks)) ||
+    (bookingNotifications.admissionEnabled &&
+      (!source.CLIENT_MESSAGING_CONSENT_POLICY_VERSION?.trim() ||
+        /placeholder/iu.test(source.CLIENT_MESSAGING_CONSENT_POLICY_VERSION)))
+  )
+    throw new Error("booking_notifications_configuration_invalid");
   const value = schema.parse(source);
   if (
     value.CLIENT_WAITLIST_ENABLED === "true" &&
@@ -442,6 +832,17 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       throw new Error("lifecycle_scheduler_configuration_incomplete");
     }
   }
+  if (
+    ((value.CLIENT_WEB_ORIGIN !== undefined &&
+      (value.CLIENT_TELEGRAM_NAVIGATION_ENABLED !== "true" ||
+        value.CLIENT_SESSION_ENABLED === "true" ||
+        value.CLIENT_TELEGRAM_LOGIN_BOT_USERNAME !== undefined)) ||
+      value.CLIENT_TELEGRAM_WIDGET_LOGIN_ENABLED === "true") &&
+    (!value.CLIENT_WEB_ORIGIN ||
+      !value.CLIENT_TELEGRAM_LOGIN_BOT_USERNAME ||
+      value.CLIENT_SESSION_ENABLED !== "true")
+  )
+    throw new Error("client_web_configuration_incomplete");
   if (
     value.TEST_EXPERT_PROMO_ENABLED === "true" &&
     value.TEST_EXPERT_DETERMINISTIC_FLOW_ENABLED === "true" &&
@@ -491,8 +892,47 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     throw new Error("Raw conversation logging is prohibited");
   }
 
-  return {
+  const config: RuntimeConfig = {
+    ...(clientAccountQueries ? { clientAccountQueries } : {}),
+    ...(payerReceipt ? { payerReceipt } : {}),
+    ...(expertApplicant ? { expertApplicant } : {}),
+    ...(expertVerification ? { expertVerification } : {}),
+    ...(expertCard ? { expertCard } : {}),
+    ...(expertResidencyLifecycle ? { expertResidencyLifecycle } : {}),
+    ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
+    bookingNotifications,
     databaseUrl: value.DATABASE_URL,
+    ...(value.PLANERKA_RECOVERY_ENABLED !== "true"
+      ? {}
+      : {
+          planerkaWorkflow: {
+            createEnabled: value.PLANERKA_CREATE_ENABLED === "true",
+            ...(value.PLANERKA_AVAILABILITY_ENABLED === "true"
+              ? { availabilityEnabled: true as const }
+              : {}),
+            apiKey: value.PLANERKA_API_KEY!,
+            accountId: value.PLANERKA_ACCOUNT_ID!,
+          },
+        }),
+    ...(value.CLIENT_TELEGRAM_NAVIGATION_ENABLED !== "true" ||
+    value.CLIENT_WEB_ORIGIN === undefined
+      ? {}
+      : { clientNavigation: { origin: value.CLIENT_WEB_ORIGIN } }),
+    ...(expertSession === undefined ? {} : { expertSession }),
+    ...(value.TELEGRAM_BOT_TOKEN === undefined
+      ? {}
+      : { clientTelegramBotToken: value.TELEGRAM_BOT_TOKEN }),
+    ...(value.CLIENT_WEB_ORIGIN === undefined ||
+    value.CLIENT_SESSION_ENABLED !== "true"
+      ? {}
+      : {
+          clientWeb: {
+            origin: value.CLIENT_WEB_ORIGIN,
+            botUsername: value.CLIENT_TELEGRAM_LOGIN_BOT_USERNAME!,
+            widgetEnabled:
+              value.CLIENT_TELEGRAM_WIDGET_LOGIN_ENABLED === "true",
+          },
+        }),
     integrations: {
       selarti: false,
       planerka: false,
@@ -526,15 +966,71 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(value.SELARTI_RESPONSE_SHARED_SECRET === undefined
       ? {}
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
+    ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
+      ? { privateVerification: privateVerificationConfig(source) }
+      : {}),
+    ...(source.RESIDENT_SEMANTIC_SOCKET
+      ? { residentSemanticSocket: source.RESIDENT_SEMANTIC_SOCKET }
+      : {}),
+    ...(source.RESIDENT_GEOCODE_ENABLED === "true"
+      ? {
+          residentGeocode: {
+            key: requiredResidentGeocodeKey(source.RESIDENT_GEOCODE_API_KEY),
+          },
+        }
+      : {}),
     features: {
+      ...(separatedSalesFlag === "true" ? { expertSeparatedSales: true } : {}),
+      ...(heldFlag === "true" ? { expertHeldOnboarding: true } : {}),
+      ...(clientAccountQueries ? { clientAccountQueries: true } : {}),
+      ...(expertApplicant ? { expertApplicant: true } : {}),
+      ...(verificationFormFlag === "true"
+        ? { expertVerificationForm: true }
+        : {}),
+      ...(source.EXPERT_CARD_ENABLED === "true" ? { expertCard: true } : {}),
+      ...(source.EXPERT_DRAFT_TAGS_ENABLED === "true"
+        ? { expertDraftTags: true }
+        : {}),
+      ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
+        ? { residentPrivateJobs: true }
+        : {}),
+      ...(source.RESIDENT_REVIEW_NOTIFICATIONS_ENABLED === "true"
+        ? { residentReviewNotifications: true }
+        : {}),
+      ...(source.RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED === "true"
+        ? { residentWorkspaceNotifications: true }
+        : {}),
+      ...(expertResidencyLifecycle?.enabled
+        ? { expertResidencyLifecycle: true }
+        : {}),
+      ...(expertResidencyLifecycle?.commandsEnabled
+        ? { expertResidencyLifecycleCommands: true }
+        : {}),
+      ...(expertResidencyLifecycle?.noticeDeliveryEnabled
+        ? { expertResidencyNoticeDelivery: true }
+        : {}),
+      ...(source.EXPERT_CARD_MATERIAL_DELIVERY_ENABLED === "true"
+        ? { expertCardMaterialDelivery: true }
+        : {}),
+      ...(source.EXPERT_VERIFICATION_ENABLED === "true"
+        ? { expertVerification: true }
+        : {}),
+      bookingCallbacks: bookingCallbacks !== undefined,
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",
+      expertSession: value.EXPERT_SESSION_ENABLED === "true",
+      clientSessionBookingGrants:
+        value.CLIENT_SESSION_BOOKING_GRANTS_ENABLED === "true",
       clientCatalog: value.CLIENT_CATALOG_ENABLED === "true",
       clientBooking: value.CLIENT_BOOKING_ENABLED === "true",
       clientBookingReserve: value.CLIENT_BOOKING_RESERVE_ENABLED === "true",
       clientWaitlist: value.CLIENT_WAITLIST_ENABLED === "true",
+      clientPrivacy: value.CLIENT_PRIVACY_ENABLED === "true",
+      clientErasureRequests: value.CLIENT_ERASURE_REQUESTS_ENABLED === "true",
       clientFreeAccessV2: value.CLIENT_FREE_ACCESS_V2_ENABLED === "true",
       clientTelegramIngress: value.CLIENT_TELEGRAM_INGRESS_ENABLED === "true",
+      clientTelegramNavigation:
+        value.CLIENT_TELEGRAM_NAVIGATION_ENABLED === "true",
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
       selartiCostAdmission: value.SELARTI_COST_ADMISSION_ENABLED === "true",
       selartiResponseIngress: false,
@@ -608,4 +1104,52 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
         }
       : {}),
   };
+  assertExpertResidencyLifecycleConfig(config);
+  assertClientNavigationConfig(config);
+  return config;
+}
+
+function privateVerificationConfig(
+  source: Record<string, string | undefined>,
+): NonNullable<RuntimeConfig["privateVerification"]> {
+  const required = (key: string) => {
+    const value = source[key];
+    if (!value) throw Error("resident_private_configuration_required");
+    return value;
+  };
+  if (source.PRIVATE_BUCKET_NON_VERSIONED_VERIFIED !== "true")
+    throw Error("resident_private_non_versioned_required");
+  const token = source.PRIVATE_VK_TOKEN,
+    kind = source.PRIVATE_VK_TOKEN_KIND;
+  if (token && kind !== "user" && kind !== "service")
+    throw Error("resident_private_vk_capability_required");
+  return {
+    bucket: required("PRIVATE_BUCKET"),
+    region: required("PRIVATE_REGION"),
+    endpoint: required("PRIVATE_ENDPOINT"),
+    credentials: {
+      accessKeyId: required("PRIVATE_ACCESS_KEY_ID"),
+      secretAccessKey: required("PRIVATE_SECRET_ACCESS_KEY"),
+    },
+    dedicatedNonVersionedVerified: true,
+    ocr: source.PRIVATE_OCR_ENABLED === "true",
+    telegramPreview: source.PRIVATE_TELEGRAM_PREVIEW_ENABLED === "true",
+    ...(source.PRIVATE_PARSER_SOCKET
+      ? { parserSocket: source.PRIVATE_PARSER_SOCKET }
+      : {}),
+    ...(token
+      ? { vkToken: token, vkTokenKind: kind as "user" | "service" }
+      : {}),
+  };
+}
+
+function requiredResidentGeocodeKey(value: string | undefined): string {
+  if (
+    !value ||
+    value.length > 256 ||
+    /\s/u.test(value) ||
+    value.includes("__PLACEHOLDER_")
+  )
+    throw Error("resident_geocode_configuration");
+  return value;
 }

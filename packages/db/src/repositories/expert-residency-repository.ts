@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { quoteResidency } from "@ii-tonya/domain";
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
@@ -155,6 +155,190 @@ export function releaseAmountFromReservation(
   amountMinor: bigint | string,
 ): bigint {
   return -normalizeDatabaseMoney(amountMinor, "reservation.amountMinor");
+}
+
+type CreditTransaction = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
+const invalidCredit = () =>
+  new ExpertResidencyCommandError(
+    "EXPERT_RESIDENCY_CREDIT_ALLOCATION_INVALID",
+    "Original credit allocation and release facts disagree",
+  );
+
+/** Caller holds the order lock. Validate immutable originals and every release,
+ * not merely the presence of one release (legacy releases may be partial).
+ */
+export async function readLockedExpertCreditReservations(
+  tx: CreditTransaction,
+  order: { id: string; expertId: string },
+) {
+  const reservations = await tx.execute<{
+    id: string;
+    expertId: string;
+    amount: string;
+  }>(
+    sql`select id,expert_id as "expertId",amount_minor::text amount from expert_referral_ledger_entries where order_id=${order.id}::uuid and entry_kind='reservation' order by id for update`,
+  );
+  const result: {
+    id: string;
+    amount: bigint;
+    allocations: {
+      grantId: string;
+      original: bigint;
+      released: bigint;
+      remaining: bigint;
+    }[];
+  }[] = [];
+  for (const reservation of reservations.rows) {
+    if (
+      reservation.expertId !== order.expertId ||
+      BigInt(reservation.amount) >= 0n
+    )
+      throw invalidCredit();
+    const spent = await tx.execute<{ present: boolean }>(
+      sql`select exists(select 1 from expert_referral_ledger_entries where original_entry_id=${reservation.id}::uuid and entry_kind='spend') present`,
+    );
+    // This helper is used only before settlement's spend or for a cancelled
+    // pending order. A previously spent reservation is never releasable here.
+    if (spent.rows[0]!.present) throw invalidCredit();
+    const originals = await tx.execute<{
+      grantId: string;
+      expertId: string;
+      grantExpertId: string;
+      amount: string;
+    }>(
+      sql`select a.reward_grant_id as "grantId",a.expert_id as "expertId",g.expert_id as "grantExpertId",a.amount_minor::text amount from expert_referral_ledger_allocations a join expert_referral_reward_grants g on g.id=a.reward_grant_id where a.ledger_entry_id=${reservation.id}::uuid order by a.reward_grant_id for update of a`,
+    );
+    const allocations = originals.rows.map((a) => {
+      if (
+        a.expertId !== order.expertId ||
+        a.grantExpertId !== order.expertId ||
+        BigInt(a.amount) >= 0n
+      )
+        throw invalidCredit();
+      return {
+        grantId: a.grantId,
+        original: -BigInt(a.amount),
+        released: 0n,
+        remaining: -BigInt(a.amount),
+      };
+    });
+    if (
+      !allocations.length ||
+      allocations.reduce((s, a) => s + a.original, 0n) !==
+        -BigInt(reservation.amount)
+    )
+      throw invalidCredit();
+    const releases = await tx.execute<{
+      id: string;
+      expertId: string;
+      orderId: string;
+      amount: string;
+    }>(
+      sql`select id,expert_id as "expertId",order_id as "orderId",amount_minor::text amount from expert_referral_ledger_entries where original_entry_id=${reservation.id}::uuid and entry_kind='release' order by id for update`,
+    );
+    for (const release of releases.rows) {
+      if (
+        release.expertId !== order.expertId ||
+        release.orderId !== order.id ||
+        BigInt(release.amount) <= 0n
+      )
+        throw invalidCredit();
+      const parts = await tx.execute<{
+        grantId: string;
+        expertId: string;
+        amount: string;
+      }>(
+        sql`select reward_grant_id as "grantId",expert_id as "expertId",amount_minor::text amount from expert_referral_ledger_allocations where ledger_entry_id=${release.id}::uuid order by reward_grant_id for update`,
+      );
+      if (
+        !parts.rows.length ||
+        parts.rows.reduce((s, a) => s + BigInt(a.amount), 0n) !==
+          BigInt(release.amount)
+      )
+        throw invalidCredit();
+      for (const part of parts.rows) {
+        const original = allocations.find((a) => a.grantId === part.grantId);
+        if (
+          !original ||
+          part.expertId !== order.expertId ||
+          BigInt(part.amount) <= 0n
+        )
+          throw invalidCredit();
+        original.released += BigInt(part.amount);
+        original.remaining -= BigInt(part.amount);
+        if (original.remaining < 0n) throw invalidCredit();
+      }
+    }
+    result.push({
+      id: reservation.id,
+      amount: -BigInt(reservation.amount),
+      allocations,
+    });
+  }
+  const snapshot = await tx.execute<{ credit: string }>(
+    sql`select credit_minor::text credit from expert_residency_orders where id=${order.id}::uuid and expert_id=${order.expertId}::uuid`,
+  );
+  if (
+    !snapshot.rows[0] ||
+    result.reduce((s, r) => s + r.amount, 0n) !==
+      BigInt(snapshot.rows[0].credit)
+  )
+    throw invalidCredit();
+  return result;
+}
+
+/** The order lock is shared by expiry, reversal and settlement. Append only the
+ * outstanding inverse to the ORIGINAL grants, preserving historical partials.
+ */
+export async function releaseLockedExpertResidencyCredit(
+  tx: CreditTransaction,
+  order: { id: string; expertId: string },
+  source: { type: string; id: string; keyPrefix: string },
+) {
+  const reservations = await readLockedExpertCreditReservations(tx, order);
+  for (const reservation of reservations) {
+    const remaining = reservation.allocations.filter((a) => a.remaining > 0n);
+    const amount = remaining.reduce((s, a) => s + a.remaining, 0n);
+    if (amount === 0n) continue;
+    const baseKey = `${source.keyPrefix}:${reservation.id}`;
+    const occupied = await tx.execute<{ valid: boolean }>(
+      sql`select entry_kind='release' and expert_id=${order.expertId}::uuid and order_id=${order.id}::uuid and original_entry_id=${reservation.id}::uuid and source_type=${source.type} and source_id=${source.id}::uuid as valid from expert_referral_ledger_entries where idempotency_key=${baseKey}`,
+    );
+    if (occupied.rows[0] && !occupied.rows[0].valid) throw invalidCredit();
+    // Preserve a historical partial release with this exact source key. A new
+    // append-only remainder has a deterministic key; no original is rewritten.
+    const key = occupied.rows.length
+      ? `${baseKey}:remainder:${amount}`
+      : baseKey;
+    const release = await tx.execute<{ id: string }>(
+      sql`insert into expert_referral_ledger_entries(expert_id,entry_kind,amount_minor,order_id,original_entry_id,source_type,source_id,idempotency_key) values(${order.expertId}::uuid,'release',${amount},${order.id}::uuid,${reservation.id}::uuid,${source.type},${source.id}::uuid,${key}) on conflict(idempotency_key) do nothing returning id`,
+    );
+    // An occupied key with an outstanding balance is not a successful replay.
+    if (!release.rows[0]) throw invalidCredit();
+    for (const a of remaining)
+      await tx.execute(
+        sql`insert into expert_referral_ledger_allocations(ledger_entry_id,reward_grant_id,expert_id,amount_minor) values(${release.rows[0].id}::uuid,${a.grantId}::uuid,${order.expertId}::uuid,${a.remaining})`,
+      );
+  }
+  return reservations;
+}
+
+/** Caller owns the order row lock and transaction; never opens a nested transaction. */
+export async function expireLockedExpertResidencyOrder(
+  tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+  order: { id: string; expertId: string },
+  deadlineClock: SQL,
+): Promise<boolean> {
+  const changed = await tx.execute<{ id: string }>(
+    sql`update expert_residency_orders set status='expired',updated_at=${deadlineClock} where id=${order.id}::uuid and expert_id=${order.expertId}::uuid and status='payment_pending' and ${deadlineClock} >= payment_deadline returning id`,
+  );
+  if (!changed.rows[0]) return false;
+  await releaseLockedExpertResidencyCredit(tx, order, {
+    type: "residency_order",
+    id: order.id,
+    keyPrefix: "release",
+  });
+  return true;
 }
 
 export class PostgresExpertResidencyRepository {
@@ -407,26 +591,14 @@ export class PostgresExpertResidencyRepository {
       );
       let released = 0;
       for (const order of orders.rows) {
-        const changed = await tx.execute<{ id: string }>(
-          sql`update expert_residency_orders set status='expired',updated_at=transaction_timestamp() where id=${order.id}::uuid and status='payment_pending' and transaction_timestamp() >= payment_deadline returning id`,
-        );
-        if (!changed.rows[0]) continue;
-        const reservations = await tx.execute<{
-          id: string;
-          amountMinor: bigint | string;
-        }>(
-          sql`select id,amount_minor as "amountMinor" from expert_referral_ledger_entries where order_id=${order.id}::uuid and entry_kind='reservation' for update`,
-        );
-        for (const reservation of reservations.rows) {
-          const release = await tx.execute<{ id: string }>(
-            sql`insert into expert_referral_ledger_entries (expert_id,entry_kind,amount_minor,order_id,original_entry_id,source_type,source_id,idempotency_key) values (${order.expertId}::uuid,'release',${releaseAmountFromReservation(reservation.amountMinor)},${order.id}::uuid,${reservation.id}::uuid,'residency_order',${order.id}::uuid,${`release:${reservation.id}`}) on conflict (idempotency_key) do nothing returning id`,
-          );
-          if (release.rows[0])
-            await tx.execute(
-              sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) select ${release.rows[0].id}::uuid,reward_grant_id,expert_id,-amount_minor from expert_referral_ledger_allocations where ledger_entry_id=${reservation.id}::uuid`,
-            );
-        }
-        released++;
+        if (
+          await expireLockedExpertResidencyOrder(
+            tx,
+            order,
+            sql`transaction_timestamp()`,
+          )
+        )
+          released++;
       }
       return { examined: orders.rows.length, released };
     });

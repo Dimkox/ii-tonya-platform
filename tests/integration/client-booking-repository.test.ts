@@ -131,7 +131,7 @@ describe("protected client booking PostgreSQL authority", () => {
       reservations: "1",
       receipts: "1",
       audits: "1",
-      outbox: "2",
+      outbox: "1",
     });
   });
 
@@ -166,14 +166,20 @@ describe("protected client booking PostgreSQL authority", () => {
         bookingHandle,
         correlationId: "protected-cancel",
       }),
-    ).resolves.toEqual({ kind: "cancelled" });
+    ).resolves.toEqual({
+      kind: "cancelled",
+      providerCancellationPending: false,
+    });
     await expect(
       repository.cancelOwnedByHandle({
         userId: ownerId,
         bookingHandle,
         correlationId: "protected-cancel-replay",
       }),
-    ).resolves.toEqual({ kind: "replayed" });
+    ).resolves.toEqual({
+      kind: "replayed",
+      providerCancellationPending: false,
+    });
     await expect(
       repository.cancelOwnedByHandle({
         userId: foreignId,
@@ -186,6 +192,20 @@ describe("protected client booking PostgreSQL authority", () => {
         (select count(*)::text from audit_events where action='reservation.client_cancel') audits,
         (select count(*)::text from integration_outbox where correlation_id='protected-cancel') outbox
     `);
-    expect(counts.rows[0]).toEqual({ audits: "1", outbox: "2" });
+    expect(counts.rows[0]).toEqual({ audits: "1", outbox: "1" });
+    // Provider creation is separately admitted by expert approval; neither the
+    // client reserve nor its local cancellation emits a generic provider job.
+    expect(
+      (
+        await db.execute<{ topic: string }>(sql`
+        select topic from integration_outbox
+        where correlation_id in ('protected-reserve','protected-cancel')
+        order by topic
+      `)
+      ).rows,
+    ).toEqual([
+      { topic: "telegram.booking_cancelled" },
+      { topic: "telegram.reservation_request" },
+    ]);
   });
 });

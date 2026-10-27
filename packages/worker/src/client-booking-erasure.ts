@@ -169,6 +169,18 @@ const processCleanup = async (db: DrizzleDb, claim: Claim): Promise<boolean> =>
       }
       return false;
     }
+    const unresolved = await tx.execute(sql`
+      select o.id from planerka_booking_operations o join reservations r on r.id=o.reservation_id
+      where r.user_id=${claim.userId}::uuid and o.state not in ('cancelled','rejected','finished')
+      union all
+      select l.reservation_id from planerka_legacy_booking_reviews l join reservations r on r.id=l.reservation_id
+      where r.user_id=${claim.userId}::uuid and l.resolved_at is null limit 1
+    `);
+    if (unresolved.rows.length) {
+      await tx.execute(sql`update client_booking_erasure_work set lease_token=null,lease_until=null,attempt_count=0,updated_at=clock_timestamp()
+        where deletion_job_id=${claim.deletionJobId}::uuid and lease_token=${claim.leaseToken}::uuid`);
+      return false;
+    }
     await tx.execute(sql`
       delete from client_booking_receipts where user_id=${claim.userId}::uuid
     `);

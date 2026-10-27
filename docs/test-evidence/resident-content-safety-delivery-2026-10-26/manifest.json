@@ -1,0 +1,40 @@
+{
+  "candidate": "a790589c4c833dc7a82c5e8004f4432ab0ddc228",
+  "method": "lossless gzip, mtime zero",
+  "logs": [
+    {
+      "source": "safety-final-gate-1793045604501472402.log",
+      "archive": "logs/safety-final-gate-1793045604501472402.log.gz",
+      "bytes": 484,
+      "sha256": "4b66e6b5cde5fcc552ae35570b3fd817211e04d6a501c55971c1f872e66f95e1",
+      "archive_bytes": 263,
+      "archive_sha256": "95cd94e692c63e8c26c6b15e78576fe9eaf37e9a3c24d36abe3798d2df260960"
+    },
+    {
+      "source": "safety-final-repo-1793045604501472402.log",
+      "archive": "logs/safety-final-repo-1793045604501472402.log.gz",
+      "bytes": 7893,
+      "sha256": "ac735f165c216d20453106f73f99e9518be3c655b3f1e2dcf94ade119c335738",
+      "archive_bytes": 2255,
+      "archive_sha256": "77ec72257210c4d3146fc76bf241a6a4e4927c33fb711d52d480b3fc0852379f"
+    },
+    {
+      "source": "safety-push-gate-1793045774106602561.log",
+      "archive": "logs/safety-push-gate-1793045774106602561.log.gz",
+      "bytes": 920,
+      "sha256": "d323300dbaf810b414dc8052af7719a07d393f3a9f16980434c94edf63dc790b",
+      "archive_bytes": 434,
+      "archive_sha256": "6eaf8a1066089dd78f16455a0a91151c50fb1a13f228a70b0ff52dd63f916ca0"
+    },
+    {
+      "source": "safety-push-repo-1793045774106602561.log",
+      "archive": "logs/safety-push-repo-1793045774106602561.log.gz",
+      "bytes": 7890,
+      "sha256": "0a4ae9db4dbcffd9b756111e7674b9908363fd702486486ba88f5d21f35ecf9f",
+      "archive_bytes": 2268,
+      "archive_sha256": "e3754c9d85ca0a871e5c9aad11dec636e5662622f66b2a37b9076c5aa5ac4a27"
+    }
+  ],
+  "pushed_head": "53df4d2fbbe09038bde2298e4642cee4247fbe2b",
+  "draft_pr": "https://github.com/Dimkox/ii-tonya-platform/pull/112"
+}

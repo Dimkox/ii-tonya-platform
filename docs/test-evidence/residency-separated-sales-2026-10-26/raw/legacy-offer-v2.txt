@@ -1,0 +1,16 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/integration/expert-offer-v2.test.ts (4 tests) 3254ms
+   ✓ requires stored facts, binds their revision and upgrades the earliest original anchor  424ms
+   ✓ computes modifiers on server and independently floors package while showing monthly  340ms
+   ✓ uses a bounded operational TTL at day10 and refuses three-month downgrade  350ms
+   ✓ preserves the current stage window before day10 when approved tariff validity exceeds24h  354ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  17:52:29
+   Duration  5.70s (transform 768ms, setup 0ms, collect 2.02s, tests 3.25s, environment 0ms, prepare 97ms)
+
+
+[END OF RAW CAPTURE]

@@ -1,3 +1,4 @@
+import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
@@ -25,9 +26,8 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
       await db.db.execute(
         sql`insert into channel_identities(user_id, provider, external_id, bot_key, external_chat_id, status) values (${client}::uuid, 'telegram', '22', 'bot-a', '22', 'active')`,
       );
-      await db.db.execute(
-        sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${client}::uuid,'client_messaging','granted','client-msg-v1','2026-08-28T00:00:00Z'),(${client}::uuid,'selarti_ai_processing','granted','selarti-v1','2026-08-28T00:00:00Z')`,
-      );
+      await seedClientConsent(db.db, client, "client_messaging");
+      await seedClientConsent(db.db, client, "selarti_ai_processing");
 
       const nowResult = await db.db.execute<{ now: Date | string }>(
         sql`select clock_timestamp() as now`,
@@ -152,8 +152,8 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
     locale: "ru-RU",
     deadline: "2026-08-29T00:00:30.000Z",
     occurredAt: "2026-08-29T00:00:00.000Z",
-    messagingConsentPolicyVersion: "client-msg-v1",
-    selartiConsentPolicyVersion: "selarti-v1",
+    messagingConsentPolicyVersion: "client-messaging-v1",
+    selartiConsentPolicyVersion: "selarti-ai-v1",
   });
   const bindClient = async (options: {
     externalUserId: string;
@@ -178,22 +178,21 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
     await database.db.execute(
       sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values(${userId}::uuid,'telegram',${options.externalUserId},'bot-a',${options.externalChatId ?? options.externalUserId},${options.status ?? "active"})`,
     );
-    let createdAt = 0;
-    for (const [decision, version] of options.messaging ?? [
-      ["granted", "client-msg-v1"] as const,
-    ]) {
-      await database.db.execute(
-        sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${userId}::uuid,'client_messaging',${decision},${version},${`2026-08-28T00:00:0${createdAt}Z`})`,
-      );
-      createdAt += 1;
-    }
-    for (const [decision, version] of options.ai ?? [
-      ["granted", "selarti-v1"] as const,
-    ]) {
-      await database.db.execute(
-        sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${userId}::uuid,'selarti_ai_processing',${decision},${version},${`2026-08-28T00:01:0${createdAt}Z`})`,
-      );
-      createdAt += 1;
+    for (const [purpose, decisions] of [
+      [
+        "client_messaging",
+        options.messaging ?? [["granted", "client-messaging-v1"]],
+      ],
+      ["selarti_ai_processing", options.ai ?? [["granted", "selarti-ai-v1"]]],
+    ] as const) {
+      for (const [decision, version] of decisions) {
+        if (decision === "granted")
+          await seedClientConsent(database.db, userId, purpose, version);
+        else
+          await database.db.execute(
+            sql`insert into consents(user_id,consent_type,decision,policy_version,created_at) values(${userId}::uuid,${purpose},${decision},${version},clock_timestamp())`,
+          );
+      }
     }
     return userId;
   };
@@ -323,20 +322,20 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
   it("requires the latest exact messaging and Selarti policy grants before storing text", async () => {
     await bindClient({
       externalUserId: "wrong-policy",
-      messaging: [["granted", "client-msg-v0"]],
+      messaging: [["granted", "client-messaging-v0"]],
     });
     await bindClient({
       externalUserId: "revoked-message",
       messaging: [
-        ["granted", "client-msg-v1"],
-        ["revoked", "client-msg-v1"],
+        ["granted", "client-messaging-v1"],
+        ["revoked", "client-messaging-v1"],
       ],
     });
     await bindClient({
       externalUserId: "revoked-ai",
       ai: [
-        ["granted", "selarti-v1"],
-        ["revoked", "selarti-v1"],
+        ["granted", "selarti-ai-v1"],
+        ["revoked", "selarti-ai-v1"],
       ],
     });
     for (const [updateId, externalId] of [
@@ -427,7 +426,7 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
     const withdrawal = privacyAfterIngress.withdrawConsentAtomically({
       targetUserId: ingressUser,
       purpose: "client_messaging",
-      policyVersion: "client-msg-v1",
+      policyVersion: "client-messaging-v1",
       correlationId: "withdraw-after-ingress",
     });
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -455,7 +454,7 @@ describe("hybrid gateway B1 PostgreSQL transaction", () => {
     const revoke = privacyFirst.withdrawConsentAtomically({
       targetUserId: revokeUser,
       purpose: "client_messaging",
-      policyVersion: "client-msg-v1",
+      policyVersion: "client-messaging-v1",
       correlationId: "withdraw-before-ingress",
     });
     await withdrawalLocked;

@@ -8,7 +8,16 @@ import {
 } from "@ii-tonya/integrations";
 import type { WebhookInbox } from "./selarti-webhook.js";
 
+export type BoundPaymentPurpose = "ONBOARDING_FEE" | "MAIN_SUBSCRIPTION";
 export interface YooKassaWebhookDependencies {
+  /** Production supplies the durable binding lookup; metadata never chooses a product. */
+  readonly resolvePurpose?: (
+    providerObjectId: string,
+    event: YooKassaNotification["event"],
+  ) => Promise<BoundPaymentPurpose | null>;
+  readonly onboarding?: {
+    handle(notification: YooKassaNotification): Promise<boolean>;
+  };
   readonly effectivePeerAddress: (request: FastifyRequest) => string;
   readonly inbox: WebhookInbox;
   readonly verify: (
@@ -81,7 +90,42 @@ export async function yookassaWebhookRoutes(
         return reply.code(503).send({ error: "delivery_pending" });
       }
       try {
+        if (deps.resolvePurpose) {
+          const purpose = await deps.resolvePurpose(
+            parsed.data.object.id,
+            parsed.data.event,
+          );
+          if (purpose === null)
+            throw new Error("yookassa_webhook_binding_pending");
+          if (purpose === "ONBOARDING_FEE") {
+            if (
+              !deps.onboarding ||
+              !(await deps.onboarding.handle(parsed.data))
+            )
+              throw new Error("yookassa_webhook_onboarding_pending");
+            await deps.inbox.complete(claim.claimId);
+            return reply.send({ accepted: true });
+          }
+          if (purpose !== "MAIN_SUBSCRIPTION")
+            throw new Error("yookassa_webhook_purpose_invalid");
+        } else if (
+          deps.onboarding &&
+          (await deps.onboarding.handle(parsed.data))
+        ) {
+          // Compatibility for existing injected test/legacy capabilities. Normal
+          // composition supplies resolvePurpose and cannot take this fallback.
+          await deps.inbox.complete(claim.claimId);
+          return reply.send({ accepted: true });
+        }
         const event = await deps.verify(parsed.data);
+        // A terminal payment/refund notification without verified ownership is retryable.
+        // In particular, an early callback must survive provider binding commit.
+        if (
+          event === null &&
+          (parsed.data.event === "payment.succeeded" ||
+            parsed.data.event === "refund.succeeded")
+        )
+          throw new Error("yookassa_webhook_pending");
         if (event !== null) {
           await deps.deliver(event);
           await deps.resolveSucceeded(parsed.data);

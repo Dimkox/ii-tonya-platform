@@ -5,6 +5,8 @@ export const PAYMENT_SCOPE_MAX_TRACKED_FILES = 5_000;
 export const PAYMENT_SCOPE_MAX_FILE_BYTES = 1_048_576;
 
 export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
+  // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
+  "packages/integrations/src/expert-residency/verified-event-internal.ts",
   "packages/contracts/src/expert-residency.ts",
   "packages/integrations/src/expert-residency/payment-port.ts",
   "packages/integrations/src/expert-residency/disabled-payment-adapter.ts",
@@ -13,6 +15,13 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 ]);
 
 export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
+  "packages/integrations/src/yookassa/held-onboarding.ts",
+  // BlockB purpose-bound onboarding verifier; no residency mint authority.
+  "packages/integrations/src/yookassa/onboarding-verifier.ts",
+  "packages/integrations/src/yookassa/onboarding-webhook-capability.ts",
+  // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
+  "packages/integrations/src/yookassa/payer-receipt-source.ts",
+  "packages/integrations/src/yookassa/payer-receipt-vault.ts",
   "packages/integrations/src/yookassa/client.ts",
   "packages/integrations/src/yookassa/contracts.ts",
   "packages/integrations/src/yookassa/exact-body-recovery.ts",
@@ -57,6 +66,19 @@ export const findSandboxProductionCompositionViolations = ({
   return ["privileged sandbox verifier composed outside sandbox runtime"];
 };
 
+// Internal branding is financial authority. Only these exact implementations may
+// depend on its module; exported primitive names cannot pass through a barrel.
+const verifierAuthorityImporters = new Set([
+  "packages/integrations/src/expert-residency/verified-event.ts",
+  "packages/integrations/src/yookassa/verifier.ts",
+]);
+const verifierAuthorityPrimitives = new Set([
+  "mintVerifiedExpertResidencyPaymentEvent",
+  "isVerifiedExpertResidencyPaymentEvent",
+]);
+const isVerifierAuthorityModule = (specifier: string): boolean =>
+  /(?:^|\/)verified-event-internal(?:\.[cm]?[jt]s)?$/u.test(specifier);
+
 export const SANDBOX_PAYMENT_RELATION_SOURCE_PATHS = new Set([
   "packages/sandbox-payments/src/repository.ts",
   "packages/sandbox-payments/src/schema.ts",
@@ -75,6 +97,27 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0070_planerka_availability.sql",
+  "packages/db/migrations/0069_resident_semantic_tags.sql",
+  "packages/db/migrations/0060_separated_sales_review_corrections.sql",
+  "packages/db/migrations/0061_resident_content_safety.sql",
+  "packages/db/migrations/0062_resident_verification_messages.sql",
+  "packages/db/migrations/0063_resident_verification_review_corrections.sql",
+  "packages/db/migrations/0064_resident_private_jobs.sql",
+  "packages/db/migrations/0065_resident_private_recovery_fences.sql",
+  "packages/db/migrations/0066_resident_rich_onboarding.sql",
+  "packages/db/migrations/0067_resident_rich_review_corrections.sql",
+  "packages/db/migrations/0068_resident_latest_approved_publication.sql",
+  "packages/db/migrations/0059_residency_separated_sales.sql",
+  "packages/db/migrations/0058_residency_core_stabilization.sql",
+  "packages/db/migrations/0057_resident_verification_form.sql",
+  "packages/db/migrations/0056_residency_offer_corrections.sql",
+  "packages/db/migrations/0055_expert_residency_lifecycle.sql",
+  "packages/db/migrations/0054_expert_card_publication.sql",
+  "packages/db/migrations/0053_expert_verification_onboarding.sql",
+  // BlockA exact inventory: docs/spec/phase1-block-a-guard-registration.md.
+  "packages/db/migrations/0052_expert_promo_applicants.sql",
+  "packages/db/migrations/0051_expert_onboarding_applications.sql",
   "packages/db/migrations/0018_expert_residency_referrals.sql",
   "packages/db/migrations/0019_expert_order_provider_deadline.sql",
   "packages/db/migrations/0020_expert_provider_verification_evidence.sql",
@@ -93,15 +136,145 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0036_selarti_budget_controls_b3.sql",
   "packages/db/migrations/0037_partner_commerce_a.sql",
   "packages/db/migrations/0038_test_expert_trial.sql",
-  "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
-  "packages/db/migrations/0040_booking_waitlist_d1.sql",
-  "packages/db/migrations/0041_booking_reschedule_replay.sql",
+  "packages/db/migrations/0071_lifecycle_scheduler_c1.sql",
+  "packages/db/migrations/0072_booking_waitlist_d1.sql",
+  "packages/db/migrations/0073_booking_reschedule_replay.sql",
+  "packages/db/migrations/0039_consent_evidence_grant.sql",
   "packages/db/migrations/meta/0018_snapshot.json",
   "packages/db/migrations/meta/0021_snapshot.json",
   "packages/db/migrations/meta/_journal.json",
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "forbidden_patterns",
+  "resident_card_corrections",
+  "resident_card_proposal_changes",
+  "resident_safety_active",
+  "resident_safety_outcomes",
+  "resident_safety_policies",
+  "resident_safety_publications",
+  "security_logs",
+
+  "expert_sales_operator_recoveries",
+  "expert_sales_bases",
+  "expert_sales_choices",
+  "expert_sales_selections",
+  "expert_sales_form_bridges",
+  "expert_sales_fee_attempts",
+  "expert_sales_paid_locks",
+  "expert_sales_recovery_work",
+  "expert_sales_provider_requests",
+  "expert_sales_provider_observations",
+  "expert_sales_notices",
+  "expert_sales_ticks",
+  "expert_sales_erased_cohorts",
+  "resident_sales_application",
+
+  // Core stabilization: docs/spec/residency-core-stabilization-guard-registration.md.
+  "hashtags_db",
+  "hashtags_taxonomy",
+  "expert_card_draft_tags",
+  "resident_workspace_access",
+
+  // Pre-price intake only; docs/spec/verification-schema-form-guard-registration.md.
+  "residents_applications",
+  "resident_message_templates",
+  "resident_review_previews",
+  "resident_object_deletions",
+  "resident_private_objects",
+  "resident_card_media",
+  "resident_card_versions",
+  "resident_tag_decisions",
+  "tag_embeddings_cache",
+  "resident_review_events",
+  "resident_document_access_audit",
+  "resident_evidence_jobs",
+  "resident_information_requests",
+  "resident_check_generations",
+  "resident_review_messages",
+  "resident_review_recoveries",
+  "resident_verification_cohorts",
+  "resident_social_observations",
+  "resident_verification_application_updates",
+  "resident_verification_check_work",
+  "resident_verification_requests",
+
+  // Exact correction inventory; docs/spec/residency-offer-corrections-guard-registration.md.
+  "expert_application_material_jobs",
+  "expert_application_promo_confirmations",
+  "expert_application_promo_proofs",
+  "expert_main_activation_admissions",
+  "expert_manager_telegram_callbacks",
+  "expert_manager_telegram_notifications",
+  "expert_manager_telegram_pairings",
+  "expert_offer_profile_verifications",
+  "expert_offer_profiles",
+  "expert_offer_schedules",
+  "expert_personal_offer_notices",
+  "expert_personal_offer_state",
+  "expert_promo_ready_logs",
+  "expert_space_tariff_approvals",
+
+  // BlockD calendar lifecycle; docs/spec/phase1-block-d-guard-registration.md.
+  "expert_residency_lifecycle",
+  "expert_residency_renewal_bills",
+  "expert_residency_lifecycle_audits",
+  "expert_residency_lifecycle_notices",
+  "expert_residency_renewal_attempts",
+  // BlockC card/publication contract; docs/spec/phase1-block-c-guard-registration.md.
+  "expert_card_drafts",
+  "expert_card_entries",
+  "expert_card_reviews",
+  "expert_card_material_templates",
+  "expert_card_material_jobs",
+  "expert_card_promo_proofs",
+  "expert_card_promo_confirmations",
+  "expert_card_handoffs",
+  "expert_card_requests",
+  "expert_card_staff_actions",
+  "expert_card_consent_epoch",
+  "expert_card_main_acceptances",
+  "expert_card_main_orders",
+  "expert_promo_qualification_audits",
+  "experts_published",
+  // Separate onboarding financial facts; docs/spec/phase1-block-b-guard-registration.md.
+  "expert_verification_decisions",
+  "expert_onboarding_invoices",
+  "expert_onboarding_payment_operations",
+  "expert_verification_work",
+  "expert_onboarding_payment_facts",
+  // Nonfinancial acquisition only; BlockA registration rationale is versioned.
+  "expert_promo_codes",
+  "expert_promo_registrations",
+  "expert_promo_requests",
+  "expert_promo_guide_work",
+  "expert_promo_bonus_indications",
+  "expert_promo_manager_work",
+  "expert_promo_enrollments",
+  // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
+  "client_paid_orders",
+  "client_paid_payment_bindings",
+  "client_coupon_grants",
+  "client_paid_settlements",
+  "planerka_service_mappings",
+  "planerka_availability_refreshes",
+  "planerka_booking_operations",
+  "planerka_account_requests",
+  "planerka_legacy_booking_reviews",
+  "booking_notification_contexts",
+  "booking_notification_deliveries",
+  "booking_notification_attempts",
+  "booking_notification_attempt_facts",
+  "booking_notification_callbacks",
+  "booking_notification_bot_controls",
+  "booking_handoff_revocation_receipts",
+  "expert_campaign_anchors",
+  "expert_campaign_quotes",
+  "expert_sessions",
+  "expert_identity_proof_receipts",
+  "payer_receipt_contacts",
+  "payer_receipt_order_bindings",
+  "expert_onboarding_applications",
   "commercial_participants",
   "expert_ai_request_receipts",
   "expert_referral_admin_execution_results",
@@ -157,6 +330,43 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
+  "/v1/admin/expert-verification/private-recovery",
+  "/v1/admin/expert-verification/private-recovery/:custodyId",
+  "/v1/admin/expert-verification/:applicationId/private-evidence",
+  "/v1/admin/expert-verification/:applicationId/documents/:custodyId/link",
+
+  // Protected profile recovery and paired scoped manager transport.
+  "/v1/admin/expert-verification/:applicationId/profile-verification",
+  "/v1/admin/expert-verification/telegram-pairing",
+  "/v1/webhooks/telegram/expert-manager/:botKey",
+
+  "/v1/admin/expert-cards",
+  "/v1/admin/expert-cards/:applicationId",
+  "/v1/admin/expert-cards/:applicationId/media/:mediaId/link",
+  "/v1/admin/expert-cards/:applicationId/public-card",
+  "/v1/admin/expert-cards/:applicationId/review",
+  "/v1/admin/expert-cards/:applicationId/promo-review",
+  "/v1/admin/expert-cards/:applicationId/tags/review",
+  "/v1/admin/expert-cards/catalogue-export",
+  "/v1/admin/expert-verification",
+  "/v1/admin/expert-verification/:applicationId",
+  "/v1/admin/expert-verification/invoices/:invoiceId/checkout",
+  "/v1/admin/expert-verification/invoices/:invoiceId/recover",
+  "/v1/admin/expert-verification/:applicationId/decision",
+  "/v1/admin/expert-verification/:applicationId/review-preview",
+  "/v1/admin/expert-verification/:applicationId/review-confirm",
+  "/v1/admin/expert-verification/:applicationId/review-recovery",
+
+  "/v1/webhooks/telegram/expert-promo/:botKey",
+  // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
+  "/v1/expert/browser/residency/checkouts",
+  "/v1/expert/browser/residency/quotes",
+  "/v1/expert/browser/residency/receipt-contacts",
+  "/v1/expert/browser/residency/tariffs",
+  "/v1/expert/browser/session",
+  "/v1/expert/session",
+  "/v1/expert/sessions",
+  "/v1/expert/sessions/current",
   "/v1/expert/assistant/messages",
   "/v1/expert/referrals/redeem",
   "/v1/expert/referrals/summary",
@@ -168,6 +378,20 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
+  "RESIDENT_GEOCODE_ENABLED",
+  "RESIDENT_PRIVATE_JOBS_ENABLED",
+  "PRIVATE_OCR_ENABLED",
+  "PRIVATE_TELEGRAM_PREVIEW_ENABLED",
+
+  "EXPERT_SEPARATED_SALES_ENABLED",
+  "EXPERT_ONBOARDING_HELD_ENABLED",
+  "EXPERT_DRAFT_TAGS_ENABLED",
+  "RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED",
+  "EXPERT_VERIFICATION_FORM_ENABLED",
+  "EXPERT_RESIDENCY_LIFECYCLE_ENABLED",
+  "EXPERT_RESIDENCY_LIFECYCLE_COMMANDS_ENABLED",
+  "EXPERT_RESIDENCY_NOTICE_DELIVERY_ENABLED",
+  "EXPERT_RESIDENCY_RENEWAL_CHECKOUT_ENABLED",
   "EXPERT_REFERRAL_ENABLED",
   "EXPERT_RESIDENCY_BILLING_ENABLED",
   "EXPERT_TELEGRAM_QUERIES_ENABLED",
@@ -203,8 +427,37 @@ const approvedPaymentBoundaryPaths = new Set([
 ]);
 const approvedPaymentBoundaryHashes = new Map([
   [
+    "packages/integrations/src/yookassa/held-onboarding.ts",
+    "f938a376d3cb0bfde235a619c4be9db6b27b8c531eee699dd1fd13f15cc66182",
+  ],
+  [
+    "packages/integrations/src/yookassa/onboarding-verifier.ts",
+    "0c4867e541393854644eac11b2e7b8ac0221a3d183850f40a40d75763bda1b82",
+  ],
+  [
+    "packages/integrations/src/yookassa/onboarding-webhook-capability.ts",
+    "039cd4403d8ff78c3b58add7b1e30bc00be659f7a268a2d27dedc4b8303c5fb0",
+  ],
+
+  [
+    "packages/integrations/src/expert-residency/verified-event-internal.ts",
+    "4a6637fe6f456ad97fed9aefeed336558a590d07178a01ededd1649928baa2c4",
+  ],
+  [
+    "packages/integrations/src/expert-residency/verified-event.ts",
+    "48aa1b67f7b73beb4bd87e1b42bdd34ab75a8460980a8880569adc4ff5664cae",
+  ],
+  [
+    "packages/integrations/src/yookassa/payer-receipt-source.ts",
+    "25c08bcd83582d43193059371662c1f99d0cf9485facf2ff11a6c3364f7ef4e8",
+  ],
+  [
+    "packages/integrations/src/yookassa/payer-receipt-vault.ts",
+    "189c14e45c2836ad9914719f937a0f3b966849d5933ac845b3a33dcf375134dd",
+  ],
+  [
     "packages/integrations/src/index.ts",
-    "1240f56e1f9f3d50381da99f358404090deafc24525da7cd035d0c715fb1abd3",
+    "f7bab87698f4c2e40567eb7c384e74ca160cff281ce66ab13b0174715d2ffc27",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -216,11 +469,11 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/client.ts",
-    "89a55569d5170d266f2c416963f26c023a11947917be6a102140f785e2173802",
+    "d2f344d4f4598a09babd95453a303a044de1db492a533632a1b95726b99fb8f8",
   ],
   [
     "packages/integrations/src/yookassa/contracts.ts",
-    "499c6f3f16a54ce403ffcb7ae355f48793934ed76af7bdba5185106b0112c376",
+    "2f2dec6322fb43c669bcc2dcc1b2ba3a85ec39b740120034182b3d1a846556e0",
   ],
   [
     "packages/integrations/src/yookassa/exact-body-recovery.ts",
@@ -228,7 +481,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/operation-port.ts",
-    "9da075cd09902befa3c06fc85b8a91e578d6002301653fdeaa17136e6698f5e8",
+    "e05e7a6d3806837ddecf651c575856ec0869d31a3d8782d53aaa6fe280e0ac5b",
   ],
   [
     "packages/integrations/src/yookassa/receipt-contact-source.ts",
@@ -236,7 +489,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/payment-adapter.ts",
-    "bc8e8873c6c286514b922b9d526e4cf4c02d14b7cd89d7c85c0c093dddad6dc3",
+    "39b16ddb47a45eb630ea4b50e4b2e1a717eecc51e194b54e8b03b3acd401a26a",
   ],
   [
     "packages/integrations/src/yookassa/reconciliation-reader.ts",
@@ -244,21 +497,23 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/verifier.ts",
-    "3414dfe6e335b072180519599b88f9f98ec6522b0e5fdc7eeabf2e75a74373a8",
+    "daafddc3b4b46743c19abb2b2edc3ceeafe1a6f5821dcef2639e34b52fd771ab",
   ],
   [
     "packages/integrations/src/yookassa/webhook-capability.ts",
-    "56ceea9a45aa7b620528e090dfef549093656e2ec26baa7f799ba5081d752636",
+    "5aad24de2f1ab17b9fa4a22155a49b2b41eb6a5935af33e6d93b5e75ce323d3a",
   ],
 ]);
 const approvedPackageManifestHashes = new Map([
+  // Security patch only: Fastify >=5.12.5 closes the reviewed September 2026
+  // advisories. Dependency names and payment integration boundaries are unchanged.
   [
     "apps/sandbox-api/package.json",
-    "10d849ade54b15694f30f477c4911acbb2e0a2750fb7cec617339cb23f26f1f2",
+    "449a71ee2e260137f66e409824c7b940503a5227ddb2838b793ae2959eca555d",
   ],
   [
     "apps/api/package.json",
-    "82e0499817addb7236e92216b60592618b4e03cc0c60acc1c24c0dedbdb42b3e",
+    "612edab1de19229840f06fe1cead61134e8ba5bba085bfb5a41a43540c68a51b",
   ],
   [
     "apps/web/package.json",
@@ -270,9 +525,9 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "package.json",
-    // Re-registered: verify:deploy now syntax-checks each script separately (a multi-file
-    // `bash -n` validated only the first operand), and the pre-push gate scripts are wired in.
-    "a876cdc0275f096e74209dbf94da4d689d1d28cb7d5fb82bbd4b6f22a0530665",
+    // Reviewed navigation increment: add the native Nginx proof entrypoint and
+    // invoke it from verify:deploy. Existing scripts and dependency graph remain.
+    "db3bc1f5f1d61883a1dfde9374f1411694c4746c5a0ed7f6dc28a153f80fcc02",
   ],
   [
     "packages/application/package.json",
@@ -296,7 +551,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/integrations/package.json",
-    "e041afbaee8eacfd08b0ac94127f5fd181787713ffb89e56c6d33aa055d708df",
+    "37a9cc6e97ad7e6e56b7476741e97ec209d37535a3f88c43b2eb8703f05a4e57",
   ],
   [
     "packages/observability/package.json",
@@ -311,7 +566,88 @@ const approvedPackageManifestHashes = new Map([
     "9548d95e818bc5d0010d9d1b6010e1a6cde75ffedfc721a9a11d0433deaac88d",
   ],
 ]);
+// Existing loopback DOM harnesses load an operator-supplied Playwright install.
+// This exception covers unresolved loader names only, never internal mint access.
+const reviewedDomHarnessHashes = new Map([
+  [
+    "scripts/verify-resident-review-browser.mjs",
+    "3ec062ea1c7b511a6a209ac24c95e22db51fbcc2dc1791c4bd44a19acd634be3",
+  ],
+  [
+    "scripts/verify-client-web-account-browser.mjs",
+    "02ffce350b89d5d89a50966693eb23cc14fd0caaf0dd2ed469ac07d5e8678e4d",
+  ],
+  [
+    "scripts/verify-public-client-catalog-browser.mjs",
+    "624d88eac52263707e442aee0c61802744c34d7e5cd8328acff2faeb1625839f",
+  ],
+]);
+
 const approvedAutomationArtifactHashes = new Map([
+  // Exact reviewed local semantic helper; docs/spec/resident-semantic-tags-guard-registration.md.
+  [
+    "compose.semantic-tags.yaml",
+    "55c4e129bc7a3c8920eec86bf2a0093c0a9b4ea3fdecf7e09bf4c96550b5b33c",
+  ],
+  [
+    "runtime/semantic-tags/dockerfile",
+    "0460bbac1393c1ad42044dc95772ca4eb97557cbef97e9a70963c07a4bcdd9b1",
+  ],
+  [
+    "runtime/semantic-tags/engine.py",
+    "fe768cb9c478e8a1731bdad22f71af1c1527edbcc8a01e7058ababffcaff30a3",
+  ],
+  [
+    "runtime/semantic-tags/server.py",
+    "809f74c442c71395d464de42bc3bb24d7a8aa8f7e864563ba9dea8697c49c48a",
+  ],
+  [
+    "runtime/semantic-tags/test_engine.py",
+    "2bf7ea90c53601214dd6547832710c25ace37b1b4bbeea451c70fab1a22fc9c6",
+  ],
+  // Reviewed S2b isolated helper and synthetic witnesses; exact paths and bytes only.
+  [
+    "compose.private-parser.yaml",
+    "f427649d02cc363c4e4894cf03b7a436da345be08b1c9c7468871d2d80b805da",
+  ],
+  [
+    "packages/integrations/parser/dockerfile",
+    "05bc975e61f4be435f1e83a647952ad52c3a3129da5bf16f35b627652e0bd41f",
+  ],
+  [
+    "packages/integrations/parser/build-image.sh",
+    "ad9cc39982c5a9660e8787cd661bcd332ff435e5569cae65744f2d0847188d52",
+  ],
+  [
+    "packages/integrations/parser/socket_server.py",
+    "8d65070a7c92c78bf42c9e5380f5f9747ea7221f3c063a0d06de444a9c697643",
+  ],
+  [
+    "packages/integrations/parser/test_coverage.py",
+    "c91184645d5c5124866095e59c148886595e038051a45cb1fe5cf582be5c8aed",
+  ],
+  [
+    "tests/acceptance/private-verification/make-parser-fixtures.py",
+    "22491e04222bc5be599ab20e22a7dc073ba4b79f44c23518114c816d27a20746",
+  ],
+  [
+    "tests/acceptance/private-verification/sandbox-probe.py",
+    "271a3b646dfe5e8a8f0a9ef3b96b07ade0c10cca8799e07c6a6fac5eb9a93d53",
+  ],
+  [
+    "tests/acceptance/private-verification/socket-denial-probe.py",
+    "5b14f07f9b4eac0b4825a589c438bc52308f33932ba12400685687d899e84ab2",
+  ],
+  // Exact core stabilization artifacts; no adjacent namespace exemption.
+  [
+    "packages/integrations/parser/helper.py",
+    "c9afa24fa01446c2aea4d5772491fc09d44f394b4160b2caaf7b5969abacf7d5",
+  ],
+  [
+    "packages/integrations/parser/test_helper.py",
+    "3df51295dc4820998763a4fa9e1322cf9767c564c2eb7282562850be59f0cdda",
+  ],
+
   // Read-only owner backlog validator: inspect source coverage, task links and dependency DAG.
   [
     "_bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py",
@@ -337,7 +673,7 @@ const approvedAutomationArtifactHashes = new Map([
     // truncated, and wrapped the release gate body in step() so the artifact build is
     // recorded with an exit code and a duration. Registered in the same change as the runner.
     "scripts/run-claw-ci.sh",
-    "0151459fce14199efb65e25e71025ba9c4cbcf6023aa7639436cae994082812a",
+    "99d14383600ee43346e237fbf7f31e04cba4ebce780669df3f28385f29329677",
   ],
   [
     "scripts/build-native-release.sh",
@@ -349,7 +685,7 @@ const approvedAutomationArtifactHashes = new Map([
     // to the readiness probe, so a cold API start no longer aborts a good deployment.
     // Registering the new normalized-content hash instead of relaxing the rule.
     "scripts/deploy-native-remote.sh",
-    "0bfe4350610d253d0cdc56c19df2fc715d29300f1d056f529dd8b7a514655af2",
+    "0a487419596c82cec0f386a85fff90fc6cc2ae228a97b09176a64b736bfb56eb",
   ],
   [
     "scripts/provision-claw-syft.sh",
@@ -363,7 +699,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/migrate-native.mjs",
-    "b41b805e9c57cb9d93f296e0e18bc408c9b628e312302d09d197a650c6ffba2d",
+    "2a5d9ea65d70b7301e175aad6acf6dc6a0a4d41a3c70018f28dd30a614a78df3",
   ],
   [
     "deploy/systemd/ii-tonya-api.service",
@@ -530,7 +866,12 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   ["packages/domain/package.json", new Set(["fast-check"])],
   [
     "packages/integrations/package.json",
-    new Set(["@ii-tonya/contracts", "zod"]),
+    new Set([
+      "@ii-tonya/contracts",
+      "zod",
+      "@aws-sdk/client-s3",
+      "@aws-sdk/s3-request-presigner",
+    ]),
   ],
   [
     "packages/observability/package.json",
@@ -570,6 +911,8 @@ const approvedDependencySpecifiers = new Map([
   ["@ii-tonya/observability", "workspace:*"],
   ["@ii-tonya/sandbox-payments", "workspace:*"],
   ["@ii-tonya/worker", "workspace:*"],
+  ["@aws-sdk/client-s3", "3.1157.0"],
+  ["@aws-sdk/s3-request-presigner", "3.1157.0"],
   ["@opentelemetry/api", "^1.9.0"],
   ["@opentelemetry/sdk-node", "^0.221.0"],
   ["@testcontainers/postgresql", "^10.28.0"],
@@ -580,7 +923,7 @@ const approvedDependencySpecifiers = new Map([
   ["drizzle-orm", "^0.45.2"],
   ["eslint", "^9.31.0"],
   ["fast-check", "^4.2.0"],
-  ["fastify", "^5.5.0"],
+  ["fastify", "^5.12.5"],
   ["globals", "^14.0.0"],
   ["pg", "^8.16.3"],
   ["pino", "^9.7.0"],
@@ -595,6 +938,587 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/meta/0070_snapshot.json",
+    "538bfaf12180e49f5f2a0e9d4a4d2574645b899401d52aaf632fe1ce37b4ab0c",
+  ],
+  [
+    "packages/db/migrations/state/0070_manifest.json",
+    "aff9330d9c1bbd94ef511e298ebd6d8c40849a4abcc0d869a41208d9179ee925",
+  ],
+  [
+    "packages/db/migrations/state/0070_sql_objects.json",
+    "96a9dd70096a148a598a23c5a0719f50f3545659015234e5a9a6913da8a04aff",
+  ],
+  [
+    "packages/db/migrations/meta/0071_snapshot.json",
+    "e511235411b7c01a50e672daf14e5309563f5a8199ce583189512a83b8e187f8",
+  ],
+  [
+    "packages/db/migrations/state/0071_manifest.json",
+    "44564b00bcde15055269fd0a0e4dfb5fb94044e18d6dfda8867b4ff993209ef4",
+  ],
+  [
+    "packages/db/migrations/state/0071_sql_objects.json",
+    "57a3764156e186e7e6ca025059d489141e57add709de267691f54881052b97cf",
+  ],
+  [
+    "packages/db/migrations/meta/0072_snapshot.json",
+    "2dbc15b5c2f22ace38a587cf7190d0751eb9a9463c8f900160b9b7004909fa92",
+  ],
+  [
+    "packages/db/migrations/state/0072_manifest.json",
+    "0933260beb39a30155da3a96dec70875e1d9a5a4341e3469e38c3bd3df53b90f",
+  ],
+  [
+    "packages/db/migrations/state/0072_sql_objects.json",
+    "d011f500ac43301819458357621847f25ccbd1a5eb0c3050f243840f53e6eebd",
+  ],
+  [
+    "packages/db/migrations/meta/0073_snapshot.json",
+    "e415d2dfb48f49cacd58af880d239f3cc8c6f6da05ee55720db5535e07f10613",
+  ],
+  [
+    "packages/db/migrations/state/0073_manifest.json",
+    "db078855e5d7bffe45b65e40c0d295734fc50f3d804062044e13d364ee78edca",
+  ],
+  [
+    "packages/db/migrations/state/0073_sql_objects.json",
+    "43732405c71a10780f3549adef95bb41a092f1bf640ef608d53ded1419e75339",
+  ],
+  [
+    "packages/db/migrations/history/main-before-unification/0039_lifecycle_scheduler_c1.sql",
+    "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
+  ],
+  [
+    "packages/db/migrations/history/main-before-unification/0040_booking_waitlist_d1.sql",
+    "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
+  ],
+  [
+    "packages/db/migrations/history/main-before-unification/0041_booking_reschedule_replay.sql",
+    "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed",
+  ],
+  [
+    "packages/db/migrations/history/main-before-unification/manifest.json",
+    "eb0370db0c6dc802c30b300cf8fc6bcac7cd7afe2853d5266075da9bc2ecefcf",
+  ],
+  [
+    "packages/db/migrations/history/rc-before-unification/0051_planerka_availability.sql",
+    "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e",
+  ],
+  [
+    "packages/db/migrations/history/rc-before-unification/manifest.json",
+    "7f9b67cfdde6889b3af37ad192b8247c21f32c1276b2a7c5c3b0e7ab9affb9e8",
+  ],
+  [
+    "packages/db/migrations/0070_planerka_availability.sql",
+    "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e",
+  ],
+  [
+    "packages/db/migrations/0069_resident_semantic_tags.sql",
+    "a5c787fb5e784b5cde3c8aa8f19d6f43e916b25c3587d5ed61b72490ff78d4d2",
+  ],
+  [
+    "packages/db/migrations/meta/0069_snapshot.json",
+    "9887f6cdc11a4684993b375e0dc7cdf101fc1409c093d6f6c1f74a04e0e33247",
+  ],
+  [
+    "packages/db/migrations/state/0069_sql_objects.json",
+    "e8ca1f50fe003a504d6cf335db6b58215a1f0dc92a0f005f17a4066fdd9a4517",
+  ],
+  [
+    "packages/db/migrations/state/0069_manifest.json",
+    "55a7bdb1f65af85e21ee7bc549dd4461870a781b65e59e43a2904bbb94e9e671",
+  ],
+
+  [
+    "packages/db/migrations/0068_resident_latest_approved_publication.sql",
+    "573c612c1c00841f38929ec89eee01b1e27ef6a5dab11bc4d8b032f535ca98f9",
+  ],
+  [
+    "packages/db/migrations/meta/0068_snapshot.json",
+    "00a3b8600e6158f2f844daabd4779a423a58e3b9de52f73a9f9bec0a0064daab",
+  ],
+  [
+    "packages/db/migrations/state/0068_sql_objects.json",
+    "5e5c3670e3272d2b7e3eca095a200a457a28c01c6cdffe73cbcc3124a3006e3b",
+  ],
+  [
+    "packages/db/migrations/state/0068_manifest.json",
+    "48974d54f539dbf674604335cdc00228aa91b1b3dbb32cc55af1e40ab7304781",
+  ],
+
+  [
+    "packages/db/migrations/0067_resident_rich_review_corrections.sql",
+    "7f79f93ef2cf00a79b3740472147c0e650abf154b545fec34be9b0d443ae8422",
+  ],
+  [
+    "packages/db/migrations/meta/0067_snapshot.json",
+    "37fee0f597aaee54127c47461f9ee674db668280c1703ac5ecf2861bd371071a",
+  ],
+  [
+    "packages/db/migrations/state/0067_sql_objects.json",
+    "86770b5ead5c04bd7cd1ac9988fa6e49798ffeef46d065aae5cbffb27ac61e45",
+  ],
+  [
+    "packages/db/migrations/state/0067_manifest.json",
+    "acfac0882803c6df25917311027e211a818d04d9efe3f3dfe6232f3ba00ecde3",
+  ],
+
+  [
+    "packages/db/migrations/0066_resident_rich_onboarding.sql",
+    "7c81e8b71f77d256aef1a2fd8c8ee672a15ddb2680855f7c10bf182ec7d4b196",
+  ],
+  [
+    "packages/db/migrations/meta/0066_snapshot.json",
+    "ee67fcc27b22f6ee480a3285e4cefe6dea2c73cfeb34addbf431e7544a39fd78",
+  ],
+  [
+    "packages/db/migrations/state/0066_sql_objects.json",
+    "36d43b7aee8965bbc8080632485bc0df37a119b5d9ae37d22cb2c6afd9505b55",
+  ],
+  [
+    "packages/db/migrations/state/0066_manifest.json",
+    "ce4d4ab299ae4ad05817ee746c3108056c3b9aed8da3e2df6b03b35da7ef1585",
+  ],
+
+  [
+    "packages/db/migrations/0065_resident_private_recovery_fences.sql",
+    "932d096ed16419f3a25814ccd881d116ff76847f1984fba61557164c0c4d6307",
+  ],
+  [
+    "packages/db/migrations/meta/0065_snapshot.json",
+    "f7874d7bf5025a00589b452088afe364731746fee98d2ff1da0e5fd98eea52f6",
+  ],
+  [
+    "packages/db/migrations/state/0065_sql_objects.json",
+    "0abdb21719f5a63aa8f87ca84a6b46e9be4c5bf5f0fb065562b118fbb492a53f",
+  ],
+  [
+    "packages/db/migrations/state/0065_manifest.json",
+    "724315937a3764631452f1994bfeca6cc5dede6949df0790bd49ae2ce4911caa",
+  ],
+
+  [
+    "packages/db/migrations/0064_resident_private_jobs.sql",
+    "9d792a30d7044cd7a3a9a49091266bb9fd2bc4fe2968809cf67175ffb6c94ab3",
+  ],
+  [
+    "packages/db/migrations/meta/0064_snapshot.json",
+    "651975b80ba7f4a7b43ed70643c756ad944668e4099e5ecfe1258fa45e22858a",
+  ],
+  [
+    "packages/db/migrations/state/0064_sql_objects.json",
+    "2967be9de10c11e299ea9a4c316d826e6041c17ba4c2a0dc016329ca733f6b16",
+  ],
+  [
+    "packages/db/migrations/state/0064_manifest.json",
+    "f00c4aa05958039ed6b0367602be094660ae90c8782107138be10b686adba9af",
+  ],
+
+  [
+    "packages/db/migrations/0063_resident_verification_review_corrections.sql",
+    "a68c5513b4ee341950e6e39eae2c81ff6004b02ba2f1df689a7cc9a41f4e042a",
+  ],
+  [
+    "packages/db/migrations/meta/0063_snapshot.json",
+    "1c6e9a6ed43c4c963ef6986ea28edaf2de0035ea6a584341505e4723be6c0aa0",
+  ],
+  [
+    "packages/db/migrations/state/0063_sql_objects.json",
+    "a4df0d0aac2b6fee356fa29f625db4ea65afabdc7d6ce7d69be7228e6ccb3909",
+  ],
+  [
+    "packages/db/migrations/state/0063_manifest.json",
+    "793201b793c47a67fb07a3cc765eacb17ef04dccc262101ec4f7f87a87278469",
+  ],
+
+  [
+    "packages/db/migrations/0062_resident_verification_messages.sql",
+    "6fedda508f5b6fede3dbf3c0113262fbba06c892f16ff2146ee455b1a887a1ff",
+  ],
+  [
+    "packages/db/migrations/meta/0062_snapshot.json",
+    "eb4bc06d16ce0fe1900a46fd3e3c1734867fe7b5b421df8ac0acd8c10c76b7e8",
+  ],
+  [
+    "packages/db/migrations/state/0062_sql_objects.json",
+    "23fc5f17f92cee664dfa6b67fb48eeeebca8523e8fae1717fad387757a17c751",
+  ],
+  [
+    "packages/db/migrations/state/0062_manifest.json",
+    "bc3ead0c5ebe1cddf40b41a83a109cccb724a4c49a00753034690de573a8a660",
+  ],
+
+  [
+    "packages/db/migrations/0061_resident_content_safety.sql",
+    "2e8c028c080e8e00a5c8a02bddaae31bb6f90fc5ce536c041c9852d560619a3b",
+  ],
+  [
+    "packages/db/migrations/meta/0061_snapshot.json",
+    "368c6872330255d153218cb00a8c5b0702f0740338ff653a8fe4941dd0e346d5",
+  ],
+  [
+    "packages/db/migrations/state/0061_sql_objects.json",
+    "30bf08027abf68d8bfcb0f2d56e393e56e26c6c412da5f92b706e8d498f6b237",
+  ],
+  [
+    "packages/db/migrations/state/0061_manifest.json",
+    "1b036e4fd3729eba94ac67dba0beeef8a8f7fe194dbca09be44d6450524036dc",
+  ],
+
+  [
+    "packages/db/migrations/0060_separated_sales_review_corrections.sql",
+    "4b9f5b78690f8eb7bd59d7d1d2f8f51fd73b3ae50ac2e99bd28767cff4f43933",
+  ],
+  [
+    "packages/db/migrations/meta/0060_snapshot.json",
+    "c2590b2c31ccfb74236a34b0e20598005b5cefea1a67641c113fb4ad3ffc4a7d",
+  ],
+  [
+    "packages/db/migrations/state/0060_sql_objects.json",
+    "fc9fdaca9ba3bf7b9772265cd095d29f15af01338f3a0b58edda3491537175d2",
+  ],
+  [
+    "packages/db/migrations/state/0060_manifest.json",
+    "9dc31e816dd08f3971b59920fa251f87bdb9a881f4ec690cd884e205e0f89cf1",
+  ],
+
+  [
+    "packages/db/migrations/state/0059_sql_objects.json",
+    "25d1c71c3a0ad26a24c0ed538662792d54b4136527e6b4cf9773003aebec6353",
+  ],
+  [
+    "packages/db/migrations/state/0059_manifest.json",
+    "414ccd8d616a65be0beb91a94cc2d8220db1929db85c9e736b289be93e4952cc",
+  ],
+  [
+    "packages/db/migrations/meta/0059_snapshot.json",
+    "65f53050b8edbc5abe06cdde115b6ea6dc6751960b894dcf7b7f78a6d12d5ed5",
+  ],
+  [
+    "packages/db/migrations/0059_residency_separated_sales.sql",
+    "b0b50a318ed689d1c9032787e17e3889224d7ec0d0b842fafd800d725dbd3846",
+  ],
+  // Exact core stabilization artifacts; no adjacent namespace exemption.
+  [
+    "packages/db/migrations/0058_residency_core_stabilization.sql",
+    "b8e32b6377288312800692f03090a341744bec0f360ca108cf03bdadc63aab61",
+  ],
+  [
+    "packages/db/migrations/meta/0058_snapshot.json",
+    "79449bbe6d9a42942cb32794250fb8a1ce2fdccbc751e7cc5ef1b88dbaafc78c",
+  ],
+  [
+    "packages/db/migrations/state/0058_stabilization_sql_objects.json",
+    "4e502af2dc8bb11fffdd55d8a7a6175c7c328396304d661f6a6d34c9f59b4b07",
+  ],
+
+  // SQL replay + additive catalogue; docs/spec/verification-schema-form-guard-registration.md.
+  [
+    "packages/db/migrations/0057_resident_verification_form.sql",
+    "06b540f1cfd16a86984454fd52ab90e0bfb0d9984c1ed82f23c0799283292093",
+  ],
+  [
+    "packages/db/migrations/meta/0057_snapshot.json",
+    "2eaa0c604dc8f3ffac0b0754e4fa2bd17d1fe98e14cc2b553f0bfa6721f91fb4",
+  ],
+  [
+    "packages/db/migrations/state/0057_verification_sql_objects.json",
+    "23158ba19989bc5919a93bc967465244a2865f2be3d6550e8d2bacb538d2dc6c",
+  ],
+
+  // Reviewed additive v2 SQL, PG-derived supported snapshot and exact catalogue.
+  [
+    "packages/db/migrations/0056_residency_offer_corrections.sql",
+    "6605ab63ddf5ac31f7b49e5d45c93e96118e731cf9aa1a6c6d287ef1d6f01c1b",
+  ],
+  [
+    "packages/db/migrations/meta/0056_snapshot.json",
+    "b22ff021153b6a85fce4dad523921edba378be4ca518ffeb8d26c3811c0c5ec5",
+  ],
+  [
+    "packages/db/migrations/state/0056_offer_sql_objects.json",
+    "1b785221149f28bcff758f1829ec909ef385fbab2580ea11f61753933b61709d",
+  ],
+
+  // BlockD actual full-chain replay; docs/spec/phase1-block-d-guard-registration.md.
+  [
+    "packages/db/migrations/0055_expert_residency_lifecycle.sql",
+    "ff08821bc86ffb3157fa759419251dbb5e68167629cf8e1d8114826e42be74d1",
+  ],
+  [
+    "packages/db/migrations/meta/0055_snapshot.json",
+    "d6d7052022a575a9ca297e407a36a993d30e9548ae8034ab96c3e36d8cab758c",
+  ],
+  [
+    "packages/db/migrations/state/0055_manifest.json",
+    "03e735f484bed1b70522a03479b06e8eb71ffb2c9493f9d19e58701b3e58de0a",
+  ],
+  [
+    "packages/db/migrations/state/0055_sql_objects.json",
+    "19376bc5d926c10c68b35839526d0685199fab172d9eee4001fb2ce320032dce",
+  ],
+
+  // BlockC actual full-chain SQL catalogue; no generation authority.
+  [
+    "packages/db/migrations/0054_expert_card_publication.sql",
+    "526ac3bd5fa9ac6edfee72128d2898ae19b1ea6555161091b897db0ed1f860f8",
+  ],
+  [
+    "packages/db/migrations/meta/0054_snapshot.json",
+    "6740fe1ebd96adf044694be07759d99a3b45f0aaa67ea910588940741f87ff69",
+  ],
+  [
+    "packages/db/migrations/state/0054_manifest.json",
+    "9e13049f850d32a0fd6c4c816ff45359f9d1e9d40a32e9f3130523a530c94cc3",
+  ],
+  [
+    "packages/db/migrations/state/0054_sql_objects.json",
+    "2f21249b5210b9725bd5a0ff029827b4c55b54fb859d6e98f4799cecebe7c9c2",
+  ],
+
+  // BlockB full SQL replay; docs/spec/phase1-block-b-guard-registration.md.
+  [
+    "packages/db/migrations/0053_expert_verification_onboarding.sql",
+    "28563c02972211e931645521b2a5f1f36668c2c621813c1a942850120803b182",
+  ],
+  [
+    "packages/db/migrations/meta/0053_snapshot.json",
+    "455be9c95a7e086ce42d1b432176f7fc07368d0846c400386bb036b8ad8f8dbb",
+  ],
+  [
+    "packages/db/migrations/state/0053_manifest.json",
+    "fafd4b12b1fab06e6292cab3ffd7bdcd520b3aac164d1c99f61dd91b1172ab80",
+  ],
+  [
+    "packages/db/migrations/state/0053_sql_objects.json",
+    "f56c527a2794a5f3fe71b155bb4133d012d56225ac240c11faa0980259ac3f75",
+  ],
+
+  // BlockA SQL-replayed state: docs/spec/phase1-block-a-guard-registration.md.
+  [
+    "packages/db/migrations/0052_expert_promo_applicants.sql",
+    "bc75a0731f408194741548f4bb7a9342aa0fbc4e2d1dad52d97dceb325b933f1",
+  ],
+  [
+    "packages/db/migrations/meta/0052_snapshot.json",
+    "91120bff86bcc62bae1bd7883d875c9409dcc1adca1ee9e0104a8f56fe6fd8e8",
+  ],
+  [
+    "packages/db/migrations/state/0052_manifest.json",
+    "76bef7cc0003b995bd0d9afc1b45a5d33e5c5da73a7e7b42c56e17ff5bab1029",
+  ],
+  [
+    "packages/db/migrations/state/0052_sql_objects.json",
+    "2b5870f64ef8a125e474b8bb404340b570b8c4e7291d964a3d2113e0958b1c42",
+  ],
+
+  // Reviewed SQL0042–0050 and reconstructed metadata; no bytes changed.
+  [
+    "packages/db/migrations/0042_client_paid_orders.sql",
+    "adc94b568ddee0b8e29244e5f602f1781b02aba70dfca3bc8048d9882e250d94",
+  ],
+  [
+    "packages/db/migrations/meta/0042_snapshot.json",
+    "282f3ff749dd9a057c2eb83b08e12df2467a957e21e0a39115f0b89c64c5d48a",
+  ],
+  [
+    "packages/db/migrations/state/0042_manifest.json",
+    "3fc0e60b7e588e0ee2f7ebdec70af366ebf3276f51f47921f781d68d6712490d",
+  ],
+  [
+    "packages/db/migrations/state/0042_sql_objects.json",
+    "151ab1dc8fc02864cd317939e23c4dc4a79bedb9f2fd9060cacdb95044e13fba",
+  ],
+  [
+    "packages/db/migrations/0043_planerka_booking_operations.sql",
+    "259104111cfe60ad07d77a4e6e07d65f2df741f1fa77b19114a1d385fcd0c913",
+  ],
+  [
+    "packages/db/migrations/meta/0043_snapshot.json",
+    "4eb8d01149034a06f4ac77a9082366bce2ebffd443d075a5c8ad8570cff2d890",
+  ],
+  [
+    "packages/db/migrations/state/0043_manifest.json",
+    "efb470d8d7ce307deb0868389611da15e1e2a83306dc9fb08dffa74a76ec0cf5",
+  ],
+  [
+    "packages/db/migrations/state/0043_sql_objects.json",
+    "587961fee2f2abe09cb3119ec27d968ffdcf4091f4cf0429f2cf09a6acae392a",
+  ],
+  [
+    "packages/db/migrations/0044_booking_notification_delivery.sql",
+    "f8bedcec57d442018bf10bf8f6f496a7bb686decd26d7f94ecda0ff7f04c1f60",
+  ],
+  [
+    "packages/db/migrations/meta/0044_snapshot.json",
+    "fe533483a523bdfe1efc217522046fe80143fab2f1e03a05c7d441109e971276",
+  ],
+  [
+    "packages/db/migrations/state/0044_manifest.json",
+    "baf87f1b00a889f72995b16eeee3aa4767f6942c3cc9e30807b8240890370f5a",
+  ],
+  [
+    "packages/db/migrations/state/0044_sql_objects.json",
+    "52985e59bb67add6b3246822ecc6ef95a9e4ec20db314fc536ac127ba4944cb6",
+  ],
+  [
+    "packages/db/migrations/0045_booking_notification_controls.sql",
+    "2d48d6e29661a5f6c405a0ccd45ee7deca900392d2d7fec229c489abf839a3ec",
+  ],
+  [
+    "packages/db/migrations/meta/0045_snapshot.json",
+    "9feb08fc0b09419b6402faeb1e223ad85398a86fcded1f658839b4063a0f62f8",
+  ],
+  [
+    "packages/db/migrations/state/0045_manifest.json",
+    "466b7667b16ba72ad0ea5fc6e620a2c6ff38589051607d3c7189c07ced4b6f7d",
+  ],
+  [
+    "packages/db/migrations/state/0045_sql_objects.json",
+    "f394bee58713e60f1cec828e3c8eddbc91da6aaf79db6472db07a6e03a149d6a",
+  ],
+  [
+    "packages/db/migrations/0046_booking_handoff_revocation.sql",
+    "67898707a8d46162e06706681632900f956b0c961f480994fc98bdcd51c2997e",
+  ],
+  [
+    "packages/db/migrations/meta/0046_snapshot.json",
+    "7740b7153af60ea160a6144460a676eaac81406fed302f66a58894d320e46626",
+  ],
+  [
+    "packages/db/migrations/state/0046_manifest.json",
+    "8314d248bfbb998479aedac5ce62e77192b2dcd9b91cd769e036650474f087ae",
+  ],
+  [
+    "packages/db/migrations/state/0046_sql_objects.json",
+    "7cbc46dda67d475839f076e7d51de0da5815886eb156765e4f93845556b2ecca",
+  ],
+  [
+    "packages/db/migrations/0047_expert_campaign_quotes.sql",
+    "feab6a3d5afe04d32f89b5e1ca7f157252a2aad10bc4c252a2f5a889d8c0d8eb",
+  ],
+  [
+    "packages/db/migrations/meta/0047_snapshot.json",
+    "ff5dba10059c1d048cff9d81f3194a355891f7845a633376454e591dd81b78d8",
+  ],
+  [
+    "packages/db/migrations/state/0047_manifest.json",
+    "a04cfe79b44ed94502815f2ec0318e7101f06017a91edd47296c58e00fa8d208",
+  ],
+  [
+    "packages/db/migrations/state/0047_sql_objects.json",
+    "147b6cc1eca852e523995e65dd44e37f66342eebec40153530d9e33fb1abd867",
+  ],
+  [
+    "packages/db/migrations/0048_expert_campaign_orders.sql",
+    "4d89da04a0dee6f6b6f5fa360ebb2c6cc84c4341770b3b11854b5c57b0f76d59",
+  ],
+  [
+    "packages/db/migrations/meta/0048_snapshot.json",
+    "599855326596fff428fda669b1c8997c1319c0394ca49ef4ae77ed09e34d81be",
+  ],
+  [
+    "packages/db/migrations/state/0048_manifest.json",
+    "13f248ed704e091e6b65acb469ecbf331ce4aec125323dc453271b6f7e19b26a",
+  ],
+  [
+    "packages/db/migrations/state/0048_sql_objects.json",
+    "195a4bc016d1ccfacc3c1569dc08f6af44136c5bd2132429091e69bc5179e93e",
+  ],
+  [
+    "packages/db/migrations/0049_expert_sessions.sql",
+    "5e3f0283ad5e1e065bf2e21e21dd4c9f7b4dbbbdbff9bbea345708b4b47c25de",
+  ],
+  [
+    "packages/db/migrations/meta/0049_snapshot.json",
+    "f79d7e11e65f425afcdc227ab5768cf152632bf0af0198bdffebe804d2506c2a",
+  ],
+  [
+    "packages/db/migrations/state/0049_manifest.json",
+    "387d14038e7c0dd5ad228a4f4a78103e5255aee0ee4ddad2cc3ff7f6485e4af0",
+  ],
+  [
+    "packages/db/migrations/state/0049_sql_objects.json",
+    "a9a6e024cae54a09675818db5da626da2014ead4de2aed095b6f8d893f4e7588",
+  ],
+  [
+    "packages/db/migrations/0050_expert_receipt_contact_bindings.sql",
+    "bfaeb278183a8fefe2c9bd14e094618a15de754a02be1fd11d25f4dfd5d04399",
+  ],
+  [
+    "packages/db/migrations/meta/0050_snapshot.json",
+    "f3bc44aa46cf4aa1f78c0682d5e1957fd62b961febb0d65440831b0fff33d1f3",
+  ],
+  [
+    "packages/db/migrations/state/0050_manifest.json",
+    "dcaaebcc1758173562505cce8315b6a276cf5490ffa2467d37b5e290c6626b45",
+  ],
+  [
+    "packages/db/migrations/state/0050_sql_objects.json",
+    "6a5473befe28851655729a979cef7d595ff72fd17959a63515da857440417cfd",
+  ],
+  [
+    "packages/db/migrations/0051_expert_onboarding_applications.sql",
+    "e244079a72a25c2707a30864c704c0ce692e96ee1f39eefc8a4203536cb99a64",
+  ],
+  [
+    "packages/db/migrations/meta/0051_snapshot.json",
+    "0c16dd5981f99e2b018dad31c7ab4d867c1c68e7beb2cf206fe5fbb05ffff681",
+  ],
+  [
+    "packages/db/migrations/state/0051_manifest.json",
+    "3f1c4fa63a8778d232d049b449a89242736db879260fc4f192f5c7c95bf6c18a",
+  ],
+  [
+    "packages/db/migrations/state/0051_sql_objects.json",
+    "0a203b2d46e09d345a19c0c71bbe849cc35e4164800689d0739ba4cd16af957a",
+  ],
+  [
+    "packages/db/migrations/0041_client_erasure_requests.sql",
+    "2e54f405b3a15acccf8c5cafd88dc385ccba5a0b5b287e8e0e5c8cd1c04a18ee",
+  ],
+  [
+    "packages/db/migrations/meta/0041_snapshot.json",
+    "365c054817f116f51c3e8b548a18191e9041700617e117b0222f2a7e98e33941",
+  ],
+  [
+    "packages/db/migrations/state/0041_manifest.json",
+    "34d68756512bf30eefa1fe3a0ad1bbbf0a2ca1150ab59a86cfd2a4bb305ae952",
+  ],
+  [
+    "packages/db/migrations/state/0041_sql_objects.json",
+    "be90ac47a3012b04af76ac275893e303cb48849716f2f47b299047433e9d2d25",
+  ],
+  [
+    "packages/db/migrations/0040_client_session_booking_grants.sql",
+    "abd7de7b230598e2f63309c660c98de4d1812e87737dcefbfe0e8a15f2f32979",
+  ],
+  [
+    "packages/db/migrations/meta/0039_snapshot.json",
+    "b7dbbb1318fa677e2f43e0975a6f858dae9fab00ff3863899cfd5e7baca8cdc1",
+  ],
+  [
+    "packages/db/migrations/meta/0040_snapshot.json",
+    "7f6d547793b02b9da77a5daa584a70bb10e0239e2bbef1169d1e9a7c7d1ca411",
+  ],
+  [
+    "packages/db/migrations/state/0039_manifest.json",
+    "db670f20b5f7c44e5a2c2590945f24f133456c5e11415a9b9451a3abc8bac9de",
+  ],
+  [
+    "packages/db/migrations/state/0039_sql_objects.json",
+    "1723fa6d795402eca56b42708a2ecc69f280574a273b9056f42fa901d1a2ef49",
+  ],
+  [
+    "packages/db/migrations/state/0040_manifest.json",
+    "0286858c8df2db68231d611be308f3fba7599a1820637476ce0c3e3351c6d730",
+  ],
+  [
+    "packages/db/migrations/state/0040_sql_objects.json",
+    "013d69c02997e3bf2fc097c9050b52603c9b62e54d293191c3dd44757ad03ebf",
+  ],
   [
     "packages/sandbox-payments/migrations/0000_sandbox_expert_residency.sql",
     "495e8b352021c1fb6d0fc027e1621df6137d0d15c4a54cff5ce975cb2c318e0a",
@@ -756,20 +1680,24 @@ const approvedMigrationHashes = new Map([
     "beb9358660e430821ea3881d7bd301310bcd239688e11970fe3cc07b5ee3c957",
   ],
   [
-    "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
+    "packages/db/migrations/0071_lifecycle_scheduler_c1.sql",
     "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d",
   ],
   [
-    "packages/db/migrations/0040_booking_waitlist_d1.sql",
+    "packages/db/migrations/0072_booking_waitlist_d1.sql",
     "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8",
   ],
   [
-    "packages/db/migrations/0041_booking_reschedule_replay.sql",
+    "packages/db/migrations/0073_booking_reschedule_replay.sql",
     "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed",
   ],
   [
+    "packages/db/migrations/0039_consent_evidence_grant.sql",
+    "1da4691ba27f4e22bc84346cc367b820d4f12280fcb1f04077f75111bc5b2e0f",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
+    "a3e589e564641129dc592202e39155a2e66d3434e1a09ff56316fc7dd39f56ed",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -849,10 +1777,63 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "0848df2837e33d6858ca07459322e9b571e0681487da53fa59a2c1422dcd68f0",
+    "a3e589e564641129dc592202e39155a2e66d3434e1a09ff56316fc7dd39f56ed",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
+  // Exact correction inventory; docs/spec/residency-offer-corrections-guard-registration.md.
+  "expert_application_material_jobs",
+  "expert_application_promo_confirmations",
+  "expert_application_promo_proofs",
+  "expert_main_activation_admissions",
+  "expert_manager_telegram_callbacks",
+  "expert_manager_telegram_notifications",
+  "expert_manager_telegram_pairings",
+  "expert_offer_profile_verifications",
+  "expert_offer_profiles",
+  "expert_offer_schedules",
+  "expert_personal_offer_notices",
+  "expert_personal_offer_state",
+  "expert_promo_ready_logs",
+  "expert_space_tariff_approvals",
+
+  // BlockD calendar lifecycle; docs/spec/phase1-block-d-guard-registration.md.
+  "expert_residency_lifecycle",
+  "expert_residency_renewal_bills",
+  "expert_residency_lifecycle_audits",
+  "expert_residency_lifecycle_notices",
+  "expert_residency_renewal_attempts",
+  // BlockC card/publication contract; docs/spec/phase1-block-c-guard-registration.md.
+  "expert_card_drafts",
+  "expert_card_entries",
+  "expert_card_reviews",
+  "expert_card_material_templates",
+  "expert_card_material_jobs",
+  "expert_card_promo_proofs",
+  "expert_card_promo_confirmations",
+  "expert_card_handoffs",
+  "expert_card_requests",
+  "expert_card_staff_actions",
+  "expert_card_consent_epoch",
+  "expert_card_main_acceptances",
+  "expert_card_main_orders",
+  "expert_promo_qualification_audits",
+  "experts_published",
+  // Separate onboarding financial facts; docs/spec/phase1-block-b-guard-registration.md.
+  "expert_verification_decisions",
+  "expert_onboarding_invoices",
+  "expert_onboarding_payment_operations",
+  "expert_verification_work",
+  "expert_onboarding_payment_facts",
+  // Nonfinancial acquisition only; BlockA registration rationale is versioned.
+  "expert_promo_codes",
+  "expert_promo_registrations",
+  "expert_promo_requests",
+  "expert_promo_guide_work",
+  "expert_promo_bonus_indications",
+  "expert_promo_manager_work",
+  "expert_promo_enrollments",
+  "expert_onboarding_applications",
   "admin_case_actions",
   "admin_approvals",
   "admin_object_assignments",
@@ -871,8 +1852,10 @@ const approvedDatabaseRelations = new Set([
   "client_catalog_snapshots",
   "client_catalog_tombstones",
   "client_identity_proof_receipts",
+  "client_erasure_requests",
   "expert_telegram_residency_callbacks",
   "client_profiles",
+  "client_session_booking_grants",
   "client_sessions",
   "consent_document_versions",
   "consent_presentations",
@@ -942,8 +1925,10 @@ const paymentApplicationIdentifier =
   /^(?:Payment\w*Consumer|\w*PaymentConsumer|grant\w*Entitlement\w*Payment|grant\w*Payment\w*Entitlement|Payment\w*EntitlementGrant|(?:Payment|Checkout|Refund)\w*Routes?)$/iu;
 const paymentApiIdentifier =
   /^(?:payment|checkout|refund|stripe|yookassa)\w*Routes?$/iu;
-const expertResidencyRoute = /^\/v1\/(?:admin\/)?expert(?:-|\/)/u;
-const expertResidencyFlag = /^EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI)_/u;
+const expertResidencyRoute =
+  /^\/v1\/(?:(?:admin\/)?expert(?:-|\/)|webhooks\/telegram\/expert(?:-|\/))/u;
+const expertResidencyFlag =
+  /^(?:EXPERT_(?:REFERRAL|RESIDENCY|TELEGRAM|AI|VERIFICATION|DRAFT_TAGS)_|RESIDENT_WORKSPACE_)/u;
 const expertResidencyAdminAction = /^(?:expert_referral|expert_residency)\./u;
 const prohibitedCouponOrReferralModel =
   /(?:^|\/)(?:client-)?(?:coupon|referral)(?:[-_.\/]|$)/iu;
@@ -1165,6 +2150,186 @@ const inspectTypeScript = (
     path.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
 
+  const isReviewedDomHarness =
+    reviewedDomHarnessHashes.get(path) ===
+    createHash("sha256")
+      .update(content.replace(/\r\n?/gu, "\n"), "utf8")
+      .digest("hex");
+
+  // Fold bounded local constants, failing closed on unknown or shadowed names.
+  // Production currently has no executable dynamic imports; literal public
+  // modules remain valid, while computed unresolved authority cannot evade review.
+  const constants = new Map<string, ts.Expression | undefined>();
+  const destructuredLoaderBindings = new Map<string, ts.Expression[]>();
+  const collectConstants = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
+      const isConst =
+        ts.isVariableDeclarationList(node.parent) &&
+        (node.parent.flags & ts.NodeFlags.Const) !== 0;
+      constants.set(
+        node.name.text,
+        constants.has(node.name.text)
+          ? undefined
+          : isConst
+            ? node.initializer
+            : undefined,
+      );
+    }
+    if (
+      (ts.isParameter(node) || ts.isBindingElement(node)) &&
+      ts.isIdentifier(node.name)
+    ) {
+      constants.set(node.name.text, undefined);
+      if (
+        ts.isBindingElement(node) &&
+        ts.isObjectBindingPattern(node.parent) &&
+        ts.isVariableDeclaration(node.parent.parent) &&
+        node.parent.parent.initializer &&
+        (node.propertyName && ts.isIdentifier(node.propertyName)
+          ? node.propertyName.text
+          : node.name.text) === "createRequire"
+      ) {
+        const bindings = destructuredLoaderBindings.get(node.name.text) ?? [];
+        bindings.push(node.parent.parent.initializer);
+        destructuredLoaderBindings.set(node.name.text, bindings);
+      }
+    }
+    ts.forEachChild(node, collectConstants);
+  };
+  collectConstants(source);
+  const resolveModule = (
+    node: ts.Expression | undefined,
+    seen = new Set<string>(),
+    depth = 0,
+  ): string | undefined => {
+    if (!node || depth > 20) return undefined;
+    const literal = literalText(node);
+    if (literal !== undefined) return literal;
+    if (ts.isParenthesizedExpression(node))
+      return resolveModule(node.expression, seen, depth + 1);
+    if (ts.isIdentifier(node) && !seen.has(node.text)) {
+      return resolveModule(
+        constants.get(node.text),
+        new Set([...seen, node.text]),
+        depth + 1,
+      );
+    }
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.PlusToken
+    ) {
+      const left = resolveModule(node.left, seen, depth + 1);
+      const right = resolveModule(node.right, seen, depth + 1);
+      return left === undefined || right === undefined
+        ? undefined
+        : left + right;
+    }
+    if (ts.isTemplateExpression(node)) {
+      let value = node.head.text;
+      for (const span of node.templateSpans) {
+        const part = resolveModule(span.expression, seen, depth + 1);
+        if (part === undefined) return undefined;
+        value += part + span.literal.text;
+      }
+      return value;
+    }
+    return undefined;
+  };
+
+  const nodeLoaderImports = new Map<string, "factory" | "module">();
+  for (const statement of source.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !ts.isStringLiteral(statement.moduleSpecifier) ||
+      !["node:module", "module"].includes(statement.moduleSpecifier.text)
+    )
+      continue;
+    const clause = statement.importClause;
+    if (clause?.name) nodeLoaderImports.set(clause.name.text, "module");
+    const bindings = clause?.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings))
+      nodeLoaderImports.set(bindings.name.text, "module");
+    if (bindings && ts.isNamedImports(bindings)) {
+      for (const element of bindings.elements) {
+        if ((element.propertyName ?? element.name).text === "createRequire") {
+          nodeLoaderImports.set(element.name.text, "factory");
+        }
+      }
+    }
+  }
+  type LoaderKind = "require" | "factory" | "module";
+  const loaderKind = (
+    node: ts.Expression | undefined,
+    seen = new Set<string>(),
+    depth = 0,
+  ): LoaderKind | undefined => {
+    if (!node || depth > 20) return undefined;
+    if (ts.isParenthesizedExpression(node) || ts.isAwaitExpression(node))
+      return loaderKind(node.expression, seen, depth + 1);
+    if (ts.isIdentifier(node)) {
+      if (node.text === "require") return "require";
+      if (seen.has(node.text)) return undefined;
+      const imported = nodeLoaderImports.get(node.text);
+      if (imported) return imported;
+      for (const initializer of destructuredLoaderBindings.get(node.text) ??
+        []) {
+        if (
+          loaderKind(initializer, new Set([...seen, node.text]), depth + 1) ===
+          "module"
+        )
+          return "factory";
+      }
+      return loaderKind(
+        constants.get(node.text),
+        new Set([...seen, node.text]),
+        depth + 1,
+      );
+    }
+    if (
+      ts.isPropertyAccessExpression(node) ||
+      ts.isElementAccessExpression(node)
+    ) {
+      const property = ts.isPropertyAccessExpression(node)
+        ? node.name.text
+        : resolveModule(node.argumentExpression);
+      if (
+        property === "require" &&
+        ((ts.isIdentifier(node.expression) &&
+          ["module", "globalThis", "global"].includes(node.expression.text)) ||
+          loaderKind(node.expression, seen, depth + 1) === "module")
+      )
+        return "require";
+    }
+    if (
+      (ts.isPropertyAccessExpression(node) ||
+        ts.isElementAccessExpression(node)) &&
+      (ts.isPropertyAccessExpression(node)
+        ? node.name.text
+        : resolveModule(node.argumentExpression)) === "createRequire" &&
+      loaderKind(node.expression, seen, depth + 1) === "module"
+    )
+      return "factory";
+    if (ts.isCallExpression(node)) {
+      if (
+        node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+        ["node:module", "module"].includes(
+          resolveModule(node.arguments[0]) ?? "",
+        )
+      )
+        return "module";
+      const kind = loaderKind(node.expression, seen, depth + 1);
+      if (kind === "factory") return "require";
+      if (
+        kind === "require" &&
+        ["node:module", "module"].includes(
+          resolveModule(node.arguments[0]) ?? "",
+        )
+      )
+        return "module";
+    }
+    return undefined;
+  };
+
   const scanner = ts.createScanner(
     ts.ScriptTarget.Latest,
     true,
@@ -1275,11 +2440,31 @@ const inspectTypeScript = (
 
   const visit = (node: ts.Node): void => {
     if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression &&
+      ts.isStringLiteral(node.moduleReference.expression) &&
+      isVerifierAuthorityModule(node.moduleReference.expression.text) &&
+      !verifierAuthorityImporters.has(path)
+    ) {
+      violations.push(
+        "internal verifier authority require alias outside trusted implementation",
+      );
+    }
+    if (
       (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) &&
       node.moduleSpecifier &&
       ts.isStringLiteral(node.moduleSpecifier)
     ) {
       const specifier = node.moduleSpecifier.text;
+      if (
+        isVerifierAuthorityModule(specifier) &&
+        (!verifierAuthorityImporters.has(path) || ts.isExportDeclaration(node))
+      ) {
+        violations.push(
+          "internal verifier authority module outside trusted implementation",
+        );
+      }
       if (
         isCommercialProviderSpecifier(specifier) &&
         !isApprovedSandboxRuntimeImport(path, specifier)
@@ -1296,7 +2481,26 @@ const inspectTypeScript = (
     }
 
     if (ts.isCallExpression(node)) {
-      const specifier = moduleSpecifierFromCall(node);
+      const isRuntimeImport =
+        node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        loaderKind(node.expression) === "require";
+      const specifier = isRuntimeImport
+        ? resolveModule(node.arguments[0])
+        : moduleSpecifierFromCall(node);
+      if (isRuntimeImport && specifier === undefined && !isReviewedDomHarness) {
+        violations.push(
+          "unresolved runtime module import requires explicit review",
+        );
+      }
+      if (
+        specifier &&
+        isVerifierAuthorityModule(specifier) &&
+        !verifierAuthorityImporters.has(path)
+      ) {
+        violations.push(
+          "internal verifier authority runtime import outside trusted implementation",
+        );
+      }
       if (specifier) {
         if (
           isCommercialProviderSpecifier(specifier) &&
@@ -1312,6 +2516,24 @@ const inspectTypeScript = (
           );
         }
       }
+    }
+
+    if (
+      (ts.isIdentifier(node) || ts.isStringLiteral(node)) &&
+      verifierAuthorityPrimitives.has(node.text) &&
+      !verifierAuthorityImporters.has(path) &&
+      path !==
+        "packages/integrations/src/expert-residency/verified-event-internal.ts"
+    ) {
+      violations.push(
+        "internal verifier primitive exposed outside trusted implementation",
+      );
+    }
+    if (
+      ts.isExportSpecifier(node) &&
+      verifierAuthorityPrimitives.has((node.propertyName ?? node.name).text)
+    ) {
+      violations.push("internal verifier primitive re-export");
     }
 
     if (path.startsWith("apps/api/")) {
@@ -1385,7 +2607,8 @@ const inspectTypeScript = (
         ...content.matchAll(/https?:\/\/[^\s"'`]+/gu),
       ].map((match) => match[0]);
       const approvedYooKassaCall =
-        path === "packages/integrations/src/yookassa/client.ts" &&
+        (path === "packages/integrations/src/yookassa/client.ts" ||
+          path === "packages/integrations/src/yookassa/held-onboarding.ts") &&
         ((target !== undefined &&
           target.startsWith("https://api.yookassa.ru/v3/")) ||
           (content.includes('const ORIGIN = "https://api.yookassa.ru"') &&
@@ -1655,7 +2878,8 @@ export const classifyApprovedTrackedScopeContent = ({
     approvedPaymentBoundaryHashes.get(path) ??
     approvedMigrationHashes.get(path) ??
     approvedPackageManifestHashes.get(path) ??
-    approvedAutomationArtifactHashes.get(path);
+    approvedAutomationArtifactHashes.get(path) ??
+    reviewedDomHarnessHashes.get(path);
   if (!expectedHash) {
     if (isPackageManifest) return ["unapproved package manifest artifact path"];
     if (isMigration) return ["unapproved database migration artifact path"];

@@ -900,7 +900,7 @@ describe("Telegram webhook callback boundary", () => {
           callback_query: {
             id: "callback-1",
             from: { id: 123456789 },
-            data: "ct2.safe_callback_token",
+            data: "legacy.safe_callback_token",
           },
         },
       });

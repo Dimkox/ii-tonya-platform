@@ -1,0 +1,26 @@
+{
+  "key": "expert.functional",
+  "version": 2,
+  "status": "inactive",
+  "archivalManifest": "docs/prompts/test-expert-source-manifest.json",
+  "ruleVersion": "expert_energy_start_v2",
+  "assets": [
+    {
+      "path": "docs/prompts/residency-offer-v2-shared.md",
+      "sha256": "a6ca6f0fa61700794100fe8a388e220e3df96947f89345c883cb6eb35dd8c594"
+    },
+    {
+      "path": "docs/prompts/demo_access_test_expert.md",
+      "sha256": "e2d201dad65507f4e7ce6b356acef30c962e506fa2e585daee97383d3da3d8b3"
+    },
+    {
+      "path": "docs/prompts/work_expert_residency_v2.md",
+      "sha256": "b5e9067e81082069c3edca15184680b96ab85670995589edcc10d851b2a827e3"
+    }
+  ],
+  "activationRequirements": [
+    "approved_prompt_copy",
+    "official_selarti_contract",
+    "provider_activation_gate"
+  ]
+}

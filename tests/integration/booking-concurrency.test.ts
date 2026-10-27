@@ -12,6 +12,39 @@ import {
 
 let testDb: TestDatabase;
 
+// Provider identity is explicit in booking fixtures; production validation stays on.
+async function mapReservation(reservationId: string) {
+  const previous = (
+    await testDb.db.execute<{ observedAt: string | null }>(sql`
+      select s.observed_at as "observedAt" from slots s
+      join reservations r on r.slot_id=s.id where r.id=${reservationId}::uuid
+    `)
+  ).rows[0]!;
+  await testDb.db.execute(
+    sql`update slots set provider='planerka' where id=(select slot_id from reservations where id=${reservationId}::uuid)`,
+  );
+  await testDb.db
+    .execute(sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at)
+    select expert_service_id,1,(select count(*)::integer+1 from planerka_service_mappings),60,'UTC',true,clock_timestamp() from reservations where id=${reservationId}::uuid
+    on conflict(expert_service_id) do nothing`);
+  // Mapping writes invalidate observations. Model the independent synthetic
+  // refresh at this fixture's historical clock, without changing production gates.
+  await testDb.db.execute(sql`
+    update slots set observed_at=${previous.observedAt}::timestamptz
+    where id=(select slot_id from reservations where id=${reservationId}::uuid)
+  `);
+}
+
+// Historical read/terminal-transition fixtures need a bound provider fact.
+// These fixtures do not exercise creation; the workflow suite does.
+async function seedHistoricalProviderFact(reservationId: string) {
+  await testDb.db
+    .execute(sql`insert into planerka_booking_operations(reservation_id,account_id,event_type_id,request,request_fingerprint,starts_at,ends_at,state,provider_uid)
+    select r.id,1,1,'{}'::jsonb,repeat('0',64),s.starts_at,s.ends_at,'booked','fixture_'||r.id::text
+    from reservations r join slots s on s.id=r.slot_id where r.id=${reservationId}::uuid
+    on conflict(reservation_id) do update set state='booked',provider_uid=excluded.provider_uid`);
+}
+
 beforeAll(async () => {
   testDb = await startTestPostgres();
   await testDb.migrate();
@@ -144,14 +177,14 @@ describe("booking transaction", () => {
     ).toBe(1);
     expect(
       await testDb.outboxCountForCorrelation(retried.command.correlationId),
-    ).toBe(2);
+    ).toBe(1);
     expect(
       (
         await testDb.outboxDeliveriesForCorrelation(
           retried.command.correlationId,
         )
       ).map((delivery) => delivery.topic),
-    ).toEqual(["planerka.reserve", "telegram.reservation_request"]);
+    ).toEqual(["telegram.reservation_request"]);
 
     const exhausted = await testDb.createReservableFixture();
     await testDb.installSerializationFailureTrigger(
@@ -187,6 +220,7 @@ describe("booking transaction", () => {
       reservationId: first.reservationId,
     });
 
+    await mapReservation(first.reservationId);
     await expect(
       repo.transition({
         reservationId: first.reservationId,
@@ -196,7 +230,7 @@ describe("booking transaction", () => {
         now: new Date("2026-07-28T10:01:00.000Z"),
         correlationId: "confirm-1",
       }),
-    ).resolves.toMatchObject({ status: "booked", version: 2 });
+    ).resolves.toMatchObject({ status: "reserved", version: 2 });
 
     await expect(
       repo.transition({
@@ -209,31 +243,10 @@ describe("booking transaction", () => {
       }),
     ).rejects.toThrow("Stale reservation version");
     expect(await testDb.auditCountForCorrelation("confirm-1")).toBe(1);
-    expect(await testDb.outboxCountForCorrelation("confirm-1")).toBe(2);
-    expect(await testDb.outboxDeliveriesForCorrelation("confirm-1")).toEqual([
-      expect.objectContaining({
-        idempotencyKey: `${first.reservationId}:2:client.booking_confirmed`,
-        topic: "client.booking_confirmed",
-        correlationId: "confirm-1",
-        reconciliationKey: "booking:confirm-1",
-        payload: expect.objectContaining({
-          reservationId: first.reservationId,
-          version: 2,
-          charge: 0,
-        }),
-      }),
-      expect.objectContaining({
-        idempotencyKey: `${first.reservationId}:2:planerka.confirm`,
-        topic: "planerka.confirm",
-        correlationId: "confirm-1",
-        reconciliationKey: "booking:confirm-1",
-        payload: expect.objectContaining({
-          reservationId: first.reservationId,
-          version: 2,
-          charge: 0,
-        }),
-      }),
-    ]);
+    expect(await testDb.outboxCountForCorrelation("confirm-1")).toBe(0);
+    expect(await testDb.outboxDeliveriesForCorrelation("confirm-1")).toEqual(
+      [],
+    );
   });
 
   it("rejects sequential and concurrent reuse of an idempotency key for another selection", async () => {
@@ -340,7 +353,7 @@ describe("booking transaction", () => {
       (await testDb.outboxDeliveriesForCorrelation("client-cancelled")).map(
         (delivery) => delivery.topic,
       ),
-    ).toEqual(["planerka.cancel", "telegram.booking_cancelled"]);
+    ).toEqual(["telegram.booking_cancelled"]);
 
     const expiryFixture = await testDb.createReservableFixture();
     const expiring = await repo.reserve(expiryFixture.command);
@@ -361,11 +374,7 @@ describe("booking transaction", () => {
       (await testDb.outboxDeliveriesForCorrelation("system-expired")).map(
         (delivery) => delivery.topic,
       ),
-    ).toEqual([
-      "client.reservation_expired",
-      "expert.reservation_expired",
-      "planerka.cancel",
-    ]);
+    ).toEqual(["client.reservation_expired", "expert.reservation_expired"]);
   });
 
   it("fails closed for completion and no-show actors and audits authorized actions", async () => {
@@ -379,6 +388,7 @@ describe("booking transaction", () => {
     ) => {
       const reserved = await repo.reserve(fixture.command);
       if (reserved.kind !== "reserved") throw new Error("Expected reservation");
+      await mapReservation(reserved.reservationId);
       await repo.transition({
         reservationId: reserved.reservationId,
         expectedVersion: 1,
@@ -387,6 +397,10 @@ describe("booking transaction", () => {
         now: new Date("2026-07-28T10:01:00.000Z"),
         correlationId,
       });
+      await seedHistoricalProviderFact(reserved.reservationId);
+      await testDb.db.execute(
+        sql`update reservations set status=\'booked\' where id=${reserved.reservationId}::uuid`,
+      );
       return reserved.reservationId;
     };
 
@@ -466,6 +480,7 @@ describe("booking transaction", () => {
       version: 3,
       expiresAt: "2026-07-28T10:05:00.000Z",
     });
+    await mapReservation(fixture.claims.reservationId);
     const repository = new PostgresBookingRepository(testDb.db);
     const command = {
       tokenHash: fixture.tokenHash,
@@ -492,7 +507,7 @@ describe("booking transaction", () => {
       repository.transitionFromTelegramCallback(command),
     ).resolves.toMatchObject({
       reservationId: fixture.claims.reservationId,
-      status: "booked",
+      status: "reserved",
       version: 4,
     });
     await expect(
@@ -505,7 +520,7 @@ describe("booking transaction", () => {
       (await testDb.outboxDeliveriesForCorrelation(command.correlationId)).map(
         (delivery) => delivery.topic,
       ),
-    ).toEqual(["client.booking_confirmed", "planerka.confirm"]);
+    ).toEqual([]);
   });
 
   it("composes eligible slot search, Telegram ownership, and an owner-scoped schedule", async () => {
@@ -716,6 +731,7 @@ describe("booking transaction", () => {
         to: new Date("2026-08-06T00:00:00.000Z"),
       });
     expect(reservedWithMeetingUrl?.[0]).not.toHaveProperty("meetingUrl");
+    await seedHistoricalProviderFact(reserved.reservationId);
     await testDb.db.execute(sql`
       update reservations
       set status = 'booked', updated_at = now()
@@ -927,11 +943,6 @@ describe("booking transaction", () => {
       expect.objectContaining({
         idempotencyKey: `${fixture.claims.reservationId}:5:client.booking_cancelled`,
         topic: "client.booking_cancelled",
-        payload: expect.objectContaining({ charge: 0, version: 5 }),
-      }),
-      expect.objectContaining({
-        idempotencyKey: `${fixture.claims.reservationId}:5:planerka.cancel`,
-        topic: "planerka.cancel",
         payload: expect.objectContaining({ charge: 0, version: 5 }),
       }),
     ]);

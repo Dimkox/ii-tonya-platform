@@ -198,6 +198,25 @@ describe("expert residency refund and reversal", () => {
         sql`select g.id,e.id as "ledgerId" from expert_referral_reward_grants g join expert_referral_ledger_entries e on e.source_id=g.id and e.entry_kind='reward_grant'`,
       )
     ).rows[0]!;
+    // The historical reservation belongs to a separate pending purchase by the
+    // inviter, not to the invitee's already-settled qualifying purchase.
+    const consumingOrderId = randomUUID();
+    await testDb!.db.execute(sql`
+      insert into expert_residency_orders(
+        id,expert_id,tariff_version_id,snapshot_display_name,price_minor,currency,
+        duration_seconds,credit_minor,cash_minor,commercial_policy_version,
+        credit_cap_bps,individual_services_enabled,group_event_limit,
+        statistics_level,support_priority,payment_deadline,provider_deadline,
+        status,idempotency_key
+      )
+      select ${consumingOrderId}::uuid,${inviter.expertId}::uuid,
+        tariff_version_id,snapshot_display_name,price_minor,currency,
+        duration_seconds,20000,price_minor-20000,commercial_policy_version,
+        credit_cap_bps,individual_services_enabled,group_event_limit,
+        statistics_level,support_priority,payment_deadline,provider_deadline,
+        'payment_pending',${randomUUID()}
+      from expert_residency_orders where id=${order.id}::uuid
+    `);
     const spendId = randomUUID();
     const reservationId = randomUUID();
     const expiryId = randomUUID();
@@ -206,7 +225,7 @@ describe("expert residency refund and reversal", () => {
         sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,original_entry_id,source_type,source_id,idempotency_key) values (${spendId}::uuid,${inviter.expertId}::uuid,'spend',-30000,${grant.ledgerId}::uuid,'test_spend',${order.id}::uuid,${randomUUID()}),(${expiryId}::uuid,${inviter.expertId}::uuid,'expiry',-10000,${grant.ledgerId}::uuid,'test_expiry',${grant.id}::uuid,${randomUUID()})`,
       );
       await tx.execute(
-        sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,order_id,source_type,source_id,idempotency_key) values (${reservationId}::uuid,${inviter.expertId}::uuid,'reservation',-20000,${order.id}::uuid,'test_reservation',${order.id}::uuid,${randomUUID()})`,
+        sql`insert into expert_referral_ledger_entries (id,expert_id,entry_kind,amount_minor,order_id,source_type,source_id,idempotency_key) values (${reservationId}::uuid,${inviter.expertId}::uuid,'reservation',-20000,${consumingOrderId}::uuid,'test_reservation',${consumingOrderId}::uuid,${randomUUID()})`,
       );
       await tx.execute(
         sql`insert into expert_referral_ledger_allocations (ledger_entry_id,reward_grant_id,expert_id,amount_minor) values (${spendId}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-30000),(${reservationId}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-20000),(${expiryId}::uuid,${grant.id}::uuid,${inviter.expertId}::uuid,-10000)`,
@@ -223,6 +242,13 @@ describe("expert residency refund and reversal", () => {
         expect.objectContaining({ debtMinor: 30000n, restoredCreditMinor: 0n }),
       ]),
     );
+    expect(
+      (
+        await testDb!.db.execute(
+          sql`select status from expert_residency_orders where id=${consumingOrderId}::uuid`,
+        )
+      ).rows,
+    ).toEqual([{ status: "failed" }]);
     expect(
       (
         await testDb!.db.execute(

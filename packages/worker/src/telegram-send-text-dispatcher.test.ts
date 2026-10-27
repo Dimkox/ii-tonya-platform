@@ -1,3 +1,8 @@
+import {
+  clientDispatchPayloadDigest,
+  type ClientDispatchAdmission,
+  type ClientDispatchAdmissionGate,
+} from "@ii-tonya/contracts";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { TransportFailure } from "@ii-tonya/integrations";
@@ -8,7 +13,22 @@ import {
   type OutboxRepository,
 } from "./outbox-runner.js";
 
-const allowAll = { allowsSend: async () => true };
+const allowAll = { consume: async () => true };
+const admissionFor = (m: OutboxMessage): ClientDispatchAdmission => ({
+  kind: "admitted",
+  outboxId: m.id,
+  topic: "telegram.send_text.v1",
+  owner: "b2-worker",
+  claimToken: m.dispatchClaimToken!,
+  attempt: m.attempt,
+  attemptId: "attempt-b2",
+  reconciliationKey: m.reconciliationKey,
+  payloadDigest: clientDispatchPayloadDigest(m.payload),
+});
+const dispatch = (
+  d: ReturnType<typeof createTelegramSendTextDispatcher>,
+  m: OutboxMessage,
+) => d.dispatch(m, admissionFor(m));
 
 const message = (payload: Record<string, unknown>): OutboxMessage => ({
   id: randomUUID(),
@@ -28,6 +48,11 @@ const payload = () => ({
   botKey: "bot-b2",
   chatId: "801",
   text: "Ответ в том же чате",
+  consentAuthority: {
+    v: 1,
+    subjectId: randomUUID(),
+    purposes: { client_messaging: { decisionId: randomUUID(), revision: "1" } },
+  },
 });
 
 describe("telegram.send_text.v1 dispatcher", () => {
@@ -37,7 +62,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
       body: { ok: true, result: { message_id: 42 } },
     }));
     const dispatcher = createTelegramSendTextDispatcher({
-      consentGate: allowAll,
+      admissionGate: allowAll,
       enabled: true,
       botKey: "bot-b2",
       sendMessageUrl: new URL(
@@ -45,7 +70,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
       ),
       transport: { request },
     });
-    await expect(dispatcher.dispatch(message(payload()))).resolves.toEqual({
+    await expect(dispatch(dispatcher, message(payload()))).resolves.toEqual({
       kind: "applied",
       providerOperationId: "42",
     });
@@ -62,7 +87,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
 
   it("maps uncertain transport completion to unknown outcome and never retries blindly", async () => {
     const dispatcher = createTelegramSendTextDispatcher({
-      consentGate: allowAll,
+      admissionGate: allowAll,
       enabled: true,
       botKey: "bot-b2",
       sendMessageUrl: new URL(
@@ -75,7 +100,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
       },
     });
     await expect(
-      dispatcher.dispatch(message(payload())),
+      dispatch(dispatcher, message(payload())),
     ).resolves.toMatchObject({
       kind: "unknown_outcome",
       reasonCode: "transport_outcome_unknown",
@@ -91,7 +116,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
         Promise<never> | Promise<{ status: number; body: unknown }>,
     ) =>
       createTelegramSendTextDispatcher({
-        consentGate: allowAll,
+        admissionGate: allowAll,
         enabled: true,
         botKey: "bot-b2",
         sendMessageUrl: new URL(
@@ -100,18 +125,35 @@ describe("telegram.send_text.v1 dispatcher", () => {
         transport: { request },
       });
     await expect(
-      make(async () => ({ status: 429, body: {} })).dispatch(
+      dispatch(
+        make(async () => ({
+          status: 429,
+          body: { ok: false, error_code: 429, parameters: { retry_after: 1 } },
+        })),
         message(payload()),
       ),
     ).resolves.toEqual({
       kind: "not_applied",
       retryable: true,
       reasonCode: "rate_limited",
+      retryAfterMs: 1000,
     });
     await expect(
-      make(async () => {
-        throw new TransportFailure("before_write");
-      }).dispatch(message(payload())),
+      dispatch(
+        make(async () => ({ status: 429, body: {} })),
+        message(payload()),
+      ),
+    ).resolves.toMatchObject({
+      kind: "unknown_outcome",
+      reasonCode: "transport_outcome_unknown",
+    });
+    await expect(
+      dispatch(
+        make(async () => {
+          throw new TransportFailure("before_write");
+        }),
+        message(payload()),
+      ),
     ).resolves.toEqual({
       kind: "not_applied",
       retryable: true,
@@ -122,7 +164,7 @@ describe("telegram.send_text.v1 dispatcher", () => {
   it("is disabled without transport and rejects token or URL authority in payload", async () => {
     const request = vi.fn();
     const dispatcher = createTelegramSendTextDispatcher({
-      consentGate: allowAll,
+      admissionGate: allowAll,
       enabled: false,
       botKey: "bot-b2",
       sendMessageUrl: new URL(
@@ -131,14 +173,14 @@ describe("telegram.send_text.v1 dispatcher", () => {
       transport: { request },
     });
     await expect(
-      dispatcher.dispatch(message(payload())),
+      dispatch(dispatcher, message(payload())),
     ).resolves.toMatchObject({
       kind: "not_applied",
       retryable: true,
     });
     expect(request).not.toHaveBeenCalled();
     const enabled = createTelegramSendTextDispatcher({
-      consentGate: allowAll,
+      admissionGate: allowAll,
       ...dispatcherDeps(request),
       enabled: true,
     });
@@ -162,11 +204,11 @@ describe("telegram.send_text.v1 dispatcher", () => {
       recoverExpiredReconciliationLeases: vi.fn(async () => 0),
       claimUnknown: vi.fn(async () => []),
       claim: vi.fn(async () => [pending]),
-      recordAttemptStarted: vi.fn(async () => undefined),
+      recordAttemptStarted: vi.fn(async () => admissionFor(pending)),
       markUnknownOutcome,
     } as unknown as OutboxRepository;
     const dispatcher = createTelegramSendTextDispatcher({
-      consentGate: allowAll,
+      admissionGate: allowAll,
       ...dispatcherDeps(async () => {
         throw new TransportFailure("after_write");
       }),
@@ -207,9 +249,9 @@ function dispatcherDeps(
   };
 }
 
-describe("pre-send consent re-check (EGRESS-01)", () => {
+describe("durable admission receipt consumption", () => {
   const build = (
-    gate: { allowsSend(dialogueId: string): Promise<boolean> },
+    gate: ClientDispatchAdmissionGate,
     body: () => Record<string, unknown> = payload,
   ) => {
     const request = vi.fn(async () => ({
@@ -221,14 +263,14 @@ describe("pre-send consent re-check (EGRESS-01)", () => {
       botKey: "bot-b2",
       sendMessageUrl: new URL("https://api.telegram.example/bot/sendMessage"),
       transport: { request } as never,
-      consentGate: gate,
+      admissionGate: gate,
     });
-    const send = () => dispatcher.dispatch(message(body()) as never);
+    const send = () => dispatch(dispatcher, message(body()));
     return { request, send };
   };
 
-  it("refuses the network call when the consent stopped being valid", async () => {
-    const { request, send } = build({ allowsSend: async () => false });
+  it("refuses the network call when receipt consumption is denied", async () => {
+    const { request, send } = build({ consume: async () => false });
     await expect(send()).resolves.toEqual({
       kind: "terminal",
       reasonCode: "local_source_invalid",
@@ -239,8 +281,8 @@ describe("pre-send consent re-check (EGRESS-01)", () => {
   it("asks about the dialogue of the message, not about the chat", async () => {
     const asked: string[] = [];
     const { request, send } = build({
-      allowsSend: async (dialogueId: string) => {
-        asked.push(dialogueId);
+      consume: async (message) => {
+        asked.push((message.payload as { dialogueId: string }).dialogueId);
         return true;
       },
     });
@@ -252,7 +294,7 @@ describe("pre-send consent re-check (EGRESS-01)", () => {
 
   it("treats a failing check as no consent", async () => {
     const { request, send } = build({
-      allowsSend: async () => {
+      consume: async () => {
         throw new Error("connection reset");
       },
     });

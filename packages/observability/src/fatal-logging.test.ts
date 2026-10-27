@@ -65,14 +65,15 @@ describe("fatal process logging", () => {
     const line = Buffer.concat(chunks).toString("utf8");
 
     expect(exit).toHaveBeenCalledWith(1);
-    // Смысл хелпера: стек уходит в журнал, а не в stderr, и по дороге лишённый секретов.
-    expect(line).toContain("connect failed for postgres://");
+    expect(line).not.toContain("connect failed for postgres://");
+    expect(line).toContain('"event":"process_fatal"');
+    expect(line).toContain('"failureClass":"internal_error"');
     expect(line).toContain("uncaughtException");
     expect(line).not.toContain("Sup3rSecret");
     expect(line).not.toContain("kk_7Td9mQz2LpXvN4sYbR8cE1uHwA6iO3gF");
   });
 
-  it("treats a non-Error rejection reason as text and still exits", async () => {
+  it("drops a non-Error rejection reason and still exits", async () => {
     const target = fakeTarget();
     const exit = vi.fn();
     const onFatal = vi.fn();
@@ -93,7 +94,46 @@ describe("fatal process logging", () => {
       expect.any(String),
       "unhandledRejection",
     );
-    expect(line).toContain("boom");
+    expect(line).not.toContain("boom");
+    expect(line).toContain('"fatal":"unhandledRejection"');
     expect(line).not.toContain("plainsecretvalue");
+  });
+
+  it("does not invoke arbitrary rejection coercion or getters and retains exit on diagnostics failure", async () => {
+    const target = fakeTarget();
+    const exit = vi.fn();
+    const invoked = vi.fn(() => {
+      throw new Error("private canary");
+    });
+    const logger = createLogger(new PassThrough());
+    const reason = {
+      toString: invoked,
+      toJSON: invoked,
+      get code() {
+        return invoked();
+      },
+    };
+    const uninstall = installFatalProcessLogging({ logger, exit }, target);
+    expect(() => target.emit("unhandledRejection", reason)).not.toThrow();
+    expect(invoked).not.toHaveBeenCalled();
+    expect(exit).toHaveBeenCalledExactlyOnceWith(1);
+    uninstall();
+    exit.mockClear();
+    installFatalProcessLogging(
+      {
+        logger,
+        exit,
+        onFatal: () => {
+          throw new Error("private hook failure");
+        },
+      },
+      target,
+    );
+    vi.spyOn(logger, "error").mockImplementation(() => {
+      throw new Error("sink failure");
+    });
+    expect(() => target.emit("uncaughtException", reason)).not.toThrow();
+    expect(exit).toHaveBeenCalledExactlyOnceWith(1);
+    await new Promise<void>((resolve) => setImmediate(resolve));
   });
 });

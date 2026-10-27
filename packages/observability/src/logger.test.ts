@@ -1,265 +1,343 @@
 import { PassThrough } from "node:stream";
-import { describe, expect, it } from "vitest";
-import { createLogger } from "./logger.js";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createLogger,
+  sanitizeTelemetry,
+  redactProviderUrl,
+  classifyFailure,
+} from "./logger.js";
+import { httpErrorStatus, httpRetryAfter } from "./telemetry-schema.js";
 
-describe("logger redaction", () => {
-  it("removes credentials, raw bodies, profile text, and meeting links", async () => {
-    const output = new PassThrough();
-    const chunks: Buffer[] = [];
-    output.on("data", (chunk: Buffer) => chunks.push(chunk));
-    createLogger(output).info(
-      {
-        authorization: "Bearer __PLACEHOLDER_TEST_AUTH_TOKEN__",
-        rawBody: "private message",
-        clientProfile: { goals: "private" },
-        meetingUrl: "https://meeting.invalid/private",
-        providerUrl:
-          "https://api.telegram.org/bot__PLACEHOLDER_TELEGRAM_BOT_TOKEN__/sendMessage",
-        correlationId: "corr-1",
+const canary = "ordinary personal prose about my appointment";
+async function capture(
+  write: (logger: ReturnType<typeof createLogger>) => void,
+) {
+  const output = new PassThrough();
+  const chunks: Buffer[] = [];
+  output.on("data", (chunk: Buffer) => chunks.push(chunk));
+  write(createLogger(output));
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  return Buffer.concat(chunks).toString("utf8");
+}
+const records = (text: string): Record<string, unknown>[] =>
+  text
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
+
+describe("content-free logger boundary", () => {
+  it("reads HTTP protocol metadata without getters, inherited fields or coercion", () => {
+    const invoked = vi.fn(() => {
+      throw new Error(canary);
+    });
+    const hostile = {
+      get status() {
+        return invoked();
       },
-      "request",
+      get statusCode() {
+        return invoked();
+      },
+      get headers() {
+        return invoked();
+      },
+      toString: invoked,
+    };
+    const proxy = new Proxy(
+      {},
+      { get: invoked, getOwnPropertyDescriptor: invoked },
     );
-    await new Promise((resolve) => output.once("data", resolve));
-    const line = Buffer.concat(chunks).toString("utf8");
-    expect(line).not.toContain("__PLACEHOLDER_TEST_AUTH_TOKEN__");
-    expect(line).not.toContain("private message");
-    expect(line).not.toContain("meeting.invalid");
-    expect(line).not.toContain("__PLACEHOLDER_TELEGRAM_BOT_TOKEN__");
-    expect(line).toContain("/bot[REDACTED]/sendMessage");
-    expect(line).toContain("corr-1");
-  });
-
-  it("recursively sanitizes nested provider, conversation, contact, URL, and token fields", async () => {
-    const output = new PassThrough();
-    const chunks: Buffer[] = [];
-    output.on("data", (chunk: Buffer) => chunks.push(chunk));
-    createLogger(output).info({
-      envelope: {
-        providerPayload: {
-          nested: {
-            token: "nested-secret",
-            text: "private conversation",
-            contact: { email: "private@example.invalid" },
-            url: "https://private.invalid",
+    for (const error of [
+      hostile,
+      proxy,
+      { status: "422", statusCode: NaN },
+      { status: 600, statusCode: 499.5 },
+      Object.create({ status: 422, headers: { "retry-after": "3" } }),
+    ]) {
+      expect(httpErrorStatus(error, 401, true)).toBe(401);
+      expect(httpErrorStatus(error, 200, false)).toBe(500);
+      expect(httpRetryAfter(error)).toBeUndefined();
+    }
+    expect(
+      httpRetryAfter({
+        headers: {
+          get "retry-after"() {
+            return invoked();
           },
         },
-        safe: {
-          correlationId: "corr-nested",
-          providerUrl: "https://api.telegram.org/botVERY_SECRET/sendMessage",
-        },
-      },
-    });
-    await new Promise((resolve) => output.once("data", resolve));
-    const line = Buffer.concat(chunks).toString("utf8");
-    for (const secret of [
-      "nested-secret",
-      "private conversation",
-      "private@example.invalid",
-      "https://private.invalid",
-      "VERY_SECRET",
-    ])
-      expect(line).not.toContain(secret);
-    expect(line).toContain("corr-nested");
-    expect(line).toContain("/bot[REDACTED]/sendMessage");
-  });
-
-  it("removes every client-session credential field and nested cause before the sink", async () => {
-    const output = new PassThrough();
-    const chunks: Buffer[] = [];
-    output.on("data", (chunk: Buffer) => chunks.push(chunk));
-    createLogger(output).error({
-      request: {
-        identityProof: "proof-sentinel-never-log",
-        rawHeaders: ["Authorization", "Bearer cs1.session-sentinel-never-log"],
-      },
-      verifierOutput: {
-        replayDigest: "hmac-sha256:v1:replay-sentinel-never-log",
-        tokenHash: "sha256:hash-sentinel-never-log",
-      },
-      error: { cause: "nested-cause-sentinel-never-log" },
-    });
-    await new Promise((resolve) => output.once("data", resolve));
-    const line = Buffer.concat(chunks).toString("utf8");
-    for (const sentinel of [
-      "proof-sentinel-never-log",
-      "session-sentinel-never-log",
-      "replay-sentinel-never-log",
-      "hash-sentinel-never-log",
-      "nested-cause-sentinel-never-log",
-    ]) {
-      expect(line).not.toContain(sentinel);
-    }
-  });
-
-  const collect = async (
-    write: (logger: ReturnType<typeof createLogger>) => void,
-  ): Promise<string> => {
-    const output = new PassThrough();
-    const chunks: Buffer[] = [];
-    output.on("data", (chunk: Buffer) => chunks.push(chunk));
-    write(createLogger(output));
-    await new Promise((resolve) => output.once("data", resolve));
-    return Buffer.concat(chunks).toString("utf8");
-  };
-
-  it("redacts a bare Telegram bot token that is not inside a /bot…/ URL", async () => {
-    const line = await collect((logger) =>
-      logger.info(
-        "telegram getMe failed for 123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw",
-      ),
-    );
-    expect(line).not.toContain("AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw");
-    expect(line).not.toContain("123456789:AAH");
-    expect(line).toContain("telegram getMe failed");
-  });
-
-  it("redacts provider key-shaped secrets appearing in message text", async () => {
-    const line = await collect((logger) =>
-      logger.info(
-        "rejected planerka key sk_live_51H8qWxLe9RtAbCdEfGh and selarti sk_test_9ZmNpQrStUvWxYz",
-      ),
-    );
-    expect(line).not.toContain("sk_live_51H8qWxLe9RtAbCdEfGh");
-    expect(line).not.toContain("sk_test_9ZmNpQrStUvWxYz");
-    expect(line).toContain("rejected");
-  });
-
-  it("redacts credential-bearing object keys that the old list missed", async () => {
-    const line = await collect((logger) =>
-      logger.info({
-        envelope: {
-          apiKey: "apikey-sentinel-never-log",
-          password: "password-sentinel-never-log",
-          credential: "credential-sentinel-never-log",
-          secretKey: "secretkey-sentinel-never-log",
-          signingKey: "signingkey-sentinel-never-log",
-        },
       }),
-    );
-    for (const sentinel of [
-      "apikey-sentinel-never-log",
-      "password-sentinel-never-log",
-      "credential-sentinel-never-log",
-      "secretkey-sentinel-never-log",
-      "signingkey-sentinel-never-log",
-    ]) {
-      expect(line).not.toContain(sentinel);
-    }
+    ).toBeUndefined();
+    expect(
+      httpRetryAfter({ headers: { "retry-after": { toString: invoked } } }),
+    ).toBeUndefined();
+    expect(httpErrorStatus({}, 302)).toBe(500);
+    expect(invoked).not.toHaveBeenCalled();
   });
-
-  it("redacts the client telegram bot key because it authenticates the webhook", async () => {
-    const line = await collect((logger) =>
-      logger.info(
-        {
-          botKey: "botkey-sentinel-never-log",
-          bot_key: "bot-key-sentinel-never-log",
-        },
-        "client ingress",
-      ),
-    );
-    expect(line).not.toContain("botkey-sentinel-never-log");
-    expect(line).not.toContain("bot-key-sentinel-never-log");
-    expect(line).toContain("client ingress");
+  it("allows finite child context independently of the event payload schema", async () => {
+    const output = await capture((logger) => {
+      logger
+        .child({
+          module: "api",
+          provider: "telegram",
+          operation: "answerCallbackQuery",
+          detail: canary,
+        })
+        .info({
+          event: "public_catalog_failure",
+          reason: "busy",
+          module: "worker",
+          provider: "selarti",
+          detail: canary,
+        });
+    });
+    expect(records(output)).toEqual([
+      expect.objectContaining({
+        event: "public_catalog_failure",
+        reason: "busy",
+        module: "api",
+        provider: "telegram",
+        operation: "answerCallbackQuery",
+      }),
+    ]);
+    expect(output).not.toContain(canary);
   });
-
-  it("keeps non-secret identifier fields ending in Key observable", async () => {
-    const line = await collect((logger) =>
-      logger.info(
-        {
-          idempotencyKey: "idem-77",
-          requestKey: "rq-77",
-        },
-        "dispatch",
-      ),
-    );
-    expect(line).toContain("idem-77");
-    expect(line).toContain("rq-77");
+  it("preserves child inheritance and keeps setBindings local to its logger", async () => {
+    const line = await capture((logger) => {
+      const child = logger.child({ module: "worker" });
+      const nested = child.child({});
+      nested.setBindings({ provider: "telegram" });
+      nested.info({
+        event: "transport_failure",
+        operation: "sendMessage",
+        outcome: "unknown",
+      });
+      child.info({ event: "startup_failure", failureClass: "internal_error" });
+      logger.info({ event: "startup_failure", failureClass: "internal_error" });
+      logger
+        .child({}, { level: "silent" })
+        .child({})
+        .fatal({ event: "process_fatal" });
+    });
+    const entries = records(line);
+    expect(entries).toHaveLength(3);
+    expect(entries[0]).toMatchObject({
+      module: "worker",
+      provider: "telegram",
+    });
+    expect(entries[1]).toMatchObject({ module: "worker" });
+    expect(entries[1]).not.toHaveProperty("provider");
+    expect(entries[2]).not.toHaveProperty("module");
+    expect(entries[2]).not.toHaveProperty("provider");
   });
-
-  it("keeps a boot failure diagnosable: error name/message/stack survive, secrets scrubbed", async () => {
-    const line = await collect((logger) =>
-      logger.fatal(
-        {
-          err: new Error(
-            "connection refused to 203.0.113.9:5432 key=sk_live_aaaaaaaaaaaaaaaa",
-          ),
-        },
-        "api startup failed",
-      ),
-    );
-    expect(line).toContain("api startup failed");
-    // the reason and the error type survive...
-    expect(line).toContain("Error");
-    expect(line).toContain("connection refused");
-    expect(line).toContain("at ");
-    // ...but an embedded provider key still never reaches the log.
-    expect(line).not.toContain("sk_live_aaaaaaaaaaaaaaaa");
+  it("keeps bounded counts only on a recognized event", async () => {
+    const line = await capture((logger) => {
+      for (const count of [0, 1_000_000, -1, 0.5, 1_000_001, NaN, Infinity]) {
+        logger.info({ event: "selarti_inbound", count });
+      }
+    });
+    expect(records(line).map((record) => record.count)).toEqual([
+      0,
+      1_000_000,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
   });
-
-  it("does not throw in the log hook when an Error has non-string message/stack", async () => {
-    const err = new Error("sentinel-ok");
-    // A deserialized error (Object.assign(serializedError)) can carry non-string members.
-    Object.assign(err, { message: 42, stack: ["at", "boom"] });
-    const line = await collect((logger) =>
-      logger.fatal({ err }, "api startup failed"),
-    );
-    expect(line).toContain("api startup failed");
-    expect(line).not.toContain("sentinel-ok"); // original message overwritten by 42
-    expect(line).toContain("42");
-    expect(line).not.toContain("boom"); // array stack is skipped, not joined blindly
-  });
-
   it.each([
-    [
-      "postgres dsn creds",
-      "connect postgresql://tonya:SuPerTopSecret@db.internal:5432/app failed",
-      "SuPerTopSecret",
-    ],
-    [
-      "bearer token",
-      "upstream Authorization: Bearer abcdefghijklmnop0123456789ABCD",
-      "abcdefghijklmnop0123456789ABCD",
-    ],
-    [
-      "jwt",
-      "auth eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.qW3rT8yU accepted",
-      "eyJzdWIiOiIxMjM0NTY3ODkwIn0",
-    ],
-    ["aws key id", "aws AKIAABCDEFGHIJKLMNOP leak", "AKIAABCDEFGHIJKLMNOP"],
-    [
-      "password assignment",
-      "config password=hunter2secret rejected",
-      "hunter2secret",
-    ],
-    [
-      "json token",
-      'log {"token": "leakedtokenvalue"} done',
-      "leakedtokenvalue",
-    ],
-    ["refresh token json", 'cfg {"refresh_token":"r3freshval"}', "r3freshval"],
+    ["ECONNREFUSED", "connection_refused"],
+    ["EADDRINUSE", "address_in_use"],
+    ["ETIMEDOUT", "timeout"],
+    ["UND_ERR_CONNECT_TIMEOUT", "timeout"],
+    ["ECONNRESET", "connection_reset"],
+    ["ENOTFOUND", "dns_failure"],
+    ["EAI_AGAIN", "dns_failure"],
+    ["FST_ERR_CTP_BODY_TOO_LARGE", "body_too_large"],
+    ["FST_ERR_CTP_INVALID_JSON_BODY", "invalid_json"],
+    ["FST_ERR_VALIDATION", "invalid_request"],
+    [canary, "internal_error"],
   ])(
-    "scrubs %s appearing in free-text message",
-    async (_label, text, secret) => {
-      const line = await collect((logger) => logger.info(text));
-      expect(line).not.toContain(secret);
-      expect(line).toContain("[REDACTED]");
+    "keeps startup failure class for machine code %s",
+    async (code, failureClass) => {
+      const error = Object.assign(new Error(canary), { code });
+      const line = await capture((logger) =>
+        logger.fatal({
+          event: "startup_failure",
+          module: "api",
+          failureClass: classifyFailure(error),
+          err: error,
+        }),
+      );
+      expect(line).not.toContain(canary);
+      expect(records(line)).toEqual([
+        expect.objectContaining({
+          event: "startup_failure",
+          module: "api",
+          failureClass,
+        }),
+      ]);
     },
   );
-
-  it("keeps benign operational text intact", async () => {
-    const line = await collect((logger) =>
-      logger.info(
-        "reservationId=abc123 count=5 status=ok session token rotated for corr-9; selarti cost tokens=1234; booked time: 10:20; https://ii-tonya.ru/api/v1/reservations?city=tambov; handle bk1_AAAAAAAAAAAAAAAAAAAA",
+  it("drops_plaintext_and_dynamic_keys_but_keeps_closed_events", async () => {
+    const error = new Error(canary, { cause: canary });
+    error.name = canary;
+    error.stack = canary;
+    const reasons = [
+      "rate_limited",
+      "busy",
+      "missing_repository",
+      "deadline",
+      "repository_failure",
+      "invalid_output",
+    ];
+    const line = await capture((logger) => {
+      logger.info(canary);
+      logger.info({
+        msg: canary,
+        detail: canary,
+        [canary]: "value",
+        correlationId: canary,
+      });
+      logger.error(error);
+      logger.error({ err: error, cause: error }, "%s", canary);
+      logger.info({
+        rawBody: Buffer.from(canary),
+        body: canary,
+        headers: { authorization: canary },
+        url: canary,
+      });
+      for (const reason of reasons)
+        logger.warn({ reason }, "public_catalog_failure");
+    });
+    expect(line).not.toContain(canary);
+    expect(records(line)).toHaveLength(11);
+    expect(records(line).slice(0, 5)).toEqual(
+      Array.from({ length: 5 }, () =>
+        expect.objectContaining({ event: "telemetry_unclassified" }),
       ),
     );
-    expect(line).toContain("reservationId=abc123");
-    expect(line).toContain("count=5");
-    expect(line).toContain("status=ok");
-    expect(line).toContain("token rotated");
-    expect(line).toContain("tokens=1234"); // plural must not trip the secret matcher
-    expect(line).toContain("time: 10:20"); // a colon in prose is not a secret assignment
-    expect(line).toContain("reservations?city=tambov"); // query url without creds is fine
-    expect(line).toContain("bk1_AAAAAAAAAAAAAAAAAAAA"); // booking handle is not a secret
+    expect(
+      records(line)
+        .slice(5)
+        .map(({ event, reason }) => ({ event, reason })),
+    ).toEqual(
+      reasons.map((reason) => ({ event: "public_catalog_failure", reason })),
+    );
+  });
+
+  it("contains nested children and setBindings including hostile child options", async () => {
+    const unsafe = vi.fn(() => ({ [canary]: canary }));
+    const line = await capture((logger) => {
+      logger.setBindings({ detail: canary, module: "api" });
+      const child = logger.child(
+        { detail: canary, [canary]: canary },
+        {
+          serializers: { event: unsafe },
+          formatters: { bindings: unsafe, log: unsafe },
+        },
+      );
+      const nested = child.child(
+        { correlationId: canary },
+        { formatters: { bindings: unsafe, log: unsafe } },
+      );
+      nested.setBindings({ [canary]: canary });
+      nested.info({
+        event: "http_request_completed",
+        method: "POST",
+        statusCode: 401,
+        durationMs: 12,
+      });
+    });
+    expect(line).not.toContain(canary);
+    expect(unsafe).not.toHaveBeenCalled();
+    expect(records(line)).toEqual([
+      expect.objectContaining({
+        event: "http_request_completed",
+        module: "api",
+        method: "POST",
+        statusCode: 401,
+        durationMs: 12,
+      }),
+    ]);
+  });
+
+  it("never evaluates unknown getters, coercion, serialization or proxy traps", async () => {
+    const invoked = vi.fn(() => {
+      throw new Error(canary);
+    });
+    const hostile = {
+      get event() {
+        return invoked();
+      },
+      get detail() {
+        return invoked();
+      },
+      toJSON: invoked,
+      toString: invoked,
+    };
+    const proxy = new Proxy(
+      {},
+      { get: invoked, ownKeys: invoked, getOwnPropertyDescriptor: invoked },
+    );
+    const line = await capture((logger) => {
+      logger.info(hostile, "%s", hostile);
+      logger.info(proxy);
+      logger
+        .child(hostile, hostile as never)
+        .child(proxy)
+        .setBindings(hostile);
+      logger.error({ err: hostile });
+    });
+    expect(invoked).not.toHaveBeenCalled();
+    expect(line).not.toContain(canary);
+    expect(sanitizeTelemetry(hostile)).toEqual({
+      event: "telemetry_unclassified",
+    });
+    expect(redactProviderUrl(hostile)).toBe("[REDACTED]");
+  });
+
+  it("preserves level and silent configuration without installing unsafe options", async () => {
+    const line = await capture((logger) => {
+      logger.level = "warn";
+      logger.info(canary);
+      logger.child({}, { level: "silent" }).fatal(canary);
+      logger.child({}, { level: "debug" }).debug({
+        event: "selarti_inbound",
+        module: "api",
+        operation: "selarti.inbound",
+        outcome: "accepted",
+      });
+    });
+    expect(records(line)).toEqual([
+      expect.objectContaining({
+        level: 20,
+        event: "selarti_inbound",
+        operation: "selarti.inbound",
+        outcome: "accepted",
+      }),
+    ]);
+  });
+
+  it("rejects unknown enum values and unbounded numeric fields", async () => {
+    const line = await capture((logger) => {
+      logger.info({ event: canary, count: 1 });
+      for (const number of [NaN, Infinity, -1, Number.MAX_SAFE_INTEGER]) {
+        logger.info({
+          event: "http_request_completed",
+          method: canary,
+          statusCode: number,
+          durationMs: number,
+          count: number,
+        });
+      }
+    });
+    expect(line).not.toContain(canary);
+    for (const record of records(line)) {
+      expect(record).not.toHaveProperty("count");
+      expect(record).not.toHaveProperty("method");
+      expect(record).not.toHaveProperty("statusCode");
+      expect(record).not.toHaveProperty("durationMs");
+    }
   });
 });
 
@@ -283,10 +361,8 @@ describe("webhook path secret in free text (TRACK-05, D16)", () => {
       ),
     );
     expect(line).not.toContain("kk_7Td9mQz2LpXvN4sYbR8cE1uHwA6iO3gF");
-    expect(line).toContain("/v1/webhooks/telegram/client/[REDACTED]");
-    // Диагностика остаётся: по какой форме маршрут не найден — видно.
-    expect(line).toContain("not found");
-    expect(line).toContain("corr-1");
+    expect(line).not.toContain("/v1/webhooks/telegram/client/");
+    expect(line).not.toContain("not found");
   });
 
   it("keeps a query string out of the redaction and still scrubs its secrets", async () => {
@@ -298,21 +374,18 @@ describe("webhook path secret in free text (TRACK-05, D16)", () => {
     );
     expect(line).not.toContain("SECRETSEGMENT");
     expect(line).not.toContain("plainvalue");
-    // Ключ запроса остаётся видимым, значение вычёркано. Существующее правило
-    // secretAssignment захватывает значение до конца токена, поэтому &count=5 уходит
-    // вместе с ним - это пере-закрытие (безопасно), а не утечка; менять её здесь нечем.
-    expect(line).toContain("?token=[REDACTED]");
+    expect(line).not.toContain("?token=");
   });
 
-  it("leaves unrelated operational text alone", async () => {
+  it("also drops unrelated free text at the content-free boundary", async () => {
     const line = await capture((logger) =>
       logger.info(
         { correlationId: "corr-2" },
         "Маршрут /v1/client/sessions жив, attempts=3, limit reached, reservationId=резерв-7",
       ),
     );
-    expect(line).toContain("/v1/client/sessions");
-    expect(line).toContain("attempts=3");
-    expect(line).toContain("limit reached");
+    expect(line).not.toContain("/v1/client/sessions");
+    expect(line).not.toContain("attempts=3");
+    expect(line).not.toContain("limit reached");
   });
 });

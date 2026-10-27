@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
+import { clientDispatchPayloadDigest } from "@ii-tonya/contracts";
 import type { DrizzleDb } from "../client.js";
+import {
+  lockClientConsentSubject,
+  validateClientConsentAuthority,
+} from "./client-consent-authority.js";
 
 export type AcceptSelartiProposalCommand = {
   readonly requestId: string;
@@ -15,6 +20,10 @@ export type AcceptSelartiProposalResult =
   "accepted" | "duplicate" | "conflict" | "rejected" | "late";
 
 type RequestBinding = {
+  id: string;
+  userId: string;
+  payload: Record<string, unknown>;
+  reason: string | null;
   requestId: string;
   dialogueId: string;
   deadline: string;
@@ -43,6 +52,40 @@ export class PostgresSelartiProposalRepository {
     const receivedAt = new Date(input.receivedAt);
     if (!Number.isFinite(receivedAt.getTime())) return "rejected";
     return this.db.transaction(async (tx) => {
+      const candidate = (
+        await tx.execute<{ userId: string }>(sql`
+        select d.user_id::text as "userId" from integration_outbox o
+        left join selarti_response_proposals prior on prior.request_id=o.idempotency_key
+        join dialogues d on d.id::text=coalesce(o.payload->>'dialogueId',prior.dialogue_id::text)
+        where o.idempotency_key=${input.requestId} and o.topic='selarti.request.v1'
+      `)
+      ).rows[0];
+      if (!candidate) return "rejected";
+      await lockClientConsentSubject(tx, candidate.userId);
+      // Shared with the immutable usage writer, before any request/proposal row locks.
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${input.requestId},0))`,
+      );
+      const request = (
+        await tx.execute<RequestBinding>(sql`
+          select o.id::text as id, d.user_id::text as "userId",o.payload,
+            o.last_normalized_reason as reason,
+            o.payload->>'requestId' "requestId",o.payload->>'dialogueId' "dialogueId",
+            o.payload->>'deadline' deadline,o.payload_hash "requestPayloadHash",
+            d.tenant_key "tenantKey",d.bot_key "botKey",d.external_chat_id "chatId"
+          from integration_outbox o
+          left join selarti_response_proposals prior on prior.request_id=o.idempotency_key
+          join dialogues d on d.id::text=coalesce(o.payload->>'dialogueId',prior.dialogue_id::text)
+          where o.idempotency_key=${input.requestId} and o.reconciliation_key=${input.requestId}
+            and o.topic='selarti.request.v1' for share of o,d
+        `)
+      ).rows[0];
+      if (
+        !request ||
+        request.userId !== candidate.userId ||
+        request.tenantKey !== input.tenantKey
+      )
+        return "rejected";
       const existing = (
         await tx.execute<{
           responsePayloadHash: string;
@@ -66,31 +109,36 @@ export class PostgresSelartiProposalRepository {
           ? "duplicate"
           : "conflict";
       }
-      const request = (
-        await tx.execute<RequestBinding>(sql`
-          select
-            o.payload->>'requestId' "requestId",
-            o.payload->>'dialogueId' "dialogueId",
-            o.payload->>'deadline' deadline,
-            o.payload_hash "requestPayloadHash",
-            d.tenant_key "tenantKey",
-            d.bot_key "botKey",
-            d.external_chat_id "chatId"
-          from integration_outbox o
-          join dialogues d on d.id::text=o.payload->>'dialogueId'
-          where o.idempotency_key=${input.requestId}
-            and o.topic='selarti.request.v1'
-          for share of o,d
-        `)
-      ).rows[0];
       if (
-        !request ||
         request.requestId !== input.requestId ||
         request.dialogueId !== input.dialogueId ||
-        request.tenantKey !== input.tenantKey
-      ) {
+        request.payload.userId !== candidate.userId
+      )
         return "rejected";
-      }
+      const consentAuthority = await validateClientConsentAuthority(
+        tx,
+        request.payload.consentAuthority,
+        request.dialogueId,
+        true,
+      );
+      if (
+        !consentAuthority ||
+        consentAuthority.subjectId !== candidate.userId ||
+        typeof request.payload.text !== "string"
+      )
+        return "rejected";
+      const facts = (
+        await tx.execute<{ started: boolean; notApplied: boolean }>(sql`
+        select exists(select 1 from delivery_attempts where outbox_id=${request.id}::uuid
+          and reconciliation_key=${input.requestId} and outcome='started'
+          and normalized_reason=${clientDispatchPayloadDigest(request.payload)}) as started,
+        (exists(select 1 from test_expert_outcomes where provider_request_id=${input.requestId} and outcome='not_applied')
+          or exists(select 1 from selarti_actual_usage_facts where request_id=${input.requestId} and outcome='not_applied')) as "notApplied"
+      `)
+      ).rows[0]!;
+      if (!facts.started) return "rejected";
+      if (facts.notApplied || request.reason === "provider_not_applied")
+        return "late";
       const trialReservation = (
         await tx.execute<{
           id: string;
@@ -104,8 +152,14 @@ export class PostgresSelartiProposalRepository {
         `)
       ).rows[0];
       if (trialReservation?.status === "not_applied") return "late";
+      const now = (
+        await tx.execute<{ now: Date | string }>(
+          sql`select clock_timestamp() as now`,
+        )
+      ).rows[0]!;
+      const acceptedAt = new Date(now.now);
       const deadline = new Date(request.deadline);
-      if (!Number.isFinite(deadline.getTime()) || receivedAt > deadline)
+      if (!Number.isFinite(deadline.getTime()) || acceptedAt >= deadline)
         return "late";
       const proposal = (
         await tx.execute<{ id: string }>(sql`
@@ -115,7 +169,7 @@ export class PostgresSelartiProposalRepository {
           ) values(
             ${input.requestId},${input.dialogueId}::uuid,${input.tenantKey},
             ${request.requestPayloadHash},${input.responsePayloadHash},${input.text},
-            ${receivedAt}::timestamptz,${receivedAt}::timestamptz+interval '30 days'
+            ${acceptedAt}::timestamptz,${acceptedAt}::timestamptz+interval '30 days'
           )
           on conflict(request_id) do nothing
           returning id
@@ -155,6 +209,7 @@ export class PostgresSelartiProposalRepository {
         botKey: request.botKey,
         chatId: request.chatId,
         text: input.text,
+        consentAuthority,
       };
       const payloadHash = createHash("sha256")
         .update(JSON.stringify(payload))

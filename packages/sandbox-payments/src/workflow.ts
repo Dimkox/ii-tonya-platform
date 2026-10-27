@@ -65,38 +65,40 @@ export class SandboxTransitionWorkflow {
       },
       nonce: command.nonce,
     } as const;
-    return withSerializableRetry(() =>
-      this.db.transaction(async (tx) => {
-        await tx.execute(sql`set transaction isolation level serializable`);
-        const consumed = await this.approvals.consumeApprovalInTransaction(
-          tx,
-          approvalInput,
-        );
-        const replay = consumed
-          ? null
-          : await this.approvals.validateConsumedApprovalReplayInTransaction(
-              tx,
-              approvalInput,
-            );
-        if (!consumed && !replay)
-          return { allowed: false, reasonCode: "approval_denied" } as const;
-        const result = await this.payments.transitionInTransaction(tx, {
-          paymentId: command.paymentId,
-          transition,
-          expectedVersion: command.expectedVersion,
-          idempotencyKey: command.idempotencyKey,
-          correlationId: command.correlationId,
-        });
-        if (consumed)
-          await tx.execute(
-            sql`insert into audit_events (actor_type,actor_id,authenticated_session_id_hash,action,object_type,object_id,decision,reason_code,correlation_id,occurred_at,metadata_hash) values ('admin',${consumed.requesterId}::uuid,${command.sessionIdHash},${command.action},'sandbox_expert_residency_payment',${objectId}::uuid,'allowed','approved_sandbox_transition',${command.correlationId},transaction_timestamp(),${digest(`${command.approvalId}:${command.action}:${command.paymentId}:${command.expectedVersion}:${command.idempotencyKey}`)})`,
+    return withSerializableRetry(
+      () =>
+        this.db.transaction(async (tx) => {
+          await tx.execute(sql`set transaction isolation level serializable`);
+          const consumed = await this.approvals.consumeApprovalInTransaction(
+            tx,
+            approvalInput,
           );
-        return {
-          allowed: true,
-          replayed: !consumed || result.replayed,
-          event: result.event,
-        } as const;
-      }),
+          const replay = consumed
+            ? null
+            : await this.approvals.validateConsumedApprovalReplayInTransaction(
+                tx,
+                approvalInput,
+              );
+          if (!consumed && !replay)
+            return { allowed: false, reasonCode: "approval_denied" } as const;
+          const result = await this.payments.transitionInTransaction(tx, {
+            paymentId: command.paymentId,
+            transition,
+            expectedVersion: command.expectedVersion,
+            idempotencyKey: command.idempotencyKey,
+            correlationId: command.correlationId,
+          });
+          if (consumed)
+            await tx.execute(
+              sql`insert into audit_events (actor_type,actor_id,authenticated_session_id_hash,action,object_type,object_id,decision,reason_code,correlation_id,occurred_at,metadata_hash) values ('admin',${consumed.requesterId}::uuid,${command.sessionIdHash},${command.action},'sandbox_expert_residency_payment',${objectId}::uuid,'allowed','approved_sandbox_transition',${command.correlationId},transaction_timestamp(),${digest(`${command.approvalId}:${command.action}:${command.paymentId}:${command.expectedVersion}:${command.idempotencyKey}`)})`,
+            );
+          return {
+            allowed: true,
+            replayed: !consumed || result.replayed,
+            event: result.event,
+          } as const;
+        }),
+      8,
     );
   }
 }

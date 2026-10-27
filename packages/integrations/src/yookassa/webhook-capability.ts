@@ -12,7 +12,7 @@ type OperationLookup = Pick<
 >;
 type AuthoritativeVerifier = Pick<
   YooKassaPaymentVerifier,
-  "verifyPayment" | "verifyRefund"
+  "verifyPayment" | "verifyRefund" | "verifyWaitingForCapture"
 >;
 
 export class YooKassaWebhookCapability {
@@ -34,6 +34,10 @@ export class YooKassaWebhookCapability {
     );
     if (operation === null)
       throw new Error("yookassa_webhook_binding_not_found");
+    if (notification.event === "payment.waiting_for_capture") {
+      await this.verifier.verifyWaitingForCapture(operation);
+      return null;
+    }
     if (
       operation.status === "failed" ||
       (notification.event !== "payment.canceled" &&
@@ -73,7 +77,10 @@ export class YooKassaWebhookCapability {
   }
 
   async resolveSucceeded(notification: YooKassaNotification): Promise<void> {
-    if (notification.event === "payment.canceled") {
+    if (
+      notification.event === "payment.canceled" ||
+      notification.event === "payment.waiting_for_capture"
+    ) {
       throw new Error("yookassa_webhook_binding_mismatch");
     }
     const kind: YooKassaOperationKind =

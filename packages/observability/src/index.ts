@@ -1,4 +1,9 @@
 export {
+  classifyFailure,
+  httpErrorStatus,
+  httpRetryAfter,
+} from "./telemetry-schema.js";
+export {
   createLogger,
   redactProviderUrl,
   sanitizeTelemetry,
@@ -37,3 +42,8 @@ export {
   shutdownTelemetry,
   traced,
 } from "./tracing.js";
+
+export {
+  createSecurityEvent,
+  type TelegramSecurityReason,
+} from "./security-event.js";

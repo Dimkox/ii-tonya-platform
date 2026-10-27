@@ -108,31 +108,33 @@ describe("native dedicated-server production release", () => {
     expect(script).not.toMatch(
       /docker|compose|API_IMAGE_REF|WORKER_IMAGE_REF/u,
     );
-    expect(script).toContain("releases/$RELEASE_SHA");
+    expect(script).toContain("releases/$release_sha");
     expect(script).toContain("sha256sum -c");
     expect(script).toContain("cosign verify-blob");
     expect(script).toContain(
       'bash "$release_dir/scripts/validate-runtime-env.sh" /etc/ii-tonya/runtime.env "$release_sha"',
     );
-    expect(script).toContain("systemctl restart ii-tonya-api.service");
-    expect(script).toContain("systemctl restart ii-tonya-worker.service");
+    expect(script).toContain("ctl start ii-tonya-api.service --no-block");
+    expect(script).toContain("ctl start ii-tonya-worker.service --no-block");
     expect(script).toContain("rollback)");
     expect(script).toContain("readlink");
-    expect(
-      script.split('install_release_units "$deploy_root/$previous"').length - 1,
-    ).toBe(2);
-    expect(script.match(/systemctl daemon-reload/gu)).toHaveLength(3);
-    expect(script.indexOf("trap rollback_on_error ERR")).toBeLessThan(
+    expect(script).toContain('install_release_units "$deploy_root/$previous"');
+    expect(script).toContain("ctl daemon-reload");
+    expect(script.indexOf("trap 'recover \"$?\"' ERR")).toBeLessThan(
       script.indexOf('install_release_units "$release_dir"'),
     );
-    expect(script).toContain('unit_install_started="true"');
-    expect(script).toContain('symlink_switched="true"');
-    expect(script).toContain('find "$release_dir" -mindepth 1 -delete');
+    expect(script).toContain("unit_install_started=true");
+    expect(script).toContain('select_release "$target"');
+    expect(script).not.toContain('find "$release_dir" -mindepth 1 -delete');
     expect(script).toContain('find "$incoming" -mindepth 1 -delete');
-    expect(script).toContain('if [[ -z "$previous" ]]');
+    expect(script).toContain('if [[ -n "$previous" ]]');
     expect(script).toContain('rm -f "$deploy_root/current"');
-    expect(script).toContain("rm -f /etc/systemd/system/ii-tonya-api.service");
-    expect(script).toContain("systemctl disable ii-tonya-api.service");
+    expect(script).toContain(
+      'rm -f "/etc/systemd/system/ii-tonya-$unit.service"',
+    );
+    expect(script).toContain('ctl disable "ii-tonya-$unit.service"');
+    expect(script).toContain("flock -w 10 9");
+    expect(script).toContain(".deployment-in-progress");
   });
 
   it("preserves interactive root password access without storing the password", () => {
@@ -170,25 +172,43 @@ describe("native dedicated-server production release", () => {
       expect(unit).toContain("ProtectSystem=strict");
       expect(unit).not.toMatch(/pnpm|docker|compose/u);
     }
-    expect(api).toContain(
-      "ExecStart=/usr/bin/node --jitless api/dist/server.js",
-    );
-    expect(worker).toContain(
-      "ExecStart=/usr/bin/node --jitless worker/dist/main.js",
-    );
+    expect(api).toContain("ExecStart=/usr/bin/node api/dist/server.js");
+    expect(worker).toContain("ExecStart=/usr/bin/node worker/dist/main.js");
   });
 
-  it("keeps Node compatible with W^X hardening and creates writable state paths", () => {
+  it("allows HTTP runtime executable memory while retaining migration W^X hardening", () => {
     const api = read("deploy/systemd/ii-tonya-api.service");
     const worker = read("deploy/systemd/ii-tonya-worker.service");
     const migrate = read("deploy/systemd/ii-tonya-migrate.service");
 
     for (const unit of [api, worker, migrate]) {
-      expect(unit).toContain("MemoryDenyWriteExecute=true");
       expect(unit).not.toContain("Environment=NODE_OPTIONS=");
-      expect(unit).toContain("ExecStart=/usr/bin/node --jitless");
+      expect(unit).toContain("User=ii_tonya");
+      expect(unit).toContain("Group=ii_tonya");
+      expect(unit).toContain("NoNewPrivileges=true");
+      expect(unit).toContain("PrivateTmp=true");
+      expect(unit).toContain("ProtectSystem=strict");
+      expect(unit).toContain("ProtectHome=true");
+      expect(unit).toContain("ProtectKernelTunables=true");
+      expect(unit).toContain("ProtectKernelModules=true");
+      expect(unit).toContain("ProtectControlGroups=true");
+      expect(unit).toContain("RestrictSUIDSGID=true");
+      expect(unit).toContain("LockPersonality=true");
+      expect(unit).toMatch(/^CapabilityBoundingSet=$/mu);
     }
+    expect(migrate).toContain("MemoryDenyWriteExecute=true");
+    expect(migrate).toContain(
+      "ExecStart=/usr/bin/node --jitless migrate-native.mjs",
+    );
     for (const unit of [api, worker]) {
+      expect(unit).toContain("MemoryDenyWriteExecute=false");
+      expect(unit).not.toContain("--jitless");
+      expect(unit).not.toContain("MemoryDenyWriteExecute=true");
+      expect(unit).toContain("Restart=on-failure");
+      expect(unit).toContain("RestartSec=5s");
+      expect(unit).toContain(
+        "ReadWritePaths=/var/lib/ii-tonya /var/log/ii-tonya",
+      );
       expect(unit).toContain("StateDirectory=ii-tonya");
       expect(unit).toContain("StateDirectoryMode=0750");
       expect(unit).toContain("LogsDirectory=ii-tonya");

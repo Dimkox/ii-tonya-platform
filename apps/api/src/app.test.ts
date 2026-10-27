@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import Fastify, { type FastifyReply } from "fastify";
 import { buildTestApp } from "./app.js";
 import { createExpertBearerPrincipalResolver } from "./expert-principal-resolver.js";
 import type { ExpertReferralApiDependencies } from "./routes/expert-referral.js";
@@ -82,6 +83,52 @@ const testExpertApi = (
 });
 
 describe("API boundary", () => {
+  describe.each([false, true])(
+    "error status differential (async=%s)",
+    (asynchronous) => {
+      it.each([
+        [undefined, 503],
+        [200, 422],
+        [429, 422],
+      ] as const)(
+        "matches installed Fastify with selected status %s",
+        async (selected, expected) => {
+          const reference = Fastify({ logger: false });
+          const app = await buildTestApp();
+          const canary = "synthetic_private_error_prose";
+          const fail = (_request: unknown, reply: FastifyReply) => {
+            if (selected !== undefined) reply.code(selected);
+            throw Object.assign(new Error(canary), {
+              status: 422,
+              statusCode: 503,
+            });
+          };
+          try {
+            for (const instance of [reference, app]) {
+              instance.get(
+                "/status-differential",
+                asynchronous
+                  ? async (request, reply) => fail(request, reply)
+                  : fail,
+              );
+            }
+            const original = await reference.inject("/status-differential");
+            const actual = await app.inject("/status-differential");
+            // Characterize the installed version independently, then require parity.
+            expect(original.statusCode).toBe(expected);
+            expect(actual.statusCode).toBe(original.statusCode);
+            expect(actual.json()).toEqual({
+              error: expected >= 500 ? "internal_error" : "invalid_request",
+            });
+            expect(actual.body).not.toContain(canary);
+          } finally {
+            await Promise.all([reference.close(), app.close()]);
+          }
+        },
+      );
+    },
+  );
+
   it("rejects unverified webhooks before application dispatch", async () => {
     const app = await buildTestApp();
     const response = await app.inject({
@@ -256,7 +303,7 @@ describe("API boundary", () => {
           payload: { update_id: 99 },
         })
       ).statusCode,
-    ).toBe(500);
+    ).toBe(503);
     expect(
       (
         await app.inject({
@@ -656,7 +703,7 @@ describe("API boundary", () => {
   });
 
   it("sanitizes expert session lookup failures in the composed path", async () => {
-    const token = "A".repeat(32);
+    const token = `es1.${"A".repeat(43)}`;
     const app = await buildTestApp({
       expertApi: testExpertApi({
         principals: createExpertBearerPrincipalResolver({

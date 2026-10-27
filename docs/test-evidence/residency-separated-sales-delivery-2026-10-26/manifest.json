@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "captures": [
+    {
+      "file": "logs/sales-final-gate-1793041197191776919.log.gz",
+      "sha256": "496dfcb5244557fdf2c5996dbc74fcb3139a7ae265d7d83ef13540b760e63d78",
+      "bytes": 439,
+      "capture_sha256": "b904303f1b3d05645ba423280b3ad6a9325b8bad0e3694da990282183ae06c6f",
+      "capture_bytes": 751,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-final-repo-1793041197191776919.log.gz",
+      "sha256": "6d006676b8a2d59076aadd4bb15af4ff0b7d96cefa10a500f65e6f4847654674",
+      "bytes": 3292,
+      "capture_sha256": "a29aacb3e011a48d904579137fe5e339a7c509c56386a40be758a679cd2abcfd",
+      "capture_bytes": 11822,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-final-inventory-green.log.gz",
+      "sha256": "66ae3ddafba115b6963c28ea2ec6c1c11a61c40f681d280eeab5c0daf805417c",
+      "bytes": 271,
+      "capture_sha256": "0b14201f51e23006cebb5d639ca6a0c1df12ef1d4c60a64c2f754773da619d1f",
+      "capture_bytes": 364,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-final-journal-green.log.gz",
+      "sha256": "56ac675b339e365ff84889ae422bf5b8e1fad7f6142f38aa9c82d1342d33743b",
+      "bytes": 276,
+      "capture_sha256": "264181cc7969d3647749b3eea6f23d2879fc59770d248d404dd9e283048734c9",
+      "capture_bytes": 365,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-final-gate-1793041429704613404.log.gz",
+      "sha256": "63a931d3089600775d1c0d2114e575d94b541175d7830e82bc2e25027c9384d0",
+      "bytes": 263,
+      "capture_sha256": "ba4bb3ce0cb4202f3b6bfb143e4e953f1f4bd2301e966ed0089e8d490836fbaa",
+      "capture_bytes": 477,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-final-repo-1793041429704613404.log.gz",
+      "sha256": "b0032cea28e867d67126f145c0c4442d4afaeeba0db195238210bb08d9a9c7a9",
+      "bytes": 2267,
+      "capture_sha256": "22b5aba5e84f66aad9e3f7a15d4e96f68c9bcadfb78e281ef135b87dd9d04481",
+      "capture_bytes": 7892,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-push-gate-1793041632945921932.log.gz",
+      "sha256": "95d118572ac278247ff9b65db48efbbed4ee455c42730da6358200c6b26908d0",
+      "bytes": 436,
+      "capture_sha256": "54b82349d73f6f1f2cac480856aff94c42c6a8d374ce08757abc35338b4b979c",
+      "capture_bytes": 926,
+      "encoding": "gzip"
+    },
+    {
+      "file": "logs/sales-push-repo-1793041632945921932.log.gz",
+      "sha256": "3117902f9585ef68e550ba25e5c692e166df6e05efa3b644d715989f77766b59",
+      "bytes": 2245,
+      "capture_sha256": "0eb6097227647279e01505b0b2b02fa661126a3d238aa49e2f89f9774cbc4f75",
+      "capture_bytes": 7892,
+      "encoding": "gzip"
+    }
+  ]
+}

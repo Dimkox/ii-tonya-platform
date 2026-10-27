@@ -25,11 +25,29 @@ export function erasureFixture(input: {
   let job: ErasureJobState = { jobId: "erase-job-1", status: "pending" };
   let crashPending = input.crashAfter !== undefined;
   const repository: ErasureDeps["repository"] = {
-    async getJob(jobId) { return { ...job, jobId }; },
-    async getAttempt(_jobId, processor) { return attempts.get(processor) ?? (input.started === processor ? "started" : "pending"); },
-    async loadManifest(_jobId, processor) { return { ciphertext: `cipher:${processor}:target`, keyReference: "test-key", algorithm: "test", version: "v1" }; },
-    async markStarted(_jobId, processor) { attempts.set(processor, "started"); },
-    async markUnknown(_jobId, processor) { attempts.set(processor, "unknown_outcome"); },
+    async getJob(jobId) {
+      return { ...job, jobId };
+    },
+    async getAttempt(_jobId, processor) {
+      return (
+        attempts.get(processor) ??
+        (input.started === processor ? "started" : "pending")
+      );
+    },
+    async loadManifest(_jobId, processor) {
+      return {
+        ciphertext: `cipher:${processor}:target`,
+        keyReference: "test-key",
+        algorithm: "test",
+        version: "v1",
+      };
+    },
+    async markStarted(_jobId, processor) {
+      attempts.set(processor, "started");
+    },
+    async markUnknown(_jobId, processor) {
+      attempts.set(processor, "unknown_outcome");
+    },
     async acknowledge(_jobId, processor) {
       attempts.set(processor, "acknowledged");
       if (crashPending && input.crashAfter === processor) {
@@ -37,9 +55,26 @@ export function erasureFixture(input: {
         throw new Error("simulated crash");
       }
     },
-    async deadLetter(_jobId, processor) { attempts.set(processor, "dead_letter"); job = { ...job, status: "dead_letter" }; },
-    async completeProcessors(jobId, backupEvidence) { job = { jobId, status: "processor_complete", backupEvidence }; },
-    async verifyBackup(jobId) { job = { ...job, jobId, status: "backup_verified", backupEvidence: { ...job.backupEvidence!, verificationState: "verified" } }; },
+    async deadLetter(_jobId, processor) {
+      attempts.set(processor, "dead_letter");
+      job = { ...job, status: "dead_letter" };
+    },
+    async completeProcessors(jobId, backupEvidence) {
+      job = { jobId, status: "processor_complete", backupEvidence };
+    },
+    async verifyBackup(jobId, evidence) {
+      job = {
+        ...job,
+        jobId,
+        status: "backup_verified",
+        backupEvidence: {
+          ...job.backupEvidence!,
+          verificationState: "verified",
+        },
+        backupVerification: evidence,
+      };
+      return { ...job };
+    },
   };
   const processors: PrivacyProcessor[] = input.processors.map((name) => ({
     name,
@@ -57,13 +92,23 @@ export function erasureFixture(input: {
     processors,
     backupPolicy: {
       version: "backup-retention-v1",
-      expiresNoLaterThan: (now) => new Date(now.getTime() + 30 * 24 * 60 * 60 * 1_000),
+      expiresNoLaterThan: (now) =>
+        new Date(now.getTime() + 30 * 24 * 60 * 60 * 1_000),
     },
     now: () => new Date("2026-07-28T10:00:00.000Z"),
-    hashReceipt: (receipt) => createHash("sha256").update(receipt).digest("hex"),
+    hashReceipt: (receipt) =>
+      createHash("sha256").update(receipt).digest("hex"),
     manifestCipher: {
-      async verifyEnvelope(envelope) { return envelope.keyReference === "test-key" && envelope.algorithm === "test" && envelope.version === "v1"; },
-      async decrypt(envelope) { return envelope.ciphertext.replace(/^cipher:[^:]+:/, ""); },
+      async verifyEnvelope(envelope) {
+        return (
+          envelope.keyReference === "test-key" &&
+          envelope.algorithm === "test" &&
+          envelope.version === "v1"
+        );
+      },
+      async decrypt(envelope) {
+        return envelope.ciphertext.replace(/^cipher:[^:]+:/, "");
+      },
     },
     capability: { enabled: true },
     processorCalls: (name) => calls.get(name) ?? 0,

@@ -1,0 +1,9 @@
+
+/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/tests/integration/expert-separated-sales-state.test.ts
+  1004:9  error  's' is never reassigned. Use 'const' instead  prefer-const
+
+✖ 1 problem (1 error, 0 warnings)
+  1 error and 0 warnings potentially fixable with the `--fix` option.
+
+
+[END OF RAW CAPTURE]

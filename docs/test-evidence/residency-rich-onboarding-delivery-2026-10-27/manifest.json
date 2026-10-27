@@ -1,0 +1,24 @@
+{
+  "head": "254c8c169cbb8432654a46de206bd20500cecc3f",
+  "pr": "https://github.com/Dimkox/ii-tonya-platform/pull/115",
+  "remoteHeadVerified": true,
+  "repositoryTestsPassed": 611,
+  "files": [
+    {
+      "file": "residency-rich-onboarding-push-gate-1793068617097223512.log.gz",
+      "bytes": 435,
+      "sha256": "590822fa8dbe5d42d2495108bc01418ec4872035c376d6e4adfe1713862244ef",
+      "rawBytes": 927,
+      "rawSha256": "07fb455413b5c6d884c8095161ff6c5fc1491065eb9fd4ef77e20e1187f2f0a4",
+      "exitCode": 0
+    },
+    {
+      "file": "residency-rich-onboarding-push-repo-1793068617097223512.log.gz",
+      "bytes": 2391,
+      "sha256": "67917a0e24b0775706d00ec47c3328bd2e2970680cf292cf031855c504878598",
+      "rawBytes": 8356,
+      "rawSha256": "4541129468fb40b3a1e50779ec5f53557c52a05648b32ff0e62b50d82108d8ef",
+      "exitCode": 0
+    }
+  ]
+}

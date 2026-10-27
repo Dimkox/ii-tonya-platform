@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { computeReservedUntil } from "@ii-tonya/domain";
 
 import type { DrizzleDb } from "../client.js";
+import { currentExpertResidencyVisibleSql } from "./catalog-repository.js";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
@@ -137,6 +138,7 @@ export class PostgresWaitlistRepository {
             join experts e on e.id=es.expert_id and e.active=true and e.verified=true
             where c.choice_digest=${command.choiceDigest}
               and cr.user_id=${command.userId}::uuid and cr.state='ready'
+              and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
               and c.expires_at>clock_timestamp() and cr.expires_at>clock_timestamp()
               and s.starts_at>clock_timestamp()+interval '24 hours'
               and s.observed_at>=clock_timestamp()-interval '15 minutes'
@@ -343,6 +345,7 @@ export class PostgresWaitlistRepository {
           from slots s join expert_services es on es.id=s.expert_service_id
           join experts e on e.id=es.expert_id
           where s.id=${command.slotId}::uuid and es.active and e.active and e.verified
+            and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
             and s.starts_at>${command.now}::timestamptz+interval '24 hours'
             and s.observed_at>=${command.now}::timestamptz-interval '15 minutes'
             and s.observed_at<=${command.now}::timestamptz

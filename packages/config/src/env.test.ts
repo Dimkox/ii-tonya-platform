@@ -24,16 +24,21 @@ describe("loadEnv", () => {
     expect(config.minorOnboarding).toBe(false);
     expect(config.rawConversationLogging).toBe(false);
     expect(config.features).toEqual({
+      bookingCallbacks: false,
+      expertSession: false,
       workerOutboxDelivery: false,
       clientCatalog: false,
       clientSession: false,
+      clientSessionBookingGrants: false,
       clientBooking: false,
       clientBookingReserve: false,
       clientWaitlist: false,
       clientFreeAccessV2: false,
       clientTelegramIngress: false,
+      clientTelegramNavigation: false,
       clientHybridRouting: false,
       clientPrivacy: false,
+      clientErasureRequests: false,
       telegramEgressConsentGate: false,
       selartiCostAdmission: false,
       selartiResponseIngress: false,
@@ -433,4 +438,24 @@ describe("loadEnv", () => {
       ),
     ).toThrow();
   });
+});
+
+it("keeps separated sales and held onboarding off unless their exact dependent capabilities are enabled", () => {
+  const config = loadEnv(localEnv());
+  expect(config.features.expertSeparatedSales).not.toBe(true);
+  expect(config.features.expertHeldOnboarding).not.toBe(true);
+  for (const key of [
+    "EXPERT_SEPARATED_SALES_ENABLED",
+    "EXPERT_ONBOARDING_HELD_ENABLED",
+  ]) {
+    for (const value of ["yes", "1", "TRUE"]) {
+      expect(() => loadEnv(localEnv({ [key]: value }))).toThrow();
+    }
+  }
+  expect(() =>
+    loadEnv(localEnv({ EXPERT_SEPARATED_SALES_ENABLED: "true" })),
+  ).toThrow();
+  expect(() =>
+    loadEnv(localEnv({ EXPERT_ONBOARDING_HELD_ENABLED: "true" })),
+  ).toThrow();
 });

@@ -1,0 +1,53 @@
+{
+  "sourceCommit": "8760c2b3",
+  "files": [
+    {
+      "file": "verification-private-jobs-final-gate-1793058629511571813.log.gz",
+      "bytes": 448,
+      "sha256": "5f0783b20d86fbe11a668fc24e224c35ec772606bc3a1e66f0b537ff829b3bea",
+      "rawBytes": 769,
+      "rawSha256": "c837be59ade58a0f4a6074358698403dc4303c8ad70494166eda252f62893a2e",
+      "exitCode": 1
+    },
+    {
+      "file": "verification-private-jobs-final-repo-1793058629511571813.log.gz",
+      "bytes": 5512,
+      "sha256": "7e84b8467e634e1c66669e4b5df95866651d191ed5cf9bf7c6566254dfd821b4",
+      "rawBytes": 29198,
+      "rawSha256": "fbbf57026af5c0479074fae38895f7f54bf6dd5482859cf57ec4b80c6f0330a1",
+      "exitCode": 1
+    },
+    {
+      "file": "verification-private-jobs-artifact-red.log.gz",
+      "bytes": 865,
+      "sha256": "ead0365c666a1e2f0a90f923cc5808e7a1cfe69264482bc5e8d358ccfabf9ebe",
+      "rawBytes": 3978,
+      "rawSha256": "a5d4a85c666d8fd08b37041acc222fc19431866fe2b78198c8ad5be349999c6e",
+      "exitCode": 1
+    },
+    {
+      "file": "verification-private-jobs-artifact-green.log.gz",
+      "bytes": 2862,
+      "sha256": "bdf51d307b055f01dc07732fad55c03316e30132506fbcf25a10e9822ea523d7",
+      "rawBytes": 17953,
+      "rawSha256": "30e6f59de86f16b01c1a5f0149daf7ca82440a815607c64447f41363ff78d792",
+      "exitCode": 1
+    },
+    {
+      "file": "verification-private-jobs-artifact-final.log.gz",
+      "bytes": 397,
+      "sha256": "71cfbdd391d233e92d327bfb3f6922a885abb58cfb939d0d694a728bc6b850f8",
+      "rawBytes": 617,
+      "rawSha256": "f3988f903f0af11c16b1b1e7ef9bf80c160f66b2169d4b31fe97c17391b4f0da",
+      "exitCode": 0
+    },
+    {
+      "file": "verification-private-jobs-artifact-lint.log.gz",
+      "bytes": 20,
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "rawBytes": 0,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "exitCode": 0
+    }
+  ]
+}

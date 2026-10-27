@@ -2,7 +2,17 @@ import type {
   ExpertPrincipal,
   ExpertReferralService,
   ExpertResidencyService,
+  ExpertCampaignService,
+  PayerReceiptRequiredCampaignService,
+  PayerReceiptCaptureService,
 } from "@ii-tonya/application";
+import {
+  expertCampaignQuoteRequestSchema,
+  expertCampaignCheckoutRequestSchema,
+  payerReceiptCheckoutRequestSchema,
+} from "@ii-tonya/application";
+import { readExactAuthorization } from "../authorization-header.js";
+import { createWindowedRateLimiter } from "../rate-limit.js";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import type { ExpertPrincipalResolver } from "../expert-principal-resolver.js";
 
@@ -43,9 +53,19 @@ const checkoutBodySchema = {
 } as const;
 
 export interface ExpertReferralApiDependencies {
+  readonly receiptCapture?: PayerReceiptCaptureService;
   readonly principals: ExpertPrincipalResolver;
   readonly referrals: ExpertReferralService;
-  readonly residency: ExpertResidencyService;
+  readonly residency:
+    | (Pick<
+        ExpertResidencyService,
+        "listActiveTariffs" | "quote" | "checkout"
+      > & {
+        readonly kind?: "legacy";
+        readonly reconciliation?: ExpertResidencyService["reconciliation"];
+      })
+    | ExpertCampaignService
+    | PayerReceiptRequiredCampaignService;
 }
 
 interface ExpertReferralRouteOptions extends ExpertReferralApiDependencies {
@@ -66,6 +86,51 @@ export async function expertReferralRoutes(
   app: FastifyInstance,
   deps: ExpertReferralRouteOptions,
 ): Promise<void> {
+  const limiter = createWindowedRateLimiter();
+  if ("receiptRequired" in deps.residency) {
+    app.removeContentTypeParser("application/json");
+    app.addContentTypeParser(
+      "application/json",
+      { parseAs: "buffer" },
+      (_request, body, done) => {
+        try {
+          const text = new TextDecoder("utf-8", { fatal: true }).decode(
+            body as Buffer,
+          );
+          const value: unknown = JSON.parse(text);
+          if (!value || typeof value !== "object" || Array.isArray(value))
+            return done(null, null);
+          const names = [...text.matchAll(/("(?:\\.|[^"\\])*")\s*:/gu)].map(
+            (m) => JSON.parse(m[1]!) as string,
+          );
+          return done(
+            null,
+            names.length === Object.keys(value).length &&
+              new Set(names).size === names.length
+              ? value
+              : null,
+          );
+        } catch {
+          return done(null, null);
+        }
+      },
+    );
+  }
+  app.addHook("onRequest", async (request, reply) => {
+    reply.header("cache-control", "no-store").header("pragma", "no-cache");
+    const count = request.raw.rawHeaders.filter(
+      (h, i) => i % 2 === 0 && h.toLowerCase() === "authorization",
+    ).length;
+    if (count > 1 || request.headers.authorization?.includes(","))
+      return reply.code(400).send({ error: "invalid_request" });
+    if (
+      !limiter.consume("global", 600, 60000) ||
+      !limiter.consume(`ip:${request.ip}`, 60, 60000)
+    )
+      return reply.code(429).send({ error: "rate_limited" });
+    if (readExactAuthorization(request.raw.rawHeaders) === null)
+      return reply.code(401).send({ error: "unauthorized" });
+  });
   app.setErrorHandler((error, _request, reply) => {
     const candidate = error as {
       readonly validation?: unknown;
@@ -148,11 +213,27 @@ export async function expertReferralRoutes(
 
     app.post(
       "/v1/expert/residency/quotes",
-      { bodyLimit: 8 * 1024, schema: { body: quoteBodySchema } },
+      {
+        bodyLimit: 8 * 1024,
+        ...(deps.residency.kind === "campaign"
+          ? {}
+          : { schema: { body: quoteBodySchema } }),
+      },
       async (request, reply) => {
         const principal = await principalFor(request.headers.authorization);
         if (principal === null) {
           return reply.code(401).send({ error: "unauthorized" });
+        }
+        if (deps.residency.kind === "campaign") {
+          const parsed = expertCampaignQuoteRequestSchema.safeParse(
+            request.body,
+          );
+          if (!parsed.success)
+            return reply.code(400).send({ error: "invalid_request" });
+          return sendServiceResult(
+            reply,
+            await deps.residency.quote(principal, parsed.data),
+          );
         }
         const body = request.body as { tariffVersionId: string };
         const result = await deps.residency.quote(
@@ -165,11 +246,29 @@ export async function expertReferralRoutes(
 
     app.post(
       "/v1/expert/residency/checkouts",
-      { bodyLimit: 8 * 1024, schema: { body: checkoutBodySchema } },
+      {
+        bodyLimit: 8 * 1024,
+        ...(deps.residency.kind === "campaign"
+          ? {}
+          : { schema: { body: checkoutBodySchema } }),
+      },
       async (request, reply) => {
         const principal = await principalFor(request.headers.authorization);
         if (principal === null) {
           return reply.code(401).send({ error: "unauthorized" });
+        }
+        if (deps.residency.kind === "campaign") {
+          const parsed = (
+            "receiptRequired" in deps.residency
+              ? payerReceiptCheckoutRequestSchema
+              : expertCampaignCheckoutRequestSchema
+          ).safeParse(request.body);
+          if (!parsed.success)
+            return reply.code(400).send({ error: "invalid_request" });
+          return sendServiceResult(
+            reply,
+            await deps.residency.checkout(principal, parsed.data),
+          );
         }
         const body = request.body as {
           tariffVersionId: string;
@@ -195,6 +294,10 @@ const resultKind = (value: unknown): string | undefined =>
 
 const sendServiceResult = (reply: FastifyReply, result: unknown) => {
   const kind = resultKind(result);
+  if (kind === "invalid_request") return reply.code(400).send({ error: kind });
+  if (kind === "command_rejected") return reply.code(409).send({ error: kind });
+  if (kind === "payment_unavailable" || kind === "service_unavailable")
+    return reply.code(503).send({ error: kind });
   if (kind === "forbidden") {
     return reply.code(403).send({ error: "forbidden" });
   }

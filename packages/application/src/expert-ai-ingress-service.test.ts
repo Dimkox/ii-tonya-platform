@@ -177,3 +177,41 @@ describe("expert AI ingress", () => {
     expect(state.residency.checkout).not.toHaveBeenCalled();
   });
 });
+
+it("binds owned current offer reads into the ordinary AI ingress and blocks legacy checkout", async () => {
+  const state = dependencies({
+    kind: "start_residency_checkout",
+    tariffVersionId,
+  });
+  const readOwned = vi.fn(async () => ({
+    offer_start_date: "2026-10-23T00:00:00.000Z",
+    current_discount_stage: 1,
+    discount_percent: 40,
+    locked_price_monthly: "540000",
+    locked_price_package: "1500000",
+    payment_link_expires_at: "2026-10-27T00:00:00.000Z",
+    remaining_seconds: 86400,
+    readiness: "pending_gates" as const,
+    payment_url: null,
+  }));
+  const service = createExpertAiIngressService(state.deps);
+  const result = await service.withPersonalOffers!({ readOwned }).handle(
+    command,
+  );
+  expect(result).toEqual({
+    kind: "rejected",
+    reasonCode: "unauthorized_scope",
+  });
+  expect(readOwned).toHaveBeenCalledWith(principal.userId, principal.expertId);
+  expect(state.source.propose).toHaveBeenCalledWith(
+    expect.objectContaining({
+      context: expect.objectContaining({
+        currentOffer: expect.objectContaining({
+          locked_price_monthly: "540000",
+        }),
+      }),
+    }),
+  );
+  expect(state.residency.quote).not.toHaveBeenCalled();
+  expect(state.residency.checkout).not.toHaveBeenCalled();
+});

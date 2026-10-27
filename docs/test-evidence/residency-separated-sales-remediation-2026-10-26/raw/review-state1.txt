@@ -1,0 +1,87 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts (30 tests | 2 failed | 16 skipped) 7743ms
+   ↓ explicit choices deny foreign ownership, stale revision, replay conflict and base-quarter SKU
+   ↓ scheduler does not disclose promotion or invoice to a silent owner, and unpaid erasure removes sales PII
+   ↓ expired waiting payment is GET-verified and canceled, never captured
+   ↓ unknown create never becomes a second POST and recovers only through actual GET identity
+   ↓ deletion during pre-send decryption cancels actual first disclosure
+   ↓ proven late money remains immutable recovery work without price lock or interview
+   ↓ 96h refresh creates one new fixed-fee attempt under the original unchanged form approval
+   ↓ lost quarter requires explicit monthly choice and reuses the same quality approval
+   ↓ day10 silence stays base-only; explicit base selection remains monthly and unlocked
+   ↓ 24h reminders have one durable scoped receipt and revoked owners receive nothing
+   ↓ an explicit unpaid intake transition preserves the original form and enters separated sales
+   ↓ on-time capture reported after checkout expiry still locks its original bound terms
+   ↓ a proven capture after erasure retains money and recovery but no paid lock or receipt PII
+   ↓ checkout TTL refreshes before the commercial stage without repricing or a new manager decision
+   ↓ erasing the submitted form alone blocks delayed captured money from re-admitting the applicant
+   ↓ two genuine captures serialize to one lifetime winner and explicit duplicate-fee recovery
+   ✓ review R3 supplemental answers preserve the submitted approval and capture authority  620ms
+   ✓ review R4 quarter to month before first manager approval uses the new explicit period  370ms
+   ✓ review R5 expired monthly selection refreshes inside the real form submit transaction 288ms
+   ✓ review R7 unresolved owner does not abort the scheduler batch  653ms
+   ✓ review R9 preparation failure retries definitely unsent notice 238ms
+   ✓ review R10 R11 reselection cancels superseded notices and queues one replacement  367ms
+   ✓ review R8 R13 lost capture ACK resolves authoritative succeeded without repost  515ms
+   ✓ review R8 R13 lost capture ACK resolves authoritative canceled without repost  482ms
+   ✓ review R13 lost cancel ACK is resolved by GET without repost  394ms
+   × review R2 expired original bridge quote retains finite fiscal custody for later approval and replacement 494ms
+     → promise rejected "Error: Failed query: update expert_onboar… { …(2) }" instead of resolving
+   × review R6 operational recovery requires fresh manager and records the real GET binding 257ms
+     → Cannot find package 'fastify' imported from '/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/tests/integration/expert-separated-sales-state.test.ts'
+   ✓ review R13 R14 actual worker Telegram parser foreign_bot and exact stage amounts  1115ms
+   ✓ review R13 R14 actual worker Telegram parser foreign_chat and exact stage amounts 119ms
+   ✓ review R13 R14 actual worker Telegram parser matching and exact stage amounts 163ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R2 expired original bridge quote retains finite fiscal custody for later approval and replacement
+AssertionError: promise rejected "Error: Failed query: update expert_onboar… { …(2) }" instead of resolving
+ ❯ tests/integration/expert-separated-sales-state.test.ts:860:1326
+
+
+Caused by: Error: Failed query: update expert_onboarding_payment_operations set provider_object_id=$1,status=case when status='succeeded' then status else 'pending' end where id=$2::uuid
+params: fixture_0eded898-673e-49b6-8492-223e5da6f00e,071fa535-ce86-44dc-8a67-9bde48373d41
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:73:11
+ ❯ packages/db/src/repositories/expert-held-onboarding-repository.ts:253:7
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresHeldOnboardingCheckout.recoverCheckout packages/db/src/repositories/expert-held-onboarding-repository.ts:398:36
+ ❯ PostgresHeldOnboardingCheckout.createCheckout packages/db/src/repositories/expert-held-onboarding-repository.ts:419:20
+ ❯ tests/integration/expert-separated-sales-state.test.ts:860:1265
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { query: 'update expert_onboarding_payment_operations set provider_object_id=$1,status=case when status=\'succeeded\' then status else \'pending\' end where id=$2::uuid', params: [ 'fixture_0eded898-673e-49b6-8492-223e5da6f00e', '071fa535-ce86-44dc-8a67-9bde48373d41' ] }
+Caused by: error: duplicate key value violates unique constraint "expert_onboarding_payment_operations_provider_object_id_key"
+ ❯ node_modules/.pnpm/pg@8.22.0/node_modules/pg/lib/client.js:652:17
+ ❯ node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:71:12
+ ❯ packages/db/src/repositories/expert-held-onboarding-repository.ts:253:7
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ PostgresHeldOnboardingCheckout.recoverCheckout packages/db/src/repositories/expert-held-onboarding-repository.ts:398:36
+ ❯ PostgresHeldOnboardingCheckout.createCheckout packages/db/src/repositories/expert-held-onboarding-repository.ts:419:20
+ ❯ tests/integration/expert-separated-sales-state.test.ts:860:1265
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 368, severity: 'ERROR', code: '23505', detail: 'Key (provider_object_id)=(fixture_0eded898-673e-49b6-8492-223e5da6f00e) already exists.', hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: undefined, schema: 'public', table: 'expert_onboarding_payment_operations', dataType: undefined, constraint: 'expert_onboarding_payment_operations_provider_object_id_key', file: 'nbtinsert.c', routine: '_bt_check_unique' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R6 operational recovery requires fresh manager and records the real GET binding
+Error: Cannot find package 'fastify' imported from '/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/tests/integration/expert-separated-sales-state.test.ts'
+ ❯ tests/integration/expert-separated-sales-state.test.ts:861:152
+
+
+Caused by: Error: Failed to load url fastify (resolved id: fastify) in /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/tests/integration/expert-separated-sales-state.test.ts. Does the file exist?
+ ❯ loadAndTransform node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 12 passed | 16 skipped (30)
+   Start at  18:37:23
+   Duration  11.16s (transform 1.95s, setup 0ms, collect 2.96s, tests 7.74s, environment 0ms, prepare 103ms)
+
+
+[END OF RAW CAPTURE]

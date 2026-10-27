@@ -1,4 +1,8 @@
+// Test-only harness: provider responses are explicitly synthetic. Real PostgreSQL
+// operation claims, admission, binding, completion and cancellation remain enabled;
+// this harness performs no live provider request and does not test HTTP transport.
 import { createHash, randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { sql } from "drizzle-orm";
 
 import {
@@ -13,6 +17,7 @@ import {
   PostgresBookingRepository,
   PostgresCatalogRepository,
   PostgresMessageRepository,
+  PostgresPlanerkaBookingRepository,
   PostgresWorkerJobsRepository,
   type AdminPayload,
   type ApprovalAdminAction,
@@ -100,6 +105,15 @@ export async function startMvpHarness(input: {
     clock: { now: () => new Date(now) },
   });
   const workerRepository = new PostgresWorkerJobsRepository(testDb.db);
+  const providerRepository = new PostgresPlanerkaBookingRepository(testDb.db);
+  const providerAccountId = 1;
+  const admitSyntheticProviderRequest = async () => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (await providerRepository.admitRequest(providerAccountId)) return;
+      if (attempt < 2) await delay(2100);
+    }
+    throw new Error("Synthetic provider request was not admitted");
+  };
   const catalogFixture = await seedCatalog(testDb, now);
   const reservationVersions = new Map<string, number>();
   const providerReservations = new Map<
@@ -379,9 +393,42 @@ export async function startMvpHarness(input: {
         expectedVersion: command.expectedVersion,
         correlationId: "ac025:reservation-booked",
       });
-      reservationVersions.set(command.reservationId, result.version);
+      if (result.status !== "reserved")
+        throw new Error(
+          "Expert approval must not fabricate provider confirmation",
+        );
+      await admitSyntheticProviderRequest();
+      const operation = await providerRepository.claim(providerAccountId, true);
+      if (
+        !operation ||
+        operation.reservationId !== command.reservationId ||
+        !(await providerRepository.admitSend(operation))
+      )
+        throw new Error("Synthetic provider creation was not admitted");
+      const completed = await providerRepository.complete(operation, {
+        uid: `ac025_${operation.id}`,
+        eventTypeId: operation.eventTypeId,
+        start: operation.request.start,
+        end: new Date(
+          Date.parse(operation.request.start) +
+            operation.request.lengthInMinutes * 60000,
+        ).toISOString(),
+        status: "accepted",
+        hosts: [{ id: operation.accountId }],
+        attendees: [operation.request.attendee],
+      });
+      const stored = (
+        await testDb.db.execute<{ status: "booked"; version: number }>(sql`
+        select status,version from reservations where id=${command.reservationId}::uuid
+      `)
+      ).rows[0];
+      if (!completed || stored?.status !== "booked")
+        throw new Error(
+          "Synthetic provider completion did not confirm the booking",
+        );
+      reservationVersions.set(command.reservationId, stored.version);
       providerReservations.set(command.reservationId, "booked");
-      return result;
+      return { ...result, status: stored.status, version: stored.version };
     },
 
     async clientCancel(command: {
@@ -395,6 +442,28 @@ export async function startMvpHarness(input: {
         expectedVersion: reservationVersions.get(command.reservationId) ?? -1,
         correlationId: `ac025:${command.idempotencyKey}`,
       });
+      await admitSyntheticProviderRequest();
+      const operation = await providerRepository.claim(
+        providerAccountId,
+        false,
+      );
+      if (
+        !operation ||
+        operation.reservationId !== command.reservationId ||
+        operation.state !== "cancel_pending" ||
+        !operation.providerUid ||
+        !(await providerRepository.admitSend(operation, true))
+      )
+        throw new Error("Synthetic provider cancellation was not admitted");
+      // The synthetic provider acknowledges cancellation of this exact bound UID.
+      await providerRepository.cancelled(operation);
+      const stored = (
+        await testDb.db.execute<{ state: string }>(sql`
+        select state from planerka_booking_operations where id=${operation.id}::uuid
+      `)
+      ).rows[0];
+      if (stored?.state !== "cancelled")
+        throw new Error("Synthetic provider cancellation did not persist");
       reservationVersions.set(command.reservationId, result.version);
       providerReservations.set(command.reservationId, "cancelled");
       return result;
@@ -432,12 +501,19 @@ export async function startMvpHarness(input: {
       );
     },
 
-    async removeBookingNotificationForNegativeControl(reservationId: string) {
-      await testDb.db.execute(sql`
-        delete from integration_outbox
+    async corruptBookingNotificationForNegativeControl(reservationId: string) {
+      // Preserve referenced diagnostic history while deliberately removing the
+      // canonical notification topic from this synthetic negative-control row.
+      const corrupted = await testDb.db.execute<{ id: string }>(sql`
+        update integration_outbox set topic='test.missing_booking_notification'
         where payload @> ${JSON.stringify({ reservationId })}::jsonb
           and topic = 'telegram.booking_cancelled'
+        returning id
       `);
+      if (corrupted.rows.length !== 1)
+        throw new Error(
+          "Negative control did not target exactly one notification",
+        );
     },
 
     setProviderStatusForNegativeControl(
@@ -556,6 +632,12 @@ async function seedCatalog(testDb: TestDatabase, now: Date) {
     ) returning id
   `);
   const serviceId = service.rows[0]!.id;
+  // Configure the verified synthetic mapping before its independent observation.
+  await testDb.db.execute(sql`
+    insert into planerka_service_mappings(
+      expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at
+    ) values(${serviceId}::uuid,1,1,60,'UTC',true,${now})
+  `);
   const slot = await testDb.db.execute<{ id: string }>(sql`
     insert into slots (
       expert_service_id, provider, external_slot_id, starts_at, ends_at,

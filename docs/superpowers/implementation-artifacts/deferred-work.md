@@ -1,0 +1,15 @@
+- source_spec: `docs/superpowers/implementation-artifacts/spec-backup-erasure-evidence.md`
+  summary: Approve an explicit backup policy rescheduling and supersession workflow before erasure activation; old-policy jobs must remain fail-closed meanwhile.
+  evidence: Scheduling binds a job and proof to an exact policy version and expiry. Worker/public replay reject a different active policy, and no reviewed transition for superseding that schedule or its evidence is implemented by this bounded change.
+
+- source_spec: `docs/superpowers/implementation-artifacts/spec-backup-erasure-evidence.md`
+  summary: Establish a reviewed database invariant protecting certified jobs from later child-work insertion or mutation by arbitrary SQL and old binaries before erasure activation.
+  evidence: Parent and child row locks serialize only until transaction commit. Existing SQL triggers check completion updates but do not prevent later unfinished processor/booking work. Application terminal replay now revalidates these prerequisites; no schema change was authorized in this patch round.
+
+- source_spec: `docs/superpowers/implementation-artifacts/spec-native-http-runtime.md`
+  summary: Replace source-substring hardening checks with effective systemd directive validation in a separate automation change.
+  evidence: Existing native release tests assert required directive substrings; a later conflicting assignment can coexist. This runtime fix uses effective production-unit and process-environment acceptance, not a general INI parser repair.
+
+- source_spec: `docs/superpowers/implementation-artifacts/spec-payer-receipt-metadata-replay.md`
+  summary: Define terminal provider-status behavior for an already bound checkout without conflating a confirmation URL with payment settlement.
+  evidence: The pre-existing getPayment replay branch validates ID, metadata, amount, currency, mode and HTTPS confirmation but not status/paid. A schema-valid canceled response retaining confirmation can return created with a stale URL. The metadata-replay change preserves this branch; it neither confirms payment nor grants entitlements. Independent reviewer Leibniz identified this outside the bounded replay fix.

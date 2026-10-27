@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
 import { PostgresTelegramCallbackRepository } from "../../packages/db/src/index.js";
 import {
   startTestPostgres,
@@ -37,6 +38,21 @@ const makeConfirmIssuanceEligible = async (
   });
   return times;
 };
+
+// Cancellation tests start from a historical confirmed booking. Keep the real
+// confirmation trigger enabled and supply its separately bound synthetic fact.
+async function seedHistoricalProviderConfirmation(reservationId: string) {
+  await testDb.db.execute(sql`
+    insert into planerka_booking_operations(
+      reservation_id,account_id,event_type_id,request,request_fingerprint,
+      starts_at,ends_at,state,provider_uid
+    )
+    select r.id,1,1,'{}'::jsonb,repeat('0',64),s.starts_at,s.ends_at,
+      'booked','callback_fixture_'||r.id::text
+    from reservations r join slots s on s.id=r.slot_id
+    where r.id=${reservationId}::uuid
+  `);
+}
 
 describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
   it("does not consume for the wrong expert or an expired callback", async () => {
@@ -237,6 +253,7 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
       version: 3,
       expiresAt: "2026-07-28T10:05:00.000Z",
     });
+    await seedHistoricalProviderConfirmation(fixture.claims.reservationId);
     await testDb.setTelegramCallbackReservationState(
       fixture.claims.reservationId,
       {
@@ -285,9 +302,7 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
     const putTimes = await makeConfirmIssuanceEligible(
       putFixture.reservationId,
     );
-    await testDb.crossWireTelegramCallbackReservation(
-      putFixture.reservationId,
-    );
+    await testDb.crossWireTelegramCallbackReservation(putFixture.reservationId);
     await expect(
       repository.put("hash-cross-wired-put", {
         reservationId: putFixture.reservationId,
@@ -300,9 +315,9 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
       name: "CallbackConflictError",
       retryable: false,
     });
-    expect(
-      await testDb.notificationCountForToken("hash-cross-wired-put"),
-    ).toBe(0);
+    expect(await testDb.notificationCountForToken("hash-cross-wired-put")).toBe(
+      0,
+    );
 
     const consumeFixture = await testDb.seedTelegramCallback({
       tokenHash: "hash-cross-wired-consume",
@@ -437,6 +452,7 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
     const fixture = await testDb.createTelegramCallbackReservation({
       reservationVersion: 3,
     });
+    await seedHistoricalProviderConfirmation(fixture.reservationId);
     await testDb.setTelegramCallbackReservationState(fixture.reservationId, {
       status: "booked",
       reservedUntil: new Date(Date.now() - 60_000),
@@ -465,11 +481,10 @@ describe("PostgresTelegramCallbackRepository.consumeIfValid", () => {
     const subSecond = await testDb.createTelegramCallbackReservation({
       reservationVersion: 3,
     });
-    const subSecondClock =
-      await testDb.prepareTelegramCallbackIssuanceBoundary(
-        subSecond.reservationId,
-        "same_epoch_subsecond",
-      );
+    const subSecondClock = await testDb.prepareTelegramCallbackIssuanceBoundary(
+      subSecond.reservationId,
+      "same_epoch_subsecond",
+    );
     await expect(
       repository.put("hash-put-subsecond-expiry", {
         reservationId: subSecond.reservationId,

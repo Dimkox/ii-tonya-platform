@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ packages/config/src/env.test.ts (25 tests) 49ms
+
+ Test Files  1 passed (1)
+      Tests  25 passed (25)
+   Start at  17:58:36
+   Duration  732ms (transform 146ms, setup 0ms, collect 256ms, tests 49ms, environment 0ms, prepare 117ms)
+
+
+[END OF RAW CAPTURE]

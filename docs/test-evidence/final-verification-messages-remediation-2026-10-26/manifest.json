@@ -1,0 +1,453 @@
+{
+  "purpose": "Retained successful and failed S2a R1-R6 corrective commands; filenames are not success claims",
+  "logs": [
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/api-types.log",
+      "archive": "api-types.log.gz",
+      "bytes": 15,
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "archiveSha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/application-build.log",
+      "archive": "application-build.log.gz",
+      "bytes": 381,
+      "sha256": "00aa9339be323da9436cf2c8374d9d1edae02c707ab96ec7a1e8878aabd78ca3",
+      "archiveSha256": "9434a34ef7b3c71722af7ae7c3e68f3439c5955eaccbced36406c5c2e001e6fd"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/browser-final-r124.log",
+      "archive": "browser-final-r124.log.gz",
+      "bytes": 334,
+      "sha256": "dd32cdd0c28d77544d771c427f04ce7258dff3c894e3d629928e97e7204779c8",
+      "archiveSha256": "1ca958e12bb47f3cf96ea3533bf6a7699b2b573efbe4f91986fc95bbc4255c98"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/browser-format.log",
+      "archive": "browser-format.log.gz",
+      "bytes": 61,
+      "sha256": "4ffa7c434e0d0f64acd447c6244eadde00d37d625cb1588db26ec5ebce0022f2",
+      "archiveSha256": "5408612a8236d810d2d61289ce56bb26d5b3190d1efb83b3d45a24df02fdc7c2"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/browser-green-r124.log",
+      "archive": "browser-green-r124.log.gz",
+      "bytes": 334,
+      "sha256": "dd32cdd0c28d77544d771c427f04ce7258dff3c894e3d629928e97e7204779c8",
+      "archiveSha256": "1ca958e12bb47f3cf96ea3533bf6a7699b2b573efbe4f91986fc95bbc4255c98"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/browser-history-red.log",
+      "archive": "browser-history-red.log.gz",
+      "bytes": 576,
+      "sha256": "7cb4725aa6b3dbcdc66ee577c7b519845855d698ef148982f5851dca8c74f222",
+      "archiveSha256": "3522fc9d67ff9b7e4c2898a448e77d35963cf66270208ecf8b89a5347e279d73"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/browser-queue-green.log",
+      "archive": "browser-queue-green.log.gz",
+      "bytes": 334,
+      "sha256": "4c1f4a2fe3423a122a45cdaa1e4c977ba2e214b9ee31d73029e57af35eea74b2",
+      "archiveSha256": "b4319e23c5ef757bd7c679b19a7926655f3eafbe65cfc260ad8c3b0747812891"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/browser-queue-red.log",
+      "archive": "browser-queue-red.log.gz",
+      "bytes": 576,
+      "sha256": "b9ace6226c453bdf99c41fbe4d8924f913cc878d21fbca2ee2639bbc70716dce",
+      "archiveSha256": "d3b9a4010fc2fb8adb084dbeeedcdf9c5a067417773e77a5d79748d7b8fa26cf"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/browser-r4-red.log",
+      "archive": "browser-r4-red.log.gz",
+      "bytes": 480,
+      "sha256": "7a12fd06ee96b594868dceb5f784e911445b37145c5506e0638cff951f894242",
+      "archiveSha256": "1537f6dfd9f42596d503d74c566df1ad42feb09e029c1fa16d0d6e80a72ae186"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/calendar-30day-mutant-red.log",
+      "archive": "calendar-30day-mutant-red.log.gz",
+      "bytes": 1813,
+      "sha256": "7b6f6e390f31a2ea8874910031b8acfa7d12d92e444905be689c770dc102161c",
+      "archiveSha256": "f8a96e97597c00f37bff6f04061f69eb504f8e06ccd0659c8464b5714204e0ea"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/calendar-green-final.log",
+      "archive": "calendar-green-final.log.gz",
+      "bytes": 507,
+      "sha256": "7598b6949716e2816f04d3c7973ce6a3cba556b2e8163f08c2cb701be26fec0c",
+      "archiveSha256": "1cc2cc918549a42dc0c3122f5a44acc151a36edf3581228b97267d3522ed7810"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/calendar-red.log",
+      "archive": "calendar-red.log.gz",
+      "bytes": 3339,
+      "sha256": "0bfc8c7e7acf96c11da18e38366e17dd9618fa3f4d8e3277b487285f4097809c",
+      "archiveSha256": "3b527ae86610cde9dd4fcfd794af17edec9da6d0af8fee5cce2107c1c7cf2008"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/changed-regressions.log",
+      "archive": "changed-regressions.log.gz",
+      "bytes": 2524,
+      "sha256": "f78c0a5122e4ec89d9cbcf6327e48758e287d2a613d9d78cf57cbd9570ad2747",
+      "archiveSha256": "1464ee84b78e7b4f4890c03c3c7a70bbe59877219205cea2bd16a80d636f7731"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/client-queue-green.log",
+      "archive": "client-queue-green.log.gz",
+      "bytes": 362,
+      "sha256": "fb4927df496aad1356c44568ad7ba4f857c96e41bc0784572c927e1ea3a20aa9",
+      "archiveSha256": "c93bc6ff21beb4a0b880f5c6f5ba852787bcd8217e897061b5eb73559e6f36c5"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/db-build.log",
+      "archive": "db-build.log.gz",
+      "bytes": 379,
+      "sha256": "793c95716f5cb51a1b634921027ffda3eedf7aff284d61666419225106aecdfe",
+      "archiveSha256": "c93db9099637934218460cf45ec2dd7a5337e356b01ed5f498e9b828cde298f5"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/db-reapply-build.log",
+      "archive": "db-reapply-build.log.gz",
+      "bytes": 379,
+      "sha256": "f18b52989ac0993363242a69cc1da5599dc495d7a6d866b9fb633dfc8774bdc8",
+      "archiveSha256": "9a8c5e9c4f01dd7801d059094d16cb69f41f1953d20fac0fcb2b4318aa0b58c8"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/environment.log",
+      "archive": "environment.log.gz",
+      "bytes": 484,
+      "sha256": "79a06dcd1c13332ff0a5e5789716a5ba993b771222a799b3c5ddec9dbc2596cb",
+      "archiveSha256": "532f262c179b98362934344837e3bfc52112651b4084c2f28173712a127eecfd"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/evidence-final-format.log",
+      "archive": "evidence-final-format.log.gz",
+      "bytes": 90,
+      "sha256": "41a8a50a0268765208a9cb98b5c4281b722fea75e40cee09d850ae4f7ff91113",
+      "archiveSha256": "f6497cbf5101f6c26f719b7ed2333afe6c4e16a86a87bf4432e61a90a132e47e"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/evidence-format.log",
+      "archive": "evidence-format.log.gz",
+      "bytes": 79,
+      "sha256": "345b53952dabe8353f9bb574abcc031275cfe91a0f7b5e86838c6b76d8381f24",
+      "archiveSha256": "183a7556ddec8667230459434d09dceca7439bc172bec4258e1b543e08ddbec3"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/format-complete.log",
+      "archive": "format-complete.log.gz",
+      "bytes": 66,
+      "sha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "archiveSha256": "710c63d8d40d5688a62c3b08053dd1971c4e4ee87b2297f3f20c2540d22cd94e"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/format-final.log",
+      "archive": "format-final.log.gz",
+      "bytes": 155,
+      "sha256": "51ff4dd7d09de4715ce3b6306cc0549227d8827650c17d9b9b279b9fbc8733b1",
+      "archiveSha256": "e52f314b9d18ec2bb924f0443688013a0c717455bc6668e4d5296e431cff9cdf"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/format-pins.log",
+      "archive": "format-pins.log.gz",
+      "bytes": 56,
+      "sha256": "a7a6e03ce2c349cfa0e4ae3d18828bdbb9ab3205b7d4bf7925ad2a19125dd4ee",
+      "archiveSha256": "f87e0fcd7d9ee20b0ffc569331ab2476e6857e04c13c1eb785d04d1781ce27b8"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/format.log",
+      "archive": "format.log.gz",
+      "bytes": 555,
+      "sha256": "1fd285ee75a64cf5af818ad9813fd6a8859e96102696830a505327cea67ff904",
+      "archiveSha256": "1c463567d72430b96a88c5536c92c9eb7e43fce6dd6935363a6cfae80ef6242f"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/introspection.log",
+      "archive": "introspection.log.gz",
+      "bytes": 247894,
+      "sha256": "7c9148d3d8022f66b7975882255dd27d3733206bcfc58e76c18d07d593be2bc1",
+      "archiveSha256": "b5d4fc84f97933cd833aa4f5c4b0987e80bf1d238c9d3c89e59254a0f87d9b2d"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/inventories.log",
+      "archive": "inventories.log.gz",
+      "bytes": 818,
+      "sha256": "97d56eab7f8fa4353ca30281135cac1515ed742fb53bf1dd986105225d07781a",
+      "archiveSha256": "6d534e1ef7455a2a5f9e2b03578b71c7a65e99b6c47324928d14dfaf21362f8d"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/lint-final.log",
+      "archive": "lint-final.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archiveSha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/lint.log",
+      "archive": "lint.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archiveSha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-actual-r26.log",
+      "archive": "pg-actual-r26.log.gz",
+      "bytes": 1842,
+      "sha256": "07f7dd0b5929bb7b5eb51d3a9b2ef6a2020acca27e86cc2e18c966b5b9fe9b71",
+      "archiveSha256": "9e8394cd75445315c45436c903baee677bc352728fb0154c098cf4b35e426d3f"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-api-financial-regression.log",
+      "archive": "pg-api-financial-regression.log.gz",
+      "bytes": 718,
+      "sha256": "ceac53aad860749b728f4b62776dc5f6382c9b18f426c9a5f6f88118de257ef4",
+      "archiveSha256": "260e0b6e43769fc846ac6b7bfb89f3e21a5420c9e6404577d358e0836740673c"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-command-green.log",
+      "archive": "pg-command-green.log.gz",
+      "bytes": 553,
+      "sha256": "80324eea7cb081b5dbb2ab586e4f1aa324e5251c8e70699b877012402716293d",
+      "archiveSha256": "50422f7ae7684ca5833de37cb62e605d3503f04bbacf0a7b35d3f9cf43d56c7d"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-final-focused.log",
+      "archive": "pg-final-focused.log.gz",
+      "bytes": 2879,
+      "sha256": "4fc50e228a564266ef22d6ed222de8708769aa705567abc3b3d7d565c797c906",
+      "archiveSha256": "0d98dd29255b05115bddac7b76f4360e95328e7e5bbf95cbf6a80ca1eb30964b"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-green-r123.log",
+      "archive": "pg-green-r123.log.gz",
+      "bytes": 647,
+      "sha256": "5fd9387f95c6b2961f325f4213b286da5fe3f04edb411c112f2dfc41baf51acd",
+      "archiveSha256": "f5640c7d8c633630a9405da91f07ae519240c56f212fdedc23197d15bfd79907"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-queue-green.log",
+      "archive": "pg-queue-green.log.gz",
+      "bytes": 488,
+      "sha256": "2f6ac77d3b67c19d23acf55ebb7128d9d050b9e5ced513c5ea64fd88a244252d",
+      "archiveSha256": "d32cbf51e751b677952de1ce5f74dc045a156982146fe1f241f92fef9cbb20f5"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-queue-red.log",
+      "archive": "pg-queue-red.log.gz",
+      "bytes": 1852,
+      "sha256": "8919832f6de08580456c4aef9d80ef4f84c835696c5123a4b7a784d5983712d7",
+      "archiveSha256": "03e2f582aba4cc9acc0110f5224b3f07232d077041847dc4efb4c3bf569578ec"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-red-r123.log",
+      "archive": "pg-red-r123.log.gz",
+      "bytes": 4583,
+      "sha256": "29b4e390825da68f84161a4b03403345c24639ae69fe380d44a68991cd792b07",
+      "archiveSha256": "ce7150e321a370141d08e038a0b59b48aa88d3fd5616734072e6c67f4dc11167"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/pg-v2-regression.log",
+      "archive": "pg-v2-regression.log.gz",
+      "bytes": 1141,
+      "sha256": "bfd4ecf64a04aeb26de7bf348033dcc8b6e0014f0b1fe22bd0989c2b63bd2738",
+      "archiveSha256": "4ce1375a6bc2f104dbb16cc88bfd3b17b34cd35a3759b13415d10821aab0598f"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/queue-application-build.log",
+      "archive": "queue-application-build.log.gz",
+      "bytes": 381,
+      "sha256": "f4efb331b962e35b53261bca87965a469388e147b7f01012a47f7d665061402a",
+      "archiveSha256": "53f1d54ed25f352c8018eca919430d41cad67880f01d0ab38694e6c7b3c8a308"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/queue-db-build.log",
+      "archive": "queue-db-build.log.gz",
+      "bytes": 379,
+      "sha256": "340a961748090d3eca9d93609200eb051d86aa659ee173dc4fa0d2d14b4dce93",
+      "archiveSha256": "874fab06e6451d6084a1a293f860a9a21592ac4c7121ed13c04e68e9f6087ae0"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/queue-format.log",
+      "archive": "queue-format.log.gz",
+      "bytes": 397,
+      "sha256": "bcb2d2ce91a7358233eec4f1bd97ceb07d212dcc55e8c02515597aba8c4cc73a",
+      "archiveSha256": "af8c2e4a48f3f99c70c67772678a8ee3b5e5a9348464a457dba287dcb7971884"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/queue-tests-format.log",
+      "archive": "queue-tests-format.log.gz",
+      "bytes": 107,
+      "sha256": "73841d5b17de6b458f7793adb15bef3320e6bc440f3a92ab2039e645ce46aa84",
+      "archiveSha256": "2eaa44aa55a2d487532b29d581eb3064a7b13b6a53afaa42c048ffd979ae2f41"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/queue-web-build.log",
+      "archive": "queue-web-build.log.gz",
+      "bytes": 360,
+      "sha256": "bc6345bad2158da1eb6d2ecd720f3b7cc33a855170e6c1bb97d4920418075a7d",
+      "archiveSha256": "0658ca7960650a2639b4f48e1a977e62dc90e912ce113bc83c8b839722567330"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/reconstruction.log",
+      "archive": "reconstruction.log.gz",
+      "bytes": 272,
+      "sha256": "1a6a82eb6703f6da0ea64102a49147d455cbdae191559734f9bff70c9f254140",
+      "archiveSha256": "f1431307a3d641e4f790f9363de7db9b856576484d8dd7a76ca12aa4bc76fa2a"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/route-format.log",
+      "archive": "route-format.log.gz",
+      "bytes": 49,
+      "sha256": "3c7db752d1de66480af3e7133b4ca6bbc7ac26e9ec27dd993ff9bb1ef9cff6dc",
+      "archiveSha256": "505e508b8e2527808c5f8a9efb86ecf0bbb7f024fdd17c57f021d6221b83ccb1"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/route-green-final.log",
+      "archive": "route-green-final.log.gz",
+      "bytes": 365,
+      "sha256": "9da97bcff400b105deaaf9b9b7028acee3b3ce8f2ea1f78614d60afb0a211ed9",
+      "archiveSha256": "aad5843ca45a717e31a49467bbde6e6a83b0af89371c2809f43f26168dde9ddd"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/route-queue-green.log",
+      "archive": "route-queue-green.log.gz",
+      "bytes": 365,
+      "sha256": "7aebdb3811182510fd68b378e1aa2c0da604044267826ca505b8fa2874b32f5c",
+      "archiveSha256": "f092e7465ecadd13f2fb6121d19e830088293e077cb14a4b164561f8b7226cbd"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/route-regression-green.log",
+      "archive": "route-regression-green.log.gz",
+      "bytes": 2377,
+      "sha256": "5419def0735c94960970a177e960b9ddb0c1e48281b207c6ae7921a42aaeee23",
+      "archiveSha256": "6bca7684c07a5e2933ae9f8641212de08036f15678d8da41886b31ea7db92146"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/staged-scope-final.log",
+      "archive": "staged-scope-final.log.gz",
+      "bytes": 535,
+      "sha256": "a298cf327e837660a9758c5462615bc6026c1c0c459caa5f9716e341c5073682",
+      "archiveSha256": "e9b7102c7fb0edd5c2f4c3d8bc09ccc7aea6eede8f60a387479708bd45480e92"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/staged-scope.log",
+      "archive": "staged-scope.log.gz",
+      "bytes": 468,
+      "sha256": "33c85c825ae891b9ef4457f9fae3f7b6902d8498402b887edc8a790730a08a8d",
+      "archiveSha256": "99ba51cbc13cea85919b6bbe1513b31f5557f81d92a42f027e1d0d1d011b948c"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/static-exit-status.txt",
+      "archive": "static-exit-status.txt.gz",
+      "bytes": 95,
+      "sha256": "17eaf9a9478af28ba25d67016442f3cecb4519e3acfae96dc7aba900680da653",
+      "archiveSha256": "a7ce8172fa0887dbb46c5ba56868568ce9592986d40ccb767c9e17c528b99702"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/static-nullability-exit-status.txt",
+      "archive": "static-nullability-exit-status.txt.gz",
+      "bytes": 21,
+      "sha256": "71884f1220e791ee363d9490bdb8fb2970568cb0bc3c5e14536d55cdf69f6fa6",
+      "archiveSha256": "6585ce094ad54d8142f18d3ab599342d8f033a0ad5bacd535892c7f96297f213"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/tests-types-complete.log",
+      "archive": "tests-types-complete.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archiveSha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/tests-types-final.log",
+      "archive": "tests-types-final.log.gz",
+      "bytes": 147,
+      "sha256": "a92c4452012bb43518e176ddb2fbbab1c7ad7c079d92b5c7870a4c79770a13af",
+      "archiveSha256": "f40f7dc0c8e74b21acd74b224a7ef0e1f1c92cd8849f1cd743c563752f8d09f9"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/tests-types.log",
+      "archive": "tests-types.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archiveSha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/types-api-final.log",
+      "archive": "types-api-final.log.gz",
+      "bytes": 15,
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "archiveSha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/types-queue-nullability-red.log",
+      "archive": "types-queue-nullability-red.log.gz",
+      "bytes": 210,
+      "sha256": "a0a58ef02c13171efeceb27aae44f11d099f1d0879a11fb3b89076611e5760f4",
+      "archiveSha256": "970d2850f7424e710d5cb9b34528ef52ce27746ff439c045eef4778a6012e51a"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/types-tests-final.log",
+      "archive": "types-tests-final.log.gz",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "archiveSha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/types-web-final.log",
+      "archive": "types-web-final.log.gz",
+      "bytes": 15,
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "archiveSha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/types-worker-final.log",
+      "archive": "types-worker-final.log.gz",
+      "bytes": 15,
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "archiveSha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/view-format-fix.log",
+      "archive": "view-format-fix.log.gz",
+      "bytes": 47,
+      "sha256": "334300a7b99cb4804662da6afeafa922352e655ff1108dbc25f14a0b9f0d2719",
+      "archiveSha256": "649d56df53535dd0d6a01ba5f6ffc3298d151e49deeb9d50b532ddf531101e6a"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/view-queue-regression.log",
+      "archive": "view-queue-regression.log.gz",
+      "bytes": 359,
+      "sha256": "a15e3c5e493cfee46687b5d1071e4489a4af2b0b7ab144e39f72df4e2d26ee07",
+      "archiveSha256": "63190518d8f410fcd0df4f734c08bf3e82b9abe07ef6d1542c2622e1651db407"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/web-build.log",
+      "archive": "web-build.log.gz",
+      "bytes": 360,
+      "sha256": "bba1e3db31e7cbbdf000745b821fcfe7ec5b27d237bf2bcc728510da11b1b019",
+      "archiveSha256": "73b3edd0ca8df57b0b37a6374c2f9606410a15ccd95a0c9478dd49243ee5574c"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/web-final-build.log",
+      "archive": "web-final-build.log.gz",
+      "bytes": 360,
+      "sha256": "9c28923feaaf55daec54096e121f534c8f65ca22f6742a9edbb337e8aa6f2be3",
+      "archiveSha256": "4de5d68373bae72e8b5363f8753a98e0e1df3a859d55c0a338288b082620c51f"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/web-types.log",
+      "archive": "web-types.log.gz",
+      "bytes": 15,
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "archiveSha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169"
+    },
+    {
+      "source": ".superpowers/sdd/verification-messages-remediation-20261026/worker-types.log",
+      "archive": "worker-types.log.gz",
+      "bytes": 15,
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "archiveSha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169"
+    }
+  ]
+}

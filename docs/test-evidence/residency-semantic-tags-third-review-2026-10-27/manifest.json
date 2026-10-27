@@ -1,0 +1,637 @@
+{
+  "kind": "local-synthetic-semantic-third-review-correction-R2c",
+  "controlCommit": "4b81ec50c2a3035a1f0f0e851855c411d12f9d2d",
+  "productionEvidence": false,
+  "compression": "gzip level9 mtime0; one original artifact per file",
+  "preservedManifests": [
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-2026-10-27/manifest.json",
+      "sha256": "4d6bd9964db22932b24d1c8787eb614963913f7527326f40bc8715aa737b9d22"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-ordinary-input-2026-10-27/manifest.json",
+      "sha256": "5c5f3ba3053934b124ac80596a5bab2e28cf099323aa600a9673706d5a6e8358"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-reply-compatibility-2026-10-27/manifest.json",
+      "sha256": "2fa9a1ca364414eb955caa817a6ac7ba095934bd4c4818e984c5e26f8edfcc9e"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-review-corrections-2026-10-27/manifest.json",
+      "sha256": "ec453f84524bca0c2365995b36278e047b0cb49302f96139392b60eb16b730f2"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-second-review-2026-10-27/manifest.json",
+      "sha256": "24c796bdc995a92011e4ab2be38dcf779bbb2b7328a40e07ea40cb5d4f571071"
+    }
+  ],
+  "files": [
+    {
+      "file": "third-r2c-baseline-repository.ts.gz",
+      "sha256": "88caa84c82057ef61d5522a2cc91403a3bee4d85ba48a3e79f7652b8a93b1365",
+      "bytes": 23057,
+      "rawSha256": "ca1cf76e99fad87e0f79208cbdae15e656509d8625f17aa825a99fc83f4a34ed",
+      "rawBytes": 119075,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-baseline-repository.ts"
+    },
+    {
+      "file": "third-r2c-final-format.log.gz",
+      "sha256": "710c63d8d40d5688a62c3b08053dd1971c4e4ee87b2297f3f20c2540d22cd94e",
+      "bytes": 82,
+      "rawSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "rawBytes": 66,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-format.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "docs/runbooks/resident-semantic-tags.md",
+        "docs/test-evidence/residency-semantic-tags-third-review-2026-10-27.md"
+      ],
+      "exitCode": 0,
+      "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "recordedResult": "third-r2c-final-format.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-format.result.json.gz",
+      "sha256": "7ad8dc91294408f9f3ac70dc66db553fa1b141dce5e82306f57430e854757d8f",
+      "bytes": 259,
+      "rawSha256": "b36a6df6fb07c920c686579e03f40c222ee9b4771a511b15fd368f5d4e570884",
+      "rawBytes": 370,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-format.result.json"
+    },
+    {
+      "file": "third-r2c-final-introspected-schema.ts.gz",
+      "sha256": "ddc31301fc65a89884838d8504e3c1a0fc95b9d6b21b26354db0a7742258aad6",
+      "bytes": 50918,
+      "rawSha256": "f3dafcaec2e5a1e47b0594650c9692bd5986a17b7b7a2829b8d21aff5a1e652e",
+      "rawBytes": 378336,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-introspected-schema.ts"
+    },
+    {
+      "file": "third-r2c-final-introspection.log.gz",
+      "sha256": "e4b5497c623970979ffeaeb26ec29f36280d68fb6c2a8c81763fedce8c7d71cb",
+      "bytes": 3819,
+      "rawSha256": "e384624415cff8ac3bce5f803c95066ee3bf013771a6d91721155b4c6df942ef",
+      "rawBytes": 260336,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-introspection.log"
+    },
+    {
+      "file": "third-r2c-final-lint.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "third-r2c-final-lint.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-lint.result.json.gz",
+      "sha256": "5fdae512ac9e2c87e5e019982b3441bcff53aac9abb8eb5382f81fde7ac850d5",
+      "bytes": 204,
+      "rawSha256": "2d0a6fe417e5bda0323ee94882229ffc9fa5261f13dcc5a14ff353c60fcbf38d",
+      "rawBytes": 241,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-lint.result.json"
+    },
+    {
+      "file": "third-r2c-final-owner-green.log.gz",
+      "sha256": "8c4da3f2c5f796c6314cab3081052f7ea715878614f31b43039f04d5bf4be292",
+      "bytes": 697,
+      "rawSha256": "d2fbded2f16f22ad74120a93f70dd4e4395d01c1299f7d5779b3da6fac6c1ab5",
+      "rawBytes": 1447,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-owner-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "R2c strict|R2a profile|R2b retained|R2 removes obsolete|R2 newly blocked|mutable SQL tags"
+      ],
+      "exitCode": 0,
+      "logSha256": "d2fbded2f16f22ad74120a93f70dd4e4395d01c1299f7d5779b3da6fac6c1ab5",
+      "recordedResult": "third-r2c-final-owner-green.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-owner-green.result.json.gz",
+      "sha256": "9a2ead7b14eaf26e35a07723f3e32f496d7a74b55810d67f7e31e14d5e9b2873",
+      "bytes": 239,
+      "rawSha256": "e42d6de866b1ed7106f3629ab6cf8e857e93b7ecfcdf067169627d4ae09d1e6e",
+      "rawBytes": 294,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-owner-green.result.json"
+    },
+    {
+      "file": "third-r2c-final-r4-green.log.gz",
+      "sha256": "0528f512d4bd7184383ef343c72b5e0081763b8e576cba22a54d88c86983dbea",
+      "bytes": 485,
+      "rawSha256": "24622e93beefc564770d301a9076181fe99fec95fa657dc0df60b04702df2214",
+      "rawBytes": 954,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-r4-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R2a approved|S3b R4 complete review"
+      ],
+      "exitCode": 0,
+      "logSha256": "24622e93beefc564770d301a9076181fe99fec95fa657dc0df60b04702df2214",
+      "recordedResult": "third-r2c-final-r4-green.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-r4-green.result.json.gz",
+      "sha256": "e1bd4e74cec5c32700b0ac3bdd692c0d0f4681a0db23d70f81b8a3678743fb8e",
+      "bytes": 209,
+      "rawSha256": "170b309ce039b554f905921fb751abea61e32d907cfafd04856b507a4771c427",
+      "rawBytes": 242,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-r4-green.result.json"
+    },
+    {
+      "file": "third-r2c-final-reconstruct.ts.gz",
+      "sha256": "49e417921226c5d9cb2cc4d7c7d539ee3c943f0aeb8b69e6cb1c231c9e891cf7",
+      "bytes": 2244,
+      "rawSha256": "4b5875c06e5103d6e1f1a0265961754224b2965bec525f95cc6f6f9eb4c852ba",
+      "rawBytes": 5629,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-reconstruct.ts"
+    },
+    {
+      "file": "third-r2c-final-scope-guards.log.gz",
+      "sha256": "f1f3f0af70f16b2c2bd2d997977e78711e5ad359d1b6c277fdfe7f4a1670a786",
+      "bytes": 271,
+      "rawSha256": "8087e62812d7f6559f273915acf85a58d0a14bc2e0a2d3bc9e8f023790ddf20a",
+      "rawBytes": 364,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-scope-guards.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/expert-referral-scope-guards.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "8087e62812d7f6559f273915acf85a58d0a14bc2e0a2d3bc9e8f023790ddf20a",
+      "recordedResult": "third-r2c-final-scope-guards.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-scope-guards.result.json.gz",
+      "sha256": "1e2d16e3ca36808375c7796e2ed6969be64abc747c576dade9a9d534183e4512",
+      "bytes": 176,
+      "rawSha256": "0ef987bbb934aca417e2fbfaf97ab79dc40486c198f66d438b2d6e89b404df1f",
+      "rawBytes": 194,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-scope-guards.result.json"
+    },
+    {
+      "file": "third-r2c-final-state-guards.log.gz",
+      "sha256": "7db34303d5279392ad332173680286b38db684010e51a80fa2e712c72fd9a0f2",
+      "bytes": 325,
+      "rawSha256": "1dcfe1b761f3b1106e1601f4136350f98a2f344500d1ce087a0133d26f0208af",
+      "rawBytes": 457,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-state-guards.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/resident-semantic-tags-state.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "1dcfe1b761f3b1106e1601f4136350f98a2f344500d1ce087a0133d26f0208af",
+      "recordedResult": "third-r2c-final-state-guards.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-state-guards.result.json.gz",
+      "sha256": "f6afb87cbdc1e364b188f854d55f186f2b9d5b74671c31e4777227cab9f93f61",
+      "bytes": 174,
+      "rawSha256": "db79608aab6626a7e941f321ede499af691eebec06e7f923416c9fbebcf9b8d3",
+      "rawBytes": 194,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-state-guards.result.json"
+    },
+    {
+      "file": "third-r2c-final-state-reconstruction.log.gz",
+      "sha256": "2bb0763975603a0e214519275a80bb7f387435a5de85c4903943c30bf0dbd157",
+      "bytes": 199,
+      "rawSha256": "e8c2ca903afc09d450344fad9e7c69fe651cb518ff61057c6b9fd40785103a53",
+      "rawBytes": 274,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-state-reconstruction.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-reconstruct.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e8c2ca903afc09d450344fad9e7c69fe651cb518ff61057c6b9fd40785103a53",
+      "recordedResult": "third-r2c-final-state-reconstruction.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-state-reconstruction.result.json.gz",
+      "sha256": "7ea7a12d404e7d38c9300a2298918390e0c9fe550f4643b0e1a4b4b6e1a29a73",
+      "bytes": 192,
+      "rawSha256": "ed14dae639b8a63e585f07bd9a375874d3350ee5d85232aa62a2f558234ff19b",
+      "rawBytes": 217,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-state-reconstruction.result.json"
+    },
+    {
+      "file": "third-r2c-final-tests-types.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-tests-types.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "third-r2c-final-tests-types.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-tests-types.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-tests-types.result.json"
+    },
+    {
+      "file": "third-r2c-final-whitespace.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-whitespace.log",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "third-r2c-final-whitespace.result.json.gz"
+    },
+    {
+      "file": "third-r2c-final-whitespace.result.json.gz",
+      "sha256": "40ea006f471eb799cd3d2ed7504fa1f444bbdfb87a13d9e50241b8a82cb60d7d",
+      "bytes": 137,
+      "rawSha256": "e3b9db95b0bd75d85eed2989d2b622082fdb471c5a0b78a7037b9a03038a167f",
+      "rawBytes": 136,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-final-whitespace.result.json"
+    },
+    {
+      "file": "third-r2c-green.log.gz",
+      "sha256": "1d789d9da842ecb9c1e972b7da9d05112b670759a70f1ccd10422bff90d1dbfe",
+      "bytes": 659,
+      "rawSha256": "3968891e750df3477a6b741d1ce3c741d11a825461eda6df131033f2b3be4577",
+      "rawBytes": 1368,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "R2c strict|R2a profile|R2b retained|R2 removes obsolete|R2 newly blocked"
+      ],
+      "exitCode": 0,
+      "logSha256": "3968891e750df3477a6b741d1ce3c741d11a825461eda6df131033f2b3be4577",
+      "recordedResult": "third-r2c-green.result.json.gz"
+    },
+    {
+      "file": "third-r2c-green.result.json.gz",
+      "sha256": "46a0ca60b30f6a5dbcd01a06fbd0af279a8fd10cfa523222a3f55d15730844b6",
+      "bytes": 226,
+      "rawSha256": "cfe87a01d08d6370ba766c99d18f22e41e3a71fb483c6abde3b3208404d66260",
+      "rawBytes": 277,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-green.result.json"
+    },
+    {
+      "file": "third-r2c-introspected-schema.ts.gz",
+      "sha256": "ddc31301fc65a89884838d8504e3c1a0fc95b9d6b21b26354db0a7742258aad6",
+      "bytes": 50918,
+      "rawSha256": "f3dafcaec2e5a1e47b0594650c9692bd5986a17b7b7a2829b8d21aff5a1e652e",
+      "rawBytes": 378336,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-introspected-schema.ts"
+    },
+    {
+      "file": "third-r2c-introspection.log.gz",
+      "sha256": "8dcb0d033fe0c82ec2f9182d00ad8eaebe742e173805c58bf6e7ecdd8288ab7e",
+      "bytes": 3784,
+      "rawSha256": "1f90b6789e84af096ba04d2775fde20daa1c13edff4b0478867be8fe617d253a",
+      "rawBytes": 259165,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-introspection.log"
+    },
+    {
+      "file": "third-r2c-legacy-syntax-green.log.gz",
+      "sha256": "e606d274996f2e2c65ae6e9af704693493fcc7153b31bd5324aff18b7dc1dcf6",
+      "bytes": 488,
+      "rawSha256": "23364b3c7cc63a04074ef8c8ece2fea29250041d732eb6682c11f57dbb54351f",
+      "rawBytes": 907,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-legacy-syntax-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-legacy-syntax-upgrade.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "23364b3c7cc63a04074ef8c8ece2fea29250041d732eb6682c11f57dbb54351f",
+      "recordedResult": "third-r2c-legacy-syntax-green.result.json.gz"
+    },
+    {
+      "file": "third-r2c-legacy-syntax-green.result.json.gz",
+      "sha256": "f21afcc72ddfa86065faec086137189099d3263de7e0a34c5d223c054227113a",
+      "bytes": 187,
+      "rawSha256": "1a034120f5f79ef0ad9e24ab979c679be98b20a21c0e7f33ccb5c2cd214ef91d",
+      "rawBytes": 212,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-legacy-syntax-green.result.json"
+    },
+    {
+      "file": "third-r2c-legacy-syntax-red.log.gz",
+      "sha256": "74eddd29d95278f657295217e473d6283ba5847926d0fe64fe8be3c1c6931ef4",
+      "bytes": 573,
+      "rawSha256": "dfb146addaaca5b614ae2f0d9c31296c9c34a6ce5f3c4979383b82b4606add02",
+      "rawBytes": 1236,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-legacy-syntax-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-legacy-syntax-upgrade.test.ts"
+      ],
+      "exitCode": 1,
+      "logSha256": "dfb146addaaca5b614ae2f0d9c31296c9c34a6ce5f3c4979383b82b4606add02",
+      "recordedResult": "third-r2c-legacy-syntax-red.result.json.gz"
+    },
+    {
+      "file": "third-r2c-legacy-syntax-red.result.json.gz",
+      "sha256": "5f9fb0029d99fb65e63a7d9ef86db0986ed310a91e873b22b03835796b10a38e",
+      "bytes": 186,
+      "rawSha256": "151707afc8467950ecea1a227cf218f7f5902e65b92e89592194aef78b5a8304",
+      "rawBytes": 212,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-legacy-syntax-red.result.json"
+    },
+    {
+      "file": "third-r2c-legacy-syntax-upgrade.test.ts.gz",
+      "sha256": "3ec7e6eb949a5433945a609ac489f8836406d83c29193609cb17cfb062008d81",
+      "bytes": 5408,
+      "rawSha256": "530ad29d8a65d973eaa5aad3dd2306fefeefc0ae92d8293599318649b1a69847",
+      "rawBytes": 17040,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-legacy-syntax-upgrade.test.ts"
+    },
+    {
+      "file": "third-r2c-lint.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "third-r2c-lint.result.json.gz"
+    },
+    {
+      "file": "third-r2c-lint.result.json.gz",
+      "sha256": "5fdae512ac9e2c87e5e019982b3441bcff53aac9abb8eb5382f81fde7ac850d5",
+      "bytes": 204,
+      "rawSha256": "2d0a6fe417e5bda0323ee94882229ffc9fa5261f13dcc5a14ff353c60fcbf38d",
+      "rawBytes": 241,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-lint.result.json"
+    },
+    {
+      "file": "third-r2c-migration.sql.gz",
+      "sha256": "a5b380297db36a10389ac70d43acd6e9c5eb4db29d800bd9b43607877deb3cad",
+      "bytes": 4907,
+      "rawSha256": "a5c787fb5e784b5cde3c8aa8f19d6f43e916b25c3587d5ed61b72490ff78d4d2",
+      "rawBytes": 19627,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-migration.sql"
+    },
+    {
+      "file": "third-r2c-package-evidence.py.gz",
+      "sha256": "419e79449a708d3adca9c4e082684e435784cab2a0069911b1606645212afa6d",
+      "bytes": 1457,
+      "rawSha256": "1b332a252542d977f44525cc41d75d4f24b3fdb9f60aedebe07347280c94a315",
+      "rawBytes": 2961,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-package-evidence.py"
+    },
+    {
+      "file": "third-r2c-r4-green.log.gz",
+      "sha256": "352a5a8011a29a942e004220a66b56c2eaed4c3fe92c39a20f95d4d6ad115412",
+      "bytes": 486,
+      "rawSha256": "b75aad5a237a5ed2b2e1e346af7450c9265455fc80665646aec8487b08e7c8ad",
+      "rawBytes": 954,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-r4-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R2a approved|S3b R4 complete review"
+      ],
+      "exitCode": 0,
+      "logSha256": "b75aad5a237a5ed2b2e1e346af7450c9265455fc80665646aec8487b08e7c8ad",
+      "recordedResult": "third-r2c-r4-green.result.json.gz"
+    },
+    {
+      "file": "third-r2c-r4-green.result.json.gz",
+      "sha256": "5644cab39178109d8fd797107fcc2d359b8e61b5c43f8fd199d06b3c79635858",
+      "bytes": 208,
+      "rawSha256": "a4184988d846caae9f37ddd8cb83fd3e9bc1b4d23c395fdfaeae74f5b488602f",
+      "rawBytes": 242,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-r4-green.result.json"
+    },
+    {
+      "file": "third-r2c-reconstruct.ts.gz",
+      "sha256": "b9f379c70a80364b1308dd4ec8b2656290dda5ddba22019dd2883f9b32c05cfc",
+      "bytes": 2241,
+      "rawSha256": "7f3748e425539e498916a8d843a77f1e222816045bce62c53b8e2bacf7170e11",
+      "rawBytes": 5617,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-reconstruct.ts"
+    },
+    {
+      "file": "third-r2c-red.log.gz",
+      "sha256": "5d243e5295c40656029ed6859d243dcff4aeb2dbd8df824c5f8e5cb1f8cfd46c",
+      "bytes": 1739,
+      "rawSha256": "6c06fdc8e4fe22f2df16dd4ca35b6abf44d4d9b434fdaced4f453ec5d6aeaff1",
+      "rawBytes": 4698,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "R2c strict"
+      ],
+      "exitCode": 1,
+      "logSha256": "6c06fdc8e4fe22f2df16dd4ca35b6abf44d4d9b434fdaced4f453ec5d6aeaff1",
+      "recordedResult": "third-r2c-red.result.json.gz"
+    },
+    {
+      "file": "third-r2c-red.result.json.gz",
+      "sha256": "6e67dbbdef5a6fd35af8a9939b24b3731d797a239699e0bd1a6ab4acdaf11ff8",
+      "bytes": 186,
+      "rawSha256": "ed89ec0e80e77663105137e550e9bf6562dd747c9f7c804b2eabb9146b2926b8",
+      "rawBytes": 215,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-red.result.json"
+    },
+    {
+      "file": "third-r2c-run.py.gz",
+      "sha256": "c108321ca78af4630b6f4ec069b3130b28a81f1393617e3310e0086790eabd17",
+      "bytes": 588,
+      "rawSha256": "d23632a2c6bad41a87492bab27e687c5d0805fc245446b18922f9d622d04de03",
+      "rawBytes": 1077,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-run.py"
+    },
+    {
+      "file": "third-r2c-semantic-tests.ts.gz",
+      "sha256": "9d3ba887e48cfa7b8b1af802ecca205f2fbfd1c602606264cb404c017dfdce36",
+      "bytes": 13866,
+      "rawSha256": "8bce8b5514f4058b959c96fc3a0a5df13333dbb15ce1549429e2d4a70aa350b0",
+      "rawBytes": 64991,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-semantic-tests.ts"
+    },
+    {
+      "file": "third-r2c-state-guards.log.gz",
+      "sha256": "89bd3ec550eca2fe06d7426423f3d4a2ad01175690fccda7f7e908c77bc401d9",
+      "bytes": 388,
+      "rawSha256": "55a780fbfc044a79596b481a572bc39141f5366000a7b95b0a1aec6d80290ac3",
+      "rawBytes": 596,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-state-guards.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/resident-semantic-tags-state.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "55a780fbfc044a79596b481a572bc39141f5366000a7b95b0a1aec6d80290ac3",
+      "recordedResult": "third-r2c-state-guards.result.json.gz"
+    },
+    {
+      "file": "third-r2c-state-guards.result.json.gz",
+      "sha256": "244ebd5fb407f7a3130abc145330400f2443a24940fd60dfa1d2239e9ca4e436",
+      "bytes": 222,
+      "rawSha256": "f38a04492477789db62c6b904b038a1b5eeee9f7ac0801da77c10f833c306219",
+      "rawBytes": 295,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-state-guards.result.json"
+    },
+    {
+      "file": "third-r2c-state-reconstruction.log.gz",
+      "sha256": "2bb0763975603a0e214519275a80bb7f387435a5de85c4903943c30bf0dbd157",
+      "bytes": 199,
+      "rawSha256": "e8c2ca903afc09d450344fad9e7c69fe651cb518ff61057c6b9fd40785103a53",
+      "rawBytes": 274,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-state-reconstruction.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-reconstruct.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e8c2ca903afc09d450344fad9e7c69fe651cb518ff61057c6b9fd40785103a53",
+      "recordedResult": "third-r2c-state-reconstruction.result.json.gz"
+    },
+    {
+      "file": "third-r2c-state-reconstruction.result.json.gz",
+      "sha256": "627ec5a3f48ed1b66c1dcb368410ad0f7656b463248d4029ba86032b4f5fdf1e",
+      "bytes": 189,
+      "rawSha256": "df9d7e8cd61fd1f9ccc676c6debfe76b1ae2481fa30f3fe523cea4544e097f35",
+      "rawBytes": 211,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-state-reconstruction.result.json"
+    },
+    {
+      "file": "third-r2c-tests-types.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-tests-types.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "third-r2c-tests-types.result.json.gz"
+    },
+    {
+      "file": "third-r2c-tests-types.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/third-r2c-tests-types.result.json"
+    }
+  ],
+  "finalSources": [
+    {
+      "path": "docs/runbooks/resident-semantic-tags.md",
+      "sha256": "f7c8a1eca13e1c3109fc97158d48da00a1f6f8b4371fdfe0da30c45a0ac36dcc"
+    },
+    {
+      "path": "packages/db/migrations/0069_resident_semantic_tags.sql",
+      "sha256": "a5c787fb5e784b5cde3c8aa8f19d6f43e916b25c3587d5ed61b72490ff78d4d2"
+    },
+    {
+      "path": "packages/db/migrations/meta/0069_snapshot.json",
+      "sha256": "9887f6cdc11a4684993b375e0dc7cdf101fc1409c093d6f6c1f74a04e0e33247"
+    },
+    {
+      "path": "packages/db/migrations/state/0069_manifest.json",
+      "sha256": "55a7bdb1f65af85e21ee7bc549dd4461870a781b65e59e43a2904bbb94e9e671"
+    },
+    {
+      "path": "packages/db/migrations/state/0069_sql_objects.json",
+      "sha256": "e8ca1f50fe003a504d6cf335db6b58215a1f0dc92a0f005f17a4066fdd9a4517"
+    },
+    {
+      "path": "tests/integration/resident-semantic-tags.test.ts",
+      "sha256": "8bce8b5514f4058b959c96fc3a0a5df13333dbb15ce1549429e2d4a70aa350b0"
+    },
+    {
+      "path": "tests/repo/support/payment-scope-boundary-core.ts",
+      "sha256": "3fd6b99129805581b68a83a694181cc656bbb14c5c489ca331bedd33eba9dbff"
+    }
+  ]
+}

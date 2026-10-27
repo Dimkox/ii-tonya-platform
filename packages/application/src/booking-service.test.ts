@@ -12,15 +12,12 @@ describe("booking workflows", () => {
     );
 
     expect(result).toMatchObject({ kind: "reserved", version: 1 });
-    expect(deps.outbox.topics()).toEqual([
-      "planerka.reserve",
-      "telegram.reservation_request",
-    ]);
+    expect(deps.outbox.topics()).toEqual(["telegram.reservation_request"]);
     expect(deps.outbox.allFree()).toBe(true);
     expect(deps.audit.actions()).toEqual(["reservation.created"]);
   });
 
-  it("confirms the expected version once and emits one free client notification", async () => {
+  it("approves the expected version once without premature client confirmation", async () => {
     const deps = bookingFixture({ status: "reserved", version: 1 });
     const service = createBookingService(deps);
 
@@ -32,7 +29,7 @@ describe("booking workflows", () => {
       correlationId: "confirm-1",
     });
 
-    expect(first).toMatchObject({ status: "booked", version: 2 });
+    expect(first).toMatchObject({ status: "reserved", version: 2 });
     await expect(
       service.confirmByExpert({
         reservationId: deps.reservationId,
@@ -42,10 +39,7 @@ describe("booking workflows", () => {
         correlationId: "confirm-2",
       }),
     ).rejects.toThrow("Stale reservation version");
-    expect(deps.outbox.topics()).toEqual([
-      "planerka.confirm",
-      "client.booking_confirmed",
-    ]);
+    expect(deps.outbox.topics()).toEqual([]);
     expect(deps.outbox.allFree()).toBe(true);
   });
 
@@ -157,7 +151,6 @@ describe("booking workflows", () => {
       correlationId: "expire-1",
     });
     expect(deps.outbox.topics()).toEqual([
-      "planerka.cancel",
       "client.reservation_expired",
       "expert.reservation_expired",
     ]);

@@ -62,6 +62,7 @@ describe("client booking application boundary", () => {
       repository: {
         reserveProtectedChoice,
         cancelOwnedByHandle: async () => ({ kind: "not_found" as const }),
+        listOwnedActive: vi.fn(),
       },
       generateBookingHandle: () => bookingHandle,
       newCorrelationId: () => "reserve-correlation",
@@ -98,6 +99,7 @@ describe("client booking application boundary", () => {
       repository: {
         reserveProtectedChoice,
         cancelOwnedByHandle: vi.fn(),
+        listOwnedActive: vi.fn(),
       },
     });
 
@@ -128,6 +130,7 @@ describe("client booking application boundary", () => {
       repository: {
         reserveProtectedChoice,
         cancelOwnedByHandle: vi.fn(),
+        listOwnedActive: vi.fn(),
       },
       generateBookingHandle: () => {
         handleAttempt += 1;
@@ -155,6 +158,7 @@ describe("client booking application boundary", () => {
         .mockResolvedValueOnce({ kind: "not_found" as const })
         .mockResolvedValueOnce({ kind: "conflict" as const }),
       cancelOwnedByHandle: vi.fn(),
+      listOwnedActive: vi.fn(),
     };
     const service = createClientBookingService({ repository });
     const principal = {
@@ -180,6 +184,7 @@ describe("client booking application boundary", () => {
       repository: {
         reserveProtectedChoice: vi.fn(),
         cancelOwnedByHandle,
+        listOwnedActive: vi.fn(),
       },
       newCorrelationId: () => "cancel-correlation",
     });
@@ -212,6 +217,7 @@ describe("client booking application boundary", () => {
     }));
     const service = createClientBookingService({
       repository: {
+        listOwnedActive: vi.fn(),
         reserveProtectedChoice: vi.fn(),
         cancelOwnedByHandle: vi.fn(),
         rescheduleOwnedByHandle,

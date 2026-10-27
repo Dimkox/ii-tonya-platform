@@ -4,6 +4,7 @@ import {
   boolean,
   char,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -26,11 +27,23 @@ const mutableTimestamps = {
     .defaultNow(),
 };
 
-export const users = pgTable("users", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  active: boolean("active").notNull().default(true),
-  ...mutableTimestamps,
-});
+export const users = pgTable(
+  "users",
+  {
+    currentVerificationStage: text("current_verification_stage")
+      .notNull()
+      .default("NONE"),
+    id: uuid("id").defaultRandom().primaryKey(),
+    active: boolean("active").notNull().default(true),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    check(
+      "users_current_verification_stage_check",
+      sql`${table.currentVerificationStage} IN ('NONE','FORM_FILLING','AUTO_CHECK','MANAGER_REVIEW','DONE')`,
+    ),
+  ],
+);
 
 export const clientSessions = pgTable(
   "client_sessions",
@@ -58,6 +71,22 @@ export const clientSessions = pgTable(
       sql`${table.expiresAt} > ${table.createdAt} and (${table.revokedAt} is null or ${table.revokedAt} >= ${table.createdAt})`,
     ),
     index("client_sessions_expiry_idx").on(table.expiresAt),
+  ],
+);
+
+export const clientSessionBookingGrants = pgTable(
+  "client_session_booking_grants",
+  {
+    sessionTokenDigest: char("session_token_digest", {
+      length: 71,
+    }).primaryKey(),
+  },
+  (table) => [
+    foreignKey({
+      name: "client_session_booking_grants_session_fk",
+      columns: [table.sessionTokenDigest],
+      foreignColumns: [clientSessions.tokenDigest],
+    }).onDelete("cascade"),
   ],
 );
 
@@ -107,6 +136,7 @@ export const channelIdentities = pgTable(
     ...mutableTimestamps,
   },
   (table) => [
+    unique("channel_identity_resident_owner").on(table.id, table.userId),
     uniqueIndex("channel_identities_provider_external_legacy_unique")
       .on(table.provider, table.externalId)
       .where(sql`${table.botKey} is null`),

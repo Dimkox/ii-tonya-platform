@@ -1,0 +1,195 @@
+{
+  "kind": "local-synthetic-semantic-ordinary-reply-compatibility",
+  "controlCommit": "79b5d2334b7261a94621ecac15142df1b7053dab",
+  "productionEvidence": false,
+  "previousManifest": "docs/test-evidence/residency-semantic-tags-ordinary-input-2026-10-27/manifest.json",
+  "previousManifestSha256": "5c5f3ba3053934b124ac80596a5bab2e28cf099323aa600a9673706d5a6e8358",
+  "compression": "gzip level9 mtime0; one original artifact per file",
+  "files": [
+    {
+      "file": "ordinary-reply-regression-green.log.gz",
+      "sha256": "629c4abefc4592edb940a226db0df74a510d4511cba81237250ace16568c4855",
+      "bytes": 587,
+      "rawSha256": "f5601b0220f29c2e3369edbd0db62e3d055ae45860a13fcfbebce256e82bfbe4",
+      "rawBytes": 1492,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-reply-regression-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "ordinary (own-tag|interview replies)"
+      ],
+      "exitCode": 0,
+      "logSha256": "f5601b0220f29c2e3369edbd0db62e3d055ae45860a13fcfbebce256e82bfbe4",
+      "recordedResult": "ordinary-reply-regression-green.result.json.gz"
+    },
+    {
+      "file": "ordinary-reply-regression-green.result.json.gz",
+      "sha256": "3a8c9f41c474f6909ccf8cdbb60cc3521d6d92d6d503a1328a881c394c8a6a8c",
+      "bytes": 205,
+      "rawSha256": "7571d00875cbf9b0a06f32bc1f73d00471a585762b98e3ee23ad10fac1dd7c29",
+      "rawBytes": 241,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-reply-regression-green.result.json"
+    },
+    {
+      "file": "ordinary-reply-regression-red.log.gz",
+      "sha256": "59712fe6cdce7157bd5c834ed3029d54c1bf896b4eae69615657396243f194a5",
+      "bytes": 1183,
+      "rawSha256": "053ef589ebb89b7606d5f7eeff2bad69b3d6850612f5fa0d87e9a3d7ba58e765",
+      "rawBytes": 2476,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-reply-regression-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "ordinary interview replies"
+      ],
+      "exitCode": 1,
+      "logSha256": "053ef589ebb89b7606d5f7eeff2bad69b3d6850612f5fa0d87e9a3d7ba58e765",
+      "recordedResult": "ordinary-reply-regression-red.result.json.gz"
+    },
+    {
+      "file": "ordinary-reply-regression-red.result.json.gz",
+      "sha256": "e5010373bb3fb83bdc97426c666a0b50ec04b65f2f2b92391976b5fd0466adb1",
+      "bytes": 198,
+      "rawSha256": "fdaaa8510e408889c32d9ad7bdfb3e1eb230b1a1607938fe5417080e85a8f09e",
+      "rawBytes": 231,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-reply-regression-red.result.json"
+    },
+    {
+      "file": "reply-compat-api-types.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-api-types.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/api",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "recordedResult": "reply-compat-api-types.result.json.gz"
+    },
+    {
+      "file": "reply-compat-api-types.result.json.gz",
+      "sha256": "eac4b44fde6bd07ecef0da2ce7ac46cdd5af13fd16808a167dffeb4fe2e8c652",
+      "bytes": 157,
+      "rawSha256": "bee9f79bafd1cb4c16ead5ccb92962a28c808bd8c22f17a560f262393796dd6c",
+      "rawBytes": 160,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-api-types.result.json"
+    },
+    {
+      "file": "reply-compat-integration.test.ts.gz",
+      "sha256": "6783ba135de77bead86692f397f6c75e94165f711c2b5d632ceedbad9e152702",
+      "bytes": 11361,
+      "rawSha256": "ba361b02ca6282663d78faebca8632b6d4145dbf9c8750c9e2fc40afd86e14e9",
+      "rawBytes": 48585,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-integration.test.ts"
+    },
+    {
+      "file": "reply-compat-lint.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "apps/api/src/expert-card-tag-prompt.ts",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "tests/integration/resident-semantic-tags.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "reply-compat-lint.result.json.gz"
+    },
+    {
+      "file": "reply-compat-lint.result.json.gz",
+      "sha256": "5698c42434e3922081e1e5e05ccd0024448ce171e2ccac62251677e15be070f4",
+      "bytes": 212,
+      "rawSha256": "3226882a386725eb45155c029ea07b7a0513b616ad98bb2fc34c9189646ca027",
+      "rawBytes": 278,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-lint.result.json"
+    },
+    {
+      "file": "reply-compat-types.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-types.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "reply-compat-types.result.json.gz"
+    },
+    {
+      "file": "reply-compat-types.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-types.result.json"
+    },
+    {
+      "file": "reply-compat-whitespace.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-whitespace.log",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "reply-compat-whitespace.result.json.gz"
+    },
+    {
+      "file": "reply-compat-whitespace.result.json.gz",
+      "sha256": "40ea006f471eb799cd3d2ed7504fa1f444bbdfb87a13d9e50241b8a82cb60d7d",
+      "bytes": 137,
+      "rawSha256": "e3b9db95b0bd75d85eed2989d2b622082fdb471c5a0b78a7037b9a03038a167f",
+      "rawBytes": 136,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/reply-compat-whitespace.result.json"
+    }
+  ],
+  "finalSources": [
+    {
+      "path": "apps/api/src/expert-card-tag-prompt.ts",
+      "sha256": "4ec7f78deb05116b1ebf502b9e92c3f5c2aeaf7ae13010f31c6d65e321ab09ab"
+    },
+    {
+      "path": "apps/api/src/expert-card-telegram-ingress.ts",
+      "sha256": "89a5920be2e664829201aef553ba41b7ae1ea2aa65426cedc5bfeb577d8d56f1"
+    },
+    {
+      "path": "docs/runbooks/resident-semantic-tags.md",
+      "sha256": "fc4efef2c34f032316b9f4727ba324a1de4f92c3259b73a314a5d184abbb13d1"
+    },
+    {
+      "path": "tests/integration/resident-semantic-tags.test.ts",
+      "sha256": "ba361b02ca6282663d78faebca8632b6d4145dbf9c8750c9e2fc40afd86e14e9"
+    }
+  ]
+}

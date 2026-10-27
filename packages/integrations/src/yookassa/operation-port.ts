@@ -49,6 +49,16 @@ export interface YooKassaOperationPort {
     kind: YooKassaOperationKind,
   ): Promise<YooKassaOperation | null>;
   claim(command: ClaimYooKassaOperationCommand): Promise<YooKassaOperation>;
+  /** One invocation owns the send only after its insertion transaction commits.
+   * Optional for legacy consumers; checkout fails closed when unavailable.
+   */
+  claimInitialPayment?(command: ClaimYooKassaOperationCommand): Promise<
+    | {
+        readonly kind: "initial_send_admitted";
+        readonly operation: YooKassaOperation;
+      }
+    | { readonly kind: "existing"; readonly operation: YooKassaOperation }
+  >;
   attachReplaySnapshot?(
     operationId: string,
     snapshot: NonNullable<ClaimYooKassaOperationCommand["replaySnapshot"]>,
@@ -67,6 +77,7 @@ export interface YooKassaOperationPort {
   ): Promise<void>;
   claimReconciliationBatch(
     limit: number,
+    mode?: YooKassaMode,
   ): Promise<readonly YooKassaOperation[]>;
 }
 
@@ -77,7 +88,18 @@ export interface YooKassaReceiptContact {
   readonly authorityReference: string;
 }
 
+/** Retained purchase identity; not consent or permission to disclose contact data. */
+export interface YooKassaReceiptAuthority {
+  readonly contactKind: "email" | "phone";
+  readonly authorityReference: string;
+}
+
 export interface YooKassaReceiptContactPort {
+  /** Payer sources expose this even when metadata is unavailable. Only legacy
+   * contact-only sources may omit the capability. Never fall back on failure. */
+  receiptAuthorityForOrder?(
+    orderId: string,
+  ): Promise<YooKassaReceiptAuthority | null>;
   receiptContactForOrder(
     orderId: string,
   ): Promise<YooKassaReceiptContact | null>;

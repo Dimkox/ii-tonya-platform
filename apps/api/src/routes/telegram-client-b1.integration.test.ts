@@ -1,3 +1,4 @@
+import { seedClientConsent } from "../../../../packages/db/src/testkit/client-consent.js";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import Fastify from "fastify";
@@ -88,12 +89,18 @@ describe("B1 dedicated Telegram HTTP to PostgreSQL path", () => {
         insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status)
         values(${userId}::uuid,'telegram',${externalId},${botKey},${externalId},${status})
       `);
-        await fixtureDatabase.db.execute(sql`
-        insert into consents(user_id,consent_type,decision,policy_version,created_at)
-        values
-          (${userId}::uuid,'client_messaging',${decision},'client-msg-v1','2026-08-28T00:00:00Z'),
-          (${userId}::uuid,'selarti_ai_processing',${decision},'selarti-v1','2026-08-28T00:00:01Z')
-      `);
+        if (decision === "granted") {
+          await seedClientConsent(
+            fixtureDatabase.db,
+            userId,
+            "client_messaging",
+          );
+          await seedClientConsent(
+            fixtureDatabase.db,
+            userId,
+            "selarti_ai_processing",
+          );
+        }
       };
       await seed("701", "active", "granted");
       await seed("702", "blocked", "granted");
@@ -220,8 +227,9 @@ describe("B1 dedicated Telegram HTTP to PostgreSQL path", () => {
         botKey,
         routingEnabled: true,
         costAdmissionEnabled: true,
-        messagingConsentPolicyVersion: "client-msg-v1",
-        selartiConsentPolicyVersion: "selarti-v1",
+        messagingConsentPolicyVersion: "client-messaging-v1",
+        selartiConsentPolicyVersion: "selarti-ai-v1",
+        hasMessagingConsent: async () => true,
         clock: () => new Date("2026-08-29T00:00:00.000Z"),
         persist: (input) => repository.persist(input),
       });

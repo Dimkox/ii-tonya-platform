@@ -1,0 +1,25 @@
+{
+  "head": "fa1a669f5b521ec8dbe75216fb35e993aa8d0902",
+  "runtimeAcceptedHead": "46e03bf0db4a751977a494f9c645e165490a6c75",
+  "command": "pnpm verify:gate --full --range 219f8e0c9d0938fccb4188cf0081f71b3f8b2db9..HEAD --changed-file /tmp/residency-rich-onboarding-final-paths-20261027.txt",
+  "repositoryTestsPassed": 611,
+  "hostedCI": false,
+  "files": [
+    {
+      "file": "residency-rich-onboarding-final-gate-1793068421620890520.log.gz",
+      "bytes": 276,
+      "sha256": "17e2da102ef508cb47fb4b05e3481467c69df60424721bb84eb8b8ae0c1c859e",
+      "rawBytes": 496,
+      "rawSha256": "d83f407dbd63279d98208c6fe5d6eb9d8c98a823e6482a37dc86eba41de039fe",
+      "exitCode": 0
+    },
+    {
+      "file": "residency-rich-onboarding-final-repo-1793068421620890520.log.gz",
+      "bytes": 2380,
+      "sha256": "81d9c552b2383e896b948192a2ac07ee899b03bac0b7692559cc5972033604fd",
+      "rawBytes": 8360,
+      "rawSha256": "7863d80ef34b493053dbd65329c6abf5a72ab07c6e635e3032f92aa116df7848",
+      "exitCode": 0
+    }
+  ]
+}

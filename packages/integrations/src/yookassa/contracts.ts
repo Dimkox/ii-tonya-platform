@@ -79,6 +79,7 @@ export const yooKassaNotificationSchema = z
   .object({
     type: z.literal("notification"),
     event: z.enum([
+      "payment.waiting_for_capture",
       "payment.succeeded",
       "payment.canceled",
       "refund.succeeded",

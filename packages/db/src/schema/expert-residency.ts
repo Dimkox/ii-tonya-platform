@@ -1,3 +1,4 @@
+import { expertPromoQualificationAudits } from "./expert-card-payments.js";
 import { sql } from "drizzle-orm";
 import {
   bigint as pgBigint,
@@ -23,6 +24,7 @@ import {
 import { adminApprovals, adminSessions } from "./audit.js";
 import { experts } from "./catalog.js";
 import { channelIdentities, consents, users } from "./identity.js";
+import { expertCampaignQuotes } from "./expert-campaign-quotes.js";
 
 const createdAt = timestamp("created_at", { withTimezone: true })
   .notNull()
@@ -286,7 +288,12 @@ export const expertReferrals = pgTable(
   "expert_referrals",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    codeId: uuid("code_id").notNull(),
+    codeId: uuid("code_id"),
+    acquisitionSource: text("acquisition_source")
+      .$type<"qualified_code" | "promo_registration">()
+      .notNull()
+      .default("qualified_code"),
+    promoQualificationId: uuid("promo_qualification_id"),
     inviterExpertId: uuid("inviter_expert_id")
       .notNull()
       .references(() => experts.id),
@@ -299,6 +306,26 @@ export const expertReferrals = pgTable(
   },
   (table) => [
     unique("expert_referrals_code_unique").on(table.codeId),
+    unique("expert_referrals_promo_qualification_unique").on(
+      table.promoQualificationId,
+    ),
+    foreignKey({
+      name: "expert_referrals_promo_qualification_fk",
+      columns: [
+        table.promoQualificationId,
+        table.inviteeExpertId,
+        table.inviterExpertId,
+      ],
+      foreignColumns: [
+        expertPromoQualificationAudits.id,
+        expertPromoQualificationAudits.inviteeExpertId,
+        expertPromoQualificationAudits.inviterExpertId,
+      ],
+    }),
+    check(
+      "expert_referrals_source",
+      sql`(acquisition_source='qualified_code' AND code_id IS NOT NULL AND promo_qualification_id IS NULL) OR (acquisition_source='promo_registration' AND code_id IS NULL AND promo_qualification_id IS NOT NULL)`,
+    ),
     unique("expert_referrals_invitee_unique").on(table.inviteeExpertId),
     unique("expert_referrals_id_inviter_unique").on(
       table.id,
@@ -485,6 +512,8 @@ export const expertResidencyOrders = pgTable(
     tariffVersionId: uuid("tariff_version_id")
       .notNull()
       .references(() => expertResidencyTariffVersions.id),
+    campaignQuoteId: uuid("campaign_quote_id"),
+    campaignTermMonths: integer("campaign_term_months").$type<1 | 3>(),
     snapshotDisplayName: text("snapshot_display_name").notNull(),
     priceMinor: pgBigint("price_minor", { mode: "bigint" }).notNull(),
     currency: text("currency").notNull().default("RUB"),
@@ -522,6 +551,18 @@ export const expertResidencyOrders = pgTable(
       table.idempotencyKey,
     ),
     unique("expert_orders_id_expert_unique").on(table.id, table.expertId),
+    unique("expert_campaign_order_quote_unique").on(table.campaignQuoteId),
+    foreignKey({
+      name: "expert_campaign_order_quote_fk",
+      columns: [table.campaignQuoteId],
+      foreignColumns: [expertCampaignQuotes.id],
+    }),
+    check(
+      "expert_campaign_order_binding",
+      sql`(${table.commercialPolicyVersion} <> 'expert_campaign_v1' AND ${table.campaignQuoteId} IS NULL AND ${table.campaignTermMonths} IS NULL)
+        OR (${table.commercialPolicyVersion} = 'expert_campaign_v1' AND ${table.campaignQuoteId} IS NOT NULL AND ${table.campaignTermMonths} IS NOT NULL
+          AND ${table.campaignTermMonths} IN (1,3) AND ${table.durationSeconds} = ${table.campaignTermMonths} * 2592000 AND ${table.creditCapBps} = 3000)`,
+    ),
     uniqueIndex("expert_orders_provider_payment_unique")
       .on(table.providerPaymentId)
       .where(sql`${table.providerPaymentId} is not null`),
@@ -539,7 +580,7 @@ export const expertResidencyOrders = pgTable(
     ),
     check(
       "expert_order_policy_version",
-      sql`${table.commercialPolicyVersion} in ('legacy_residency_v1','expert_residency_v2')`,
+      sql`${table.commercialPolicyVersion} in ('legacy_residency_v1','expert_residency_v2','expert_campaign_v1')`,
     ),
     check(
       "expert_order_v2_cap",

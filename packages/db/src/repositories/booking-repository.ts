@@ -7,7 +7,29 @@ import {
   type ReservationStatus,
 } from "@ii-tonya/domain";
 import type { DrizzleDb } from "../client.js";
+import { currentExpertResidencyVisibleSql } from "./catalog-repository.js";
 import { currentConsentSatisfiedSql } from "./consent-current.js";
+import {
+  captureBookingNotificationContext,
+  lockBookingNotificationReservation,
+  lockBookingNotificationSlot,
+  type BookingNotificationOrigin,
+} from "./booking-notification-authority.js";
+import {
+  deferBookingNotificationCapture,
+  flushBookingNotificationCapture,
+} from "./booking-notification-repository.js";
+import { enqueuePlanerkaBooking } from "./planerka-booking-repository.js";
+import {
+  lockBookingCallbackAuthority,
+  loadBookingApprovalAuthority,
+  hasCurrentBookingExpert,
+  lockApprovalLinks,
+  validApprovalLink,
+  approvalClock,
+  validTelegramBookingContext,
+  type TelegramBookingCallbackContext,
+} from "./booking-notification-callback-repository.js";
 
 export interface ReserveSlotCommand {
   idempotencyKey: string;
@@ -44,6 +66,13 @@ export type ReserveSlotResult =
         | "expert_active_overlap";
     };
 
+/** Internal transaction-local timing result, never external send authority. */
+interface ProtectedReservationTiming {
+  choiceDigest: `sha256:${string}`;
+  databaseNow: Date;
+  choiceExpired: boolean;
+}
+
 export interface TransitionReservationCommand {
   reservationId: string;
   expectedVersion: number;
@@ -54,12 +83,14 @@ export interface TransitionReservationCommand {
 }
 
 export interface TransitionReservationResult {
+  replayed?: true;
   reservationId: string;
   status: ReservationStatus;
   version: number;
 }
 
 export interface TransitionTelegramCallbackCommand {
+  telegramContext?: TelegramBookingCallbackContext;
   tokenHash: string;
   reservationId: string;
   expertId: string;
@@ -89,6 +120,7 @@ export interface BookingExpertScheduleRecord {
 }
 
 export interface BookingRepositoryOptions {
+  notificationOrigin?: BookingNotificationOrigin;
   maxSerializationAttempts?: number;
   retryDelayMs?: (attempt: number) => number;
   onSerializationExhausted?: (code: "booking_serialization_exhausted") => void;
@@ -106,6 +138,7 @@ export type ProtectedClientBookingReserveResult =
 
 export type ProtectedClientBookingCancelResult = {
   kind: "cancelled" | "replayed" | "not_found" | "conflict";
+  providerCancellationPending?: boolean;
 };
 
 export interface ReserveProtectedChoiceCommand {
@@ -215,21 +248,17 @@ type BookingAuditAction =
 const outboxTopicsFor = (action: BookingAuditAction): readonly string[] => {
   switch (action) {
     case "reservation.reserve":
-      return ["planerka.reserve", "telegram.reservation_request"];
+      return ["telegram.reservation_request"];
     case "reservation.expert_confirm":
-      return ["planerka.confirm", "client.booking_confirmed"];
+      return [];
     case "reservation.client_cancel":
-      return ["planerka.cancel", "telegram.booking_cancelled"];
+      return ["telegram.booking_cancelled"];
     case "reservation.reschedule":
       return ["planerka.reschedule", "telegram.reservation_rescheduled"];
     case "reservation.expert_cancel":
-      return ["planerka.cancel", "client.booking_cancelled"];
+      return ["client.booking_cancelled"];
     case "reservation.expire":
-      return [
-        "planerka.cancel",
-        "client.reservation_expired",
-        "expert.reservation_expired",
-      ];
+      return ["client.reservation_expired", "expert.reservation_expired"];
     case "reservation.complete":
       return ["client.booking_completed"];
     case "reservation.mark_no_show":
@@ -414,7 +443,7 @@ export class PostgresBookingRepository {
 
   constructor(
     private readonly db: DrizzleDb,
-    options: BookingRepositoryOptions = {},
+    private readonly options: BookingRepositoryOptions = {},
   ) {
     const configuredAttempts = options.maxSerializationAttempts ?? 3;
     this.maxSerializationAttempts = Number.isFinite(configuredAttempts)
@@ -521,6 +550,7 @@ export class PostgresBookingRepository {
       join experts e on e.id = es.expert_id
       where e.active
         and e.verified
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
         and es.active
         and es.code is not null
         and es.language is not null
@@ -700,6 +730,21 @@ export class PostgresBookingRepository {
       return Promise.resolve(null);
     }
     return this.runSerializable(async (tx) => {
+      await lockBookingNotificationReservation(tx, command.reservationId);
+      const contextBound =
+        (
+          await tx.execute(
+            sql`select reservation_id from booking_notification_contexts where reservation_id=${command.reservationId}::uuid`,
+          )
+        ).rows.length > 0;
+      const linked =
+        (
+          await tx.execute(
+            sql`select notification_id from booking_notification_callbacks where callback_token_hash=${command.tokenHash}`,
+          )
+        ).rows.length > 0;
+      if (contextBound || linked || command.telegramContext !== undefined)
+        return this.transitionBoundTelegramCallback(tx, command);
       const consumed = (
         await tx.execute<{ reservationId: string }>(sql`
           update notifications n
@@ -765,6 +810,152 @@ export class PostgresBookingRepository {
     });
   }
 
+  private async transitionBoundTelegramCallback(
+    tx: Transaction,
+    command: TransitionTelegramCallbackCommand,
+  ): Promise<TransitionReservationResult | null> {
+    const context = command.telegramContext;
+    if (!context || !validTelegramBookingContext(context)) return null;
+    await lockBookingCallbackAuthority(tx, command.reservationId);
+    const authority = await loadBookingApprovalAuthority(
+      tx,
+      context.deliveryId,
+    );
+    if (
+      !authority ||
+      authority.reservationId !== command.reservationId ||
+      authority.expertId !== command.expertId ||
+      authority.botKey !== context.botKey ||
+      authority.externalUserId !== context.telegramUserId ||
+      authority.chatId !== context.chatId ||
+      authority.version !== command.version ||
+      !(await hasCurrentBookingExpert(tx, authority))
+    )
+      return null;
+    const links = await lockApprovalLinks(tx, context.deliveryId);
+    if (
+      links.length !== 2 ||
+      links.some((link) => !validApprovalLink(link, authority))
+    )
+      return null;
+    const credential = links.find(
+      (link) =>
+        link.hash === command.tokenHash && link.action === command.action,
+    );
+    if (!credential) return null;
+    // Only an admitted, possibly delivered request authorizes a click. A receipt
+    // binds the actual Telegram message; uncertainty never fabricates one.
+    const attempts = (
+      await tx.execute<{ id: string; botKey: string; chatId: string }>(
+        sql`select id,bot_key as "botKey",chat_id as "chatId" from booking_notification_attempts where delivery_id=${context.deliveryId}::uuid and ordinal=${authority.attemptCount} for update`,
+      )
+    ).rows;
+    const attempt = attempts[0];
+    if (
+      !attempt ||
+      attempt.botKey !== context.botKey ||
+      attempt.chatId !== context.chatId ||
+      !["sending", "unknown", "manual", "delivered"].includes(authority.state)
+    )
+      return null;
+    const facts = (
+      await tx.execute<{
+        outcome: string;
+        messageId: string | null;
+        botKey: string | null;
+        chatId: string | null;
+      }>(
+        sql`select outcome,telegram_message_id::text as "messageId",bot_key as "botKey",response_chat_id as "chatId" from booking_notification_attempt_facts where attempt_id=${attempt.id}::uuid for share`,
+      )
+    ).rows;
+    if (
+      facts.some((f) => f.outcome === "not_applied" || f.outcome === "failed")
+    )
+      return null;
+    const receipt = facts.find((f) => f.outcome === "applied");
+    if (
+      receipt &&
+      (receipt.messageId !== String(context.messageId) ||
+        receipt.botKey !== context.botKey ||
+        receipt.chatId !== context.chatId)
+    )
+      return null;
+    if (authority.state === "delivered" && !receipt) return null;
+    if (credential.consumedAt) {
+      const action =
+        command.action === "confirm" ? "expert_confirm" : "expert_cancel";
+      const version = command.version + 1;
+      const status =
+        command.action === "confirm" ? "reserved" : "cancelled_by_expert";
+      const audit = (
+        await tx.execute(sql`select a.id from audit_events a join notifications n on n.id=${credential.id}::uuid
+        where a.object_type='reservation' and a.object_id=${command.reservationId}::uuid and a.actor_type='expert' and a.actor_id=${command.expertId}::uuid
+        and a.action=${`reservation.${action}`} and a.reason_code=${action} and a.decision=${status}
+        and a.occurred_at=n.callback_consumed_at and a.metadata_hash=${hash({ reservationId: command.reservationId, action: `reservation.${action}`, version })}`)
+      ).rows;
+      return audit.length === 1
+        ? {
+            reservationId: command.reservationId,
+            status,
+            version,
+            replayed: true,
+          }
+        : null;
+    }
+    await this.beforeCallbackTransition();
+    // All authority/domain/provider/delivery/credential/attempt locks precede this
+    // single database instant. Legacy caller timestamps are not new-flow authority.
+    const clock = await approvalClock(tx, command.reservationId);
+    if (
+      !clock ||
+      !clock.eligible ||
+      clock.version !== command.version ||
+      Number(credential.expires) > Number(clock.expires) ||
+      links.some((link) => Number(link.expires) !== Number(credential.expires))
+    )
+      return null;
+    const now = new Date(clock.now);
+    if (Number(credential.expires) * 1000 <= now.getTime()) return null;
+    await tx.execute(
+      sql`update notifications set callback_consumed_at=${now},updated_at=${now} where id=${credential.id}::uuid and callback_consumed_at is null`,
+    );
+    const result = await this.transitionInTransaction(tx, {
+      reservationId: command.reservationId,
+      expectedVersion: command.version,
+      action: command.action === "confirm" ? "expert_confirm" : "expert_cancel",
+      actor: { type: "expert", id: command.expertId },
+      now,
+      correlationId: command.correlationId,
+    });
+    await tx.execute(
+      sql`update booking_notification_callbacks set callback_token_ciphertext=null,encryption_key_id=null where delivery_id=${context.deliveryId}::uuid`,
+    );
+    return result;
+  }
+
+  async listOwnedActive(command: {
+    userId: string;
+    after?: `bk1.${string}`;
+  }): Promise<
+    | { kind: "not_found" }
+    | {
+        kind: "found";
+        bookings: {
+          bookingHandle: `bk1.${string}`;
+          state:
+            | "reserved"
+            | "booked"
+            | "calendar_pending"
+            | "cancellation_pending"
+            | "confirmation_unverified";
+          startsAt: Date;
+          reservedUntil: Date;
+        }[];
+      }
+  > {
+    return readOwnedActiveBookingsInTransaction(this.db, command);
+  }
+
   async reserveProtectedChoice(
     command: ReserveProtectedChoiceCommand,
   ): Promise<ProtectedClientBookingReserveResult> {
@@ -782,8 +973,20 @@ export class PostgresBookingRepository {
     ) {
       return { kind: "conflict" };
     }
+    command = { ...command };
     try {
       return await this.runSerializable(async (tx) => {
+        const notificationChoice = (
+          await tx.execute<{ slotId: string }>(
+            sql`select slot_id as "slotId" from client_catalog_choices where choice_digest=${command.choiceDigest}`,
+          )
+        ).rows[0];
+        if (notificationChoice)
+          await lockBookingNotificationSlot(
+            tx,
+            command.userId,
+            notificationChoice.slotId,
+          );
         await tx.execute(sql`
           select pg_advisory_xact_lock(
             hashtextextended(${`choice:${command.choiceDigest}`}, 0)
@@ -843,20 +1046,30 @@ export class PostgresBookingRepository {
           `)
         ).rows[0];
         if (choice === undefined) return { kind: "not_found" as const };
-        const reservation = await this.reserveInTransaction(tx, {
-          idempotencyKey: command.idempotencyKey,
-          userId: command.userId,
-          slotId: choice.slotId,
-          now,
-          minimumLeadMs: command.minimumLeadMs,
-          confirmationBufferMs: command.confirmationBufferMs,
-          correlationId: command.correlationId,
-        });
+        const timing: ProtectedReservationTiming = {
+          choiceDigest: command.choiceDigest,
+          databaseNow: now,
+          choiceExpired: false,
+        };
+        const reservation = await this.reserveInTransaction(
+          tx,
+          {
+            idempotencyKey: command.idempotencyKey,
+            userId: command.userId,
+            slotId: choice.slotId,
+            now,
+            minimumLeadMs: command.minimumLeadMs,
+            confirmationBufferMs: command.confirmationBufferMs,
+            correlationId: command.correlationId,
+          },
+          timing,
+        );
+        if (timing.choiceExpired) return { kind: "not_found" as const };
         if (reservation.kind === "unavailable") {
           return { kind: "conflict" as const };
         }
         if (
-          reservation.reservedUntil.getTime() - now.getTime() >
+          reservation.reservedUntil.getTime() - timing.databaseNow.getTime() >
           MAXIMUM_HOLD_MS
         ) {
           throw new Error("client_booking_hold_policy_invalid");
@@ -929,7 +1142,13 @@ export class PostgresBookingRepository {
         owned.status === "cancelled_by_client" ||
         owned.status === "cancelled_by_expert"
       ) {
-        return { kind: "replayed" };
+        const pending = await tx.execute<{ pending: boolean }>(
+          sql`select (exists(select 1 from planerka_booking_operations where reservation_id=${owned.reservationId}::uuid and state not in ('cancelled','rejected','finished')) or exists(select 1 from planerka_legacy_booking_reviews where reservation_id=${owned.reservationId}::uuid and resolved_at is null)) as pending`,
+        );
+        return {
+          kind: "replayed",
+          providerCancellationPending: pending.rows[0]?.pending === true,
+        };
       }
       if (owned.status !== "reserved" && owned.status !== "booked") {
         return { kind: "conflict" };
@@ -942,8 +1161,14 @@ export class PostgresBookingRepository {
         now,
         correlationId: command.correlationId,
       });
+      const pending = await tx.execute<{ pending: boolean }>(
+        sql`select (exists(select 1 from planerka_booking_operations where reservation_id=${owned.reservationId}::uuid and state not in ('cancelled','rejected','finished')) or exists(select 1 from planerka_legacy_booking_reviews where reservation_id=${owned.reservationId}::uuid and resolved_at is null)) as pending`,
+      );
       return result.status === "cancelled_by_client"
-        ? { kind: "cancelled" }
+        ? {
+            kind: "cancelled",
+            providerCancellationPending: pending.rows[0]?.pending === true,
+          }
         : { kind: "conflict" };
     });
   }
@@ -1011,8 +1236,10 @@ export class PostgresBookingRepository {
           oldSlotId: string;
           status: ReservationStatus;
           version: number;
+          providerOperation: boolean;
         }>(sql`
-          select r.id as "reservationId",r.slot_id as "oldSlotId",r.status,r.version
+          select r.id as "reservationId",r.slot_id as "oldSlotId",r.status,r.version,
+            exists(select 1 from planerka_booking_operations o where o.reservation_id=r.id) as "providerOperation"
           from client_booking_receipts b
           join reservations r on r.id=b.reservation_id
           join users u on u.id=b.user_id and u.active=true
@@ -1022,6 +1249,9 @@ export class PostgresBookingRepository {
         `)
       ).rows[0];
       if (!owned) return { kind: "not_found" };
+      // A provider operation owns its original slot/request for its full lifetime.
+      // Local reschedule cannot replace it or imply provider cancellation/rebooking.
+      if (owned.providerOperation) return { kind: "conflict" };
       if (owned.status !== "reserved" && owned.status !== "booked") {
         return { kind: "conflict" };
       }
@@ -1042,6 +1272,7 @@ export class PostgresBookingRepository {
           join experts e on e.id=es.expert_id and e.active=true and e.verified=true
           where c.choice_digest=${command.choiceDigest}
             and cr.user_id=${command.userId}::uuid and cr.state='ready'
+            and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
             and c.expires_at>${now} and cr.expires_at>${now}
             and s.starts_at>${new Date(now.getTime() + MINIMUM_LEAD_MS)}
             and s.observed_at>=${new Date(now.getTime() - SLOT_FRESHNESS_MS)}
@@ -1183,7 +1414,9 @@ export class PostgresBookingRepository {
       try {
         return await this.db.transaction(async (tx) => {
           await tx.execute(sql`set transaction isolation level serializable`);
-          return operation(tx);
+          const result = await operation(tx);
+          await flushBookingNotificationCapture(tx);
+          return result;
         });
       } catch (error) {
         if (!hasSqlState(error, "40001")) throw error;
@@ -1205,7 +1438,9 @@ export class PostgresBookingRepository {
   private async reserveInTransaction(
     tx: Transaction,
     command: ReserveSlotCommand,
+    protectedTiming?: ProtectedReservationTiming,
   ): Promise<ReserveSlotResult> {
+    await lockBookingNotificationSlot(tx, command.userId, command.slotId);
     await tx.execute(sql`
       select pg_advisory_xact_lock(hashtextextended(lock_key, 0))
       from (
@@ -1238,7 +1473,7 @@ export class PostgresBookingRepository {
         s.ends_at as "endsAt",
         s.observed_at as "observedAt",
         s.capacity,
-        e.active as "expertActive",
+        (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})) as "expertActive",
         e.verified as "expertVerified",
         es.active as "serviceActive"
       from slots s
@@ -1270,6 +1505,53 @@ export class PostgresBookingRepository {
         command,
         normalizeReservationResultRow(rawDuplicate),
       );
+    }
+
+    if (protectedTiming) {
+      // Choice/request/user and slot/service/expert rows, and all advisory locks,
+      // are now held. A pure row-lock wait does not require an SSI retry: acquire
+      // fresh database time here and compare source timestamps at full precision.
+      const timing = one(
+        (
+          await tx.execute<{
+            databaseNow: Date | string;
+            choiceValid: boolean;
+            slotFresh: boolean;
+            leadValid: boolean;
+            deadlineValid: boolean;
+          }>(sql`
+        with current_clock as materialized (select clock_timestamp() as at)
+        select current_clock.at as "databaseNow",
+          exists(select 1 from client_catalog_choices c
+            join client_catalog_requests cr on cr.id=c.request_id
+            join users u on u.id=cr.user_id
+            where c.choice_digest=${protectedTiming.choiceDigest}
+              and c.slot_id=${command.slotId}::uuid
+              and cr.user_id=${command.userId}::uuid and u.active and cr.state='ready'
+              and c.expires_at>current_clock.at and cr.expires_at>current_clock.at) as "choiceValid",
+          (s.observed_at between current_clock.at-interval '15 minutes' and current_clock.at) as "slotFresh",
+          (s.starts_at>=current_clock.at+${command.minimumLeadMs}::bigint*interval '1 millisecond') as "leadValid",
+          (s.starts_at-${command.confirmationBufferMs}::bigint*interval '1 millisecond'>current_clock.at) as "deadlineValid"
+        from slots s cross join current_clock where s.id=${command.slotId}::uuid
+      `)
+        ).rows,
+        "the protected reservation clock",
+      );
+      protectedTiming.databaseNow = normalizeBookingTimestamp(
+        timing.databaseNow,
+        "clock_timestamp",
+      );
+      if (timing.choiceValid !== true) {
+        protectedTiming.choiceExpired = true;
+        return { kind: "unavailable", reason: "deadline" };
+      }
+      if (timing.slotFresh !== true)
+        return { kind: "unavailable", reason: "stale_slot" };
+      if (timing.leadValid !== true)
+        return { kind: "unavailable", reason: "lead_time" };
+      if (timing.deadlineValid !== true)
+        return { kind: "unavailable", reason: "deadline" };
+      command = { ...command, now: protectedTiming.databaseNow };
     }
 
     if (!isFresh(slot.observedAt, command.now)) {
@@ -1340,6 +1622,12 @@ export class PostgresBookingRepository {
       "an inserted reservation",
     );
     const inserted = normalizeReservationResultRow(rawInserted);
+    if (this.options.notificationOrigin)
+      await captureBookingNotificationContext(
+        tx,
+        inserted.reservationId,
+        this.options.notificationOrigin,
+      );
 
     await this.auditAndOutbox(tx, {
       actorType: "client",
@@ -1403,6 +1691,7 @@ export class PostgresBookingRepository {
     tx: Transaction,
     command: TransitionReservationCommand,
   ): Promise<TransitionReservationResult> {
+    await lockBookingNotificationReservation(tx, command.reservationId);
     await tx.execute(sql`
       select pg_advisory_xact_lock(hashtextextended(lock_key, 0))
       from (
@@ -1438,7 +1727,7 @@ export class PostgresBookingRepository {
         s.ends_at as "endsAt",
         s.observed_at as "observedAt",
         s.capacity,
-        e.active as "expertActive",
+        (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})) as "expertActive",
         e.verified as "expertVerified",
         es.active as "serviceActive"
       from reservations r
@@ -1456,6 +1745,9 @@ export class PostgresBookingRepository {
     }
 
     await this.assertTransitionEligibility(tx, reservation, command);
+    if (command.action === "expert_confirm") {
+      await enqueuePlanerkaBooking(tx, reservation.reservationId);
+    }
     const nextStatus = transitionReservation(
       reservation.status,
       command.action,
@@ -1485,6 +1777,7 @@ export class PostgresBookingRepository {
             and s.observed_at <= ${command.now}
             and e.active = true
             and e.verified = true
+            and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
             and es.active = true
           returning r.id as "reservationId", r.status, r.version
         `)
@@ -1683,7 +1976,7 @@ export class PostgresBookingRepository {
         version: event.version,
         charge: 0,
       };
-      await tx.execute(sql`
+      const source = await tx.execute<{ id: string }>(sql`
         insert into integration_outbox (
           idempotency_key, topic, payload, correlation_id,
           reconciliation_key, payload_hash
@@ -1695,9 +1988,116 @@ export class PostgresBookingRepository {
           ${`booking:${event.correlationId}`},
           ${hash(payload)}
         )
+      returning id
       `);
+      deferBookingNotificationCapture(tx, source.rows[0]!.id);
     }
   }
 }
 
 export type { ReservationAction };
+
+export async function readOwnedActiveBookingsInTransaction(
+  tx: Pick<DrizzleDb, "execute">,
+  command: {
+    userId: string;
+    after?: `bk1.${string}`;
+  },
+): Promise<
+  | { kind: "not_found" }
+  | {
+      kind: "found";
+      bookings: {
+        bookingHandle: `bk1.${string}`;
+        state:
+          | "reserved"
+          | "booked"
+          | "calendar_pending"
+          | "cancellation_pending"
+          | "confirmation_unverified";
+        startsAt: Date;
+        reservedUntil: Date;
+      }[];
+    }
+> {
+  if (
+    !UUID_PATTERN.test(command.userId) ||
+    (command.after !== undefined &&
+      !/^bk1\.[A-Za-z0-9_-]{43}$/u.test(command.after))
+  ) {
+    return { kind: "not_found" };
+  }
+  // Resolve the anchor and the page in one snapshot. Keep microsecond cursor
+  // comparisons in PostgreSQL; cancelled receipts remain valid anchors.
+  const rows = (
+    await tx.execute<{
+      anchorFound: boolean;
+      bookingHandle: `bk1.${string}` | null;
+      state:
+        | "reserved"
+        | "booked"
+        | "calendar_pending"
+        | "cancellation_pending"
+        | "confirmation_unverified";
+      startsAt: Date | string;
+      reservedUntil: Date | string;
+    }>(sql`
+      with anchor as (
+        select b.created_at,b.booking_handle
+        from client_booking_receipts b
+        join users u on u.id=b.user_id and u.active
+        where b.user_id=${command.userId}::uuid and b.booking_handle=${command.after ?? null}
+      ), authority as (
+        select (${command.after === undefined} or exists(select 1 from anchor)) as valid
+      )
+      select authority.valid as "anchorFound", page.booking_handle as "bookingHandle",
+        page.status as state, page.starts_at as "startsAt", page.reserved_until as "reservedUntil"
+      from authority
+      left join lateral (
+        select b.booking_handle,b.created_at,
+          case when o.cancel_requested and o.state not in ('cancelled','rejected') then 'cancellation_pending'
+            when l.reservation_id is not null and l.resolved_at is null and r.status in ('cancelled_by_client','cancelled_by_expert','expired') then 'cancellation_pending'
+            when r.status='booked' and o.provider_uid is null then 'confirmation_unverified'
+            when r.status='reserved' and o.id is not null then 'calendar_pending'
+            else r.status::text end as status,s.starts_at,r.reserved_until
+        from client_booking_receipts b
+        join reservations r on r.id=b.reservation_id and r.user_id=b.user_id
+        left join planerka_booking_operations o on o.reservation_id=r.id
+        left join planerka_legacy_booking_reviews l on l.reservation_id=r.id
+        join slots s on s.id=r.slot_id
+        join users u on u.id=b.user_id and u.active
+        where authority.valid and b.user_id=${command.userId}::uuid
+          and (r.status in ('reserved','booked') or (
+            r.status in ('cancelled_by_client','cancelled_by_expert','expired')
+            and ((o.cancel_requested and o.state not in ('cancelled','rejected')) or (l.reservation_id is not null and l.resolved_at is null))
+          ))
+          and (${command.after === undefined} or (b.created_at,b.booking_handle) > (select created_at,booking_handle from anchor))
+        order by b.created_at,b.booking_handle
+        limit 21
+      ) page on true
+      order by page.created_at,page.booking_handle
+    `)
+  ).rows;
+  if (rows[0]?.anchorFound !== true) return { kind: "not_found" };
+  return {
+    kind: "found",
+    bookings: rows.flatMap((row) =>
+      row.bookingHandle === null
+        ? []
+        : [
+            {
+              bookingHandle: row.bookingHandle,
+              state: row.state,
+              startsAt: normalizeBookingTimestamp(
+                row.startsAt,
+                "slots.starts_at",
+              ),
+              reservedUntil: normalizeBookingTimestamp(
+                row.reservedUntil,
+                "reservations.reserved_until",
+              ),
+            },
+          ],
+    ),
+  };
+}

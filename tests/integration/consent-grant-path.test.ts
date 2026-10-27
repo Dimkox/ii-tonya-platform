@@ -260,6 +260,21 @@ describe("consent grant path", () => {
       documentKey: "consent.client_profile",
     });
 
+    const denied = await repository().recordDecision({
+      token: (
+        await repository().issuePresentation({
+          userId,
+          purpose: "client_profile",
+          channel: "web",
+          documentKey: "consent.client_profile",
+        })
+      ).token,
+      userId,
+      purpose: "client_profile",
+      decision: "denied",
+      policyVersion: "profile-v1",
+      correlationId: "corr-profile-deny",
+    });
     const granted = await repository().recordDecision({
       token: (
         await repository().issuePresentation({
@@ -275,26 +290,11 @@ describe("consent grant path", () => {
       policyVersion: "profile-v1",
       correlationId: "corr-profile-grant",
     });
-    const denied = await repository().recordDecision({
-      token: (
-        await repository().issuePresentation({
-          userId,
-          purpose: "client_profile",
-          channel: "web",
-          documentKey: "consent.client_profile",
-        })
-      ).token,
-      userId,
-      purpose: "client_profile",
-      decision: "denied",
-      policyVersion: "profile-v1",
-      correlationId: "corr-profile-revoke",
-    });
-    expect([granted.revision, denied.revision]).toEqual([1, 2]);
+    expect([denied.revision, granted.revision]).toEqual([1, 2]);
     expect(
       await repository().currentState({ userId, purpose: "client_profile" }),
     ).toEqual({
-      decision: "denied",
+      decision: "granted",
       revision: 2,
     });
 

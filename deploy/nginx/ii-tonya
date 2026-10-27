@@ -1,10 +1,85 @@
+# Method tokens are client-controlled too; only log a closed vocabulary.
+map $request_method $ii_tonya_safe_method {
+    default OTHER;
+    GET GET;
+    HEAD HEAD;
+    POST POST;
+    PUT PUT;
+    PATCH PATCH;
+    DELETE DELETE;
+    OPTIONS OPTIONS;
+}
+# Deliberately omit URI, query, IP, referer, user agent, cookies and request body.
+log_format ii_tonya_minimal '$ii_tonya_safe_method $status $request_time';
+
 server {
     server_name ii-tonya.ru www.ii-tonya.ru;
+    access_log /var/log/nginx/ii-tonya-access.log ii_tonya_minimal;
+    # nginx error messages can include raw request targets and headers. Use the
+    # content-free status log plus API/worker health for this site's diagnostics.
+    error_log /dev/null;
 
     root /opt/ii-tonya-platform/web-current;
     index index.html;
 
+    location ^~ /v1/browser/ {
+        # Reject oversized proofs at the edge and never spool private request or
+        # response content into nginx temporary files or caches.
+        client_max_body_size 8k;
+        client_body_buffer_size 16k;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_ignore_headers X-Accel-Buffering;
+        proxy_max_temp_file_size 0;
+        proxy_cache off;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location ^~ /v1/webhooks/telegram/client/ {
+        # Reject oversize updates and keep accepted content in memory before admission.
+        client_max_body_size 64k;
+        client_body_buffer_size 128k;
+        client_body_in_file_only off;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_ignore_headers X-Accel-Buffering;
+        proxy_max_temp_file_size 0;
+        proxy_cache off;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location ^~ /v1/ {
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_ignore_headers X-Accel-Buffering;
+        proxy_max_temp_file_size 0;
+        proxy_cache off;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location = /v1/client/sessions {
+        client_max_body_size 8k;
+        client_body_buffer_size 16k;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_ignore_headers X-Accel-Buffering;
+        proxy_max_temp_file_size 0;
+        proxy_cache off;
         proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -28,9 +103,23 @@ server {
         add_header Cache-Control "public, immutable";
     }
 
+    # Staff shell contains no embedded identity, but must never be cached.
+    location = /admin/expert-verification {
+        try_files /index.html =404;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+    }
+
+    location = /admin/expert-verification/ {
+        try_files /index.html =404;
+        add_header Cache-Control "no-store" always;
+        add_header Referrer-Policy "no-referrer" always;
+    }
+
     location / {
         try_files $uri $uri/ /index.html;
         add_header Cache-Control "no-cache";
+        add_header Referrer-Policy "no-referrer" always;
     }
 
     listen [::]:443 ssl ipv6only=on;
@@ -45,5 +134,7 @@ server {
     listen 80 default_server;
     listen [::]:80 default_server;
     server_name ii-tonya.ru www.ii-tonya.ru;
+    access_log /var/log/nginx/ii-tonya-access.log ii_tonya_minimal;
+    error_log /dev/null;
     return 301 https://$host$request_uri;
 }

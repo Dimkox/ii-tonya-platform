@@ -1,0 +1,49 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts (15 tests | 1 failed | 14 skipped) 2153ms
+   ↓ explicit choices deny foreign ownership, stale revision, replay conflict and base-quarter SKU
+   ↓ scheduler does not disclose promotion or invoice to a silent owner, and unpaid erasure removes sales PII
+   ↓ expired waiting payment is GET-verified and canceled, never captured
+   ↓ unknown create never becomes a second POST and recovers only through actual GET identity
+   ↓ deletion during pre-send decryption cancels actual first disclosure
+   ↓ proven late money remains immutable recovery work without price lock or interview
+   ↓ 96h refresh creates one new fixed-fee attempt under the original unchanged form approval
+   ↓ lost quarter requires explicit monthly choice and reuses the same quality approval
+   ↓ day10 silence stays base-only; explicit base selection remains monthly and unlocked
+   ↓ 24h reminders have one durable scoped receipt and revoked owners receive nothing
+   ↓ an explicit unpaid intake transition preserves the original form and enters separated sales
+   ↓ on-time capture reported after checkout expiry still locks its original bound terms
+   ↓ a proven capture after erasure retains money and recovery but no paid lock or receipt PII
+   ↓ checkout TTL refreshes before the commercial stage without repricing or a new manager decision
+   × erasing the submitted form alone blocks delayed captured money from re-admitting the applicant 538ms
+     → expected { admission: 'interview', …(1) } to deeply equal { admission: 'blocked', …(1) }
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > erasing the submitted form alone blocks delayed captured money from re-admitting the applicant
+AssertionError: expected { admission: 'interview', …(1) } to deeply equal { admission: 'blocked', …(1) }
+
+- Expected
++ Received
+
+  {
+-   "admission": "blocked",
+-   "reason_code": "application_erased",
++   "admission": "interview",
++   "reason_code": "payment_verified",
+  }
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts:716:151
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 skipped (15)
+   Start at  17:49:40
+   Duration  5.51s (transform 1.29s, setup 0ms, collect 2.91s, tests 2.15s, environment 0ms, prepare 128ms)
+
+
+[END OF RAW CAPTURE]

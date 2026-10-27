@@ -5,6 +5,7 @@ import type {
   YooKassaOperation,
   YooKassaOperationPort,
   YooKassaOperationStatus,
+  YooKassaMode,
 } from "@ii-tonya/integrations";
 import type { DrizzleDb } from "../client.js";
 import { withSerializableRetry } from "./message-repository.js";
@@ -171,6 +172,25 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
   async claim(
     command: ClaimYooKassaOperationCommand,
   ): Promise<YooKassaOperation> {
+    return (await this.claimOperation(command, false)).operation;
+  }
+
+  async claimInitialPayment(
+    command: ClaimYooKassaOperationCommand,
+  ): ReturnType<NonNullable<YooKassaOperationPort["claimInitialPayment"]>> {
+    if (
+      command.kind !== "create_payment" ||
+      command.replaySnapshot !== undefined
+    ) {
+      throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+    }
+    return this.claimOperation(command, true);
+  }
+
+  private async claimOperation(
+    command: ClaimYooKassaOperationCommand,
+    initialSend: boolean,
+  ): ReturnType<NonNullable<YooKassaOperationPort["claimInitialPayment"]>> {
     validateClaim(command);
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
@@ -199,12 +219,12 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
           if (replay.claimDigest !== replayDigest) {
             throw new YooKassaOperationError("YOOKASSA_IDEMPOTENCY_CONFLICT");
           }
-          return toOperation(replay);
+          return { kind: "existing" as const, operation: toOperation(replay) };
         }
         let paymentAttemptId = command.paymentAttemptId;
         if (
           command.kind === "create_payment" &&
-          paymentAttemptId === undefined
+          (initialSend || paymentAttemptId === undefined)
         ) {
           const order = await tx.execute<{
             id: string;
@@ -226,6 +246,11 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
           ) {
             throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
           }
+        }
+        if (
+          command.kind === "create_payment" &&
+          paymentAttemptId === undefined
+        ) {
           const providerRequestId = `command:${command.commandId}`;
           const attemptIdempotencyKey = `yookassa:${command.commandId}`;
           await tx.execute(sql`
@@ -295,6 +320,34 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
           throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
         }
         const parentAttempt = parent.rows[0]!;
+        if (initialSend) {
+          // Both order and attempt are locked. This separate statement reads
+          // wall-clock time after all lock waits, never transaction-start time.
+          const valid = await tx.execute<{ id: string }>(sql`
+            select id from expert_residency_orders
+            where id=${command.orderId}::uuid and status='payment_pending'
+              and cash_minor=${command.amountMinor}::bigint
+              and currency=${command.currency}
+              and payment_deadline > clock_timestamp()
+              and provider_deadline > clock_timestamp()
+          `);
+          if (
+            valid.rows.length !== 1 ||
+            parentAttempt.expectedAmountMinor !== command.amountMinor ||
+            parentAttempt.currency !== command.currency ||
+            parentAttempt.status !== "created"
+          ) {
+            throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+          }
+          const used = await tx.execute<{ id: string }>(sql`
+            select id from expert_residency_provider_operations
+            where payment_attempt_id=${paymentAttemptId}::uuid
+              and operation_kind='create_payment' limit 1
+          `);
+          if (used.rows.length !== 0) {
+            throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+          }
+        }
         if (command.kind === "create_refund") {
           if (
             parentAttempt.status !== "settled" ||
@@ -319,13 +372,13 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         }
         const resolvedCommand = { ...command, paymentAttemptId };
         const claimDigest = canonicalYooKassaRequestDigest(resolvedCommand);
-        await tx.execute(sql`
+        const inserted = await tx.execute<{ id: string }>(sql`
           insert into expert_residency_provider_operations (
             command_id, order_id, payment_attempt_id, operation_kind,
             provider, environment_mode, parent_payment_id, amount_minor,
             currency, request_digest, claim_digest, replay_ciphertext,
             replay_key_reference, replay_body_version, recovery_expires_at,
-            recovery_next_at
+            recovery_next_at, status
           ) values (
             ${command.commandId}::uuid, ${command.orderId}::uuid,
             ${paymentAttemptId}::uuid, ${command.kind}, 'yookassa',
@@ -335,9 +388,18 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
             ${command.replaySnapshot?.keyReference ?? null},
             ${command.replaySnapshot?.bodyVersion ?? null},
             ${command.replaySnapshot?.expiresAt ?? null}::timestamptz,
-            case when ${command.replaySnapshot !== undefined} then transaction_timestamp() else null end
+            case when ${command.replaySnapshot !== undefined} then transaction_timestamp() else null end,
+            ${initialSend ? "unknown_outcome" : "claimed"}
           ) on conflict (provider, command_id) do nothing
+          returning id
         `);
+        if (initialSend && inserted.rows.length === 1) {
+          await tx.execute(sql`
+            update expert_residency_payment_attempts
+            set status='unknown_outcome',updated_at=clock_timestamp()
+            where id=${paymentAttemptId}::uuid
+          `);
+        }
         const selected = await tx.execute<StoredOperation>(sql`
           select id, order_id as "orderId",
             payment_attempt_id as "paymentAttemptId",
@@ -356,7 +418,13 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         if (row === undefined || row.claimDigest !== claimDigest) {
           throw new YooKassaOperationError("YOOKASSA_IDEMPOTENCY_CONFLICT");
         }
-        return toOperation(row);
+        return {
+          kind:
+            initialSend && inserted.rows.length === 1
+              ? ("initial_send_admitted" as const)
+              : ("existing" as const),
+          operation: toOperation(row),
+        };
       }),
     );
   }
@@ -490,14 +558,25 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
       returning id
     `);
     if (result.rows.length !== 1) {
+      const existing = await this.db.execute<{ status: string }>(sql`
+        select status from expert_residency_provider_operations
+        where id = ${operationId}::uuid
+      `);
+      if (existing.rows[0]?.status === status) return;
       throw new YooKassaOperationError("YOOKASSA_OPERATION_NOT_FOUND");
     }
   }
 
   async claimReconciliationBatch(
     limit: number,
+    mode?: YooKassaMode,
   ): Promise<readonly YooKassaOperation[]> {
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    if (
+      !Number.isInteger(limit) ||
+      limit < 1 ||
+      limit > 100 ||
+      (mode !== undefined && mode !== "test" && mode !== "live")
+    ) {
       throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
     }
     const result = await this.db.execute<StoredOperation>(sql`
@@ -505,6 +584,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         select id
         from expert_residency_provider_operations
         where status in ('pending','unknown_outcome')
+          and (${mode ?? null}::text is null or environment_mode = ${mode ?? null})
           and provider_object_id is not null
           and (reconciliation_claimed_at is null or
                reconciliation_claimed_at < transaction_timestamp() - interval '5 minutes')
@@ -612,10 +692,18 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
     leaseToken: string,
     providerObjectId: string,
   ): Promise<void> {
-    if (!UUID.test(operationId) || !UUID.test(leaseToken) || !PROVIDER_ID.test(providerObjectId))
+    if (
+      !UUID.test(operationId) ||
+      !UUID.test(leaseToken) ||
+      !PROVIDER_ID.test(providerObjectId)
+    )
       throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
     await this.db.transaction(async (tx) => {
-      const bound = await tx.execute<{ paymentAttemptId: string; operationKind: "create_payment" | "create_refund"; orderId: string }>(sql`
+      const bound = await tx.execute<{
+        paymentAttemptId: string;
+        operationKind: "create_payment" | "create_refund";
+        orderId: string;
+      }>(sql`
         update expert_residency_provider_operations
         set provider_object_id=${providerObjectId}, status='pending',
             recovery_lease_token=null, recovery_lease_until=null,
@@ -645,16 +733,30 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
     });
   }
 
-  async rescheduleUnboundRecovery(operationId: string, leaseToken: string): Promise<void> {
-    await this.finishRecoveryLease(operationId, leaseToken, sql`
+  async rescheduleUnboundRecovery(
+    operationId: string,
+    leaseToken: string,
+  ): Promise<void> {
+    await this.finishRecoveryLease(
+      operationId,
+      leaseToken,
+      sql`
       recovery_next_at=transaction_timestamp() + interval '5 minutes'
-    `);
+    `,
+    );
   }
 
-  async markUnboundRecoveryManualReview(operationId: string, leaseToken: string): Promise<void> {
-    await this.finishRecoveryLease(operationId, leaseToken, sql`
+  async markUnboundRecoveryManualReview(
+    operationId: string,
+    leaseToken: string,
+  ): Promise<void> {
+    await this.finishRecoveryLease(
+      operationId,
+      leaseToken,
+      sql`
       manual_review_at=transaction_timestamp(), recovery_next_at=null
-    `);
+    `,
+    );
   }
 
   private async finishRecoveryLease(

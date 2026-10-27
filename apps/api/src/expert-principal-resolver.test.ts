@@ -6,7 +6,7 @@ import {
   type ExpertSessionRecord,
 } from "./expert-principal-resolver.js";
 
-const token = "A".repeat(32);
+const token = `es1.${Buffer.alloc(32, 17).toString("base64url")}`;
 const authorization = `Bearer ${token}`;
 const now = new Date("2026-08-12T09:00:00.000Z");
 const validSession = (): ExpertSessionRecord => ({

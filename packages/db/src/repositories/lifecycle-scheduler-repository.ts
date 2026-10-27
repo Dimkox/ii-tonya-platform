@@ -3,6 +3,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 
 import type { DrizzleDb } from "../client.js";
+import {
+  captureClientConsentAuthority,
+  lockClientConsentSubject,
+} from "./client-consent-authority.js";
+import { currentConsentGrantedSql } from "./consent-current.js";
 
 export type LifecycleJobType =
   | "booking_reminder_48h"
@@ -158,6 +163,14 @@ export class PostgresLifecycleSchedulerRepository {
   async scheduleReservationLifecycle(reservationId: string): Promise<number> {
     assertLifecycleReservationId(reservationId);
     return this.db.transaction(async (tx) => {
+      const subject = (
+        await tx.execute<{ userId: string }>(sql`
+          select user_id as "userId" from reservations
+          where id=${reservationId}::uuid
+        `)
+      ).rows[0];
+      if (!subject) return 0;
+      await lockClientConsentSubject(tx, subject.userId);
       const eligible = (
         await tx.execute<{
           startsAt: Date | string;
@@ -167,18 +180,15 @@ export class PostgresLifecycleSchedulerRepository {
           from reservations r
           join slots s on s.id=r.slot_id
           join users u on u.id=r.user_id and u.active=true
-          join lateral (
-            select c.decision,c.policy_version
-            from consents c
-            where c.user_id=r.user_id and c.consent_type='client_messaging'
-            order by c.created_at desc,c.id desc
-            limit 1
-          ) consent on true
           where r.id=${reservationId}::uuid
+            and r.user_id=${subject.userId}::uuid
             and r.status='booked'
             and s.starts_at > clock_timestamp()
-            and consent.decision='granted'
-            and consent.policy_version=${this.messagingConsentPolicyVersion}
+            and ${currentConsentGrantedSql({
+              userExpression: sql`r.user_id`,
+              purpose: "client_messaging",
+              policyVersion: sql`${this.messagingConsentPolicyVersion}`,
+            })}
             and exists (
               select 1 from dialogues d
               where d.user_id=r.user_id and d.provider='telegram'
@@ -304,6 +314,16 @@ export class PostgresLifecycleSchedulerRepository {
           continue;
         }
 
+        // Resolve the subject without row locks, then join the shared consent
+        // barrier before locking reservation, identity or dialogue rows.
+        const subject = (
+          await tx.execute<{ userId: string }>(sql`
+            select r.user_id as "userId" from lifecycle_jobs job
+            join reservations r on job.subject_kind='reservation' and r.id=job.subject_id
+            where job.id=${job.id}::uuid
+          `)
+        ).rows[0];
+        if (subject) await lockClientConsentSubject(tx, subject.userId);
         const eligible = (
           await tx.execute<EligibleReminder>(sql`
             select r.id as "reservationId",r.user_id as "userId",
@@ -316,13 +336,6 @@ export class PostgresLifecycleSchedulerRepository {
             join slots s on s.id=r.slot_id
             join users u on u.id=r.user_id and u.active=true
             left join client_profiles cp on cp.user_id=r.user_id
-            join lateral (
-              select c.decision,c.policy_version
-              from consents c
-              where c.user_id=r.user_id and c.consent_type='client_messaging'
-              order by c.created_at desc,c.id desc
-              limit 1
-            ) consent on true
             join dialogues d on d.user_id=r.user_id and d.provider='telegram'
               and d.bot_key=${this.botKey}
               and d.external_chat_id ~ '^[1-9][0-9]{0,19}$'
@@ -333,15 +346,22 @@ export class PostgresLifecycleSchedulerRepository {
               )
               and r.status='booked'
               and s.starts_at > ${command.now}
-              and consent.decision='granted'
-              and consent.policy_version=${this.messagingConsentPolicyVersion}
+              and r.user_id=${subject?.userId ?? null}::uuid
             order by d.created_at,d.id
             limit 1
             for update of r,d
           `)
         ).rows[0];
 
-        if (!eligible) {
+        const consentAuthority = eligible
+          ? await captureClientConsentAuthority(tx, {
+              subjectId: eligible.userId,
+              botKey: eligible.botKey,
+              chatId: eligible.chatId,
+              messagingPolicyVersion: this.messagingConsentPolicyVersion,
+            })
+          : undefined;
+        if (!eligible || !consentAuthority) {
           const terminal = await tx.execute<{ id: string }>(sql`
             update lifecycle_jobs
             set status='cancelled',cancellation_reason='eligibility_revoked',
@@ -385,6 +405,7 @@ export class PostgresLifecycleSchedulerRepository {
           botKey: eligible.botKey,
           chatId: eligible.chatId,
           text,
+          consentAuthority,
         };
         const payloadHash = digest(JSON.stringify(payload));
         const outbox = await tx.execute<{ id: string }>(sql`

@@ -137,6 +137,18 @@ describe("booking waitlist lifecycle D1", () => {
       kind: "rescheduled",
       reservationStatus: "reserved",
     });
+    // Replay is tested after a historical provider-confirmed transition; the
+    // real confirmation guard still requires an independently bound UID.
+    await database.db.execute(sql`
+      insert into planerka_booking_operations(
+        reservation_id,account_id,event_type_id,request,request_fingerprint,
+        starts_at,ends_at,state,provider_uid
+      )
+      select r.id,1,1,'{}'::jsonb,repeat('0',64),s.starts_at,s.ends_at,
+        'booked','lifecycle_fixture_'||r.id::text
+      from reservations r join slots s on s.id=r.slot_id
+      where r.id=${fixture.occupied.reservationId}::uuid
+    `);
     await database.db.execute(sql`
       update reservations set status='booked'
       where id=${fixture.occupied.reservationId}::uuid

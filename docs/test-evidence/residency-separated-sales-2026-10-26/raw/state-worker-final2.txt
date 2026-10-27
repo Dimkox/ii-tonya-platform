@@ -1,0 +1,19 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/integration/expert-separated-sales-state.test.ts (16 tests) 7366ms
+   ✓ expired waiting payment is GET-verified and canceled, never captured  1433ms
+   ✓ unknown create never becomes a second POST and recovers only through actual GET identity  305ms
+   ✓ 96h refresh creates one new fixed-fee attempt under the original unchanged form approval  338ms
+   ✓ on-time capture reported after checkout expiry still locks its original bound terms  432ms
+   ✓ a proven capture after erasure retains money and recovery but no paid lock or receipt PII  378ms
+   ✓ erasing the submitted form alone blocks delayed captured money from re-admitting the applicant  352ms
+   ✓ two genuine captures serialize to one lifetime winner and explicit duplicate-fee recovery  569ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  17:58:24
+   Duration  10.82s (transform 1.94s, setup 0ms, collect 2.99s, tests 7.37s, environment 0ms, prepare 110ms)
+
+
+[END OF RAW CAPTURE]

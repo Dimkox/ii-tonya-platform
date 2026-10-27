@@ -1,0 +1,96 @@
+{
+  "sourceSha": "d00d24593493cb348a25abf0eec0318a1c018ddf",
+  "origin": "https://ii-tonya.ru",
+  "scope": "Activate existing expert-session entry and the installed expert bot menu; no new application deployment",
+  "helperSha256": "487110087ac2075f3b0b46e81c1b6069fb66ffdaacc91b9c19fdb1e24db97f97",
+  "independentReview": "Peirce; concrete replacement, target-binding, acceptance and recovery findings corrected; final narrow static acceptance",
+  "sourceTestsRerun": false,
+  "firstAttempt": {
+    "startedAt": "2026-10-14T15:15:24Z",
+    "outcome": "Failed; original runtime restored",
+    "originalError": "Masked by wrapper; exact cause not established",
+    "recoveryVerifiedAt": "2026-10-14T15:16:45.250Z",
+    "runtimeMatchedOriginal": true,
+    "actualExpertSessionEnabled": false,
+    "healthStatus": 200,
+    "apiPid": 425337,
+    "workerPid": 425338,
+    "retainedPrivateStage": "/home/ii_tonya/expert-entry-20261014.QdA5bC"
+  },
+  "activation": {
+    "verifiedAt": "2026-10-14T15:23:12.506Z",
+    "apiPid": 426218,
+    "workerPid": 426207,
+    "available": true,
+    "authenticated": false,
+    "widgetEnabled": false,
+    "readiness": true,
+    "workerHeartbeatAdvanced": true,
+    "actualEnvironmentsMatched": true,
+    "changedFields": [
+      "EXPERT_SESSION_ENABLED",
+      "EXPERT_TELEGRAM_BOT_KEY",
+      "EXPERT_WEB_ORIGIN",
+      "EXPERT_TELEGRAM_LOGIN_BOT_USERNAME",
+      "EXPERT_TELEGRAM_WIDGET_LOGIN_ENABLED"
+    ],
+    "unrelatedRuntimeFieldsPreserved": true,
+    "retainedPrivateStage": "/home/ii_tonya/expert-entry-20261014.K3VOXR"
+  },
+  "publicBrowser": {
+    "verifiedAt": "2026-10-14T15:23:57.316Z",
+    "route": "/expert/account",
+    "browser": "Installed Google Chrome, Playwright, fresh anonymous mobile context",
+    "httpStatus": 200,
+    "loginButtonEnabled": true,
+    "telegramMenuHelpShown": true,
+    "mutatingRequests": 0,
+    "javascriptErrors": 0,
+    "tlsVerification": true
+  },
+  "telegramMenu": {
+    "botUsername": "ii_tonya_expert_promo_bot",
+    "verifiedAt": "2026-10-14T15:27:11.518Z",
+    "method": "getChatMenuButton",
+    "ok": true,
+    "type": "web_app",
+    "expectedUrl": "https://ii-tonya.ru/expert/account",
+    "urlMatched": true,
+    "textMatched": true,
+    "initialWriteAcknowledgment": "Not retained; invocation exited after write-start marker without its result artifact",
+    "subsequentReadConfirmedDesiredState": true,
+    "blindResend": false
+  },
+  "cleanupAndFinalVerification": {
+    "verifiedAt": "2026-10-14T15:29:19.532Z",
+    "removedTemporaryUnits": 3,
+    "removedInstalledHelper": true,
+    "recoveryCopiesRetained": true,
+    "privateStagesRetained": true,
+    "apiPid": 426218,
+    "workerPid": 426207,
+    "sourceShaUnchanged": true,
+    "actualEnvironmentsMatched": true,
+    "sessionAvailable": true,
+    "ready": true,
+    "workerHeartbeatAdvanced": true,
+    "vpnPid": 423677,
+    "vpnRestarts": 1,
+    "vpnActive": true
+  },
+  "identityInventory": {
+    "verifiedAt": "2026-10-14T14:56:34.201Z",
+    "readOnly": true,
+    "experts": 0,
+    "verifiedExperts": 0,
+    "verifiedExpertTelegramMappings": 0,
+    "sessionTablePresent": true
+  },
+  "limitations": [
+    "No authenticated expert or client journey was executed.",
+    "No expert profile, identity mapping, consent or financial authority was fabricated.",
+    "No chat message, booking, payment or paid provider test was sent.",
+    "The YooKassa cancellation RC27cdbbc5 in Draft PR104 is not deployed by this configuration operation.",
+    "Full Selarti delivery, calendar access, client/expert payment composition and erasure remain separate unfinished work."
+  ]
+}

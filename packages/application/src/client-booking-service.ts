@@ -20,9 +20,27 @@ export type ClientBookingReserveRepositoryResult =
 
 export type ClientBookingCancelRepositoryResult = Readonly<{
   kind: "cancelled" | "replayed" | "not_found" | "conflict";
+  providerCancellationPending?: boolean;
 }>;
 
 export interface ProtectedClientBookingRepository {
+  listOwnedActive(input: { userId: string; after?: `bk1.${string}` }): Promise<
+    | { kind: "not_found" }
+    | {
+        kind: "found";
+        bookings: readonly {
+          bookingHandle: `bk1.${string}`;
+          state:
+            | "reserved"
+            | "booked"
+            | "calendar_pending"
+            | "cancellation_pending"
+            | "confirmation_unverified";
+          startsAt: Date;
+          reservedUntil: Date;
+        }[];
+      }
+  >;
   reserveProtectedChoice(input: {
     userId: string;
     choiceDigest: `sha256:${string}`;
@@ -54,7 +72,25 @@ export interface ProtectedClientBookingRepository {
   >;
 }
 
+export interface ClientActiveBooking {
+  bookingHandle: `bk1.${string}`;
+  state:
+    | "reserved"
+    | "booked"
+    | "calendar_pending"
+    | "cancellation_pending"
+    | "confirmation_unverified";
+  startsAt: string;
+  reservedUntil: string;
+}
+
+export interface ClientBookingPage {
+  bookings: ClientActiveBooking[];
+  nextCursor: string | null;
+}
+
 export interface ClientBookingService {
+  list(principal: ClientPrincipal, after?: string): Promise<ClientBookingPage>;
   reserve(
     principal: ClientPrincipal,
     input: { choiceHandle: string },
@@ -67,7 +103,10 @@ export interface ClientBookingService {
   cancel(
     principal: ClientPrincipal,
     bookingHandle: string,
-  ): Promise<{ bookingHandle: `bk1.${string}`; state: "cancelled" }>;
+  ): Promise<{
+    bookingHandle: `bk1.${string}`;
+    state: "cancelled" | "cancellation_pending";
+  }>;
   reschedule(
     principal: ClientPrincipal,
     bookingHandle: string,
@@ -169,6 +208,47 @@ export function createClientBookingService(deps: {
     throw new Error("client_booking_confirmation_buffer_invalid");
   }
   const service: ClientBookingService = {
+    async list(principal, after) {
+      const userId = principalUserId(principal);
+      if (
+        after !== undefined &&
+        (typeof after !== "string" || !BOOKING_HANDLE_PATTERN.test(after))
+      ) {
+        throw new ClientBookingInvalidRequestError();
+      }
+      const result = await deps.repository.listOwnedActive({
+        userId,
+        ...(after === undefined ? {} : { after: after as `bk1.${string}` }),
+      });
+      if (result.kind === "not_found") throw new ClientBookingNotFoundError();
+      const bookings = result.bookings
+        .slice(0, 20)
+        .map((row): ClientActiveBooking => {
+          if (
+            !BOOKING_HANDLE_PATTERN.test(row.bookingHandle) ||
+            ![
+              "reserved",
+              "booked",
+              "calendar_pending",
+              "cancellation_pending",
+              "confirmation_unverified",
+            ].includes(row.state)
+          ) {
+            throw new Error("client_booking_invalid_projection");
+          }
+          return {
+            bookingHandle: row.bookingHandle,
+            state: row.state,
+            startsAt: publicInstant(row.startsAt),
+            reservedUntil: publicInstant(row.reservedUntil),
+          };
+        });
+      return {
+        bookings,
+        nextCursor:
+          result.bookings.length > 20 ? bookings[19]!.bookingHandle : null,
+      };
+    },
     async reserve(principal, input) {
       const userId = principalUserId(principal);
       if (
@@ -230,7 +310,12 @@ export function createClientBookingService(deps: {
       });
       if (result.kind === "not_found") throw new ClientBookingNotFoundError();
       if (result.kind === "conflict") throw new ClientBookingConflictError();
-      return { bookingHandle: canonicalBookingHandle, state: "cancelled" };
+      return {
+        bookingHandle: canonicalBookingHandle,
+        state: result.providerCancellationPending
+          ? "cancellation_pending"
+          : "cancelled",
+      };
     },
     async reschedule(principal, bookingHandle, input) {
       const userId = principalUserId(principal);

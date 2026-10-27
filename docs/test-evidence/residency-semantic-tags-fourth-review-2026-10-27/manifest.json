@@ -1,0 +1,395 @@
+{
+  "kind": "local-synthetic-semantic-fourth-review-correction-R7",
+  "controlCommit": "4d2bb601c91f8d399b888e07b334f46141c69d9f",
+  "productionEvidence": false,
+  "compression": "gzip level9 mtime0; one original artifact per file",
+  "preservedManifests": [
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-2026-10-27/manifest.json",
+      "sha256": "4d6bd9964db22932b24d1c8787eb614963913f7527326f40bc8715aa737b9d22"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-ordinary-input-2026-10-27/manifest.json",
+      "sha256": "5c5f3ba3053934b124ac80596a5bab2e28cf099323aa600a9673706d5a6e8358"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-reply-compatibility-2026-10-27/manifest.json",
+      "sha256": "2fa9a1ca364414eb955caa817a6ac7ba095934bd4c4818e984c5e26f8edfcc9e"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-review-corrections-2026-10-27/manifest.json",
+      "sha256": "ec453f84524bca0c2365995b36278e047b0cb49302f96139392b60eb16b730f2"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-second-review-2026-10-27/manifest.json",
+      "sha256": "24c796bdc995a92011e4ab2be38dcf779bbb2b7328a40e07ea40cb5d4f571071"
+    },
+    {
+      "path": "docs/test-evidence/residency-semantic-tags-third-review-2026-10-27/manifest.json",
+      "sha256": "75fb5fefa55482382d0b1cbe423d96ee6d99e1dbafd0cefebc2ceda6d617d564"
+    }
+  ],
+  "files": [
+    {
+      "file": "fourth-r7-baseline-repository.ts.gz",
+      "sha256": "88caa84c82057ef61d5522a2cc91403a3bee4d85ba48a3e79f7652b8a93b1365",
+      "bytes": 23057,
+      "rawSha256": "ca1cf76e99fad87e0f79208cbdae15e656509d8625f17aa825a99fc83f4a34ed",
+      "rawBytes": 119075,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-baseline-repository.ts"
+    },
+    {
+      "file": "fourth-r7-build.log.gz",
+      "sha256": "12d4a48dcd3e3619db5b51b620d6b25035067e004f9debf7d1e5298003c000fe",
+      "bytes": 243,
+      "rawSha256": "fef3edf42c370c15eca0d879e376a6a7ec41170d8fa8f0520c39eebee31fc7e6",
+      "rawBytes": 379,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-build.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/db",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "fef3edf42c370c15eca0d879e376a6a7ec41170d8fa8f0520c39eebee31fc7e6",
+      "recordedResult": "fourth-r7-build.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-build.result.json.gz",
+      "sha256": "c6365afe30133e8f5281761c29da495e6b877a78600da0f3ef54ac0e26ec84ac",
+      "bytes": 157,
+      "rawSha256": "761470748daa584a5f1dff88ce1bd1f965add63091bf1298ea2a13d8aa713d17",
+      "rawBytes": 162,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-build.result.json"
+    },
+    {
+      "file": "fourth-r7-final-green.log.gz",
+      "sha256": "200fda40644daaffa77833f23a113a80fff22c62b5bcd5e4131dcea2981093b0",
+      "bytes": 482,
+      "rawSha256": "63682d172ddc1615a9881e593631f51ea3195bb8fcc09ff4da57708ff8a5aa16",
+      "rawBytes": 886,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-final-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-same-scope-upgrade.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "63682d172ddc1615a9881e593631f51ea3195bb8fcc09ff4da57708ff8a5aa16",
+      "recordedResult": "fourth-r7-final-green.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-final-green.result.json.gz",
+      "sha256": "32a268099de2d3adf626038895e01fcfb03b1a0d0b613eec98d02c9af7587ed3",
+      "bytes": 184,
+      "rawSha256": "c4d913f476ea191566fc9c4a1bcbde9b964b7c7d336968651490a1ac695b4fc1",
+      "rawBytes": 209,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-final-green.result.json"
+    },
+    {
+      "file": "fourth-r7-format.log.gz",
+      "sha256": "710c63d8d40d5688a62c3b08053dd1971c4e4ee87b2297f3f20c2540d22cd94e",
+      "bytes": 82,
+      "rawSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "rawBytes": 66,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-format.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "docs/runbooks/resident-semantic-tags.md",
+        "docs/test-evidence/residency-semantic-tags-fourth-review-2026-10-27.md"
+      ],
+      "exitCode": 0,
+      "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "recordedResult": "fourth-r7-format.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-format.result.json.gz",
+      "sha256": "49a3f002c51bd68eba5f60a1efff8491f8c8c63b1377fb9e03596509c0a5407e",
+      "bytes": 246,
+      "rawSha256": "18dfc20bc49f66a6d187dad4f7a5251b7097ef005d9fcbbf976fac1b9309d0b2",
+      "rawBytes": 324,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-format.result.json"
+    },
+    {
+      "file": "fourth-r7-green.log.gz",
+      "sha256": "970d432f591b33a050a8409ea83efe4ab599525f4b43e20eda2c6247e23721c2",
+      "bytes": 481,
+      "rawSha256": "44df68e38806af64c0a990ef8f552a792d1bf32180a2ff7799a9c4516cf25dd1",
+      "rawBytes": 886,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-same-scope-upgrade.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "44df68e38806af64c0a990ef8f552a792d1bf32180a2ff7799a9c4516cf25dd1",
+      "recordedResult": "fourth-r7-green.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-green.result.json.gz",
+      "sha256": "5b03db4218c9a2e88ea4ef616cf71b0aa456e127e4e752b1ce807e9c5f117136",
+      "bytes": 184,
+      "rawSha256": "b331a8707f3f14c064256436f03bf81e1dd536eb7d799626403aef6132164ad1",
+      "rawBytes": 209,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-green.result.json"
+    },
+    {
+      "file": "fourth-r7-lint.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "packages/db/src/repositories/expert-card-repository.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "fourth-r7-lint.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-lint.result.json.gz",
+      "sha256": "90bc8d2c5fa52b388b4778f22fe4cdd11154fd8cf178a7292f09b113fd46384a",
+      "bytes": 175,
+      "rawSha256": "457c3e0248efb9b62e0aea667b7cd5b0c0aef02e13d66316a28bf30f137c9069",
+      "rawBytes": 194,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-lint.result.json"
+    },
+    {
+      "file": "fourth-r7-owner-regressions.log.gz",
+      "sha256": "c245abe110290f538b090d0d53e6862eacec86cac0b20a9fc6cc7e970590e969",
+      "bytes": 700,
+      "rawSha256": "1ed9ebc07007a44718af51891a39bde7f6a05228e9333d7d9ec3c36616afa739",
+      "rawBytes": 1447,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-owner-regressions.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "R2c strict|R2a profile|R2b retained|R2 removes obsolete|R2 newly blocked|mutable SQL tags"
+      ],
+      "exitCode": 0,
+      "logSha256": "1ed9ebc07007a44718af51891a39bde7f6a05228e9333d7d9ec3c36616afa739",
+      "recordedResult": "fourth-r7-owner-regressions.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-owner-regressions.result.json.gz",
+      "sha256": "55584a6c052b5c1bd1f97f4fcc358d6a9479720b2838ca6d70ba4bf53b4325b6",
+      "bytes": 241,
+      "rawSha256": "b9cce4655c831579ba4b7e90e1f81a02c3aa8d1e1d7d17e21ab2dc29bf01c3a3",
+      "rawBytes": 294,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-owner-regressions.result.json"
+    },
+    {
+      "file": "fourth-r7-package-evidence.py.gz",
+      "sha256": "351cb07f3a1186a2cf73fe927cb8cf63f03117c0b9a6fed109f9eb6f7510759f",
+      "bytes": 1620,
+      "rawSha256": "85ef583cfc84df97c2db7f45873ad890e8bad6b0dd784e23289f566f732d5bbc",
+      "rawBytes": 3427,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-package-evidence.py"
+    },
+    {
+      "file": "fourth-r7-red.log.gz",
+      "sha256": "539fe844996b335b9c158e8e1675c8e1097a908540fff5b6b08bb83323f17d99",
+      "bytes": 785,
+      "rawSha256": "2111e08de2ec174ee1b0b93a782b5a58694a9e573b69c4cba4601bbfd785b18a",
+      "rawBytes": 1826,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-same-scope-upgrade.test.ts"
+      ],
+      "exitCode": 1,
+      "logSha256": "2111e08de2ec174ee1b0b93a782b5a58694a9e573b69c4cba4601bbfd785b18a",
+      "recordedResult": "fourth-r7-red.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-red.result.json.gz",
+      "sha256": "5733089057da6fc23be710b50081f1f21f7f1ab0f29e2304ac04fd1e5f351247",
+      "bytes": 184,
+      "rawSha256": "b20b314f878569806eed972d5b16f9a78f942251e54f3722232ffe2c8a636284",
+      "rawBytes": 209,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-red.result.json"
+    },
+    {
+      "file": "fourth-r7-repository.ts.gz",
+      "sha256": "16a99a7797a40cb6792b7b81177da129b08cd17dba947aac063e6b698b5b57e8",
+      "bytes": 27419,
+      "rawSha256": "551ac6abd916d7648895e675b361524b6033ee0e2523c8786a3a8d829a156cc0",
+      "rawBytes": 139383,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-repository.ts"
+    },
+    {
+      "file": "fourth-r7-run.py.gz",
+      "sha256": "c108321ca78af4630b6f4ec069b3130b28a81f1393617e3310e0086790eabd17",
+      "bytes": 588,
+      "rawSha256": "d23632a2c6bad41a87492bab27e687c5d0805fc245446b18922f9d622d04de03",
+      "rawBytes": 1077,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-run.py"
+    },
+    {
+      "file": "fourth-r7-source-types.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-source-types.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/db",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "recordedResult": "fourth-r7-source-types.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-source-types.result.json.gz",
+      "sha256": "397ce3d3bb5d8a506cad02fdfe1d8e8353e05d8434239090d35166f1a84a2944",
+      "bytes": 160,
+      "rawSha256": "27850ec2b734ab5fc8a52a15cdad5d59e996c31f6d912d05a82c14857b250275",
+      "rawBytes": 166,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-source-types.result.json"
+    },
+    {
+      "file": "fourth-r7-state-unchanged.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-state-unchanged.log",
+      "command": [
+        "git",
+        "diff",
+        "--exit-code",
+        "7b4f79f564aef0d14b5070496a54c682ae616229",
+        "--",
+        "packages/db/migrations"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "fourth-r7-state-unchanged.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-state-unchanged.result.json.gz",
+      "sha256": "14fad10a728ecd555862f8f4fba868d0d3efca0e263e1456436d68d6fdd6488f",
+      "bytes": 189,
+      "rawSha256": "c64d27a30fac2b7c9a97173d10c8bf4d7d069c30c90e9730e5887a74ccede95f",
+      "rawBytes": 216,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-state-unchanged.result.json"
+    },
+    {
+      "file": "fourth-r7-tests-types.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-tests-types.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "fourth-r7-tests-types.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-tests-types.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-tests-types.result.json"
+    },
+    {
+      "file": "fourth-r7-upgrade.test.ts.gz",
+      "sha256": "82ead148903cb0e46bddd90bbfb4a7fd77332a01fcefac392ef24b7581db42c3",
+      "bytes": 6351,
+      "rawSha256": "ad4f1f9576fefdfab37f18c43122d1fa1ddbf918ec592d5f5bdaa028eb2dd24e",
+      "rawBytes": 19636,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-upgrade.test.ts"
+    },
+    {
+      "file": "fourth-r7-whitespace.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-whitespace.log",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "fourth-r7-whitespace.result.json.gz"
+    },
+    {
+      "file": "fourth-r7-whitespace.result.json.gz",
+      "sha256": "40ea006f471eb799cd3d2ed7504fa1f444bbdfb87a13d9e50241b8a82cb60d7d",
+      "bytes": 137,
+      "rawSha256": "e3b9db95b0bd75d85eed2989d2b622082fdb471c5a0b78a7037b9a03038a167f",
+      "rawBytes": 136,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/fourth-r7-whitespace.result.json"
+    }
+  ],
+  "finalSources": [
+    {
+      "path": "docs/runbooks/resident-semantic-tags.md",
+      "sha256": "13e49b44072ed609c04ee451c84df4efe1bf3030b9cae9060a6293d6e85e7e3d"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-card-repository.ts",
+      "sha256": "551ac6abd916d7648895e675b361524b6033ee0e2523c8786a3a8d829a156cc0"
+    }
+  ],
+  "unchangedState": [
+    {
+      "path": "packages/db/migrations/0069_resident_semantic_tags.sql",
+      "sha256": "a5c787fb5e784b5cde3c8aa8f19d6f43e916b25c3587d5ed61b72490ff78d4d2"
+    },
+    {
+      "path": "packages/db/migrations/meta/_journal.json",
+      "sha256": "927e46e4f69f1cccc4c65e1600a228c0a1bd093a5a703997c674c1f174c62414"
+    },
+    {
+      "path": "packages/db/migrations/meta/0069_snapshot.json",
+      "sha256": "9887f6cdc11a4684993b375e0dc7cdf101fc1409c093d6f6c1f74a04e0e33247"
+    },
+    {
+      "path": "packages/db/migrations/state/0069_sql_objects.json",
+      "sha256": "e8ca1f50fe003a504d6cf335db6b58215a1f0dc92a0f005f17a4066fdd9a4517"
+    },
+    {
+      "path": "packages/db/migrations/state/0069_manifest.json",
+      "sha256": "55a7bdb1f65af85e21ee7bc549dd4461870a781b65e59e43a2904bbb94e9e671"
+    }
+  ]
+}

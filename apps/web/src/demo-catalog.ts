@@ -1,0 +1,65 @@
+// Owner-requested display fixtures. Never insert these into provider, booking,
+// identity or financial tables, or pass them to the public catalogue API.
+const examples = [
+  [
+    "Анна Примерова",
+    "Карьерная консультация",
+    "Разбор целей и подготовка плана профессионального развития.",
+    "Онлайн · 50 минут",
+  ],
+  [
+    "Михаил Образцов",
+    "Коучинг целей",
+    "Пример индивидуальной встречи для уточнения приоритетов.",
+    "Онлайн · 60 минут",
+  ],
+  [
+    "Елена Макетова",
+    "Знакомство с йогой",
+    "Пример ознакомительного занятия с мягкой практикой.",
+    "В студии · 45 минут",
+  ],
+  [
+    "Алексей Демо",
+    "Практика внимания",
+    "Пример занятия с упражнениями на внимание и спокойный темп.",
+    "Онлайн · 30 минут",
+  ],
+  [
+    "Мария Примерова",
+    "Творческая мастерская",
+    "Пример группового занятия с рисунком и обсуждением идей.",
+    "В студии · 90 минут",
+  ],
+  [
+    "Денис Образцов",
+    "Навыки общения",
+    "Пример встречи для тренировки ясного диалога и обратной связи.",
+    "Онлайн · 60 минут",
+  ],
+] as const;
+
+// Shared display labels only; these are not provider service records.
+export { examples as demoExamples };
+
+export function renderDemoCatalog(): string {
+  return `<section data-demo-catalog aria-labelledby="demo-catalog-heading">
+    <h2 id="demo-catalog-heading">Демонстрационный каталог</h2>
+    <p>Вымышленные данные для знакомства с сервисом. Эти люди, услуги и форматы не являются реальными предложениями. Запись и оплата в демокаталоге отключены.</p>
+    <ul class="catalog-list">${examples
+      .map(
+        ([
+          name,
+          service,
+          description,
+          format,
+        ]) => `<li class="catalog-card" data-demo-card>
+      <p class="eyebrow">Демо · вымышленный профиль</p>
+      <h3>${name}</h3><p><strong>${service}</strong></p><p>${description}</p>
+      <p>Пример формата: ${format}. Язык: русский.</p>
+      <p>Запись и оплата недоступны</p>
+    </li>`,
+      )
+      .join("")}</ul>
+  </section>`;
+}

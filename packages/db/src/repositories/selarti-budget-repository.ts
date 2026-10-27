@@ -176,6 +176,14 @@ export class PostgresSelartiBudgetRepository {
               : ("conflict" as const),
           metrics: [] as const,
         };
+      if (input.outcome === "not_applied") {
+        const reply = (
+          await tx.execute(
+            sql`select true as found from selarti_response_proposals where request_id=${input.requestId} limit 1`,
+          )
+        ).rows[0];
+        if (reply) return { result: "conflict" as const, metrics: [] as const };
+      }
       const reservation = (
         await tx.execute<{ reserved: bigint; effectiveQuote: bigint }>(
           sql`select reserved_rub_minor reserved,effective_usd_rub_quote_micros "effectiveQuote" from selarti_cost_reservations where request_id=${input.requestId} for update`,

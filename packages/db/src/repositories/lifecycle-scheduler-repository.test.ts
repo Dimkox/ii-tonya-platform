@@ -25,6 +25,9 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
         ],
       })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ userId: reservationId }] })
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({
         rows: [
           {
@@ -36,6 +39,16 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
             botKey: "client-test",
             chatId: "801",
             meetingUrl: "https://meet.example.test/booking",
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ rows: [{ userId: reservationId }] })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            decisionId: leaseToken,
+            revision: "1",
+            policyVersion: "client-messaging-v1",
           },
         ],
       })
@@ -61,7 +74,7 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
     ).resolves.toEqual({ examined: 1, materialized: 1, cancelled: 0 });
 
     expect(transaction).toHaveBeenCalledOnce();
-    expect(execute).toHaveBeenCalledTimes(8);
+    expect(execute).toHaveBeenCalledTimes(13);
   });
 
   it("contains the locking, authority rechecks, ordered outbox, and terminal fencing", () => {
@@ -100,6 +113,7 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
       })
       .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [] })
       .mockResolvedValueOnce({ rows: [{ id: jobId }] });
     const transaction = vi.fn(
       async (work: (tx: { execute: typeof execute }) => unknown) =>
@@ -117,6 +131,6 @@ describe("PostgreSQL lifecycle scheduler repository", () => {
         batchSize: 10,
       }),
     ).resolves.toEqual({ examined: 1, materialized: 0, cancelled: 1 });
-    expect(execute).toHaveBeenCalledTimes(5);
+    expect(execute).toHaveBeenCalledTimes(6);
   });
 });

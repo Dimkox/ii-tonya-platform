@@ -1,0 +1,25 @@
+{
+  "head": "84cae6400a706319bc518feaf3526d5ab01054c8",
+  "runtimeAcceptedHead": "790d308c957ca9be8ab83a18ff8f3de6642921b9",
+  "command": "pnpm verify:gate --full --range 254c8c169cbb8432654a46de206bd20500cecc3f..HEAD --changed-file /tmp/residency-semantic-tags-final-paths-20261027.txt",
+  "repositoryTestsPassed": 613,
+  "hostedCI": false,
+  "files": [
+    {
+      "file": "residency-semantic-tags-final-gate-1793078515005890537.log.gz",
+      "bytes": 276,
+      "sha256": "d5bd8ef221f2cf3e841a92372867858313c74c313dc57e1dd26750c2c0074049",
+      "rawBytes": 494,
+      "rawSha256": "381a356f2936de24b64afd768f90e3b8403c1a58404387bc6c8918612deeedbf",
+      "exitCode": 0
+    },
+    {
+      "file": "residency-semantic-tags-final-repo-1793078515005890537.log.gz",
+      "bytes": 2427,
+      "sha256": "6d5fcde8e9e0bda5951a362890b07cc5a8e7e2ac5dce84cc9664c7e56201a35f",
+      "rawBytes": 8522,
+      "rawSha256": "4a7f9fa4b1d99396f1850fad7fa417a175dceccc356ff299221e10a19cbbc33c",
+      "exitCode": 0
+    }
+  ]
+}
