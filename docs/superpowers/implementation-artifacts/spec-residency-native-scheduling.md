@@ -2,9 +2,9 @@
 title: Native resident scheduling and booking
 created: 2026-10-27
 type: feature
-status: in-progress
+status: in-review
 baseline_commit: c207735727210660ac949b78b84cf7463519fb99
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -445,3 +445,13 @@ Root prepares this contract from previously completed reconnaissance; no need to
 restart that research or rerender the BMad workflow. No story_key, so sprint sync
 is skipped. Next step uses one fresh context-free implementer, then three read-only
 independent reviewers. Subsequent S4b remains required after accepted S4a delivery.
+
+
+## Review correction round 1
+
+Source9ce9eb23 and evidencec80ca4a8 reviewed independently. Six scoped findings are
+tracked in residency-native-scheduling-review.md: incremental migration timestamp,
+temporary bot throttle, immutable /client detail title, pre-confirmation cancellation
+origin, actual composed native-logistics proof and clean-checkout fixture independence.
+All are within frozen acceptance; no product-intent change or source re-derivation.
+The existing implementer owns focused corrections, followed by assigned re-review.

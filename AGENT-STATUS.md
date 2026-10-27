@@ -1,3 +1,25 @@
+# Native scheduling review corrections — 2026-10-27
+
+Current branch codex/residency-native-scheduling-20261027, same isolated worktree.
+Source9ce9eb23181be0a6ee54a0920fbc952d9e5aaf3e; evidencec80ca4a82a7b2838a624f75aa57f87ce46664ce1.
+All three independent reviewers finished; root triaged six real findings R1–R6 in
+residency-native-scheduling-review.md. Existing native_scheduling_implementer will
+fix them sequentially; reviewers stay read-only/idle until exact corrected source.
+No root heavy checks while implementer runs. No push/branch acceptance yet.
+Prior proof: native13/13 + HTTPimport1/1, external37/37,495 static cases across
+initial/focused corrections, actual browser/types/lint/webbuild. Root verified all86
+archive/raw pairs and49 source hashes; actual local credential absent. Actual state
+is222tables/175functions/210triggers/1509constraints/549indexes/2extensions.
+R1 must prove normal migrateDb upgrade (journal70 timestamp is currently below69);
+R2 defer temporary throttle;R3 immutable /client detail;R4 native pre-confirm cancel;
+R5 actual composed logistics delivery;R6 ordinary test must not require ignored dirs.
+Keep one taskPG17.5/parser/semantic helper and protected rotated configuration; no
+secrets in logs/argv. Existing owner autonomous correction/focused-rerun approval
+persists. No quota/permission loop, no production activation, no old SQL rewrite.
+S4b draft /tmp/spec-residency-lifecycle-completion-draft-20261027.md now includes
+actual client reservation audit provenance; root final coverage draft is in /tmp.
+After accepted S4a: canonical gate, gated push/DraftPR, then S4b and whole journey.
+
 # Native scheduling implementation starting — 2026-10-27
 
 S3b pushed clean atc207735727210660ac949b78b84cf7463519fb99; DraftPR116
