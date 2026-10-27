@@ -50,13 +50,18 @@ S3a rich onboarding is delivered in [DraftPR115](https://github.com/Dimkox/ii-to
 at254c8c169cbb8432654a46de206bd20500cecc3f. All13 findings closed; full/push611/611.
 Original85+corrective125+second48 archives and failed/successful gates retained.
 
-Active S3b: codex/residency-semantic-tags-20261027, contract
-spec-residency-semantic-tags.md. Real local semantic recommendations, aggregate20
-confirmed selections, moderated custom tags and protected catalogue export precede
-S4 native scheduling/lifecycle. Same isolated worktree and onePGcluster. S3a exposes
-review outcomes/return reason through /card and protected manager queue. Durable
-unsolicited owner review-status delivery is still explicitly required in S4 alongside
-lifecycle notices; no whole-package completion before that seam and final journey.
+S3b semantic tags is delivered in [DraftPR116](https://github.com/Dimkox/ii-tonya-platform/pull/116)
+atc207735727210660ac949b78b84cf7463519fb99. All7 independent findings closed;
+full/push613/613. Real model, browser, normal ingress and populated migration
+proofs plus failed/corrective gates are retained with exact hashes.
+
+Active S4a: codex/residency-native-scheduling-20261027, contract
+spec-residency-native-scheduling.md. Native source validity, ordinary owner schedule
+preview/import, actual client booking and protected automatic logistics come first.
+S4b then closes durable work-bot review/activation notices, overdue/quality manager
+queues and the final combined journey. Do not declare the whole package complete
+before those seams. Same isolated worktree, one protected PG17.5 cluster and existing
+parser/semantic helpers; no production activation.
 
 ## Owner sources and precedence
 
@@ -172,7 +177,7 @@ contracts and evidence are authoritative; no earlier block is restarted.
       owner-confirmed structured proposals, gap-only questions and manual fallback.
 - [x] Required photos/online-room choice/offline logistics; bounded Yandex geocoding
       capability and human-correctable link, no unrestricted URL/file fetch.
-- [ ] In parallel where ownership is independent: semantic matching over the164-tag
+- [x] Semantic matching over the164-tag
       catalogue, synonyms, proposed method associations, format tags, top15 proposed
       suggestions under the latest correction, maximum20 confirmed tags, moderated custom tags and admin export.
       Associations are proposals, not verified clinical competence or diagnoses.

@@ -1,3 +1,19 @@
+# Native scheduling implementation starting — 2026-10-27
+
+S3b pushed clean atc207735727210660ac949b78b84cf7463519fb99; DraftPR116
+base PR115/254c8c. Mandatory push613/613 and source/raw/gzip logs archived in this
+preparation commit. Fullgate613/613 plus all relevant types/static checks; all7
+review findings accepted. No hostedCI or deployment claim.
+Current branch codex/residency-native-scheduling-20261027, same isolated worktree.
+Root froze spec-residency-native-scheduling.md against delivered S3b; migration0070
+next. RequireDocker preflight clean. One fresh implementer owns source/tests/SQL/
+state/runbook/evidence; root owns docs/review/gates/delivery. No descendants or
+competing heavy jobs. Keep taskPG/parser/semantic helper; protected rotated config
+remains /tmp/verification-form-20261026.compose.json, never print/pass secrets inargv.
+S4a completes actual native owner/client/worker paths and logistics, then S4b
+lifecycle/quality/final journey. No routine approval loops or early whole-task stop.
+S4b reconciled draft in /tmp/spec-residency-lifecycle-completion-draft-20261027.md.
+
 # Semantic tags ready for mandatory gated push — 2026-10-27
 
 Runtime790d308c accepted by all3 reviewers, R1–R7 closed. Exact registryef94cd03
