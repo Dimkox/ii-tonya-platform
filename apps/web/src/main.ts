@@ -9,6 +9,14 @@ const legalRoute: "oferta" | "privacy" | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
 
 async function initialize(): Promise<void> {
+  if (route === "/admin/expert-verification") {
+    const { renderExpertVerificationPage, bindExpertVerificationActions } =
+      await import("./expert-verification-view.js");
+    root.innerHTML = renderExpertVerificationPage();
+    bindExpertVerificationActions(root);
+    document.title = "Проверка заявок — ии-Тоня";
+    return;
+  }
   if (route === "/expert/account") {
     const { renderExpertAccountPage, bindExpertAccountActions } =
       await import("./expert-account-view.js");

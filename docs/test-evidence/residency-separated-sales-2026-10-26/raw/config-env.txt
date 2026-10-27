@@ -1,0 +1,79 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ packages/config/src/env.test.ts (24 tests | 1 failed) 59ms
+   × loadEnv > defaults dangerous integrations to disabled and rejects raw transcript logging 25ms
+     → expected { bookingCallbacks: false, …(31) } to deeply equal { workerOutboxDelivery: false, …(29) }
+   ✓ loadEnv > defaults test-expert reconciliation off and accepts only exact booleans 3ms
+   ✓ loadEnv > allows deterministic test-expert flow without Selarti and fails closed for incomplete residual activation 3ms
+   ✓ loadEnv > requires reconciliation and worker outbox capabilities for test-expert residual startup 1ms
+   ✓ loadEnv > defaults worker outbox delivery off and accepts only exact booleans 3ms
+   ✓ loadEnv > defaults client catalog off and accepts only exact booleans 2ms
+   ✓ loadEnv > defaults client sessions off and accepts only exact booleans 2ms
+   ✓ loadEnv > requires safe key metadata only when expert referrals are enabled 2ms
+   ✓ loadEnv > tolerates unrelated OS variables while rejecting every owned live flag 2ms
+   ✓ loadEnv > defaults expert Telegram queries off and exposes only a capability flag 1ms
+   ✓ loadEnv > validates the maturity worker flag instead of letting a typo mean off 2ms
+   ✓ loadEnv > defaults expert Telegram financial views off and exposes an independent flag 1ms
+   ✓ loadEnv > keeps expert AI ingress off unless explicitly requested 1ms
+   ✓ loadEnv > defaults expert Telegram referral mutations off 1ms
+   ✓ loadEnv > defaults expert Telegram checkout readiness off 1ms
+   ✓ loadEnv > accepts only the exact Postgres URL protocols 1ms
+   ✓ loadEnv > requires TLS for every non-local Postgres endpoint 2ms
+   ✓ loadEnv > rejects a non-hierarchical or pathless database URL: postgres:opaque 0ms
+   ✓ loadEnv > rejects a non-hierarchical or pathless database URL: postgresql:opaque 0ms
+   ✓ loadEnv > rejects a non-hierarchical or pathless database URL: postgres://user:password@localhost:5432 0ms
+   ✓ loadEnv > rejects a non-hierarchical or pathless database URL: postgres:///database 0ms
+   ✓ loadEnv > rejects a non-hierarchical or pathless database URL: postgres://localhost/ 0ms
+   ✓ loadEnv > rejects every project-owned enable flag when set to true 4ms
+   ✓ loadEnv > requires owned provider selectors to remain disabled 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/config/src/env.test.ts > loadEnv > defaults dangerous integrations to disabled and rejects raw transcript logging
+AssertionError: expected { bookingCallbacks: false, …(31) } to deeply equal { workerOutboxDelivery: false, …(29) }
+
+- Expected
++ Received
+
+@@ -1,8 +1,9 @@
+  {
+    "b2SensitiveRetention": false,
+    "b2TelegramDispatch": false,
++   "bookingCallbacks": false,
+    "clientBooking": false,
+    "clientBookingReserve": false,
+    "clientCatalog": false,
+    "clientErasureRequests": false,
+    "clientFreeAccessV2": false,
+@@ -14,10 +15,11 @@
+    "clientTelegramNavigation": false,
+    "expertAiIngress": false,
+    "expertReferral": false,
+    "expertReferralMaturityWorker": false,
+    "expertResidencyBilling": false,
++   "expertSession": false,
+    "expertTelegramCheckout": false,
+    "expertTelegramFinancialViews": false,
+    "expertTelegramQueries": false,
+    "expertTelegramReferral": false,
+    "selartiCostAdmission": false,
+
+ ❯ packages/config/src/env.test.ts:26:29
+     24|     expect(config.minorOnboarding).toBe(false);
+     25|     expect(config.rawConversationLogging).toBe(false);
+     26|     expect(config.features).toEqual({
+       |                             ^
+     27|       workerOutboxDelivery: false,
+     28|       clientCatalog: false,
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 23 passed (24)
+   Start at  17:57:04
+   Duration  724ms (transform 146ms, setup 0ms, collect 250ms, tests 59ms, environment 0ms, prepare 121ms)
+
+
+[END OF RAW CAPTURE]

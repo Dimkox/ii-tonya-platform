@@ -12,6 +12,13 @@ export interface WorkerCycleReport {
   readonly planerkaAvailability?: unknown;
   readonly bookingHandoffRevocations?: unknown;
   readonly bookingNotifications?: unknown;
+  readonly expertCardMaterials?: unknown;
+  readonly residentWorkspaceNotifications?: unknown;
+  readonly residentReviewNotifications?: unknown;
+  readonly residentPrivateJobs?: unknown;
+  readonly expertResidencyLifecycle?: unknown;
+  readonly expertPersonalOffers?: unknown;
+  readonly expertSeparatedSales?: unknown;
   readonly safetyHandoffs: unknown;
   readonly expiredLeaseRecovery: unknown;
   readonly unknownOutcomeReconciliation: unknown;
@@ -52,6 +59,34 @@ export interface WorkerRuntimeDependencies {
   readonly planerkaAvailability?: BoundedJob;
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
+  readonly residentPrivateJobs?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly residentReviewNotifications?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly residentWorkspaceNotifications?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertCardMaterials?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertSeparatedSales?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertPersonalOffers?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertResidencyLifecycle?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   /** Dedicated safety repository/dispatcher path; never a Planerka or intent-model call. */
   readonly safetyHandoffs: BoundedJob;
   readonly recoverExpiredLeases: BoundedJob;
@@ -83,6 +118,34 @@ export interface ProductionWorkerRuntimeDependencies {
   };
   readonly bookingHandoffRevocations?: BoundedJob;
   readonly bookingNotifications?: BookingNotificationLifecycle;
+  readonly residentPrivateJobs?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly residentReviewNotifications?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly residentWorkspaceNotifications?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertCardMaterials?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertSeparatedSales?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertPersonalOffers?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly expertResidencyLifecycle?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly planerkaBookingRunner?: BoundedJob;
   readonly clientAsyncOutboxRunner?: BoundedJob;
   readonly workerOutboxRegistry?: Readonly<{
@@ -215,6 +278,15 @@ export function createWorkerRuntime(
         await deps.expertTelegramCheckoutCleanup();
       const expertResidencyReconciliation =
         await deps.expertResidencyReconciliation();
+      const expertSeparatedSales = acceptingClaims
+        ? await deps.expertSeparatedSales?.runOnce()
+        : undefined;
+      const expertPersonalOffers = acceptingClaims
+        ? await deps.expertPersonalOffers?.runOnce()
+        : undefined;
+      const expertResidencyLifecycle = acceptingClaims
+        ? await deps.expertResidencyLifecycle?.runOnce()
+        : undefined;
       const expertReferralHoldReplay = await deps.expertReferralHoldReplay();
       const expertReferralMaturity =
         (await deps.expertReferralMaturity?.()) ?? {
@@ -227,6 +299,18 @@ export function createWorkerRuntime(
       const confirmedOutboxDelivery = await deps.deliverConfirmedOutbox();
       const bookingNotifications = acceptingClaims
         ? await deps.bookingNotifications?.runOnce()
+        : undefined;
+      const residentPrivateJobs = acceptingClaims
+        ? await deps.residentPrivateJobs?.runOnce()
+        : undefined;
+      const residentReviewNotifications = acceptingClaims
+        ? await deps.residentReviewNotifications?.runOnce()
+        : undefined;
+      const residentWorkspaceNotifications = acceptingClaims
+        ? await deps.residentWorkspaceNotifications?.runOnce()
+        : undefined;
+      const expertCardMaterials = acceptingClaims
+        ? await deps.expertCardMaterials?.runOnce()
         : undefined;
       const processorPrivacy = await deps.processorPrivacy();
       const providerReconciliation = await deps.providerReconciliation();
@@ -244,6 +328,19 @@ export function createWorkerRuntime(
           ? {}
           : { bookingHandoffRevocations }),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
+        ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(residentPrivateJobs === undefined ? {} : { residentPrivateJobs }),
+        ...(residentReviewNotifications === undefined
+          ? {}
+          : { residentReviewNotifications }),
+        ...(residentWorkspaceNotifications === undefined
+          ? {}
+          : { residentWorkspaceNotifications }),
+        ...(expertSeparatedSales === undefined ? {} : { expertSeparatedSales }),
+        ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
+        ...(expertResidencyLifecycle === undefined
+          ? {}
+          : { expertResidencyLifecycle }),
         safetyHandoffs,
         expiredLeaseRecovery,
         unknownOutcomeReconciliation,
@@ -275,6 +372,13 @@ export function createWorkerRuntime(
     acceptingClaims = false;
     deps.stopRecovery?.();
     deps.bookingNotifications?.stopAccepting();
+    deps.expertCardMaterials?.stopAccepting();
+    deps.residentPrivateJobs?.stopAccepting();
+    deps.residentReviewNotifications?.stopAccepting();
+    deps.residentWorkspaceNotifications?.stopAccepting();
+    deps.expertSeparatedSales?.stopAccepting();
+    deps.expertPersonalOffers?.stopAccepting();
+    deps.expertResidencyLifecycle?.stopAccepting();
     const notificationDeadline = Date.now() + shutdownTimeoutMs;
     closePromise = (async () => {
       let failure: unknown;
@@ -336,6 +440,27 @@ export function createProductionWorkerRuntime(
     ...(deps.planerkaAvailability === undefined
       ? {}
       : { planerkaAvailability: deps.planerkaAvailability }),
+    ...(deps.residentPrivateJobs
+      ? { residentPrivateJobs: deps.residentPrivateJobs }
+      : {}),
+    ...(deps.residentReviewNotifications
+      ? { residentReviewNotifications: deps.residentReviewNotifications }
+      : {}),
+    ...(deps.residentWorkspaceNotifications
+      ? { residentWorkspaceNotifications: deps.residentWorkspaceNotifications }
+      : {}),
+    ...(deps.expertSeparatedSales === undefined
+      ? {}
+      : { expertSeparatedSales: deps.expertSeparatedSales }),
+    ...(deps.expertPersonalOffers === undefined
+      ? {}
+      : { expertPersonalOffers: deps.expertPersonalOffers }),
+    ...(deps.expertResidencyLifecycle === undefined
+      ? {}
+      : { expertResidencyLifecycle: deps.expertResidencyLifecycle }),
+    ...(deps.expertCardMaterials === undefined
+      ? {}
+      : { expertCardMaterials: deps.expertCardMaterials }),
     ...(deps.bookingHandoffRevocations === undefined
       ? {}
       : { bookingHandoffRevocations: deps.bookingHandoffRevocations }),

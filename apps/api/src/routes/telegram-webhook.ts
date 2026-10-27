@@ -1,3 +1,16 @@
+import { isClientBotAccountCommand } from "@ii-tonya/application";
+import type { ClientBotAccountCapability } from "../client-bot-account-composition.js";
+import {
+  validRawExpertCardUpdateId,
+  isExpertResidencyLifecycleUpdate,
+  parseExpertCardTelegramUpdate,
+  type ExpertCardTelegramIngress,
+} from "../expert-card-telegram-ingress.js";
+import { createSecurityEvent } from "@ii-tonya/observability";
+import {
+  handleTelegramDeletion,
+  type TelegramDeletionCapability,
+} from "../telegram-deletion.js";
 import { createHash, timingSafeEqual } from "node:crypto";
 import type {
   ClientNavigationGateway,
@@ -157,6 +170,7 @@ const secureEqual = (actual: string | undefined, expected: string): boolean => {
 
 export const telegramWebhookRoutes: FastifyPluginAsync<{
   secret: string;
+  deletion?: TelegramDeletionCapability;
   callbacks: TelegramCallbackService;
   inbox: WebhookInbox;
   rateLimiter: RateLimitGate;
@@ -171,15 +185,83 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
   clientHybridRoutingEnabled: boolean | undefined;
   clientBotKey: string | undefined;
   clientGateway: HybridGateway | undefined;
+  clientAccountQueriesEnabled?: boolean;
+  clientAccountQueries?: ClientBotAccountCapability;
   clientNavigationEnabled?: boolean | undefined;
   clientNavigationGateway?: Pick<ClientNavigationGateway, "handle"> | undefined;
   clientBotId?: string | undefined;
   clientIngressReplay?: ClientIngressReplayRead | undefined;
   testExpertPromoEnabled?: boolean;
   testExpertPromo?: TelegramTestExpertPromoIngress;
+  expertCardEnabled?: boolean;
+  expertCard?: ExpertCardTelegramIngress;
+  expertResidencyLifecycleEnabled?: boolean;
+  expertResidencyLifecycle?: ExpertCardTelegramIngress;
   bookingCallbacksEnabled?: boolean;
   bookingCallbacks?: BookingCallbackService;
 }> = async (app, deps) => {
+  const cardShutdown = new AbortController();
+  app.addHook("preClose", async () => {
+    cardShutdown.abort();
+  });
+  if (
+    deps.expertCardEnabled === true &&
+    (!deps.expertCard ||
+      !Number.isSafeInteger(Number(deps.expertCard.workBotId)) ||
+      !/^[1-9][0-9]{0,15}$/u.test(deps.expertCard.workBotId) ||
+      !deps.expertCard.workBotKey ||
+      typeof deps.expertCard.service?.handleWork !== "function" ||
+      typeof deps.expertCard.legacyReplay?.read !== "function" ||
+      !secureEqual(deps.expertCard.webhookSecret, deps.secret))
+  )
+    throw new Error("expert_card_capability_required");
+  if (deps.expertResidencyLifecycleEnabled === true) {
+    const c = deps.expertResidencyLifecycle;
+    if (
+      !c ||
+      !Number.isSafeInteger(Number(c.workBotId)) ||
+      !/^[1-9][0-9]{0,15}$/u.test(c.workBotId) ||
+      !c.workBotKey ||
+      typeof c.service?.handleWork !== "function" ||
+      typeof c.legacyReplay?.read !== "function" ||
+      !secureEqual(c.webhookSecret, deps.secret)
+    )
+      throw new Error("expert_residency_lifecycle_capability_required");
+    if (
+      deps.expertCardEnabled === true &&
+      deps.expertCard &&
+      (deps.expertCard.workBotId !== c.workBotId ||
+        deps.expertCard.workBotKey !== c.workBotKey)
+    )
+      throw new Error("expert_residency_lifecycle_scope_conflict");
+  }
+  const securityEvent = createSecurityEvent();
+  app.addHook("onResponse", async (request, reply) => {
+    if (
+      reply.statusCode === 401 ||
+      reply.statusCode === 403 ||
+      reply.statusCode === 429
+    )
+      app.log.warn(
+        securityEvent(
+          reply.statusCode === 429 ? "rate_limited" : "authentication_rejected",
+          request.ip,
+          request.headers["user-agent"],
+        ),
+      );
+  });
+  const deletion = async (
+    body: unknown,
+    reply: FastifyReply,
+  ): Promise<boolean> => {
+    const result = await handleTelegramDeletion(body, deps.deletion);
+    if (result.kind === "unhandled") return false;
+    if (result.kind === "reply") reply.send(result.reply);
+    else if (result.kind === "denied")
+      reply.code(403).send({ error: "deletion_denied" });
+    else reply.code(503).send({ error: "deletion_unavailable" });
+    return true;
+  };
   if (
     deps.bookingCallbacksEnabled === true &&
     (!deps.bookingCallbacks || !deps.clientBotKey)
@@ -260,8 +342,16 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         if (
           deps.clientBotKey === undefined ||
           !secureEqual(request.params.botKey, deps.clientBotKey)
-        )
+        ) {
+          app.log.warn(
+            securityEvent(
+              "authentication_rejected",
+              request.ip,
+              request.headers["user-agent"],
+            ),
+          );
           return reply.send({ accepted: true, rejected: true });
+        }
         if (
           !deps.rateLimiter.consume(
             `telegram:client:auth:${deps.clientBotKey}`,
@@ -298,8 +388,32 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
       const updateId = clientIngressUpdateId(request.body);
       if (updateId === undefined)
         return reply.code(400).send({ error: "invalid_update" });
+      if (await deletion(request.body, reply)) return;
       if (isBookingCallback(request.body))
         return bookingCallback(request.body, reply, crypto.randomUUID());
+      if (isClientBotAccountCommand(request.body)) {
+        if (
+          deps.clientAccountQueriesEnabled !== true ||
+          !deps.clientAccountQueries ||
+          deps.clientAccountQueries.botId !== deps.clientBotId ||
+          deps.clientAccountQueries.botKey !== deps.clientBotKey
+        )
+          return reply
+            .code(503)
+            .send({ error: "client_account_queries_unavailable" });
+        const result = await deps.clientAccountQueries.service.handle(
+          request.body,
+        );
+        if (result.status === "reply")
+          return reply.type("application/json").send(result.reply);
+        if (result.status === "duplicate")
+          return { accepted: true, duplicate: true };
+        if (result.status === "invalid")
+          return reply.code(400).send({ error: "invalid_account_query" });
+        return reply
+          .code(503)
+          .send({ error: "client_account_queries_unavailable" });
+      }
       if (deps.clientNavigationEnabled === true) {
         try {
           const result = await deps.clientNavigationGateway?.handle(
@@ -420,6 +534,14 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
     "/v1/webhooks/telegram",
     {
       bodyLimit: 65_536,
+      preValidation: async (request, reply) => {
+        if (
+          (deps.expertCardEnabled === true ||
+            deps.expertResidencyLifecycleEnabled === true) &&
+          !validRawExpertCardUpdateId(request.body)
+        )
+          return reply.code(400).send({ error: "invalid_update" });
+      },
       onRequest: async (request, reply) => {
         const header = request.headers["x-telegram-bot-api-secret-token"];
         if (
@@ -477,6 +599,109 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
         )
       ) {
         return reply.code(429).send({ error: "rate_limited" });
+      }
+      if (await deletion(request.body, reply)) return;
+      const lifecycleRequest =
+        deps.expertResidencyLifecycleEnabled === true &&
+        isExpertResidencyLifecycleUpdate(request.body);
+      const interceptor = lifecycleRequest
+        ? deps.expertResidencyLifecycle
+        : deps.expertCardEnabled === true
+          ? deps.expertCard
+          : undefined;
+      if (interceptor) {
+        const parsed = parseExpertCardTelegramUpdate(
+          request.body,
+          interceptor,
+          { lifecycleCommands: lifecycleRequest },
+        );
+        if (parsed.kind === "invalid")
+          return reply.code(400).send({ error: "invalid_card_update" });
+        if (parsed.kind === "parsed") {
+          try {
+            const legacy = await interceptor.legacyReplay.read({
+              botId: interceptor.workBotId,
+              updateId: parsed.input.updateId,
+            });
+            if (legacy === "complete")
+              return { accepted: true, duplicate: true };
+            if (legacy !== "absent")
+              return reply
+                .code(503)
+                .send({ error: "expert_card_replay_unavailable" });
+          } catch {
+            return reply
+              .code(503)
+              .send({ error: "expert_card_replay_unavailable" });
+          }
+          if (
+            !deps.rateLimiter.consume(
+              `telegram:${lifecycleRequest ? "expert-residency-lifecycle" : "expert-card"}:${interceptor.workBotId}:${parsed.input.telegramUserId}`,
+              20,
+              60000,
+            )
+          )
+            return reply.code(429).send({ error: "rate_limited" });
+          try {
+            const requestAbort = new AbortController();
+            const abort = () => requestAbort.abort();
+            request.raw.once("aborted", abort);
+            let result;
+            try {
+              result = await interceptor.service.handleWork({
+                ...parsed.input,
+                signal: AbortSignal.any([
+                  cardShutdown.signal,
+                  requestAbort.signal,
+                ]),
+              });
+            } finally {
+              request.raw.removeListener("aborted", abort);
+            }
+            if (
+              result.tagCallbackAuthorized === true &&
+              parsed.input.callbackQueryId &&
+              interceptor.answerTagCallback
+            ) {
+              try {
+                await interceptor.answerTagCallback({
+                  botId: interceptor.workBotId,
+                  callbackQueryId: parsed.input.callbackQueryId,
+                  signal: AbortSignal.any([
+                    cardShutdown.signal,
+                    AbortSignal.timeout(2000),
+                  ]),
+                });
+              } catch {
+                /* ACK uncertainty cannot retry the committed tag mutation. */
+              }
+            }
+            if (
+              result.status === "handled" &&
+              "promptDelivered" in result &&
+              result.promptDelivered
+            )
+              return { accepted: true };
+            if (result.status === "handled")
+              return {
+                method: "sendMessage",
+                chat_id: parsed.input.chatId,
+                text: result.text,
+                ...("inlineKeyboard" in result && result.inlineKeyboard
+                  ? { reply_markup: { inline_keyboard: result.inlineKeyboard } }
+                  : {}),
+                protect_content: true,
+              };
+            if (result.status === "duplicate")
+              return { accepted: true, duplicate: true };
+            if (result.status === "rejected")
+              return reply.code(400).send({ error: "invalid_card_update" });
+            if (result.status !== "unhandled")
+              return reply.code(503).send({ error: "expert_card_unavailable" });
+          } catch {
+            return reply.code(503).send({ error: "expert_card_unavailable" });
+          }
+        }
       }
       const body = request.body as Record<string, unknown>;
       const correlationId =

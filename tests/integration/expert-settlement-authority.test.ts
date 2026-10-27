@@ -245,13 +245,17 @@ it.each(["legacy_residency_v1", "expert_residency_v2"] as const)(
     ).settle(event(a));
     try {
       await boundary.wait(pending);
-      // A has read the old end; B commits while A is paused. Without real
-      // serialization A subsequently commits the same interval as B.
-      const settledB = await provider().settle(event(b));
+      // A holds real expert authority after reading the old end. B must
+      // exhaust its bounded NOWAIT retries rather than lose paid time.
+      await expect(provider().settle(event(b))).rejects.toMatchObject({
+        cause: { code: "55P03" },
+      });
       boundary.release();
       const settledA = await pending;
-      expect(settledB.residencyStartsAt).toBe(existing.residencyEndsAt);
-      expect(settledA.residencyStartsAt).toBe(settledB.residencyEndsAt);
+      // Retry the identical verified event after authority becomes available.
+      const settledB = await provider().settle(event(b));
+      expect(settledA.residencyStartsAt).toBe(existing.residencyEndsAt);
+      expect(settledB.residencyStartsAt).toBe(settledA.residencyEndsAt);
       const durationMs =
         policy === "expert_residency_v2" ? 2592000000 : 86400000;
       expect(
@@ -259,7 +263,7 @@ it.each(["legacy_residency_v1", "expert_residency_v2"] as const)(
           Date.parse(settledB.residencyStartsAt),
       ).toBe(durationMs);
       expect(
-        Date.parse(settledA.residencyEndsAt) -
+        Date.parse(settledB.residencyEndsAt) -
           Date.parse(existing.residencyEndsAt),
       ).toBe(2 * durationMs);
       expect(
@@ -434,10 +438,8 @@ it("commits expiry and release after an order-lock wait before rejecting settlem
         )
       ).rows,
     ).toEqual([{ future: true }]);
-    boundary.release();
-    await boundary.submitted;
-    // Bounded DB-clock wait, not pg_stat_activity snapshot polling. The real
-    // unchanged order SELECT is submitted while this connection owns its lock.
+    // Keep the executor gated until expiry so bounded production lock retries
+    // are not exhausted by an artificial two-second lock hold.
     await blocker.query(
       "select pg_sleep(greatest(0,extract(epoch from payment_deadline-clock_timestamp()))+0.1) from expert_residency_orders where id=$1",
       [o.id],
@@ -450,6 +452,22 @@ it("commits expiry and release after an order-lock wait before rejecting settlem
         )
       ).rows,
     ).toEqual([{ expired: true }]);
+    boundary.release();
+    await boundary.submitted;
+    // Observe the real SQL waiting on the held row before releasing its lock.
+    const blockerPid = (
+      await blocker.query<{ pid: number }>("select pg_backend_pid() pid")
+    ).rows[0]!.pid;
+    const observationDeadline = Date.now() + 150;
+    let blocked = false;
+    do {
+      const observation = await blocker.query<{ blocked: boolean }>(
+        "select exists(select 1 from pg_stat_activity where $1::int=any(pg_blocking_pids(pid))) as blocked",
+        [blockerPid],
+      );
+      blocked = observation.rows[0]!.blocked;
+    } while (!blocked && Date.now() < observationDeadline);
+    expect(blocked).toBe(true);
     await blocker.query("commit");
     expect((await outcome).error).toMatchObject({
       code: "EXPERT_RESIDENCY_PAYMENT_EXPIRED",

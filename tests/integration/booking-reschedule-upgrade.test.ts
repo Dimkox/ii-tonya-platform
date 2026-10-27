@@ -23,19 +23,19 @@ describe("booking reschedule replay migration upgrade", () => {
   beforeAll(async () => {
     database = await startTestPostgres();
     oldMigrationsFolder = await mkdtemp(
-      join(tmpdir(), "ii-tonya-migrations-through-0040-"),
+      join(tmpdir(), "ii-tonya-migrations-through-0072-"),
     );
     await cp(defaultMigrationsFolder, oldMigrationsFolder, {
       recursive: true,
     });
     await unlink(
-      join(oldMigrationsFolder, "0041_booking_reschedule_replay.sql"),
+      join(oldMigrationsFolder, "0073_booking_reschedule_replay.sql"),
     );
     const journalPath = join(oldMigrationsFolder, "meta", "_journal.json");
     const journal = JSON.parse(await readFile(journalPath, "utf8")) as {
       entries: Array<{ idx: number }>;
     };
-    journal.entries = journal.entries.filter((entry) => entry.idx <= 40);
+    journal.entries = journal.entries.filter((entry) => entry.idx <= 72);
     await writeFile(journalPath, `${JSON.stringify(journal, null, 2)}\n`);
     await migrateDb(database.db, oldMigrationsFolder);
   }, 120_000);

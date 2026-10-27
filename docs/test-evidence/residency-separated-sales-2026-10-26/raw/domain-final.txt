@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ packages/domain/src/expert-separated-sales.test.ts (10 tests) 9ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  17:58:43
+   Duration  492ms (transform 65ms, setup 0ms, collect 60ms, tests 9ms, environment 0ms, prepare 121ms)
+
+
+[END OF RAW CAPTURE]

@@ -25,7 +25,7 @@ import {
 } from "../../packages/db/src/testkit/postgres.js";
 
 const token = "123456:synthetic_token_abcdefghijklmnopqrstuvwxyz";
-const botKey = "client.bot:one";
+const botKey = "client.bot-one";
 const reply = {
   ok: true,
   result: {

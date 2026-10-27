@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "2d943517dd27fcb951c82a3df0a7cc15fbf4c038",
+  "files": [
+    {
+      "file": "verification-private-jobs-final-gate-1793058900254571955.log.gz",
+      "bytes": 272,
+      "sha256": "33f130d57b04fc44a2fb975a06871d1e0712fd5103b5221fab566f0a642f15df",
+      "rawBytes": 495,
+      "rawSha256": "b8994ceaee13e0d11579dfd5f964a425ab63b58484dc1ac595b9f72b7930397e",
+      "exitCode": 0
+    },
+    {
+      "file": "verification-private-jobs-final-repo-1793058900254571955.log.gz",
+      "bytes": 2327,
+      "sha256": "b2d6ec05acf270d1c7603863358b2a4acafd7716ca499e777680802033e8b829",
+      "rawBytes": 8181,
+      "rawSha256": "8611bbb71ef3a7e2538d6c4eae3ec991b68232e0b080a12ef686c39c9aa81cab",
+      "exitCode": 0
+    }
+  ]
+}

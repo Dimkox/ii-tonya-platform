@@ -1,4 +1,28 @@
+import { createResidentPrivateJobsLifecycle } from "./resident-private-jobs-composition.js";
+import { createResidentReviewNotificationLifecycle } from "./resident-review-notification-composition.js";
+import { createSeparatedSalesRunner } from "./expert-separated-sales-composition.js";
+import { createResidentWorkspaceNotificationLifecycle } from "./resident-workspace-notification-composition.js";
+import {
+  createExpertPersonalOfferRunner,
+  type ExpertCardMainCheckout,
+} from "@ii-tonya/worker";
+import {
+  PostgresExpertPersonalOfferRepository,
+  PostgresExpertOnboardingMainPaymentRepository,
+} from "@ii-tonya/db";
+import {
+  createPersonalOfferNoticeTransport,
+  assertPersonalOfferNoticeConfig,
+} from "./expert-personal-offer-composition.js";
+import {
+  assertExpertResidencyLifecycleWorkerConfig,
+  createExpertResidencyLifecycleWorker,
+} from "./expert-residency-lifecycle-composition.js";
 import { randomUUID } from "node:crypto";
+import {
+  assertExpertCardMaterialsWorkerConfig,
+  createExpertCardMaterialsLifecycle,
+} from "./expert-card-materials-composition.js";
 import { composeClientAsyncTelegram } from "./client-async-composition.js";
 import {
   createYooKassaWorkerComposition,
@@ -37,6 +61,8 @@ import {
   PostgresBookingRepository,
   PostgresClientCatalogRepository,
   PostgresClientSessionRepository,
+  PostgresExpertCardRepository,
+  PostgresExpertResidencyLifecycleRepository,
   PostgresExpertReferralWorkerRepository,
   PostgresExpertTelegramResidencyCallbackRepository,
   PostgresOperatorCaseOutboxRepository,
@@ -125,7 +151,12 @@ export interface WorkerRuntimeFactory {
 export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly logger?: ReturnType<typeof createLogger>;
   readonly planerkaTransport?: PlanerkaTransport;
+  readonly expertHeldOnboarding?: import("./expert-separated-sales-composition.js").HeldSalesCapabilities;
+  readonly expertPersonalOfferCheckout?: ExpertCardMainCheckout;
   readonly clientTelegramFetch?: typeof globalThis.fetch;
+  readonly expertCardMaterialFetch?: typeof globalThis.fetch;
+  readonly residentWorkspaceNotifier?: import("@ii-tonya/db").WorkspaceNotifier;
+  readonly expertResidencyNoticeFetch?: typeof globalThis.fetch;
   readonly clientAsyncCapabilities?: ClientAsyncCapabilities;
   readonly yookassaReader?: ExpertResidencyProviderReader;
   readonly waitlistRepositoryFactory?: (
@@ -385,6 +416,9 @@ export function createProductionWorkerRuntimeFactory(
   const logger = deps.logger ?? createLogger();
   return {
     async create(config) {
+      assertExpertResidencyLifecycleWorkerConfig(config);
+      assertPersonalOfferNoticeConfig(config);
+      assertExpertCardMaterialsWorkerConfig(config);
       validateYooKassaWorkerConfig(config);
       const clientEnabled = config.features.b2TelegramDispatch === true;
       const selartiEnabled =
@@ -561,6 +595,118 @@ export function createProductionWorkerRuntimeFactory(
         config,
         db,
       );
+      const residentPrivateJobs = createResidentPrivateJobsLifecycle(
+        config,
+        db,
+      );
+      const residentReviewNotifications =
+        createResidentReviewNotificationLifecycle(config, db);
+      const residentWorkspaceNotifications =
+        createResidentWorkspaceNotificationLifecycle(
+          config,
+          db,
+          deps.residentWorkspaceNotifier,
+        );
+      const expertCardMaterials = createExpertCardMaterialsLifecycle(config, {
+        createRepository: (materialTransport) =>
+          new PostgresExpertCardRepository(db, {
+            messagingConsentPolicyVersion:
+              config.expertCard!.messagingConsentPolicyVersion,
+            workBotId: config.expertCard!.workBotId,
+            workBotKey: config.expertCard!.workBotKey,
+            materialTransport,
+          }),
+        ...(deps.expertCardMaterialFetch === undefined
+          ? {}
+          : { fetch: deps.expertCardMaterialFetch }),
+      });
+      const expertResidencyLifecycle = createExpertResidencyLifecycleWorker(
+        config,
+        {
+          createRepository: (noticeTransport) =>
+            new PostgresExpertResidencyLifecycleRepository(db, {
+              messagingConsentPolicyVersion:
+                config.expertCard!.messagingConsentPolicyVersion,
+              workBotId: config.expertCard!.workBotId,
+              workBotKey: config.expertCard!.workBotKey,
+              ...(noticeTransport === undefined ? {} : { noticeTransport }),
+            }),
+          ...(deps.expertResidencyNoticeFetch === undefined
+            ? {}
+            : { fetch: deps.expertResidencyNoticeFetch }),
+        },
+      );
+      const expertPersonalOffers =
+        config.features.expertResidencyLifecycle === true
+          ? (() => {
+              const work = config.expertCard!;
+              const repository = new PostgresExpertPersonalOfferRepository(db, {
+                workBotId: work.workBotId,
+                workBotKey: work.workBotKey,
+                ...(config.expertApplicant
+                  ? {
+                      promoBotId: config.expertApplicant.botId,
+                      promoBotKey: config.expertApplicant.botKey,
+                      promoConsentPolicyVersion:
+                        config.expertApplicant.messagingConsentPolicyVersion,
+                    }
+                  : {}),
+                messagingConsentPolicyVersion:
+                  work.messagingConsentPolicyVersion,
+                ...(config.features.expertResidencyNoticeDelivery === true
+                  ? {
+                      noticeTransport: createPersonalOfferNoticeTransport(
+                        config,
+                        deps.expertResidencyNoticeFetch,
+                      ),
+                    }
+                  : {}),
+              });
+              const financial =
+                new PostgresExpertOnboardingMainPaymentRepository(db, {
+                  providerMode: work.paymentMode,
+                  messagingConsentPolicyVersion:
+                    work.messagingConsentPolicyVersion,
+                });
+              const runner = createExpertPersonalOfferRunner({
+                enabled: true,
+                repository,
+                financial,
+                ...(deps.expertPersonalOfferCheckout
+                  ? { mainCheckout: deps.expertPersonalOfferCheckout }
+                  : {}),
+              });
+              const abort = new AbortController();
+              return {
+                async runOnce() {
+                  const offers = await runner.runOnce();
+                  let delivered = 0;
+                  if (config.features.expertResidencyNoticeDelivery === true)
+                    for (const n of await repository.listDueNotices(10)) {
+                      if (
+                        (
+                          await repository.deliverNotice(n.noticeId, {
+                            signal: abort.signal,
+                          })
+                        ).kind === "delivered"
+                      )
+                        delivered++;
+                    }
+                  return { offers, delivered };
+                },
+                stopAccepting() {
+                  abort.abort();
+                  runner.stopAccepting();
+                },
+              };
+            })()
+          : undefined;
+      const expertSeparatedSales = createSeparatedSalesRunner(
+        db,
+        config,
+        deps.expertResidencyNoticeFetch,
+        deps.expertHeldOnboarding,
+      );
       const bookingHandoffRevocations =
         new PostgresBookingHandoffRevocationRepository(db);
       const lifecycleSchedulerRepository = config.features.lifecycleReminders
@@ -595,9 +741,20 @@ export function createProductionWorkerRuntimeFactory(
                 return result;
               },
             }),
+        ...(expertSeparatedSales ? { expertSeparatedSales } : {}),
         bookingHandoffRevocations: () =>
           bookingHandoffRevocations.consumePending(20),
         ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
+        ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+        ...(residentPrivateJobs ? { residentPrivateJobs } : {}),
+        ...(residentReviewNotifications ? { residentReviewNotifications } : {}),
+        ...(residentWorkspaceNotifications
+          ? { residentWorkspaceNotifications }
+          : {}),
+        ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
+        ...(expertResidencyLifecycle === undefined
+          ? {}
+          : { expertResidencyLifecycle }),
         ...(planerka === undefined
           ? {}
           : { planerkaBookingRunner: () => runPlanerkaBookingOnce(planerka) }),

@@ -370,7 +370,6 @@ describe("original client authority", () => {
     async (first) => {
       const f = await fixture();
       const m = (await f.queue.claim(1, "worker", 60_000, 3))[0]!;
-      const release = await barrier(f.userId);
       const start = () =>
         f.queue.recordAttemptStarted(
           m.id,
@@ -381,19 +380,36 @@ describe("original client authority", () => {
           new Date(),
           m.attempt,
         );
-      let a: Promise<unknown>, b: Promise<unknown>;
+      if (first === "start")
+        expect(await start()).toMatchObject({ kind: "admitted" });
+      const release = await barrier(f.userId);
+      let withdrawing: Promise<unknown> | undefined;
       try {
-        a = first === "withdraw" ? f.withdraw() : start();
+        withdrawing = f.withdraw();
         await waitForWaiters(1);
-        b = first === "withdraw" ? start() : f.withdraw();
-        await waitForWaiters(2);
+        if (first === "withdraw") {
+          // Admission has a bounded 10ms subject wait. A queued withdrawal wins
+          // by deferring the unstarted claim, rather than adding a second waiter.
+          expect(await start()).toEqual({
+            kind: "deferred",
+            reasonCode: "client_authority_busy",
+          });
+        }
       } finally {
         await release();
+        if (withdrawing) await withdrawing;
       }
-      const results = await Promise.all([a!, b!]);
-      expect(results[first === "start" ? 0 : 1]).toMatchObject({
-        kind: first === "start" ? "admitted" : "blocked",
-      });
+      expect(
+        (
+          await database.db.execute<{ n: number }>(
+            sql`select count(*)::int n from delivery_attempts where outcome='started'`,
+          )
+        ).rows[0]!.n,
+      ).toBe(first === "start" ? 1 : 0);
+      if (first === "withdraw")
+        expect(await f.queue.claim(1, "retry-worker", 60_000, 3)).toHaveLength(
+          0,
+        );
     },
   );
 
@@ -597,6 +613,7 @@ describe("original client authority", () => {
     }).create({
       databaseUrl: database.db.$client.options.connectionString,
       clientTelegramBotKey: "fence-bot",
+      integrations: { payments: false },
       features: { b2TelegramDispatch: true, telegramEgressConsentGate: true },
     } as never);
     try {

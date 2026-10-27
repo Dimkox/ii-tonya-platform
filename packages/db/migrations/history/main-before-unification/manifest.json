@@ -5,21 +5,21 @@
       "sourceCommit": "13edda58769e8b00e8d407da821b8ab009a8fb19",
       "sourcePath": "packages/db/migrations/0039_lifecycle_scheduler_c1.sql",
       "archivePath": "packages/db/migrations/history/main-before-unification/0039_lifecycle_scheduler_c1.sql",
-      "canonicalPath": "packages/db/migrations/0052_lifecycle_scheduler_c1.sql",
+      "canonicalPath": "packages/db/migrations/0071_lifecycle_scheduler_c1.sql",
       "sha256": "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d"
     },
     {
       "sourceCommit": "13edda58769e8b00e8d407da821b8ab009a8fb19",
       "sourcePath": "packages/db/migrations/0040_booking_waitlist_d1.sql",
       "archivePath": "packages/db/migrations/history/main-before-unification/0040_booking_waitlist_d1.sql",
-      "canonicalPath": "packages/db/migrations/0053_booking_waitlist_d1.sql",
+      "canonicalPath": "packages/db/migrations/0072_booking_waitlist_d1.sql",
       "sha256": "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8"
     },
     {
       "sourceCommit": "13edda58769e8b00e8d407da821b8ab009a8fb19",
       "sourcePath": "packages/db/migrations/0041_booking_reschedule_replay.sql",
       "archivePath": "packages/db/migrations/history/main-before-unification/0041_booking_reschedule_replay.sql",
-      "canonicalPath": "packages/db/migrations/0054_booking_reschedule_replay.sql",
+      "canonicalPath": "packages/db/migrations/0073_booking_reschedule_replay.sql",
       "sha256": "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed"
     }
   ]

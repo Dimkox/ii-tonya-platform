@@ -116,9 +116,9 @@ describe("real webhook route with trusted peer helper", () => {
     { socket: "127.0.0.1", ip: "203.0.113.1", status: 403 },
     { socket: "127.0.0.1", ip: "185.71.76.04", status: 403 },
     { socket: "127.0.0.1", ip: [provider, provider], status: 403 },
-    { socket: "127.0.0.1", ip: provider, status: 200 },
-    { socket: "::1", ip: "2A02:5180::1", status: 200 },
-    { socket: "::ffff:127.0.0.1", ip: "::ffff:b947:4c04", status: 200 },
+    { socket: "127.0.0.1", ip: provider, status: 503 },
+    { socket: "::1", ip: "2A02:5180::1", status: 503 },
+    { socket: "::ffff:127.0.0.1", ip: "::ffff:b947:4c04", status: 503 },
   ])("admission %#", async ({ socket, ip, status }) => {
     const calls: string[] = [];
     const app = Fastify();
@@ -137,6 +137,7 @@ describe("real webhook route with trusted peer helper", () => {
         },
       },
       async verify() {
+        // A trusted peer does not establish ownership of this terminal event.
         calls.push("verify");
         return null;
       },
@@ -165,11 +166,11 @@ describe("real webhook route with trusted peer helper", () => {
       });
       expect(response.statusCode).toBe(status);
       expect(response.json()).toEqual(
-        status === 403 ? { error: "request_rejected" } : { accepted: true },
+        status === 403
+          ? { error: "request_rejected" }
+          : { error: "delivery_pending" },
       );
-      expect(calls).toEqual(
-        status === 403 ? [] : ["claim", "verify", "complete"],
-      );
+      expect(calls).toEqual(status === 403 ? [] : ["claim", "verify", "fail"]);
     } finally {
       await app.close();
     }

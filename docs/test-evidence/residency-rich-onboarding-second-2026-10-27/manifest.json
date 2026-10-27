@@ -1,0 +1,593 @@
+{
+  "kind": "local-synthetic-rich-onboarding-second-correction-R4-R5-R6",
+  "controlCommit": "be8a0c7d71cc5ed22b551cc2ce1cc6332adaed3e",
+  "reviewedRuntimeCommit": "5602413c7dca6809569d788b9d8254df80846cc8",
+  "historicalFixtureCommit": "219f8e0c9d0938fccb4188cf0081f71b3f8b2db9",
+  "historicalEvidenceManifest": "docs/test-evidence/residency-rich-onboarding-2026-10-27/manifest.json",
+  "historicalEvidenceManifestSha256": "60a8a5a176560f98318545aa010f435e1e8eaa63251d1d19bf542ad4fbe20cc3",
+  "firstCorrectionManifest": "docs/test-evidence/residency-rich-onboarding-corrections-2026-10-27/manifest.json",
+  "firstCorrectionManifestSha256": "d12dadbdd492fd0e4e4f72eebbe4bdf86e45d82b319293f2e376cdbc6b34775f",
+  "compression": "gzip level9 mtime0; one original artifact per file",
+  "productionEvidence": false,
+  "files": [
+    {
+      "file": "affected-unit-state.log.gz",
+      "sha256": "b6ad0d09371514c725f4eeaf388609dfb9c6c3511b00ab563d8488cea19a9a76",
+      "bytes": 421,
+      "rawSha256": "59c57b56b0d07c3d0ad07084a59b1142f109bc8f38efd4afa5bee12396e30eae",
+      "rawBytes": 728,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/affected-unit-state.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "apps/web/src/expert-card-client.test.ts",
+        "apps/web/src/expert-card-view.test.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "59c57b56b0d07c3d0ad07084a59b1142f109bc8f38efd4afa5bee12396e30eae",
+      "recordedResult": "affected-unit-state.result.json.gz"
+    },
+    {
+      "file": "affected-unit-state.result.json.gz",
+      "sha256": "5235b3d25bd1c8e7d848bf21afa16748401061d3c4432360efb15c3bdb9d0629",
+      "bytes": 248,
+      "rawSha256": "bed094517969740b310d768c4ec7e4ca5cc916bdcfea8f83cb5ba525445c5709",
+      "rawBytes": 381,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/affected-unit-state.result.json"
+    },
+    {
+      "file": "browser-final.log.gz",
+      "sha256": "fb177c4707a5fc6dd68ed3cfc4320e49acf7fca2d08546514f8c43e3ab805074",
+      "bytes": 391,
+      "rawSha256": "c00fe4803635fd190662c5ac364477f6bf31f7695494f39512fedc71295c01b9",
+      "rawBytes": 589,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/browser-final.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-second-20261027/browser-witness.mjs"
+      ],
+      "exitCode": 0,
+      "logSha256": "c00fe4803635fd190662c5ac364477f6bf31f7695494f39512fedc71295c01b9",
+      "recordedResult": "browser-final.result.json.gz"
+    },
+    {
+      "file": "browser-final.result.json.gz",
+      "sha256": "7dc31c2b80723c951c08f4d584265abbcdeadc54800d16180eb39f570d444c79",
+      "bytes": 177,
+      "rawSha256": "8ed0a4a3844c5899f03e335dd64bf5c769c49fadb43a278fe3a64691d57c6146",
+      "rawBytes": 190,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/browser-final.result.json"
+    },
+    {
+      "file": "browser-green.log.gz",
+      "sha256": "2fd82faa22fa2e0ef50ae6f3d1cc49d8ec73cc2852f44726f4c633908a5f520e",
+      "bytes": 288,
+      "rawSha256": "44d022683a3309b8d79b7f3f75b93ec36e7415a947f01a03d38b47a8992d384b",
+      "rawBytes": 609,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/browser-green.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-second-20261027/browser-witness.mjs"
+      ],
+      "exitCode": 1,
+      "logSha256": "44d022683a3309b8d79b7f3f75b93ec36e7415a947f01a03d38b47a8992d384b",
+      "recordedResult": "browser-green.result.json.gz"
+    },
+    {
+      "file": "browser-green.result.json.gz",
+      "sha256": "cb017a7ecd8be56a5051e1712c49fa4eea71ff29c1f6a42726597375955c50c3",
+      "bytes": 179,
+      "rawSha256": "c1f0b9f2933fbf80ce0706ea0e01aba32b6c4fc0da0b6d0761e5a2bcbe68d428",
+      "rawBytes": 190,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/browser-green.result.json"
+    },
+    {
+      "file": "browser-witness.mjs.gz",
+      "sha256": "44175751d23c4298292deca080dc78a01a7e2a41cecf962765e2ad138a0b8af4",
+      "bytes": 2577,
+      "rawSha256": "15782985f00b74b7aa3bc617f36346f196b9cd92eea1528b0cb601552a124817",
+      "rawBytes": 6002,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/browser-witness.mjs"
+    },
+    {
+      "file": "browser.log.gz",
+      "sha256": "a33509407525058f740245b39d8c6e97a4ab7a16a120beb33bb63faee47b9da2",
+      "bytes": 503,
+      "rawSha256": "f605aae0eeb7a196c55d1003e8b544752b83b7d3206e0196c9ef30fc047f3125",
+      "rawBytes": 777,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/browser.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-second-20261027/browser-witness.mjs"
+      ],
+      "exitCode": 1,
+      "logSha256": "f605aae0eeb7a196c55d1003e8b544752b83b7d3206e0196c9ef30fc047f3125",
+      "recordedResult": "browser.result.json.gz"
+    },
+    {
+      "file": "browser.result.json.gz",
+      "sha256": "4d7fdf26565dc77210f0014fddddd712e832e94ba9817303cbb17f135c33f2c3",
+      "bytes": 178,
+      "rawSha256": "1cb296e52a18136862f9e698d1bfcc1b8a540bf2888f5c9dddff7938f5f19a4e",
+      "rawBytes": 190,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/browser.result.json"
+    },
+    {
+      "file": "db-typecheck.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/db-typecheck.log",
+      "command": ["pnpm", "--filter", "@ii-tonya/db", "typecheck"],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "recordedResult": "db-typecheck.result.json.gz"
+    },
+    {
+      "file": "db-typecheck.result.json.gz",
+      "sha256": "0880f2fb797c76366fdf9ce68a0652f767b49d78486279575898de595b60f35a",
+      "bytes": 155,
+      "rawSha256": "601353ee178af16cab05e0fbf951befc1c32a257bbece5cb375c22c1b22e8f69",
+      "rawBytes": 159,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/db-typecheck.result.json"
+    },
+    {
+      "file": "environment.log.gz",
+      "sha256": "532f262c179b98362934344837e3bfc52112651b4084c2f28173712a127eecfd",
+      "bytes": 322,
+      "rawSha256": "79a06dcd1c13332ff0a5e5789716a5ba993b771222a799b3c5ddec9dbc2596cb",
+      "rawBytes": 484,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/environment.log",
+      "command": [
+        "pwsh",
+        "-File",
+        "scripts/check-development-environment.ps1",
+        "-RequireDocker"
+      ],
+      "exitCode": 0,
+      "logSha256": "79a06dcd1c13332ff0a5e5789716a5ba993b771222a799b3c5ddec9dbc2596cb",
+      "recordedResult": "environment.result.json.gz"
+    },
+    {
+      "file": "environment.result.json.gz",
+      "sha256": "2ba830933f5b2329adcc0718a03d526c023bee66050bad0c29356585fff00024",
+      "bytes": 178,
+      "rawSha256": "ff803fe9f220ad0f70f0cdd0f728220310e7bdc47b77d74e641dabd374a43c1f",
+      "rawBytes": 190,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/environment.result.json"
+    },
+    {
+      "file": "final-checks.py.gz",
+      "sha256": "3e3e62d069226e430bd8487e28680f0da12ddc75c45def1073e78127171efd5c",
+      "bytes": 451,
+      "rawSha256": "ccbe65627204077ac6a8727d471bb89497a42d5d757fca745cb9becc95d0e4a0",
+      "rawBytes": 985,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/final-checks.py"
+    },
+    {
+      "file": "final-state.log.gz",
+      "sha256": "ad006799ee592ff631d04dce5d08dcf72aa5af507cdf20f338065412012d0eee",
+      "bytes": 328,
+      "rawSha256": "0389382f58990bf66f0919743369ca94f0e05b4f15f25dff6c1529189cd226b5",
+      "rawBytes": 469,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/final-state.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/resident-rich-onboarding-state.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "0389382f58990bf66f0919743369ca94f0e05b4f15f25dff6c1529189cd226b5",
+      "recordedResult": "final-state.result.json.gz"
+    },
+    {
+      "file": "final-state.result.json.gz",
+      "sha256": "8c1282f86f33704823755aa5a8ab71207c02710b09d73b17cae3268c2bc4d6f8",
+      "bytes": 176,
+      "rawSha256": "073ce721a6fb35729a2ad9264ef308d502565cca7e4ee03052ffbdc5cea1c77e",
+      "rawBytes": 196,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/final-state.result.json"
+    },
+    {
+      "file": "format-final.log.gz",
+      "sha256": "710c63d8d40d5688a62c3b08053dd1971c4e4ee87b2297f3f20c2540d22cd94e",
+      "bytes": 82,
+      "rawSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "rawBytes": 66,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/format-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "apps/web/src/expert-card-client.ts",
+        "apps/web/src/expert-card-client.test.ts",
+        "apps/web/src/expert-card-view.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "packages/db/migrations/meta/_journal.json",
+        "packages/db/migrations/meta/0068_snapshot.json",
+        "packages/db/migrations/state/0068_manifest.json",
+        "docs/runbooks/resident-rich-onboarding.md",
+        "docs/test-evidence/residency-rich-onboarding-second-2026-10-27.md"
+      ],
+      "exitCode": 0,
+      "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "recordedResult": "format-final.result.json.gz"
+    },
+    {
+      "file": "format-final.result.json.gz",
+      "sha256": "49f81603d844dd1d4a82f080929a35de7e7b82fc49119821316cef26b79c5d55",
+      "bytes": 392,
+      "rawSha256": "962f2b13029575439dc6502d7b38ffdae3ea447c96df9eb70ebd6e3f14801017",
+      "rawBytes": 845,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/format-final.result.json"
+    },
+    {
+      "file": "format.log.gz",
+      "sha256": "53fcf5aaf2e11f60b0f7c7b21d9600058ac5647ab803b6123a5dbda1373da7b5",
+      "bytes": 150,
+      "rawSha256": "5fbdd29b6061662861a06ae5752e9df84f79a671a6acaec1a69710758baf83e8",
+      "rawBytes": 161,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/format.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "apps/web/src/expert-card-client.ts",
+        "apps/web/src/expert-card-client.test.ts",
+        "apps/web/src/expert-card-view.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "packages/db/migrations/meta/_journal.json",
+        "packages/db/migrations/meta/0068_snapshot.json",
+        "packages/db/migrations/state/0068_manifest.json",
+        "docs/runbooks/resident-rich-onboarding.md",
+        "docs/test-evidence/residency-rich-onboarding-second-2026-10-27.md"
+      ],
+      "exitCode": 1,
+      "logSha256": "5fbdd29b6061662861a06ae5752e9df84f79a671a6acaec1a69710758baf83e8",
+      "recordedResult": "format.result.json.gz"
+    },
+    {
+      "file": "format.result.json.gz",
+      "sha256": "c72cc0c07bd13194597c8ff4c982b4b8e0b0b814167ca03009ce3529a796e566",
+      "bytes": 387,
+      "rawSha256": "b826cc6e6bee8b0e52fd3f4dba4434d3b382e147ce1bd1ffb53eaacb3812acc9",
+      "rawBytes": 845,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/format.result.json"
+    },
+    {
+      "file": "introspected-schema.ts.gz",
+      "sha256": "788b7516dfe68ce4e024ed8b6345a593a0841a0985d0daca7bd4e64b3dfd14ef",
+      "bytes": 50496,
+      "rawSha256": "fc652c22ca41ffb348e8827c0ef86cfa37fd9a32b4777e1a86f9dd9d514a86d2",
+      "rawBytes": 375696,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/introspected-schema.ts"
+    },
+    {
+      "file": "introspection.log.gz",
+      "sha256": "07733602dfc6eaa0213605f987ba8b3e324a83ebebb67f29b2693539b33233c9",
+      "bytes": 3762,
+      "rawSha256": "5ba3d3a935b498c22bcd6e9966bccb19d677017326cf4ee1f053ed4439fbd253",
+      "rawBytes": 256555,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/introspection.log",
+      "command": null,
+      "exitCode": null,
+      "metadataNote": "Generated introspection output; parent reconstruction command has the recorded exit code."
+    },
+    {
+      "file": "lint.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "apps/web/src/expert-card-client.ts",
+        "apps/web/src/expert-card-client.test.ts",
+        "apps/web/src/expert-card-view.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "lint.result.json.gz"
+    },
+    {
+      "file": "lint.result.json.gz",
+      "sha256": "82b5b4f483e4febe5d89a568eebbcd52fc20843c69fb05863838c6e9272c92d2",
+      "bytes": 299,
+      "rawSha256": "7d17abc6ae657a2c11d9f8d7f9a26d53a6b269478ff26ddbbc99e3f8ca4e3b85",
+      "rawBytes": 572,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/lint.result.json"
+    },
+    {
+      "file": "manager-api-fixture.json.gz",
+      "sha256": "7e4e2782967aca0c98af91edc48f11f4ccbed67e958da5bc46552255a0e183d2",
+      "bytes": 2069,
+      "rawSha256": "3225a7c17a4e5b61d9188392b56f118c979ba95ff547104b509c229dd9073404",
+      "rawBytes": 8127,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/manager-api-fixture.json"
+    },
+    {
+      "file": "manager-browser.png.gz",
+      "sha256": "ec253fce00eccf44d435be13bc1673846bfb84333674f38ae47d5d57b8430622",
+      "bytes": 178798,
+      "rawSha256": "13480bc231e89e05abe4fc4f203f8e15002e09ff8eab7b30a3ba33ccc5c235b9",
+      "rawBytes": 188854,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/manager-browser.png"
+    },
+    {
+      "file": "manager-financial-red.log.gz",
+      "sha256": "71f151d820e01e119c66099972c87077a3c8e032886a125ab1b08f58de02bfbb",
+      "bytes": 3136,
+      "rawSha256": "6f4bcf7a8e8e437c089902f80d8d7ae4c04d6b2ffdb26d50d41dc79f80dc4f55",
+      "rawBytes": 12595,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/manager-financial-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R4 second|R6 second"
+      ],
+      "exitCode": 1,
+      "logSha256": "6f4bcf7a8e8e437c089902f80d8d7ae4c04d6b2ffdb26d50d41dc79f80dc4f55",
+      "recordedResult": "manager-financial-red.result.json.gz"
+    },
+    {
+      "file": "manager-financial-red.result.json.gz",
+      "sha256": "37bd7918e0bd104472b5ffcc9770940dc1777aa60eb47fa17bb8e8bc2aa8ff8b",
+      "bytes": 192,
+      "rawSha256": "5bb9c397bb261e1232cdb85b5c72dec83e3f20d4b15539703206e3026685cf7b",
+      "rawBytes": 226,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/manager-financial-red.result.json"
+    },
+    {
+      "file": "manager-legacy-red.log.gz",
+      "sha256": "52025667974ab38f1ba0f173da4459f1498811aebe0189291471018dd0fb369f",
+      "bytes": 1471,
+      "rawSha256": "be1c6f9674d8e40a9a0bfd61381898b1fd4cb2dc1c76256cbb052379616acdbc",
+      "rawBytes": 3446,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/manager-legacy-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R4 second|R5 second"
+      ],
+      "exitCode": 1,
+      "logSha256": "be1c6f9674d8e40a9a0bfd61381898b1fd4cb2dc1c76256cbb052379616acdbc",
+      "recordedResult": "manager-legacy-red.result.json.gz"
+    },
+    {
+      "file": "manager-legacy-red.result.json.gz",
+      "sha256": "1573c970166a7d28864b7dfa499be0c43dd8b43ec386dc50c77b5313fe79d406",
+      "bytes": 193,
+      "rawSha256": "6b29e4a73ac7f8d4d2bffa44bcb2a37caf35b03377825be923dd9cab6dfcb49f",
+      "rawBytes": 226,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/manager-legacy-red.result.json"
+    },
+    {
+      "file": "notes.md.gz",
+      "sha256": "091c978226a7a539f51fff96c19a2c06f8c8365037eb79b38c507d978c76e2ed",
+      "bytes": 571,
+      "rawSha256": "52071d357a76142003ab2c876702cd0b2169695a084d71ccb0fdf2b5d5f3bc81",
+      "rawBytes": 1026,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/notes.md"
+    },
+    {
+      "file": "package-evidence.py.gz",
+      "sha256": "ba4f63074a779952f287e24dcc5333500b8ea7e7687a99cedd1ac1075b899e28",
+      "bytes": 1350,
+      "rawSha256": "add7cfd408175241066ad9a1a0f9570ce8d1e394b7241a8823fddfb1fe24f862",
+      "rawBytes": 2883,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/package-evidence.py"
+    },
+    {
+      "file": "preservation-audit.py.gz",
+      "sha256": "c3f8d1cc150e15ff905dc853687e506f4d10b8c86d66e2abfbd944d8517f0888",
+      "bytes": 971,
+      "rawSha256": "22fa1307051d76983238db70f67905f231ba678bde7f1fabc240a10a5c42d49e",
+      "rawBytes": 1927,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/preservation-audit.py"
+    },
+    {
+      "file": "preservation.log.gz",
+      "sha256": "01d89152ee47f5bd57b25dad30e3c1487df19d367ff215cbd77324dbf2529304",
+      "bytes": 211,
+      "rawSha256": "430410de06b8bb1d97ccef90f96608d6f5dbfc1e240e6be1229140631d229945",
+      "rawBytes": 247,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/preservation.log",
+      "command": [
+        "python3",
+        ".superpowers/sdd/rich-onboarding-second-20261027/preservation-audit.py"
+      ],
+      "exitCode": 0,
+      "logSha256": "430410de06b8bb1d97ccef90f96608d6f5dbfc1e240e6be1229140631d229945",
+      "recordedResult": "preservation.result.json.gz"
+    },
+    {
+      "file": "preservation.result.json.gz",
+      "sha256": "0060e741707fcbf607f1c892608f5ec3f7ee8c3d6450f8fc18ad9686763b03f1",
+      "bytes": 180,
+      "rawSha256": "4f51b4ef72549740dfdbe10f96f13552b54fc2e6a10653fd441697956be96369",
+      "rawBytes": 195,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/preservation.result.json"
+    },
+    {
+      "file": "reconstruct.log.gz",
+      "sha256": "a187e02250ae62d7236051d6012bdfe9907c8d4c145bb629716456f38ee6c05f",
+      "bytes": 198,
+      "rawSha256": "5fe4eb3ebfeae8e987ca57ab6cf5cbdd2a149eaf7d676b57f9cc40327f1c57d0",
+      "rawBytes": 274,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/reconstruct.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        ".superpowers/sdd/rich-onboarding-second-20261027/reconstruct.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "5fe4eb3ebfeae8e987ca57ab6cf5cbdd2a149eaf7d676b57f9cc40327f1c57d0",
+      "recordedResult": "reconstruct.result.json.gz"
+    },
+    {
+      "file": "reconstruct.result.json.gz",
+      "sha256": "23ca1275e3c5f522c8c4b28f1d0c67c6c0ca593362256c411d7ba75f6dd12536",
+      "bytes": 181,
+      "rawSha256": "ab4d0a50fe232479d2e58d647ac8bf71810b66bcf2986f66916b72da5c08916a",
+      "rawBytes": 200,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/reconstruct.result.json"
+    },
+    {
+      "file": "reconstruct.ts.gz",
+      "sha256": "bf3b886aaec5da5343c99abc7c5927accba0fa6d42a6a3c8c7bf97e34b916de2",
+      "bytes": 2235,
+      "rawSha256": "144775f6f5209fa6fc5826181c21a2965b7619d9771a1606abe5f35e35414126",
+      "rawBytes": 5597,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/reconstruct.ts"
+    },
+    {
+      "file": "run.py.gz",
+      "sha256": "fbb29995a429eb9e68600e055dedd298521932e7e257dc73fe37542e6b15c741",
+      "bytes": 588,
+      "rawSha256": "90bb3b88b3030ee665281d7104210b26db4eca2989f7743b6d590463190264c4",
+      "rawBytes": 1075,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/run.py"
+    },
+    {
+      "file": "second-green.log.gz",
+      "sha256": "0d9fe3e630ec3d4ffe4adac451b4683326d7e96f748874e85c5f016a2dee0910",
+      "bytes": 486,
+      "rawSha256": "19be2551b13c9b7cf0a23c414fa0219bc12ff90d47522eef29a85baea8731e5c",
+      "rawBytes": 799,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/second-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R4 second|R5 second|R6 second"
+      ],
+      "exitCode": 0,
+      "logSha256": "19be2551b13c9b7cf0a23c414fa0219bc12ff90d47522eef29a85baea8731e5c",
+      "recordedResult": "second-green.result.json.gz"
+    },
+    {
+      "file": "second-green.result.json.gz",
+      "sha256": "feae1a0649008aad89f203cf5159bbf2f76758edd4f71212fa7ce7d73e1a1169",
+      "bytes": 196,
+      "rawSha256": "e4f2322b74c0200b85776ed20e2f5012aa1170e760466531196a089f43eb6cde",
+      "rawBytes": 236,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/second-green.result.json"
+    },
+    {
+      "file": "tests-typecheck.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/tests-typecheck.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "tests-typecheck.result.json.gz"
+    },
+    {
+      "file": "tests-typecheck.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/tests-typecheck.result.json"
+    },
+    {
+      "file": "typechecks.py.gz",
+      "sha256": "84c97a8f5bd3a04f1a39cf738538c988ef7eeaa8ed0d01882a56f64874a17356",
+      "bytes": 258,
+      "rawSha256": "9b4be3926df6cc944dacb436e58bb8b7387577a47d994f1741d4e698f8ae17a0",
+      "rawBytes": 419,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/typechecks.py"
+    },
+    {
+      "file": "web-typecheck.log.gz",
+      "sha256": "67be5567bde7f0f4c1fd5e775e918562bc1f228a849614e4ad48b4172e907169",
+      "bytes": 35,
+      "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "rawBytes": 15,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/web-typecheck.log",
+      "command": ["pnpm", "--filter", "@ii-tonya/web", "typecheck"],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "recordedResult": "web-typecheck.result.json.gz"
+    },
+    {
+      "file": "web-typecheck.result.json.gz",
+      "sha256": "7b69c99a6b18cab9187b1cc36b28e17b351f63d4453b98c5efe1ba1fbabddc56",
+      "bytes": 157,
+      "rawSha256": "59624d29ca605a874484f2e4790a88bb0b2bea9f87c77018a6734d6d6f67669f",
+      "rawBytes": 160,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/web-typecheck.result.json"
+    },
+    {
+      "file": "whitespace.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/whitespace.log",
+      "command": ["git", "diff", "--check"],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "whitespace.result.json.gz"
+    },
+    {
+      "file": "whitespace.result.json.gz",
+      "sha256": "40ea006f471eb799cd3d2ed7504fa1f444bbdfb87a13d9e50241b8a82cb60d7d",
+      "bytes": 137,
+      "rawSha256": "e3b9db95b0bd75d85eed2989d2b622082fdb471c5a0b78a7037b9a03038a167f",
+      "rawBytes": 136,
+      "originalPath": ".superpowers/sdd/rich-onboarding-second-20261027/whitespace.result.json"
+    }
+  ]
+}

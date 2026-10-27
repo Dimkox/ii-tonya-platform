@@ -1,8 +1,6 @@
+import { mintVerifiedExpertResidencyPaymentEvent } from "../expert-residency/verified-event-internal.js";
 import { createHash } from "node:crypto";
-import type {
-  CanonicalExpertResidencyPaymentEventVerifier,
-  VerifiedExpertResidencyPaymentEvent,
-} from "../expert-residency/verified-event.js";
+import type { VerifiedExpertResidencyPaymentEvent } from "../expert-residency/verified-event.js";
 import type { YooKassaClient } from "./client.js";
 import type {
   YooKassaOperation,
@@ -28,12 +26,9 @@ export class YooKassaPaymentVerifier {
   constructor(
     private readonly client: Pick<YooKassaClient, "getPayment" | "getRefund">,
     private readonly operations: Pick<YooKassaOperationPort, "resolve">,
-    private readonly canonical: CanonicalExpertResidencyPaymentEventVerifier,
   ) {}
 
-  async verifyPayment(
-    operation: YooKassaOperation,
-  ): Promise<VerifiedExpertResidencyPaymentEvent | null> {
+  private async readBoundPayment(operation: YooKassaOperation) {
     if (
       operation.kind !== "create_payment" ||
       operation.providerObjectId === undefined ||
@@ -51,6 +46,28 @@ export class YooKassaPaymentVerifier {
     ) {
       throw new Error("yookassa_payment_binding_mismatch");
     }
+    return payment;
+  }
+
+  // A delayed hold notification may observe a terminal GET result. Acknowledge
+  // it without minting settlement facts or changing durable operation state.
+  async verifyWaitingForCapture(operation: YooKassaOperation): Promise<void> {
+    const payment = await this.readBoundPayment(operation);
+    if (
+      payment.status === "pending" ||
+      (payment.status === "waiting_for_capture" && !payment.paid) ||
+      (payment.status === "canceled" && payment.paid) ||
+      (payment.status === "succeeded" &&
+        (!payment.paid || payment.capturedAt === undefined))
+    ) {
+      throw new Error("yookassa_payment_binding_mismatch");
+    }
+  }
+
+  async verifyPayment(
+    operation: YooKassaOperation,
+  ): Promise<VerifiedExpertResidencyPaymentEvent | null> {
+    const payment = await this.readBoundPayment(operation);
     if (
       payment.status === "pending" ||
       payment.status === "waiting_for_capture"
@@ -85,7 +102,7 @@ export class YooKassaPaymentVerifier {
       occurredAt,
     };
     const event = { ...facts, payloadDigest: payloadDigest(facts) };
-    const verified = this.canonical.verifyCanonical(event, {
+    const verified = mintVerifiedExpertResidencyPaymentEvent(event, {
       verificationId: `yookassa-read:${payloadDigest(event).slice(7, 39)}`,
       verifierKeyVersion: "yookassa-api-v3",
       verifiedAt: occurredAt,
@@ -144,7 +161,7 @@ export class YooKassaPaymentVerifier {
       occurredAt,
     };
     const event = { ...facts, payloadDigest: payloadDigest(facts) };
-    const verified = this.canonical.verifyCanonical(event, {
+    const verified = mintVerifiedExpertResidencyPaymentEvent(event, {
       verificationId: `yookassa-read:${payloadDigest(event).slice(7, 39)}`,
       verifierKeyVersion: "yookassa-api-v3",
       verifiedAt: occurredAt,

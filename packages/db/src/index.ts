@@ -357,3 +357,40 @@ export type {
 export * from "./repositories/expert-campaign-read-repository.js";
 export * from "./repositories/payer-receipt-contact-repository.js";
 export * from "./repositories/planerka-availability-repository.js";
+
+export * from "./repositories/expert-promo-repository.js";
+
+export * from "./repositories/expert-verification-repository.js";
+
+export * from "./repositories/expert-card-repository.js";
+export * from "./repositories/expert-manager-authority.js";
+
+export * from "./repositories/expert-onboarding-main-payment-repository.js";
+
+export * from "./repositories/expert-residency-lifecycle-repository.js";
+
+export * from "./repositories/client-bot-account-read-repository.js";
+
+export * from "./repositories/expert-manager-telegram-repository.js";
+
+export * from "./repositories/expert-personal-offer-repository.js";
+
+export * from "./repositories/yookassa-payment-purpose-repository.js";
+
+export * from "./repositories/expert-offer-v2.js";
+
+export * from "./repositories/resident-verification-repository.js";
+
+export * from "./repositories/resident-workspace-repository.js";
+
+export { PostgresExpertSeparatedSalesRepository } from "./repositories/expert-separated-sales-repository.js";
+
+export { PostgresHeldOnboardingCheckout } from "./repositories/expert-held-onboarding-repository.js";
+export {
+  PostgresExpertSalesScheduler,
+  type SalesNoticeTransport,
+} from "./repositories/expert-sales-scheduler.js";
+
+export * from "./repositories/resident-review-repository.js";
+
+export * from "./repositories/resident-private-jobs-repository.js";

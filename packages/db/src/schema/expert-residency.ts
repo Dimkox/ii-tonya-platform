@@ -1,3 +1,4 @@
+import { expertPromoQualificationAudits } from "./expert-card-payments.js";
 import { sql } from "drizzle-orm";
 import {
   bigint as pgBigint,
@@ -287,7 +288,12 @@ export const expertReferrals = pgTable(
   "expert_referrals",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    codeId: uuid("code_id").notNull(),
+    codeId: uuid("code_id"),
+    acquisitionSource: text("acquisition_source")
+      .$type<"qualified_code" | "promo_registration">()
+      .notNull()
+      .default("qualified_code"),
+    promoQualificationId: uuid("promo_qualification_id"),
     inviterExpertId: uuid("inviter_expert_id")
       .notNull()
       .references(() => experts.id),
@@ -300,6 +306,26 @@ export const expertReferrals = pgTable(
   },
   (table) => [
     unique("expert_referrals_code_unique").on(table.codeId),
+    unique("expert_referrals_promo_qualification_unique").on(
+      table.promoQualificationId,
+    ),
+    foreignKey({
+      name: "expert_referrals_promo_qualification_fk",
+      columns: [
+        table.promoQualificationId,
+        table.inviteeExpertId,
+        table.inviterExpertId,
+      ],
+      foreignColumns: [
+        expertPromoQualificationAudits.id,
+        expertPromoQualificationAudits.inviteeExpertId,
+        expertPromoQualificationAudits.inviterExpertId,
+      ],
+    }),
+    check(
+      "expert_referrals_source",
+      sql`(acquisition_source='qualified_code' AND code_id IS NOT NULL AND promo_qualification_id IS NULL) OR (acquisition_source='promo_registration' AND code_id IS NULL AND promo_qualification_id IS NOT NULL)`,
+    ),
     unique("expert_referrals_invitee_unique").on(table.inviteeExpertId),
     unique("expert_referrals_id_inviter_unique").on(
       table.id,

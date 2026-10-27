@@ -1,3 +1,4 @@
+import { PostgresExpertCampaignQuoteRepository } from "../../../packages/db/src/repositories/expert-campaign-quote-repository.js";
 import { beforeAll, afterAll, expect, it } from "vitest";
 import { createHmac, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
@@ -127,6 +128,15 @@ it("ordinary composition requires receipt on both cookie and bearer routes, capt
   await database.db.execute(
     sql`update channel_identities set bot_key='expert-bot',external_chat_id=external_id where user_id=${owner.userId}::uuid`,
   );
+  await new PostgresExpertCampaignQuoteRepository(database.db).saveProfile({
+    userId: owner.userId,
+    cityCode: "synthetic",
+    millionCity: false,
+    serviceFormat: "offline",
+    ticketMinor: "300000",
+    participantKind: "expert",
+    idempotencyKey: randomUUID(),
+  });
   const tariffVersionId = await database.createResidencyTariff({
     tariffKey: "PRO",
     displayName: "Про",
@@ -331,25 +341,24 @@ it("ordinary composition requires receipt on both cookie and bearer routes, capt
       headers: browser,
       payload: command,
     });
-    expect(checkout.statusCode).toBe(200);
-    expect(
-      await receipt.source.receiptContactForOrder(
-        checkout.json<{ id: string }>().id,
-      ),
-    ).toEqual({
-      email: "payer@example.test",
-      authorityReference: `payer-receipt:${contact}`,
-    });
+    // Current V2 quotes require the main-card admission path. Ordinary
+    // residency checkout cannot bypass that gate by supplying a receipt.
+    expect(checkout.statusCode).toBe(403);
     const replay = await enabled.inject({
       method: "POST",
       url: "/v1/expert/residency/checkouts",
       headers: bearer,
       payload: command,
     });
-    expect(replay.statusCode).toBe(200);
-    expect(replay.json<{ id: string }>().id).toBe(
-      checkout.json<{ id: string }>().id,
-    );
+    expect(replay.statusCode).toBe(403);
+    expect(providerCalls).toBe(0);
+    expect(
+      (
+        await database.db.execute(
+          sql`select count(*)::int n from expert_residency_orders where campaign_quote_id=${q}::uuid`,
+        )
+      ).rows,
+    ).toEqual([{ n: 0 }]);
   } finally {
     await enabled.close();
   }

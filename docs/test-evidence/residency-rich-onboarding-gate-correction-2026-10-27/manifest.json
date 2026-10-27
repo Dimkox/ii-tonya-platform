@@ -1,0 +1,63 @@
+{
+  "failedGateHead": "405add47",
+  "runtimeAcceptedHead": "46e03bf0db4a751977a494f9c645e165490a6c75",
+  "failed": 1,
+  "passed": 610,
+  "cause": "Exact journal-tail expectation remained0065; current reviewed additive tail is0068.",
+  "sourceFiles": [
+    {
+      "path": "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+      "sha256": "f7cada6277f614f95ef3ffad38bc66af8b7bc958dc7d1d6db04ce54696500f64"
+    }
+  ],
+  "files": [
+    {
+      "file": "residency-rich-onboarding-final-gate-1793068147978305636.log.gz",
+      "bytes": 455,
+      "sha256": "c312b444b7b48a01551a123f862192ec35f60c4093f91a133b0496698d3d2aa1",
+      "rawBytes": 770,
+      "rawSha256": "f7b53bb75ca11b5bc1b9033961a98adae0b1a2cdfa5f3f274f3c6f114dcd3d53",
+      "exitCode": 1
+    },
+    {
+      "file": "residency-rich-onboarding-final-repo-1793068147978305636.log.gz",
+      "bytes": 2914,
+      "sha256": "d5d0b553ab9effe038fc483d2f98406d575db25988fbab331581812e98d5cea0",
+      "rawBytes": 9812,
+      "rawSha256": "d4a448c784338c99832a7673e08549915251e521ccdd6653b2551143938a8ca5",
+      "exitCode": 1
+    },
+    {
+      "file": "residency-rich-onboarding-tail-focused-20261027.log.gz",
+      "bytes": 296,
+      "sha256": "6f41d71edac23aba974b6177af166fef7eb6dcfdbdc020d4fecf1e44b79d0c88",
+      "rawBytes": 451,
+      "rawSha256": "71d2dd0480655027e1111c0d49aa99480cbc22753c1845f734e4dbf4d0722de6",
+      "exitCode": 0
+    },
+    {
+      "file": "residency-rich-onboarding-tail-lint-20261027.log.gz",
+      "bytes": 94,
+      "sha256": "1539a7cda0aeba08315d5265ae83af76e4170d7230785a4cb190a76933cc6943",
+      "rawBytes": 82,
+      "rawSha256": "31a5edb57242154af1bae84e191417fe4933bc7acc984ba43c0563fccb734824",
+      "exitCode": 0
+    },
+    {
+      "file": "residency-rich-onboarding-tail-format-20261027.log.gz",
+      "bytes": 143,
+      "sha256": "ecb042647c20649eb18f9ef225dc5930383849bef05cd92fb5b971b27b45bb33",
+      "rawBytes": 158,
+      "rawSha256": "b912eb41434e61f806aa356e52d7999dfbf4c5594407b71eeb643982abc7afe4",
+      "exitCode": 0
+    },
+    {
+      "file": "residency-rich-onboarding-tail-whitespace-20261027.log.gz",
+      "bytes": 46,
+      "sha256": "2ec7229e9da04d2cd1255af747b6be79196a57fed6390f22f80f14fabe1d7ebf",
+      "rawBytes": 26,
+      "rawSha256": "7ad819196304115b746c2e33f05573c91a12f4411edbe56ba068b0f0bede65fe",
+      "exitCode": 0
+    }
+  ]
+}

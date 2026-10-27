@@ -1,0 +1,477 @@
+{
+  "kind": "local-synthetic-semantic-ordinary-input-correction",
+  "controlCommit": "36bedff81c47156f443163bce1d522cdd2d8bddd",
+  "productionEvidence": false,
+  "initialManifest": "docs/test-evidence/residency-semantic-tags-2026-10-27/manifest.json",
+  "initialManifestSha256": "4d6bd9964db22932b24d1c8787eb614963913f7527326f40bc8715aa737b9d22",
+  "compression": "gzip level9 mtime0; one original artifact per file",
+  "files": [
+    {
+      "file": "ordinary-build.log.gz",
+      "sha256": "615ce76afe969544c553a571bc10d5e0b2ca7ef1dff7bccdac9a71e48d326169",
+      "bytes": 316,
+      "rawSha256": "dd2530249236628a5c7911fc458cc0c03edca666d67467ce8c626d0d762c79ac",
+      "rawBytes": 1173,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-build.log",
+      "command": [
+        "pnpm",
+        "--workspace-concurrency=1",
+        "--filter",
+        "@ii-tonya/contracts",
+        "--filter",
+        "@ii-tonya/application",
+        "--filter",
+        "@ii-tonya/db",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "dd2530249236628a5c7911fc458cc0c03edca666d67467ce8c626d0d762c79ac",
+      "recordedResult": "ordinary-build.result.json.gz"
+    },
+    {
+      "file": "ordinary-build.result.json.gz",
+      "sha256": "5e7da1b4f08ce958959a31372930bf6ecbbc56d2c483dee511b1919918d10f50",
+      "bytes": 193,
+      "rawSha256": "af4b380a26359aec3597ef93a1eff1c81a5214c351d0f1537a7e5f574d6c1745",
+      "rawBytes": 263,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-build.result.json"
+    },
+    {
+      "file": "ordinary-final-application-build.log.gz",
+      "sha256": "11503a93c056df1c71e96da39794fe0c2e1ffd4e1c76829d52ce79a7f2f3ce65",
+      "bytes": 245,
+      "rawSha256": "19f02a8e764321b6bf59a8cc30e868ca21ae79a76d6f3d12c081da4824fcc5d1",
+      "rawBytes": 381,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-final-application-build.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/application",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "19f02a8e764321b6bf59a8cc30e868ca21ae79a76d6f3d12c081da4824fcc5d1",
+      "recordedResult": "ordinary-final-application-build.result.json.gz"
+    },
+    {
+      "file": "ordinary-final-application-build.result.json.gz",
+      "sha256": "0547aa944bdcca702bbe0269487b73aa1537dfefa69a06310bcec9e4e03b3485",
+      "bytes": 158,
+      "rawSha256": "f9496c3dcb2663d3158bd7526ae3a06f5adbcb32dcbd06e833dadc99d258b113",
+      "rawBytes": 164,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-final-application-build.result.json"
+    },
+    {
+      "file": "ordinary-input-final.log.gz",
+      "sha256": "f8dda0494d37e261a9e9b3ad442d589abd9ffdb2f323e22ae662a8c19e238419",
+      "bytes": 475,
+      "rawSha256": "5d3cd54fd4bd8593d78d68d1d4ccd784af5f5768b9ae59cb694cae5a56b6273e",
+      "rawBytes": 870,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-input-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "ordinary own-tag"
+      ],
+      "exitCode": 0,
+      "logSha256": "5d3cd54fd4bd8593d78d68d1d4ccd784af5f5768b9ae59cb694cae5a56b6273e",
+      "recordedResult": "ordinary-input-final.result.json.gz"
+    },
+    {
+      "file": "ordinary-input-final.result.json.gz",
+      "sha256": "b1b9c5d30d0ae7e1e4a2f924861fe842eded083e9bef726ddbc0526089c7439d",
+      "bytes": 187,
+      "rawSha256": "9a68f2cb1cb54a7ba5ffbeb12941ed13718da84505a81eaa5cc72daab92fcc84",
+      "rawBytes": 221,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-input-final.result.json"
+    },
+    {
+      "file": "ordinary-input-green.log.gz",
+      "sha256": "10a9cd4f482225734352b2b193d16c098519f6d32d90fca7343c9a70e7def2d3",
+      "bytes": 459,
+      "rawSha256": "01e1a83493e8650e6686db3d9197acec67930c47f425d98dec76d96cba37d8ad",
+      "rawBytes": 826,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-input-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "ordinary own-tag"
+      ],
+      "exitCode": 0,
+      "logSha256": "01e1a83493e8650e6686db3d9197acec67930c47f425d98dec76d96cba37d8ad",
+      "recordedResult": "ordinary-input-green.result.json.gz"
+    },
+    {
+      "file": "ordinary-input-green.result.json.gz",
+      "sha256": "791d823934e189c5dc649094fb4eab7c028ce40741dcea0d4c1ea0ebc7aa90aa",
+      "bytes": 188,
+      "rawSha256": "bf6ecc213bab9bc9c10c7124ec3e1217b032038ce3bd04f4200331363a3b85ad",
+      "rawBytes": 221,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-input-green.result.json"
+    },
+    {
+      "file": "ordinary-input-red.log.gz",
+      "sha256": "7108f9a60fa156c6e67a912dbe3a08ea664bbf2ba2eba9e31f0bda75df502a32",
+      "bytes": 1139,
+      "rawSha256": "5d10cac50a73085c4153cadbe9467eaa3b7fb6e5e04df1bff29769e6cad94cd1",
+      "rawBytes": 2426,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-input-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-semantic-tags.test.ts",
+        "-t",
+        "ordinary own-tag"
+      ],
+      "exitCode": 1,
+      "logSha256": "5d10cac50a73085c4153cadbe9467eaa3b7fb6e5e04df1bff29769e6cad94cd1",
+      "recordedResult": "ordinary-input-red.result.json.gz"
+    },
+    {
+      "file": "ordinary-input-red.result.json.gz",
+      "sha256": "95ba39e680e025649d809318eddf6f23564cb4415498ef2405a9bf010cf5808d",
+      "bytes": 190,
+      "rawSha256": "79b788ca2de5a947bc30613c0d1ef22ecbd12f6a3a211f8a6b3a3854d1346f5b",
+      "rawBytes": 221,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-input-red.result.json"
+    },
+    {
+      "file": "ordinary-integration-final.test.ts.gz",
+      "sha256": "7259dcd0e4394c1f5849c55384c04fc0af72e4a4c48feef8baa452ffde1e8a0f",
+      "bytes": 10836,
+      "rawSha256": "6242568203b93af3a041f95b14f2cc611636e8783aa5cc5f63b99d94c9b782eb",
+      "rawBytes": 45452,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-integration-final.test.ts"
+    },
+    {
+      "file": "ordinary-lint-final.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-lint-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "apps/api/src/expert-card-wiring.test.ts",
+        "apps/api/src/routes/telegram-webhook.ts",
+        "packages/application/src/expert-card-service.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "ordinary-lint-final.result.json.gz"
+    },
+    {
+      "file": "ordinary-lint-final.result.json.gz",
+      "sha256": "52ba6dc970883e3024de649910213f2328e281f440f986937f587f84e1a474b7",
+      "bytes": 213,
+      "rawSha256": "18c97d906e1d27e55cedad72cdb9232ea751aa9758965e6a94b75f663edd6526",
+      "rawBytes": 273,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-lint-final.result.json"
+    },
+    {
+      "file": "ordinary-lint.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "apps/api/src/expert-card-tag-prompt.ts",
+        "apps/api/src/expert-card-tag-prompt.test.ts",
+        "apps/api/src/expert-card-composition.ts",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "apps/api/src/routes/telegram-webhook.ts",
+        "packages/application/src/expert-card-service.ts",
+        "packages/contracts/src/resident-semantic-tags.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "tests/integration/resident-semantic-tags.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "ordinary-lint.result.json.gz"
+    },
+    {
+      "file": "ordinary-lint.result.json.gz",
+      "sha256": "2228b79d56562ad29d615ac18c0ef8df2b4897b4078ca43f86959f6b3d83dc91",
+      "bytes": 288,
+      "rawSha256": "ac3c407b63bdf2e2140df8a98c56eb783b7e27b0d0ce863d8652be60b666ad55",
+      "rawBytes": 572,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-lint.result.json"
+    },
+    {
+      "file": "ordinary-replay-shape-lint.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-replay-shape-lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "packages/db/src/repositories/expert-card-repository.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "ordinary-replay-shape-lint.result.json.gz"
+    },
+    {
+      "file": "ordinary-replay-shape-lint.result.json.gz",
+      "sha256": "90bc8d2c5fa52b388b4778f22fe4cdd11154fd8cf178a7292f09b113fd46384a",
+      "bytes": 175,
+      "rawSha256": "457c3e0248efb9b62e0aea667b7cd5b0c0aef02e13d66316a28bf30f137c9069",
+      "rawBytes": 194,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-replay-shape-lint.result.json"
+    },
+    {
+      "file": "ordinary-reply-build.log.gz",
+      "sha256": "411e2429fc970cadddb4482fb2d7e99434b2d773badaa8badd68d9e0f4b0ae83",
+      "bytes": 245,
+      "rawSha256": "c37aa9722285af6f476f0b3cbd6868d0686c694580072f3315b67fcd4699937d",
+      "rawBytes": 381,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-reply-build.log",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/application",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "c37aa9722285af6f476f0b3cbd6868d0686c694580072f3315b67fcd4699937d",
+      "recordedResult": "ordinary-reply-build.result.json.gz"
+    },
+    {
+      "file": "ordinary-reply-build.result.json.gz",
+      "sha256": "1369f6e8545d4435cc0807fd74a1dbabb5fb0dd06b99f82d498136554387ec0b",
+      "bytes": 159,
+      "rawSha256": "80c46c79cfb5ab9e1b3c6fe373935adaa3f2d2061a96afe2ab692e7ab2de6eac",
+      "rawBytes": 164,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-reply-build.result.json"
+    },
+    {
+      "file": "ordinary-source-types.log.gz",
+      "sha256": "8e327c9fef325972ab7161d641df45d6115db1d3e9873f88ae9b172798aad8ab",
+      "bytes": 70,
+      "rawSha256": "986c99681707ebf031c281d4c2ff4ccdf915cfdc9e381f001c04af6c61cac7a2",
+      "rawBytes": 94,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-source-types.log",
+      "command": [
+        "pnpm",
+        "--workspace-concurrency=1",
+        "--filter",
+        "@ii-tonya/contracts",
+        "--filter",
+        "@ii-tonya/application",
+        "--filter",
+        "@ii-tonya/db",
+        "--filter",
+        "@ii-tonya/api",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "986c99681707ebf031c281d4c2ff4ccdf915cfdc9e381f001c04af6c61cac7a2",
+      "recordedResult": "ordinary-source-types.result.json.gz"
+    },
+    {
+      "file": "ordinary-source-types.result.json.gz",
+      "sha256": "15162433da9ca8f27c58f10d59ebf82b30c35806219c3af2076f39e91af2eb5b",
+      "bytes": 204,
+      "rawSha256": "6ccfb1a3dd413fcb9f8eaab15e1fd03c0db815e26c8b687ed2c6972a8f06fe1b",
+      "rawBytes": 296,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-source-types.result.json"
+    },
+    {
+      "file": "ordinary-tests-types.log.gz",
+      "sha256": "aaa927fbabc686e26d2ae0a953fc3d758252ce12f942d514aeaca2f3dbe4becd",
+      "bytes": 718,
+      "rawSha256": "10c83716c97493f8320bf10b0b98c1ed6d8d01204cdf86419700142807766eef",
+      "rawBytes": 2974,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-tests-types.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 2,
+      "logSha256": "10c83716c97493f8320bf10b0b98c1ed6d8d01204cdf86419700142807766eef",
+      "recordedResult": "ordinary-tests-types.result.json.gz"
+    },
+    {
+      "file": "ordinary-tests-types.result.json.gz",
+      "sha256": "f3b946804ce52682468cd85f96dbd68272b1797af9bc180dedf069844e142d03",
+      "bytes": 161,
+      "rawSha256": "6cb201398181d94a3543f025a9e841e448f291991e9dfbf2258e573032f4e1dd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-tests-types.result.json"
+    },
+    {
+      "file": "ordinary-transport.log.gz",
+      "sha256": "2752e7c1d06f78292dc8080e973811cb7c52e87603d2feb75538fdee5530d42e",
+      "bytes": 267,
+      "rawSha256": "2616bec8f62a6ccf67550b93e5bda039345a8219aedaa8d0ce03846121246c9f",
+      "rawBytes": 354,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-transport.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "apps/api/src/expert-card-tag-prompt.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "2616bec8f62a6ccf67550b93e5bda039345a8219aedaa8d0ce03846121246c9f",
+      "recordedResult": "ordinary-transport.result.json.gz"
+    },
+    {
+      "file": "ordinary-transport.result.json.gz",
+      "sha256": "91d6aba04a29df8d9a23e5cd31c6710937b2436e29a1031b3f5a12f895526899",
+      "bytes": 174,
+      "rawSha256": "139412f0713aa0995979a3f75434154dff5742e37e7cb508ab193d34733d32b8",
+      "rawBytes": 190,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-transport.result.json"
+    },
+    {
+      "file": "ordinary-types-final.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-types-final.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "ordinary-types-final.result.json.gz"
+    },
+    {
+      "file": "ordinary-types-final.result.json.gz",
+      "sha256": "34ed5495feb14b1b0f17287422b7ee6d617b2a35e0c24a63c185fd50400efefc",
+      "bytes": 161,
+      "rawSha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "rawBytes": 174,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-types-final.result.json"
+    },
+    {
+      "file": "ordinary-whitespace.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-whitespace.log",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "recordedResult": "ordinary-whitespace.result.json.gz"
+    },
+    {
+      "file": "ordinary-whitespace.result.json.gz",
+      "sha256": "40ea006f471eb799cd3d2ed7504fa1f444bbdfb87a13d9e50241b8a82cb60d7d",
+      "bytes": 137,
+      "rawSha256": "e3b9db95b0bd75d85eed2989d2b622082fdb471c5a0b78a7037b9a03038a167f",
+      "rawBytes": 136,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-whitespace.result.json"
+    },
+    {
+      "file": "ordinary-wiring.log.gz",
+      "sha256": "5cc2fb1cd8d9d574b070901409601f471f083aa23dba8e7162986a79b37e821f",
+      "bytes": 393,
+      "rawSha256": "b703773e81c37d139ff3b594bfadd0fc91ab38c339c58fe105119f058b553fb9",
+      "rawBytes": 616,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-wiring.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "apps/api/src/expert-card-wiring.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "b703773e81c37d139ff3b594bfadd0fc91ab38c339c58fe105119f058b553fb9",
+      "recordedResult": "ordinary-wiring.result.json.gz"
+    },
+    {
+      "file": "ordinary-wiring.result.json.gz",
+      "sha256": "7fbd80fa44cec4f55efa2c5b19674f1bf21887e54150601f718100bde9935323",
+      "bytes": 171,
+      "rawSha256": "50367c69656ba2649b1b05733fb0f95c469e35afdebb4b17b390d8ce4341d322",
+      "rawBytes": 186,
+      "originalPath": ".superpowers/sdd/residency-semantic-tags-20261027/ordinary-wiring.result.json"
+    }
+  ],
+  "finalSources": [
+    {
+      "path": "apps/api/src/expert-card-composition.ts",
+      "sha256": "cb6027611ff3ea2f6a173a97a08f9e07dbdbe923767f18036a43fb44088a48f4"
+    },
+    {
+      "path": "apps/api/src/expert-card-tag-prompt.test.ts",
+      "sha256": "17e1cb3a6291a75cbadcf02ef0c0264a0fb7eb7673c23be86886bb2f95288163"
+    },
+    {
+      "path": "apps/api/src/expert-card-tag-prompt.ts",
+      "sha256": "4c421e3d5e5b898b42b4f8410d455dc5526ee7419bde8197f4f04a9b6eec02dc"
+    },
+    {
+      "path": "apps/api/src/expert-card-telegram-ingress.ts",
+      "sha256": "279278d6d82fb251e45354915060be3563970a287cd4a5f4e013017f37357acd"
+    },
+    {
+      "path": "apps/api/src/expert-card-wiring.test.ts",
+      "sha256": "88f7585f6637cc72b54cd53ea9623f0ea6b4d39f71b697c9b85f2552c4792e95"
+    },
+    {
+      "path": "apps/api/src/routes/telegram-webhook.ts",
+      "sha256": "126f697a47959c5e9c9767b38e80b64f13060307a6df79e84957827d74e5ced3"
+    },
+    {
+      "path": "docs/runbooks/resident-semantic-tags.md",
+      "sha256": "362e99b506d89ac3f213b920df3e0e877c2f3ce5d459aa27e4558992bd83aad8"
+    },
+    {
+      "path": "packages/application/src/expert-card-service.ts",
+      "sha256": "7922d403f445b3cf3ee5d82012e1d444e692fa5b227e7e91709f405ed60cccc4"
+    },
+    {
+      "path": "packages/contracts/src/resident-semantic-tags.ts",
+      "sha256": "464302f5fd2fc985eac28317d11d5c3b66bfe7cc508a338b007e0ae94f4ddf0a"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-card-repository.ts",
+      "sha256": "7aadc8203fbb31ae89aedf35274a0c9f4de3c3bb106672fc1e228c75f4bb4c51"
+    },
+    {
+      "path": "tests/integration/resident-semantic-tags.test.ts",
+      "sha256": "6242568203b93af3a041f95b14f2cc611636e8783aa5cc5f63b99d94c9b782eb"
+    }
+  ]
+}

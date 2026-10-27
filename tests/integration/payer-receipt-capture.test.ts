@@ -16,6 +16,7 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../../packages/db/src/testkit/expert-referral.js";
+import { startTestPostgres } from "../../packages/db/src/testkit/postgres.js";
 type Contact = { receiptContactId: string; quoteId: string; expiresAt: string };
 type Vault = {
   seal(
@@ -524,12 +525,25 @@ it("migration50 catalogue and provenance match a fresh SQL replay", async () => 
   const state = JSON.parse(
     readFileSync(`${folder}/state/0050_sql_objects.json`, "utf8"),
   ) as { constraints: unknown; indexes: unknown };
-  expect((await database.db.$client.query(constraintStateSql)).rows).toEqual(
-    state.constraints,
-  );
-  expect((await database.db.$client.query(indexStateSql)).rows).toEqual(
-    state.indexes,
-  );
+  // This is the historical 0050 boundary, independent of later live schema.
+  const historical = await startTestPostgres();
+  try {
+    const journal = JSON.parse(
+      readFileSync(`${folder}/meta/_journal.json`, "utf8"),
+    ) as { entries: { idx: number; tag: string }[] };
+    for (const entry of journal.entries.filter((entry) => entry.idx <= 50))
+      await historical.db.execute(
+        sql.raw(readFileSync(`${folder}/${entry.tag}.sql`, "utf8")),
+      );
+    expect(
+      (await historical.db.$client.query(constraintStateSql)).rows,
+    ).toEqual(state.constraints);
+    expect((await historical.db.$client.query(indexStateSql)).rows).toEqual(
+      state.indexes,
+    );
+  } finally {
+    await historical.stop();
+  }
   const manifest = JSON.parse(
     readFileSync(`${folder}/state/0050_manifest.json`, "utf8"),
   ) as {

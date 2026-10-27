@@ -1,7 +1,7 @@
 {
   "databaseVersion": "170005",
   "drizzleKitVersion": "0.31.10",
-  "method": "SQL replay through 0052; database introspection normalized against positional catalog data",
+  "method": "Full-chain hand-authored SQL replay on isolated PostgreSQL17.5; fresh empty-directory introspection normalized against exact positional constraint/index catalogue. SQL-only functions/triggers retained separately.",
   "generatePermitted": false,
   "migrations": [
     {
@@ -261,15 +261,15 @@
     },
     {
       "idx": 51,
-      "tag": "0051_planerka_availability",
-      "sha256": "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e"
+      "tag": "0051_expert_onboarding_applications",
+      "sha256": "e244079a72a25c2707a30864c704c0ce692e96ee1f39eefc8a4203536cb99a64"
     },
     {
       "idx": 52,
-      "tag": "0052_lifecycle_scheduler_c1",
-      "sha256": "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d"
+      "tag": "0052_expert_promo_applicants",
+      "sha256": "bc75a0731f408194741548f4bb7a9342aa0fbc4e2d1dad52d97dceb325b933f1"
     }
   ],
-  "snapshotSha256": "282d15c434d4b3f14eda6047003c2b8615b80e0b841bfccf56a8df03613c5642",
-  "sqlObjectsSha256": "2a5f12e9a1024b63064b7ec1d3356d6af952accef74838e67384296dcc3ae553"
+  "snapshotSha256": "91120bff86bcc62bae1bd7883d875c9409dcc1adca1ee9e0104a8f56fe6fd8e8",
+  "sqlObjectsSha256": "2b5870f64ef8a125e474b8bb404340b570b8c4e7291d964a3d2113e0958b1c42"
 }

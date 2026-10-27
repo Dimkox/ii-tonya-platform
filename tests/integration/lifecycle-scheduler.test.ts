@@ -1,4 +1,9 @@
 import { sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { decodeTelegramSendTextPayload } from "../../packages/worker/src/telegram-send-text-dispatcher.js";
+import { PostgresOrderedTelegramOutboxRepository } from "../../packages/db/src/repositories/outbox-repository.js";
+import { createClientDispatchAdmissionGate } from "../../packages/db/src/repositories/client-consent-authority.js";
+import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
@@ -81,6 +86,35 @@ describe("lifecycle scheduler PostgreSQL authority", () => {
     });
     expect(result.rows[0]!.text).toContain("Europe/Moscow");
     expect(result.rows[0]!.text).toContain("через 2 дня");
+    const queue = new PostgresOrderedTelegramOutboxRepository(database.db, {
+      enabled: true,
+    });
+    const message = (await queue.claim(1, "lifecycle-worker", 60_000, 3))[0];
+    expect(message).toBeDefined();
+    if (!message) throw new Error("lifecycle_reminder_not_claimable");
+    const payload = decodeTelegramSendTextPayload(
+      message.payload,
+      "client-test",
+    );
+    expect(payload.consentAuthority.subjectId).toBe(fixture.userId);
+    const admission = await queue.recordAttemptStarted(
+      message.id,
+      "lifecycle-worker",
+      message.dispatchClaimToken!,
+      randomUUID(),
+      message.reconciliationKey,
+      new Date(),
+      message.attempt,
+    );
+    expect(admission?.kind).toBe("admitted");
+    if (admission?.kind !== "admitted")
+      throw new Error("lifecycle_admission_missing");
+    expect(
+      await createClientDispatchAdmissionGate(database.db).consume(
+        message,
+        admission,
+      ),
+    ).toBe(true);
   });
 
   it("includes the HTTPS meeting link in the one-day reminder", async () => {
@@ -131,5 +165,13 @@ describe("lifecycle scheduler PostgreSQL authority", () => {
           where correlation_id like 'lifecycle:%') outbox
     `);
     expect(counts.rows[0]).toEqual({ cancelled: "1", outbox: "2" });
+    await seedClientConsent(database.db, fixture.userId, "client_messaging");
+    const queue = new PostgresOrderedTelegramOutboxRepository(database.db, {
+      enabled: true,
+    });
+    // A fresh grant cannot revive the earlier unstarted one-day reminder.
+    expect(await queue.claim(10, "lifecycle-worker", 60_000, 3)).toHaveLength(
+      0,
+    );
   });
 });

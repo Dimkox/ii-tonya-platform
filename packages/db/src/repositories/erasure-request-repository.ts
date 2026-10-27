@@ -73,6 +73,112 @@ export class PostgresErasureRequestRepository {
         : { kind: "conflict" };
     });
   }
+  /** Authenticated Telegram admission and update ownership share one commit.
+   * Lock order: event advisory lock -> user -> identity -> erasure request.
+   * A durable denied/pinned owner tombstone prevents old updates targeting a new binding.
+   */
+  async acceptTelegram(input: {
+    botKey: string;
+    telegramUserId: string;
+    chatId: string;
+    eventKey: string;
+    payloadHash: string;
+    receiptDigest(userId: string): string;
+  }): Promise<
+    | {
+        kind: "accepted";
+        userId: string;
+        request: RequestRow;
+        receiptAvailable: boolean;
+      }
+    | { kind: "denied" }
+  > {
+    if (
+      !input.botKey ||
+      input.botKey.length > 256 ||
+      !/^[1-9]\d{0,19}$/u.test(input.telegramUserId) ||
+      input.chatId !== input.telegramUserId ||
+      !/^[0-9a-f]{64}$/u.test(input.eventKey) ||
+      !/^[0-9a-f]{64}$/u.test(input.payloadHash)
+    )
+      return { kind: "denied" };
+    return this.bounded(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${"telegram-erasure:" + input.eventKey},0))`,
+      );
+      const replay = (
+        await tx.execute<{ owner: string; hash: string }>(sql`
+        select normalized_identifier as owner, payload_hash as hash from integration_inbox
+        where provider='telegram_erasure_v1' and external_event_id=${input.eventKey}
+      `)
+      ).rows[0];
+      if (
+        replay &&
+        (replay.hash !== input.payloadHash || replay.owner === "denied")
+      )
+        return { kind: "denied" };
+      // Preliminary discovery supplies the user lock only; authorization is repeated
+      // after that lock and under a row lock on the exact private identity.
+      const candidates = (
+        await tx.execute<{ id: string; userId: string }>(sql`
+        select id, user_id as "userId" from channel_identities
+        where provider='telegram' and bot_key=${input.botKey} and external_id=${input.telegramUserId}
+          and external_chat_id=${input.chatId} and status='active' limit 2
+      `)
+      ).rows;
+      const candidate = candidates.length === 1 ? candidates[0] : undefined;
+      const pinnedOwner = replay?.owner ?? candidate?.userId ?? "denied";
+      if (!replay)
+        await tx.execute(sql`
+        insert into integration_inbox(provider,external_event_id,payload_hash,normalized_identifier)
+        values('telegram_erasure_v1',${input.eventKey},${input.payloadHash},${pinnedOwner})
+      `);
+      if (!candidate || pinnedOwner !== candidate.userId)
+        return { kind: "denied" };
+      const userId = candidate.userId;
+      const owner = (
+        await tx.execute(
+          sql`select id from users where id=${userId}::uuid and active for update`,
+        )
+      ).rows[0];
+      if (!owner) return { kind: "denied" };
+      const identity = (
+        await tx.execute(sql`
+        select id from channel_identities where id=${candidate.id}::uuid and user_id=${userId}::uuid
+          and provider='telegram' and bot_key=${input.botKey} and external_id=${input.telegramUserId}
+          and external_chat_id=${input.chatId} and status='active' for update
+      `)
+      ).rows[0];
+      if (!identity) return { kind: "denied" };
+      const receiptDigest = input.receiptDigest(userId);
+      if (!/^[0-9a-f]{64}$/u.test(receiptDigest))
+        throw new Error("invalid_receipt_digest");
+      const inserted = (
+        await tx.execute<RequestRow>(sql`
+        insert into client_erasure_requests(user_id,receipt_digest) values(${userId}::uuid,${receiptDigest})
+        on conflict do nothing returning ${projection}
+      `)
+      ).rows[0];
+      const request =
+        inserted ??
+        (
+          await tx.execute<RequestRow & { receiptAvailable: boolean }>(sql`
+        select ${projection}, (receipt_digest=${receiptDigest} and receipt_revoked_at is null) as "receiptAvailable"
+        from client_erasure_requests where user_id=${userId}::uuid for update
+      `)
+        ).rows[0];
+      if (!request) throw new Error("erasure_request_unavailable");
+      return {
+        kind: "accepted",
+        userId,
+        request,
+        receiptAvailable:
+          inserted !== undefined ||
+          (request as RequestRow & { receiptAvailable: boolean })
+            .receiptAvailable === true,
+      };
+    });
+  }
   async findOwned(userId: string): Promise<RequestRow | null> {
     return this.bounded(
       async (tx) =>

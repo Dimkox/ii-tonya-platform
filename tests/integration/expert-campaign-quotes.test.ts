@@ -724,6 +724,10 @@ describe("immutable expert campaign quotes (PG17.5)", () => {
     }
   });
   it("uses the later stage after a real transaction boundary wait", async () => {
+    // Seed before checkout owns the subject lock: the anchor INSERT trigger
+    // participates in the same authority as the real quote writer.
+    const boundary = Date.now() + 1000;
+    await anchor(boundary - 72 * HOUR);
     const gate = gateBeforeAuthority(database.db);
     const blocker = await database.db.$client.connect();
     const observer = await database.db.$client.connect();
@@ -744,17 +748,9 @@ describe("immutable expert campaign quotes (PG17.5)", () => {
         await blocker.query<{ pid: number }>("select pg_backend_pid() pid")
       ).rows[0]!.pid;
       gate.release();
-      const observedAt = await observeBlocked(
-        observer,
-        gate.backendPid,
-        blockerPid,
-        work,
-      );
-      // PRIVILEGED historical fixture, not a normal competing quote writer:
-      // seed while the consumer is proven blocked and will reread after its lock.
-      const boundary = observedAt + 100;
+      await observeBlocked(observer, gate.backendPid, blockerPid, work);
+      // Cross the preseeded historical stage only after proving the real wait.
       expect(gate.transactionStartedAtMs).toBeLessThan(boundary);
-      await anchor(boundary - 72 * HOUR);
       await blocker.query(
         "select pg_sleep(greatest(0,($1::numeric+2-extract(epoch from clock_timestamp())*1000)/1000)::double precision)",
         [boundary],

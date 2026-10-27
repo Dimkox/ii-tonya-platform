@@ -743,10 +743,18 @@ describe("server composition", () => {
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
       yookassaRecovery: { enabled: false },
+      expertSession: {
+        botToken: `123456:${"a".repeat(35)}`,
+        botKey: "synthetic-expert-bot",
+        origin: "https://expert.example",
+        botUsername: "synthetic_expert_bot",
+        widgetEnabled: false,
+      },
       features: {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: true,
+        expertSession: true,
         expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
@@ -772,6 +780,7 @@ describe("server composition", () => {
     });
     const fakeDb = {
       execute: async () => ({ rows: [] }),
+      transaction: vi.fn(),
       $client: { end: async () => undefined },
     } as unknown as DrizzleDb;
     const config: RuntimeConfig = {
@@ -789,10 +798,18 @@ describe("server composition", () => {
       selartiOutboundBillingMode: "disabled",
       displayTimezone: "Europe/Moscow",
       yookassaRecovery: { enabled: false },
+      expertSession: {
+        botToken: `123456:${"a".repeat(35)}`,
+        botKey: "synthetic-expert-bot",
+        origin: "https://expert.example",
+        botUsername: "synthetic_expert_bot",
+        widgetEnabled: false,
+      },
       features: {
         workerOutboxDelivery: false,
         clientCatalog: false,
         expertReferral: true,
+        expertSession: true,
         expertReferralMaturityWorker: false,
         expertResidencyBilling: false,
       },
@@ -804,7 +821,7 @@ describe("server composition", () => {
     const dependencies = await lifecycle.dependencies(config, fakeDb);
     expect(dependencies.expertCodeKeyring).toBe(keyring);
     expect(dependencies.expertReferralAdminService).toBeDefined();
-    expect(dependencies.expertApi).toBeUndefined();
+    expect(dependencies.expertApi).toBeDefined();
     const app = await (
       await import("./app.js")
     ).buildApp({
@@ -823,6 +840,12 @@ describe("server composition", () => {
     expect(
       (app as unknown as { expertCodeKeyring: unknown }).expertCodeKeyring,
     ).toBe(keyring);
+    expect(
+      (await app.inject({ url: "/v1/expert/referrals/summary" })).statusCode,
+    ).toBe(404);
+    expect(
+      (await app.inject({ url: "/v1/expert/residency/tariffs" })).statusCode,
+    ).toBe(404);
     await app.close();
   });
 
@@ -879,4 +902,51 @@ describe("server composition", () => {
     ).rejects.toThrow("EADDRINUSE");
     expect(order).toEqual(["app-close", "lifecycle-close"]);
   });
+});
+
+it("rebinds ordinary AI ingress to actual owned offer reads when card offers are enabled", async () => {
+  const { loadEnv } = await import("@ii-tonya/config");
+  const config = loadEnv({
+    DATABASE_URL: "postgresql://local:local@localhost/test",
+    ALLOW_INSECURE_LOCAL_DATABASE: "true",
+    EXPERT_CARD_ENABLED: "true",
+    EXPERT_CARD_PAYMENT_MODE: "test",
+    EXPERT_CARD_WORK_BOT_ID: "123456",
+    EXPERT_CARD_WORK_BOT_KEY: "expert-work",
+    EXPERT_CARD_WORK_BOT_USERNAME: "synthetic_work_bot",
+    EXPERT_CARD_MESSAGING_CONSENT_POLICY_VERSION: "policy-v1",
+    TELEGRAM_WEBHOOK_SECRET: "synthetic_work_secret_123456789012",
+  });
+  config.features.expertAiIngress = true;
+  const fakeDb = {
+    execute: async () => ({ rows: [] }),
+    $client: {
+      query: async () => ({ rows: [], rowCount: 0 }),
+      end: async () => undefined,
+    },
+  } as unknown as DrizzleDb;
+  const bound = { handle: vi.fn(async () => ({ kind: "disabled" as const })) };
+  const withPersonalOffers = vi.fn(() => bound);
+  const deps = await createDefaultLifecycle({
+    expertAiComposition: {
+      ingress: {
+        handle: vi.fn(async () => ({ kind: "disabled" as const })),
+        withPersonalOffers,
+      },
+      principals: { resolve: async () => null },
+    },
+  }).dependencies(config, fakeDb);
+  expect(withPersonalOffers).toHaveBeenCalledOnce();
+  expect(withPersonalOffers).toHaveBeenCalledWith(
+    expect.objectContaining({ readOwned: expect.any(Function) }),
+  );
+  expect(deps.expertAiIngress).toBe(bound);
+  await expect(
+    createDefaultLifecycle({
+      expertAiComposition: {
+        ingress: { handle: vi.fn(async () => ({ kind: "disabled" as const })) },
+        principals: { resolve: async () => null },
+      },
+    }).dependencies(config, fakeDb),
+  ).rejects.toThrow("expert_ai_personal_offer_capability_required");
 });

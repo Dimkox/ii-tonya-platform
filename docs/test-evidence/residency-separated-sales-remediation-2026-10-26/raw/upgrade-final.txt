@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/integration/expert-sales-upgrade.test.ts (1 test) 1362ms
+   ✓ 0060 upgrades actual 0059 submitted plus followup and erased owners without fabricating proof  1359ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  18:42:39
+   Duration  3.97s (transform 826ms, setup 0ms, collect 2.14s, tests 1.36s, environment 0ms, prepare 116ms)
+
+
+[END OF RAW CAPTURE]

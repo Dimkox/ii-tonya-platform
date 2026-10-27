@@ -1,0 +1,15 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ apps/api/src/routes/expert-separated-sales.integration.test.ts (4 tests) 5030ms
+   ✓ normal private ingress shows base, separate positive/promo/period, real form and manager-approved fixed fee  1159ms
+   ✓ paid selected terms feed the real gated main invoice and never bypass card/promo admission  1098ms
+   ✓ automatic bill and explicit renewal preserve the locked quarter after the original tariff closes  889ms
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  17:52:19
+   Duration  9.21s (transform 2.24s, setup 0ms, collect 3.72s, tests 5.03s, environment 0ms, prepare 130ms)
+
+
+[END OF RAW CAPTURE]

@@ -131,11 +131,6 @@
       "definition": "CREATE OR REPLACE FUNCTION public.payer_receipt_redaction_due(contact payer_receipt_contacts)\n RETURNS boolean\n LANGUAGE sql\n STABLE\nAS $function$\n  SELECT contact.expires_at<=clock_timestamp() OR (\n    NOT EXISTS(SELECT 1 FROM payer_receipt_order_bindings b WHERE b.contact_id=contact.id)\n    AND (EXISTS(SELECT 1 FROM expert_residency_orders o WHERE o.campaign_quote_id=contact.quote_id)\n      OR NOT EXISTS(SELECT 1 FROM expert_campaign_quotes q\n        JOIN users u ON u.id=q.user_id JOIN expert_residency_tariff_versions t ON t.id=q.tariff_version_id\n        WHERE q.id=contact.quote_id AND u.active AND q.expires_at>clock_timestamp()\n          AND t.active_from<=clock_timestamp() AND t.active_to>clock_timestamp())))\n$function$\n"
     },
     {
-      "name": "planerka_availability_mapping_invalidate",
-      "arguments": "",
-      "definition": "CREATE OR REPLACE FUNCTION public.planerka_availability_mapping_invalidate()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE affected_services uuid[];\nBEGIN\n  IF TG_OP='UPDATE' AND NEW IS NOT DISTINCT FROM OLD THEN RETURN NEW; END IF;\n  IF TG_OP='INSERT' THEN affected_services := ARRAY[NEW.expert_service_id];\n  ELSE affected_services := ARRAY[OLD.expert_service_id];\n    IF TG_OP='UPDATE' THEN affected_services := array_append(affected_services,NEW.expert_service_id); END IF;\n  END IF;\n  -- The mapping row is already locked by UPDATE/DELETE. Match publication's\n  -- mapping -> service -> expert -> refresh -> slot order.\n  -- Never wait while holding a mapping: booking approval owns these rows before\n  -- requesting its mapping lock. NOWAIT aborts the whole mutation for safe retry.\n  PERFORM 1 FROM expert_services WHERE id=ANY(affected_services) ORDER BY id FOR UPDATE NOWAIT;\n  PERFORM 1 FROM experts WHERE id IN (SELECT expert_id FROM expert_services WHERE id=ANY(affected_services)) ORDER BY id FOR UPDATE NOWAIT;\n  PERFORM 1 FROM planerka_availability_refreshes WHERE expert_service_id=ANY(affected_services) ORDER BY expert_service_id FOR UPDATE NOWAIT;\n  UPDATE planerka_availability_refreshes SET lease_token=NULL,lease_until=NULL,\n    next_attempt_at=clock_timestamp(),reason_code='mapping_invalid'\n    WHERE expert_service_id=ANY(affected_services);\n  PERFORM 1 FROM slots WHERE expert_service_id=ANY(affected_services) AND provider='planerka' ORDER BY id FOR UPDATE NOWAIT;\n  UPDATE slots SET observed_at=NULL WHERE expert_service_id=ANY(affected_services) AND provider='planerka';\n  IF TG_OP='DELETE' THEN RETURN OLD; END IF;\n  RETURN NEW;\nEND $function$\n"
-    },
-    {
       "name": "planerka_operation_guard",
       "arguments": "",
       "definition": "CREATE OR REPLACE FUNCTION public.planerka_operation_guard()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF TG_OP='DELETE' THEN RAISE EXCEPTION 'planerka_operation_retained'; END IF;\n  IF (NEW.reservation_id,NEW.account_id,NEW.event_type_id,NEW.request,NEW.request_fingerprint,NEW.starts_at,NEW.ends_at)\n    IS DISTINCT FROM (OLD.reservation_id,OLD.account_id,OLD.event_type_id,OLD.request,OLD.request_fingerprint,OLD.starts_at,OLD.ends_at)\n    OR (OLD.provider_uid IS NOT NULL AND NEW.provider_uid IS DISTINCT FROM OLD.provider_uid)\n    OR (OLD.send_admitted_at IS NOT NULL AND NEW.send_admitted_at IS DISTINCT FROM OLD.send_admitted_at)\n    OR (NEW.send_admitted_at IS NOT NULL AND NEW.state='pending')\n    OR (OLD.cancel_requested AND NOT NEW.cancel_requested)\n  THEN RAISE EXCEPTION 'planerka_operation_identity_immutable'; END IF;\n  RETURN NEW;\nEND $function$\n"
@@ -533,12 +528,6 @@
       "table_name": "planerka_booking_operations",
       "name": "planerka_operation_identity_guard",
       "definition": "CREATE TRIGGER planerka_operation_identity_guard BEFORE DELETE OR UPDATE ON planerka_booking_operations FOR EACH ROW EXECUTE FUNCTION planerka_operation_guard()",
-      "enabled": "O"
-    },
-    {
-      "table_name": "planerka_service_mappings",
-      "name": "planerka_availability_mapping_invalidation",
-      "definition": "CREATE TRIGGER planerka_availability_mapping_invalidation BEFORE INSERT OR DELETE OR UPDATE ON planerka_service_mappings FOR EACH ROW EXECUTE FUNCTION planerka_availability_mapping_invalidate()",
       "enabled": "O"
     },
     {
@@ -4395,6 +4384,90 @@
       "expression": "isfinite(created_at) AND isfinite(expires_at) AND expires_at > created_at AND expires_at <= (created_at + '00:05:30'::interval)"
     },
     {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_applications_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_archive_bounds",
+      "kind": "c",
+      "definition": "CHECK (archived_at IS NULL AND archive_until_date IS NULL OR archived_at IS NOT NULL AND archive_until_date IS NOT NULL AND isfinite(archived_at) AND isfinite(archive_until_date) AND archive_until_date >= archived_at AND archive_until_date <= (((archived_at AT TIME ZONE 'UTC'::text) + '3 mons'::interval) AT TIME ZONE 'UTC'::text))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "archived_at IS NULL AND archive_until_date IS NULL OR archived_at IS NOT NULL AND archive_until_date IS NOT NULL AND isfinite(archived_at) AND isfinite(archive_until_date) AND archive_until_date >= archived_at AND archive_until_date <= (((archived_at AT TIME ZONE 'UTC'::text) + '3 mons'::interval) AT TIME ZONE 'UTC'::text)"
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_quote_owner_fk",
+      "kind": "f",
+      "definition": "FOREIGN KEY (campaign_quote_id, user_id) REFERENCES expert_campaign_quotes(id, user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["campaign_quote_id", "user_id"],
+      "columns_to": ["id", "user_id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_stage_valid",
+      "kind": "c",
+      "definition": "CHECK (onboarding_stage = ANY (ARRAY['interview'::text, 'card_draft'::text, 'manager_review'::text, 'promo_check'::text, 'payment_ready'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "onboarding_stage = ANY (ARRAY['interview'::text, 'card_draft'::text, 'manager_review'::text, 'promo_check'::text, 'payment_ready'::text])"
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_user_fk",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_user_unique",
+      "kind": "u",
+      "definition": "UNIQUE (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_verification_valid",
+      "kind": "c",
+      "definition": "CHECK (verification_status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "verification_status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])"
+    },
+    {
       "table_name": "expert_referral_abuse_holds",
       "name": "expert_abuse_holds_lifecycle",
       "kind": "c",
@@ -6722,13 +6795,13 @@
       "table_name": "expert_residency_tariff_versions",
       "name": "expert_tariff_v2_combination",
       "kind": "c",
-      "definition": "CHECK (commercial_policy_version <> 'expert_residency_v2'::text OR tariff_key = 'START'::text AND display_name = 'Старт'::text AND price_minor = 390000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 0 AND statistics_level = 'basic'::text AND support_priority = 'standard'::text OR tariff_key = 'BASE'::text AND display_name = 'База'::text AND price_minor = 590000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 1 AND statistics_level = 'expanded'::text AND support_priority = 'standard'::text OR tariff_key = 'PRO'::text AND display_name = 'Про'::text AND price_minor = 999000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 3 AND statistics_level = 'expanded'::text AND support_priority = 'priority'::text)",
+      "definition": "CHECK (commercial_policy_version <> 'expert_residency_v2'::text OR tariff_key = 'START'::text AND display_name = '\u0421\u0442\u0430\u0440\u0442'::text AND price_minor = 390000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 0 AND statistics_level = 'basic'::text AND support_priority = 'standard'::text OR tariff_key = 'BASE'::text AND display_name = '\u0411\u0430\u0437\u0430'::text AND price_minor = 590000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 1 AND statistics_level = 'expanded'::text AND support_priority = 'standard'::text OR tariff_key = 'PRO'::text AND display_name = '\u041f\u0440\u043e'::text AND price_minor = 999000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 3 AND statistics_level = 'expanded'::text AND support_priority = 'priority'::text)",
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
       "columns_from": null,
       "columns_to": null,
-      "expression": "commercial_policy_version <> 'expert_residency_v2'::text OR tariff_key = 'START'::text AND display_name = 'Старт'::text AND price_minor = 390000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 0 AND statistics_level = 'basic'::text AND support_priority = 'standard'::text OR tariff_key = 'BASE'::text AND display_name = 'База'::text AND price_minor = 590000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 1 AND statistics_level = 'expanded'::text AND support_priority = 'standard'::text OR tariff_key = 'PRO'::text AND display_name = 'Про'::text AND price_minor = 999000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 3 AND statistics_level = 'expanded'::text AND support_priority = 'priority'::text"
+      "expression": "commercial_policy_version <> 'expert_residency_v2'::text OR tariff_key = 'START'::text AND display_name = '\u0421\u0442\u0430\u0440\u0442'::text AND price_minor = 390000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 0 AND statistics_level = 'basic'::text AND support_priority = 'standard'::text OR tariff_key = 'BASE'::text AND display_name = '\u0411\u0430\u0437\u0430'::text AND price_minor = 590000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 1 AND statistics_level = 'expanded'::text AND support_priority = 'standard'::text OR tariff_key = 'PRO'::text AND display_name = '\u041f\u0440\u043e'::text AND price_minor = 999000 AND duration_seconds = 2592000 AND credit_cap_bps = 3000 AND individual_services_enabled = true AND group_event_limit = 3 AND statistics_level = 'expanded'::text AND support_priority = 'priority'::text"
     },
     {
       "table_name": "expert_residency_tariff_versions",
@@ -8229,102 +8302,6 @@
       "columns_from": null,
       "columns_to": null,
       "expression": null
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_account_id_check",
-      "kind": "c",
-      "definition": "CHECK (account_id > 0)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "account_id > 0"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_check",
-      "kind": "c",
-      "definition": "CHECK ((lease_token IS NULL) = (lease_until IS NULL))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "(lease_token IS NULL) = (lease_until IS NULL)"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_check1",
-      "kind": "c",
-      "definition": "CHECK (window_end = (window_start + '168:00:00'::interval))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "window_end = (window_start + '168:00:00'::interval)"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_duration_minutes_check",
-      "kind": "c",
-      "definition": "CHECK (duration_minutes >= 1 AND duration_minutes <= 1440)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "duration_minutes >= 1 AND duration_minutes <= 1440"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_event_type_id_check",
-      "kind": "c",
-      "definition": "CHECK (event_type_id > 0)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "event_type_id > 0"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_expert_service_id_fkey",
-      "kind": "f",
-      "definition": "FOREIGN KEY (expert_service_id) REFERENCES expert_services(id)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": ["expert_service_id"],
-      "columns_to": ["id"],
-      "expression": null
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_pkey",
-      "kind": "p",
-      "definition": "PRIMARY KEY (expert_service_id)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": null
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_reason_code_check",
-      "kind": "c",
-      "definition": "CHECK (reason_code = ANY (ARRAY['account_rate_limit'::text, 'provider_unavailable'::text, 'invalid_response'::text, 'mapping_invalid'::text, 'slot_conflict'::text, 'database_busy'::text]))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "reason_code = ANY (ARRAY['account_rate_limit'::text, 'provider_unavailable'::text, 'invalid_response'::text, 'mapping_invalid'::text, 'slot_conflict'::text, 'database_busy'::text])"
     },
     {
       "table_name": "planerka_booking_operations",
@@ -12099,6 +12076,43 @@
       ]
     },
     {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_applications_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_onboarding_applications_pkey ON public.expert_onboarding_applications USING btree (id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_pending_queue_idx",
+      "definition": "CREATE INDEX expert_onboarding_pending_queue_idx ON public.expert_onboarding_applications USING btree (created_at, id) WHERE (verification_status = 'pending'::text)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "timestamptz_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_user_unique",
+      "definition": "CREATE UNIQUE INDEX expert_onboarding_user_unique ON public.expert_onboarding_applications USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
       "table_name": "expert_referral_abuse_holds",
       "name": "expert_abuse_holds_closed_approval_unique",
       "definition": "CREATE UNIQUE INDEX expert_abuse_holds_closed_approval_unique ON public.expert_referral_abuse_holds USING btree (closed_approval_id) WHERE (closed_approval_id IS NOT NULL)",
@@ -13819,17 +13833,6 @@
       ]
     },
     {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_pkey",
-      "definition": "CREATE UNIQUE INDEX planerka_availability_refreshes_pkey ON public.planerka_availability_refreshes USING btree (expert_service_id)",
-      "columns": [
-        {
-          "position": 1,
-          "opclass": "uuid_ops"
-        }
-      ]
-    },
-    {
       "table_name": "planerka_booking_operations",
       "name": "planerka_booking_operations_due",
       "definition": "CREATE INDEX planerka_booking_operations_due ON public.planerka_booking_operations USING btree (next_attempt_at, lease_until) WHERE (state = ANY (ARRAY['pending'::text, 'sending'::text, 'unknown'::text, 'cancel_pending'::text, 'cancelling'::text, 'cancel_unknown'::text]))",
@@ -14470,21 +14473,6 @@
         {
           "position": 1,
           "opclass": "uuid_ops"
-        }
-      ]
-    },
-    {
-      "table_name": "slots",
-      "name": "slots_planerka_service_start_idx",
-      "definition": "CREATE INDEX slots_planerka_service_start_idx ON public.slots USING btree (expert_service_id, starts_at) WHERE (provider = 'planerka'::text)",
-      "columns": [
-        {
-          "position": 1,
-          "opclass": "uuid_ops"
-        },
-        {
-          "position": 2,
-          "opclass": "timestamptz_ops"
         }
       ]
     },

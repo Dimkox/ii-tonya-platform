@@ -270,3 +270,76 @@ export {
   type PayerReceiptEnvelope,
 } from "./yookassa/payer-receipt-vault.js";
 export { createPayerReceiptSource } from "./yookassa/payer-receipt-source.js";
+
+export {
+  YooKassaOnboardingPaymentVerifier,
+  assertVerifiedOnboardingPayment,
+  type OnboardingPaymentBinding,
+  type VerifiedOnboardingPayment,
+} from "./yookassa/onboarding-verifier.js";
+export { YooKassaOnboardingWebhookCapability } from "./yookassa/onboarding-webhook-capability.js";
+
+export {
+  createExpertMaterialTransport,
+  type ExpertMaterialSendInput,
+  type ExpertMaterialReceipt,
+  type ExpertMaterialTransport,
+} from "./telegram/expert-material-transport.js";
+
+export {
+  VK_COMMUNITY_CONTRACT,
+  type VkCommunityPort,
+  type VkCommunitySendCommand,
+  type VkCommunityWebhookCommand,
+} from "./vk-community/port.js";
+export {
+  DisabledVkCommunityAdapter,
+  VkCommunityDisabledError,
+} from "./vk-community/disabled-adapter.js";
+export {
+  MAX_BUSINESS_CONTRACT,
+  type MaxBusinessPort,
+  type MaxBusinessTarget,
+  type MaxBusinessSendCommand,
+  type MaxBusinessWebhookCommand,
+} from "./max-business/port.js";
+export {
+  DisabledMaxBusinessAdapter,
+  MaxBusinessDisabledError,
+} from "./max-business/disabled-adapter.js";
+export {
+  buildVkCommunityTextRequest,
+  parseVkCommunityTextResponse,
+  VkCommunityContractError,
+  type VkCommunityTextRequestInput,
+  type VkCommunityTextRequest,
+  type VkCommunityTextResponse,
+} from "./vk-community/text-contract.js";
+export {
+  buildMaxBusinessTextRequest,
+  parseMaxBusinessTextResponse,
+  MaxBusinessContractError,
+  type MaxBusinessTextRequestInput,
+  type MaxBusinessTextRequest,
+  type MaxBusinessTextResponse,
+} from "./max-business/text-contract.js";
+
+export * from "./telegram/manager-notification-transport.js";
+
+export * from "./documents/safe-document-parser.js";
+export * from "./telegram/workspace-notification-transport.js";
+export {
+  createHeldOnboardingClient,
+  assertHeldPaymentObservation,
+  type HeldOnboardingClient,
+  type HeldPaymentObservation,
+} from "./yookassa/held-onboarding.js";
+
+export * from "./telegram/resident-review-notification-transport.js";
+
+export * from "./documents/private-verification.js";
+export * from "./documents/verification-extraction.js";
+export * from "./documents/isolated-document-parser.js";
+
+export * from "./documents/resident-geocode.js";
+export * from "./documents/isolated-semantic-tags.js";

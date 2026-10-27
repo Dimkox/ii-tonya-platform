@@ -1,0 +1,24 @@
+apps/api/src/expert-applicant-composition.ts 108ms (unchanged)
+apps/api/src/expert-verification-composition.ts 33ms (unchanged)
+apps/api/src/routes/expert-applicant-telegram.ts 71ms (unchanged)
+apps/api/src/routes/expert-separated-sales.integration.test.ts 103ms (unchanged)
+apps/api/src/routes/expert-verification.ts 31ms (unchanged)
+apps/api/src/server.ts 87ms (unchanged)
+packages/application/src/expert-separated-sales-service.ts 23ms (unchanged)
+packages/application/src/expert-verification-service.ts 27ms (unchanged)
+packages/application/src/resident-verification-service.ts 61ms (unchanged)
+packages/db/src/repositories/expert-held-onboarding-repository.ts 55ms (unchanged)
+packages/db/src/repositories/expert-sales-scheduler.ts 24ms (unchanged)
+packages/db/src/repositories/expert-separated-sales-repository.ts 47ms (unchanged)
+packages/db/src/repositories/expert-verification-repository.ts 50ms (unchanged)
+packages/db/src/repositories/payer-receipt-contact-repository.ts 21ms (unchanged)
+packages/db/src/schema/expert-separated-sales.ts 23ms (unchanged)
+packages/db/src/testkit/expert-referral.ts 27ms (unchanged)
+tests/integration/expert-separated-sales-state.test.ts 126ms (unchanged)
+tests/repo/migration-history-integrity.test.ts 40ms (unchanged)
+tests/repo/residency-separated-sales-boundary.test.ts 12ms
+tests/repo/support/payment-scope-boundary-core.ts 108ms
+tests/support/held-onboarding-local.ts 15ms (unchanged)
+tests/integration/expert-sales-upgrade.test.ts 15ms (unchanged)
+
+[END OF RAW CAPTURE]

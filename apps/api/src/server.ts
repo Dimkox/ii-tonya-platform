@@ -1,3 +1,28 @@
+import { PostgresYooKassaPaymentPurposeRepository } from "@ii-tonya/db";
+import { createExpertManagerTelegramComposition } from "./expert-manager-telegram-composition.js";
+import { createClientBotAccountComposition } from "./client-bot-account-composition.js";
+import { assertClientAccountQueriesConfig } from "@ii-tonya/config";
+import {
+  createExpertResidencyLifecycleComposition,
+  assertExpertResidencyLifecycleCheckout,
+  type ExpertResidencyLifecycleCompositionOptions,
+} from "./expert-residency-lifecycle-composition.js";
+import { assertExpertResidencyLifecycleConfig } from "@ii-tonya/config";
+import {
+  createExpertCardComposition,
+  assertExpertCardCheckout,
+  type ExpertCardCompositionOptions,
+} from "./expert-card-composition.js";
+import { assertExpertCardConfig } from "@ii-tonya/config";
+import type { YooKassaWebhookDependencies } from "./routes/yookassa-webhook.js";
+import {
+  createExpertVerificationComposition,
+  assertExpertVerificationPayments,
+  type ExpertVerificationPaymentCapabilities,
+} from "./expert-verification-composition.js";
+import { createExpertApplicantComposition } from "./expert-applicant-composition.js";
+import { assertExpertApplicantConfig } from "@ii-tonya/config";
+import { createTelegramDeletionCapability } from "./telegram-deletion-composition.js";
 import { randomBytes } from "node:crypto";
 import { createExpertSessionService } from "@ii-tonya/application";
 import { PostgresExpertSessionRepository } from "@ii-tonya/db";
@@ -127,6 +152,14 @@ const disabledService = <T extends object>(name: string): T =>
 
 export const createDefaultLifecycle = (
   options: {
+    expertResidencyLifecycle?: ExpertResidencyLifecycleCompositionOptions;
+    expertCard?: ExpertCardCompositionOptions;
+    expertManagerTelegram?: Omit<
+      Parameters<typeof createExpertManagerTelegramComposition>[1],
+      "verification"
+    >;
+    expertVerificationPayments?: ExpertVerificationPaymentCapabilities;
+    yookassaWebhook?: Omit<YooKassaWebhookDependencies, "onboarding">;
     expertCodeSecretResolver?: {
       resolve(input: {
         reference: string;
@@ -171,6 +204,35 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    assertClientAccountQueriesConfig(config);
+    assertExpertResidencyLifecycleConfig(config);
+    assertExpertResidencyLifecycleCheckout(
+      config,
+      options.expertResidencyLifecycle,
+    );
+    if (
+      config.expertResidencyLifecycle?.renewalCheckoutEnabled &&
+      (!config.features.yookassa || !options.yookassaWebhook)
+    )
+      throw new Error("expert_residency_lifecycle_merchant_callback_required");
+    assertExpertCardConfig(config);
+    assertExpertCardCheckout(config, options.expertCard);
+    if (
+      config.features.expertCard === true &&
+      config.expertCard?.mainCheckoutEnabled &&
+      (!config.features.yookassa || !options.yookassaWebhook)
+    )
+      throw new Error("expert_card_merchant_callback_required");
+    assertExpertVerificationPayments(
+      config,
+      options.expertVerificationPayments,
+    );
+    if (
+      config.expertVerification?.paymentVerificationEnabled &&
+      (!config.features.yookassa || !options.yookassaWebhook)
+    )
+      throw new Error("expert_verification_merchant_callback_required");
+    assertExpertApplicantConfig(config);
     if (
       (config.features.expertResidencyBilling ||
         config.features.expertReferral) &&
@@ -535,6 +597,85 @@ export const createDefaultLifecycle = (
             proposals: new PostgresSelartiProposalRepository(db),
           })
         : undefined;
+    const clientAccountQueries = createClientBotAccountComposition(db, config);
+    const expertVerification = createExpertVerificationComposition(
+      db,
+      config,
+      options.expertVerificationPayments,
+    );
+    if (
+      options.expertManagerTelegram?.enabled &&
+      (!expertVerification || config.features.expertVerification !== true)
+    )
+      throw new Error("manager_telegram_verification_required");
+    const expertManagerTelegram =
+      options.expertManagerTelegram && expertVerification
+        ? createExpertManagerTelegramComposition(db, {
+            ...options.expertManagerTelegram,
+            verification: expertVerification,
+          })
+        : undefined;
+    const expertResidencyLifecycle = createExpertResidencyLifecycleComposition(
+      db,
+      config,
+      options.expertResidencyLifecycle,
+    );
+    const expertCard = createExpertCardComposition(
+      db,
+      config,
+      options.expertCard,
+    );
+    await expertCard?.initializeTags?.();
+    let expertAiIngress = options.expertAiComposition?.ingress;
+    if (config.features.expertAiIngress === true && expertCard) {
+      if (
+        !expertCard.personalOfferReads ||
+        !expertAiIngress?.withPersonalOffers
+      )
+        throw new Error("expert_ai_personal_offer_capability_required");
+      expertAiIngress = expertAiIngress.withPersonalOffers(
+        expertCard.personalOfferReads,
+      );
+    }
+    const applicantReceipt = config.features.expertSeparatedSales
+      ? createPayerReceiptComposition(db, config)
+      : undefined;
+    const originalExpertApplicantTelegram = createExpertApplicantComposition(
+      db,
+      config,
+      {
+        ...(applicantReceipt && config.payerReceipt
+          ? {
+              receipt: {
+                vault: applicantReceipt.vault,
+                retentionDays: config.payerReceipt.retentionDays,
+              },
+            }
+          : {}),
+        ...(expertVerification?.heldCheckout
+          ? { checkout: expertVerification.heldCheckout }
+          : {}),
+      },
+    );
+    const expertApplicantTelegram =
+      originalExpertApplicantTelegram && expertCard
+        ? {
+            ...originalExpertApplicantTelegram,
+            service: {
+              async handle(
+                input: Parameters<
+                  typeof originalExpertApplicantTelegram.service.handle
+                >[0],
+              ) {
+                const result =
+                  await expertCard.service.handlePromoHandoff(input);
+                return result.status === "unhandled"
+                  ? originalExpertApplicantTelegram.service.handle(input)
+                  : result;
+              },
+            },
+          }
+        : originalExpertApplicantTelegram;
     const testExpertRepository = new PostgresTestExpertTelegramRepository(db, {
       messagingConsentPolicyVersion:
         config.clientMessagingConsentPolicyVersion ?? "unconfigured",
@@ -571,6 +712,27 @@ export const createDefaultLifecycle = (
         : undefined;
     return {
       config,
+      ...(expertManagerTelegram ? { expertManagerTelegram } : {}),
+      ...(clientAccountQueries ? { clientAccountQueries } : {}),
+      ...(expertResidencyLifecycle ? { expertResidencyLifecycle } : {}),
+      ...(expertCard ? { expertCard } : {}),
+      ...(expertApplicantTelegram ? { expertApplicantTelegram } : {}),
+      ...(expertVerification ? { expertVerification } : {}),
+      ...(options.yookassaWebhook
+        ? {
+            yookassaWebhook: {
+              ...options.yookassaWebhook,
+              resolvePurpose: (providerObjectId, event) =>
+                new PostgresYooKassaPaymentPurposeRepository(db).resolvePurpose(
+                  providerObjectId,
+                  event,
+                ),
+              ...(expertVerification?.onboardingWebhook
+                ? { onboarding: expertVerification.onboardingWebhook }
+                : {}),
+            },
+          }
+        : {}),
       ...(expertApi ? { expertApi } : {}),
       ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -605,6 +767,22 @@ export const createDefaultLifecycle = (
           : disabledService<PrivacyService>("privacy ingress"),
       // Reads stay composed when request creation is closed. Physical execution
       // remains gated separately on real capture, custody and backup evidence.
+      ...(config.features.clientPrivacy === true &&
+      config.features.clientErasureRequests === true
+        ? {
+            telegramDeletion: createTelegramDeletionCapability({
+              enabled: true,
+              botKey: config.clientTelegramBotKey,
+              botId: clientBotId,
+              receiptKey: config.telegramWebhookSecret,
+              repository: new PostgresErasureRequestRepository(db),
+              service: createErasureRequestService({
+                repository: new PostgresErasureRequestRepository(db),
+                requestEnabled: true,
+              }),
+            }),
+          }
+        : {}),
       erasureRequests: createErasureRequestService({
         repository: new PostgresErasureRequestRepository(db),
         requestEnabled:
@@ -724,7 +902,7 @@ export const createDefaultLifecycle = (
       ...(options.expertAiComposition === undefined
         ? {}
         : {
-            expertAiIngress: options.expertAiComposition.ingress,
+            expertAiIngress: expertAiIngress!,
             expertAiPrincipal: options.expertAiComposition.principals,
             expertAiRequests: new PostgresExpertAiRequestReceiptStore(db),
             ...(options.expertAiComposition.telegramPrincipals === undefined

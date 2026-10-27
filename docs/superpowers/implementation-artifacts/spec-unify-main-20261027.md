@@ -1,8 +1,8 @@
 ---
 title: Consolidate main-target release candidate branches
-created: '2026-10-27'
+created: "2026-10-27"
 type: chore
-status: in-progress
+status: in-review
 baseline_commit: 13edda58769e8b00e8d407da821b8ab009a8fb19
 review_loop_iteration: 0
 ---
@@ -25,13 +25,13 @@ review_loop_iteration: 0
 
 ## I/O & Edge-Case Matrix
 
-| Scenario | Input / State | Expected Output / Behavior | Error Handling |
-|---|---|---|---|
-| Branch integration | main and PR101/106 histories | Both histories retained with current main features | Resolve conflicts explicitly and review combined result |
-| Fresh database | Empty isolated PostgreSQL17.5 | Complete combined schema replays coherently | Stop on replay/schema failure |
-| Existing RC database | Exact known committed migration prefix | Only remaining canonical migrations apply | Reject mismatched hashes/timestamps |
-| Diverged main database | Different historical migrations with overlapping numbers | No silent skipping or duplicate replay | Fail closed with reconciliation guidance |
-| Working tree | Existing uncommitted documents/local files | Original files remain untouched | Keep isolated integration worktree |
+| Scenario               | Input / State                                            | Expected Output / Behavior                         | Error Handling                                          |
+| ---------------------- | -------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
+| Branch integration     | main and PR101/106 histories                             | Both histories retained with current main features | Resolve conflicts explicitly and review combined result |
+| Fresh database         | Empty isolated PostgreSQL17.5                            | Complete combined schema replays coherently        | Stop on replay/schema failure                           |
+| Existing RC database   | Exact known committed migration prefix                   | Only remaining canonical migrations apply          | Reject mismatched hashes/timestamps                     |
+| Diverged main database | Different historical migrations with overlapping numbers | No silent skipping or duplicate replay             | Fail closed with reconciliation guidance                |
+| Working tree           | Existing uncommitted documents/local files               | Original files remain untouched                    | Keep isolated integration worktree                      |
 
 </frozen-after-approval>
 
@@ -50,15 +50,17 @@ review_loop_iteration: 0
 ## Tasks & Acceptance
 
 **Execution:**
+
 - [x] Inspect live GitHub PR heads, bases and main; fetch current histories.
 - [x] Create isolated `codex/unify-main-20261027` from current main.
-- [ ] Resolve conflicts in API/web/worker composition, packages and documents.
-- [ ] Preserve original migration SQL, construct canonical union and reject incompatible applied histories.
-- [ ] Verify frozen install, build, focused checks, types/lint, whitespace and migration replay.
-- [ ] Run independent review of exact combined tree; resolve material findings.
+- [x] Resolve conflicts in API/web/worker composition, packages and documents.
+- [x] Preserve original migration SQL, construct canonical union and reject incompatible applied histories.
+- [x] Verify frozen install, build, focused checks, types/lint, whitespace and migration replay.
+- [x] Run independent review of exact combined tree; resolve material findings.
 - [ ] Commit/push integration through repository gate and merge to main; verify GitHub SHA and PR states.
 
 **Acceptance Criteria:**
+
 - Given the two main-target PRs, when integration completes, then their original heads are ancestors of main and neither remains pending.
 - Given current main functionality, when combined sources build and are checked, then landing/lifecycle behavior and privacy/payment safeguards remain represented and tested.
 - Given divergent migration histories, when migration starts, then unknown history is rejected before any SQL application.
@@ -67,7 +69,9 @@ review_loop_iteration: 0
 
 ## Spec Change Log
 
-- Owner explicitly expanded integration to all nine open PRs. Include dependent residency chain through c2077357 and preserve its canonical migrations through0069; append main lifecycle migrations after that chain. Existing initial0052–54 integration metadata is provisional and must be replaced before verification.
+- Independent review exposed cross-branch behavioral seams: lifecycle payloads must capture the original consent authority for the strict dispatch gate; reschedule and waitlist mutation admissions must enforce current residency visibility; rescheduling a reservation with an existing Planerka provider operation must fail closed until a dedicated reconciliation contract exists. Preserve all existing default-off boundaries and add regression coverage.
+
+- Owner explicitly expanded integration to all nine open PRs. Include dependent residency chain through c2077357 and preserve its canonical migrations through0069; append original RC availability as0070 and main lifecycle as0071–0073 after that chain. Existing initial0052–54 integration metadata is provisional and must be replaced before verification.
 
 ## Design Notes
 
@@ -82,3 +86,10 @@ Both PRs conflict with main and cannot be accepted with a blanket choice of one 
 - `git diff --check`, repository pre-push gate: whitespace, policy and automation checks.
 - Read-only independent adversarial review: exact merged tree, migration compatibility, authorization and lost-main-feature checks.
 - GitHub API and commit ancestry after merge: main contains both original heads, PR states terminal.
+
+## Pre-publication verification checkpoint
+
+All source fixes have focused green evidence and independent scoped review.
+Owner-authorized additional run4 passed20/20and12/12; allowances consumed.
+Final build/lint/full types/format/whitespace pass. Publishing and live GitHub
+ancestry/PR-state verification remain the final execution task.

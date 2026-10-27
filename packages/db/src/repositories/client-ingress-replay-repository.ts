@@ -2,7 +2,7 @@ import type { DrizzleDb } from "../client.js";
 import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 type Event = { readonly botId: string; readonly updateId: number };
-const eventKey = (event: Event): string => {
+export const clientIngressEventKey = (event: Event): string => {
   if (
     !/^[1-9]\d{0,15}$/u.test(event.botId) ||
     !Number.isSafeInteger(Number(event.botId)) ||
@@ -16,26 +16,19 @@ const eventKey = (event: Event): string => {
 export class PostgresClientIngressReplayRepository {
   constructor(private readonly db: DrizzleDb) {}
   async record(event: Event): Promise<"recorded" | "duplicate"> {
-    const key = eventKey(event);
+    clientIngressEventKey(event);
     try {
       return await this.db.transaction(async (tx) => {
         await tx.execute(sql`SET LOCAL lock_timeout = '1s'`);
         await tx.execute(sql`SET LOCAL statement_timeout = '2s'`);
-        const result = await tx.execute<{ id: string }>(sql`
-          insert into webhook_inbox (provider, external_event_id, status, claim_id, lease_until)
-          values ('telegram', ${key}, 'complete', ${randomUUID()}::uuid, null)
-          on conflict (provider, external_event_id) do nothing returning id
-        `);
-        if (result.rows.length === 1) return "recorded";
-        if (result.rows.length === 0) return "duplicate";
-        throw new Error("unexpected_receipt_result");
+        return recordClientIngressInTransaction(tx, event);
       });
     } catch {
       throw new Error("client_ingress_replay_unavailable");
     }
   }
   async hasReceipt(event: Event): Promise<boolean> {
-    const key = eventKey(event);
+    const key = clientIngressEventKey(event);
     try {
       return await this.db.transaction(async (tx) => {
         await tx.execute(sql`SET LOCAL lock_timeout = '1s'`);
@@ -52,4 +45,16 @@ export class PostgresClientIngressReplayRepository {
       throw new Error("client_ingress_replay_unavailable");
     }
   }
+}
+
+export async function recordClientIngressInTransaction(
+  tx: Pick<DrizzleDb, "execute">,
+  event: Event,
+): Promise<"recorded" | "duplicate"> {
+  const result = await tx.execute<{ id: string }>(
+    sql`insert into webhook_inbox(provider,external_event_id,status,claim_id,lease_until) values ('telegram',${clientIngressEventKey(event)},'complete',${randomUUID()}::uuid,null) on conflict(provider,external_event_id) do nothing returning id`,
+  );
+  if (result.rows.length === 1) return "recorded";
+  if (result.rows.length === 0) return "duplicate";
+  throw Error("client_ingress_replay_unavailable");
 }

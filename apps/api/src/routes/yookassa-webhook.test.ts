@@ -178,3 +178,53 @@ describe("YooKassa webhook boundary", () => {
     await app.close();
   });
 });
+
+describe("capture-wait ingress", () => {
+  it("acknowledges verified holds and completed replays without delivery or success resolution", async () => {
+    const { app, dependencies } = await build();
+    dependencies.verify.mockResolvedValue(null as never);
+    dependencies.inbox.claim
+      .mockResolvedValueOnce({ kind: "claimed", claimId: "claim-1" })
+      .mockResolvedValueOnce({ kind: "duplicate" });
+    const payload = {
+      ...notification,
+      event: "payment.waiting_for_capture",
+      object: { ...notification.object, status: "succeeded", paid: true },
+    };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/webhooks/yookassa",
+        payload,
+      });
+      expect(response.statusCode).toBe(200);
+    }
+    expect(dependencies.verify).toHaveBeenCalledExactlyOnceWith({
+      type: "notification",
+      event: "payment.waiting_for_capture",
+      object: { id: notification.object.id },
+    });
+    expect(dependencies.deliver).not.toHaveBeenCalled();
+    expect(dependencies.resolveSucceeded).not.toHaveBeenCalled();
+    expect(dependencies.inbox.complete).toHaveBeenCalledOnce();
+    await app.close();
+  });
+  it("keeps unverifiable hold notifications retryable without financial effects", async () => {
+    const { app, dependencies } = await build();
+    dependencies.verify.mockRejectedValueOnce(
+      new Error("private provider failure"),
+    );
+    const response = await app.inject({
+      method: "POST",
+      url: "/v1/webhooks/yookassa",
+      payload: { ...notification, event: "payment.waiting_for_capture" },
+    });
+    expect(response.statusCode).toBe(503);
+    expect(response.body).not.toContain("private provider failure");
+    expect(dependencies.deliver).not.toHaveBeenCalled();
+    expect(dependencies.resolveSucceeded).not.toHaveBeenCalled();
+    expect(dependencies.inbox.complete).not.toHaveBeenCalled();
+    expect(dependencies.inbox.fail).toHaveBeenCalledWith("claim-1");
+    await app.close();
+  });
+});

@@ -1,3 +1,24 @@
+import {
+  readClientAccountQueriesConfig,
+  type ClientAccountQueriesConfig,
+} from "./client-account-queries-config.js";
+import {
+  readExpertResidencyLifecycleConfig,
+  assertExpertResidencyLifecycleConfig,
+  type ExpertResidencyLifecycleConfig,
+} from "./expert-residency-lifecycle-config.js";
+import {
+  readExpertCardConfig,
+  type ExpertCardConfig,
+} from "./expert-card-config.js";
+import {
+  readExpertVerificationConfig,
+  type ExpertVerificationConfig,
+} from "./expert-verification-config.js";
+import {
+  readExpertApplicantConfig,
+  type ExpertApplicantConfig,
+} from "./expert-applicant-config.js";
 import { z } from "zod";
 import {
   readPayerReceiptConfig,
@@ -400,7 +421,26 @@ const schema = z
   });
 
 export type RuntimeConfig = {
+  clientAccountQueries?: ClientAccountQueriesConfig;
   payerReceipt?: PayerReceiptConfig;
+  expertApplicant?: ExpertApplicantConfig;
+  residentSemanticSocket?: string;
+  residentGeocode?: { key: string };
+  privateVerification?: {
+    bucket: string;
+    region: string;
+    endpoint: string;
+    credentials: { accessKeyId: string; secretAccessKey: string };
+    dedicatedNonVersionedVerified: boolean;
+    parserSocket?: string;
+    ocr: boolean;
+    telegramPreview: boolean;
+    vkToken?: string;
+    vkTokenKind?: "user" | "service";
+  };
+  expertVerification?: ExpertVerificationConfig;
+  expertCard?: ExpertCardConfig;
+  expertResidencyLifecycle?: ExpertResidencyLifecycleConfig;
   bookingNotifications?: {
     admissionEnabled: boolean;
     sendEnabled: boolean;
@@ -446,6 +486,21 @@ export type RuntimeConfig = {
   telegramWebhookSecret?: string;
   selartiResponseSharedSecret?: string;
   features: {
+    clientAccountQueries?: boolean;
+    expertApplicant?: boolean;
+    expertVerificationForm?: boolean;
+    expertSeparatedSales?: boolean;
+    expertHeldOnboarding?: boolean;
+    expertVerification?: boolean;
+    expertCard?: boolean;
+    expertCardMaterialDelivery?: boolean;
+    expertDraftTags?: boolean;
+    residentWorkspaceNotifications?: boolean;
+    residentReviewNotifications?: boolean;
+    residentPrivateJobs?: boolean;
+    expertResidencyLifecycle?: boolean;
+    expertResidencyLifecycleCommands?: boolean;
+    expertResidencyNoticeDelivery?: boolean;
     bookingCallbacks?: boolean;
     workerOutboxDelivery: boolean;
     clientSession?: boolean;
@@ -663,6 +718,31 @@ function readBookingCallbacks(
 
 export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   const payerReceipt = readPayerReceiptConfig(source);
+  const expertApplicant = readExpertApplicantConfig(source);
+  const verificationFormFlag =
+    source.EXPERT_VERIFICATION_FORM_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(verificationFormFlag) ||
+    (verificationFormFlag === "true" && !expertApplicant)
+  )
+    throw new Error("resident_verification_configuration_required");
+  const separatedSalesFlag = source.EXPERT_SEPARATED_SALES_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(separatedSalesFlag) ||
+    (separatedSalesFlag === "true" && verificationFormFlag !== "true")
+  )
+    throw new Error("expert_sales_configuration_required");
+  const expertVerification = readExpertVerificationConfig(source);
+  const heldFlag = source.EXPERT_ONBOARDING_HELD_ENABLED ?? "false";
+  if (
+    !["true", "false"].includes(heldFlag) ||
+    (heldFlag === "true" &&
+      (separatedSalesFlag !== "true" || !expertVerification?.checkoutEnabled))
+  )
+    throw new Error("held_onboarding_configuration_required");
+  const clientAccountQueries = readClientAccountQueriesConfig(source);
+  const expertResidencyLifecycle = readExpertResidencyLifecycleConfig(source);
+  const expertCard = readExpertCardConfig(source);
   let expertSession: RuntimeConfig["expertSession"];
   if (source.EXPERT_SESSION_ENABLED === "true") {
     const botToken = source.EXPERT_TELEGRAM_BOT_TOKEN ?? "",
@@ -813,7 +893,12 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   }
 
   const config: RuntimeConfig = {
+    ...(clientAccountQueries ? { clientAccountQueries } : {}),
     ...(payerReceipt ? { payerReceipt } : {}),
+    ...(expertApplicant ? { expertApplicant } : {}),
+    ...(expertVerification ? { expertVerification } : {}),
+    ...(expertCard ? { expertCard } : {}),
+    ...(expertResidencyLifecycle ? { expertResidencyLifecycle } : {}),
     ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
     bookingNotifications,
     databaseUrl: value.DATABASE_URL,
@@ -881,7 +966,55 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(value.SELARTI_RESPONSE_SHARED_SECRET === undefined
       ? {}
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
+    ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
+      ? { privateVerification: privateVerificationConfig(source) }
+      : {}),
+    ...(source.RESIDENT_SEMANTIC_SOCKET
+      ? { residentSemanticSocket: source.RESIDENT_SEMANTIC_SOCKET }
+      : {}),
+    ...(source.RESIDENT_GEOCODE_ENABLED === "true"
+      ? {
+          residentGeocode: {
+            key: requiredResidentGeocodeKey(source.RESIDENT_GEOCODE_API_KEY),
+          },
+        }
+      : {}),
     features: {
+      ...(separatedSalesFlag === "true" ? { expertSeparatedSales: true } : {}),
+      ...(heldFlag === "true" ? { expertHeldOnboarding: true } : {}),
+      ...(clientAccountQueries ? { clientAccountQueries: true } : {}),
+      ...(expertApplicant ? { expertApplicant: true } : {}),
+      ...(verificationFormFlag === "true"
+        ? { expertVerificationForm: true }
+        : {}),
+      ...(source.EXPERT_CARD_ENABLED === "true" ? { expertCard: true } : {}),
+      ...(source.EXPERT_DRAFT_TAGS_ENABLED === "true"
+        ? { expertDraftTags: true }
+        : {}),
+      ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
+        ? { residentPrivateJobs: true }
+        : {}),
+      ...(source.RESIDENT_REVIEW_NOTIFICATIONS_ENABLED === "true"
+        ? { residentReviewNotifications: true }
+        : {}),
+      ...(source.RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED === "true"
+        ? { residentWorkspaceNotifications: true }
+        : {}),
+      ...(expertResidencyLifecycle?.enabled
+        ? { expertResidencyLifecycle: true }
+        : {}),
+      ...(expertResidencyLifecycle?.commandsEnabled
+        ? { expertResidencyLifecycleCommands: true }
+        : {}),
+      ...(expertResidencyLifecycle?.noticeDeliveryEnabled
+        ? { expertResidencyNoticeDelivery: true }
+        : {}),
+      ...(source.EXPERT_CARD_MATERIAL_DELIVERY_ENABLED === "true"
+        ? { expertCardMaterialDelivery: true }
+        : {}),
+      ...(source.EXPERT_VERIFICATION_ENABLED === "true"
+        ? { expertVerification: true }
+        : {}),
       bookingCallbacks: bookingCallbacks !== undefined,
       workerOutboxDelivery: value.WORKER_OUTBOX_DELIVERY_ENABLED === "true",
       clientSession: value.CLIENT_SESSION_ENABLED === "true",
@@ -971,6 +1104,52 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
         }
       : {}),
   };
+  assertExpertResidencyLifecycleConfig(config);
   assertClientNavigationConfig(config);
   return config;
+}
+
+function privateVerificationConfig(
+  source: Record<string, string | undefined>,
+): NonNullable<RuntimeConfig["privateVerification"]> {
+  const required = (key: string) => {
+    const value = source[key];
+    if (!value) throw Error("resident_private_configuration_required");
+    return value;
+  };
+  if (source.PRIVATE_BUCKET_NON_VERSIONED_VERIFIED !== "true")
+    throw Error("resident_private_non_versioned_required");
+  const token = source.PRIVATE_VK_TOKEN,
+    kind = source.PRIVATE_VK_TOKEN_KIND;
+  if (token && kind !== "user" && kind !== "service")
+    throw Error("resident_private_vk_capability_required");
+  return {
+    bucket: required("PRIVATE_BUCKET"),
+    region: required("PRIVATE_REGION"),
+    endpoint: required("PRIVATE_ENDPOINT"),
+    credentials: {
+      accessKeyId: required("PRIVATE_ACCESS_KEY_ID"),
+      secretAccessKey: required("PRIVATE_SECRET_ACCESS_KEY"),
+    },
+    dedicatedNonVersionedVerified: true,
+    ocr: source.PRIVATE_OCR_ENABLED === "true",
+    telegramPreview: source.PRIVATE_TELEGRAM_PREVIEW_ENABLED === "true",
+    ...(source.PRIVATE_PARSER_SOCKET
+      ? { parserSocket: source.PRIVATE_PARSER_SOCKET }
+      : {}),
+    ...(token
+      ? { vkToken: token, vkTokenKind: kind as "user" | "service" }
+      : {}),
+  };
+}
+
+function requiredResidentGeocodeKey(value: string | undefined): string {
+  if (
+    !value ||
+    value.length > 256 ||
+    /\s/u.test(value) ||
+    value.includes("__PLACEHOLDER_")
+  )
+    throw Error("resident_geocode_configuration");
+  return value;
 }

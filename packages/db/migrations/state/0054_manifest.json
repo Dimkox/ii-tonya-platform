@@ -1,7 +1,7 @@
 {
   "databaseVersion": "170005",
   "drizzleKitVersion": "0.31.10",
-  "method": "SQL replay through 0054; database introspection normalized against positional catalog data",
+  "method": "Full-chain hand-authored SQL replay on isolated PostgreSQL17.5; fresh empty-directory introspection normalized against exact positional constraint/index catalogue. SQL-only functions/triggers retained separately.",
   "generatePermitted": false,
   "migrations": [
     {
@@ -261,25 +261,25 @@
     },
     {
       "idx": 51,
-      "tag": "0051_planerka_availability",
-      "sha256": "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e"
+      "tag": "0051_expert_onboarding_applications",
+      "sha256": "e244079a72a25c2707a30864c704c0ce692e96ee1f39eefc8a4203536cb99a64"
     },
     {
       "idx": 52,
-      "tag": "0052_lifecycle_scheduler_c1",
-      "sha256": "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d"
+      "tag": "0052_expert_promo_applicants",
+      "sha256": "bc75a0731f408194741548f4bb7a9342aa0fbc4e2d1dad52d97dceb325b933f1"
     },
     {
       "idx": 53,
-      "tag": "0053_booking_waitlist_d1",
-      "sha256": "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8"
+      "tag": "0053_expert_verification_onboarding",
+      "sha256": "28563c02972211e931645521b2a5f1f36668c2c621813c1a942850120803b182"
     },
     {
       "idx": 54,
-      "tag": "0054_booking_reschedule_replay",
-      "sha256": "6b8f79dbf68e2150d0dce0b95302662389375c6c93ee194760403569f06042ed"
+      "tag": "0054_expert_card_publication",
+      "sha256": "526ac3bd5fa9ac6edfee72128d2898ae19b1ea6555161091b897db0ed1f860f8"
     }
   ],
-  "snapshotSha256": "9126ca55272631d9a804cb769bdbe5b4ecab6cca2e647b1efa6b01379f40a480",
-  "sqlObjectsSha256": "881645781992b79b52638c5845bf12ad88fed1b105acfdd51be8bb9a0c031adc"
+  "snapshotSha256": "6740fe1ebd96adf044694be07759d99a3b45f0aaa67ea910588940741f87ff69",
+  "sqlObjectsSha256": "2f21249b5210b9725bd5a0ff029827b4c55b54fb859d6e98f4799cecebe7c9c2"
 }

@@ -1,0 +1,348 @@
+{
+  "scope": "S3a R1\u2013R13 corrective source and local witnesses",
+  "controlCommit": "a41652c684f79263350cd2cc2d5573c8f98ec71f",
+  "sourceCommit": "Commit containing these source hashes; exact SHA is reported to coordinator after commit.",
+  "productionEvidence": false,
+  "hostedCi": false,
+  "independentClosure": "pending coordinator-assigned reviewers",
+  "finalBranchGate": "not run by implementer",
+  "notificationSeam": "S4 durable original-work-bot status delivery remains open in the same package",
+  "archiveManifest": "docs/test-evidence/residency-rich-onboarding-corrections-2026-10-27/manifest.json",
+  "archiveManifestSha256": "d12dadbdd492fd0e4e4f72eebbe4bdf86e45d82b319293f2e376cdbc6b34775f",
+  "sourceFiles": [
+    {
+      "path": "apps/api/src/expert-card-composition.ts",
+      "sha256": "3b2a0466d21db95c5b7df6cd92d33371c607cf200614c4437faafebb0048ad5c"
+    },
+    {
+      "path": "apps/api/src/expert-card-telegram-ingress.ts",
+      "sha256": "ba250a4948f7ef9aa7df77d33303fc8aefbce60c25f6bff916c64491778a87de"
+    },
+    {
+      "path": "docs/runbooks/resident-rich-onboarding.md",
+      "sha256": "76c7f267013085fb6716ac5fcc8fdbeedf9e42dd933b07a0b1bb3c5a25ff6e0e"
+    },
+    {
+      "path": "packages/application/src/expert-card-service.ts",
+      "sha256": "43f7be52294cd13a6cca7a414d52221d076257c715fd13282c23524f986c0be1"
+    },
+    {
+      "path": "packages/contracts/src/resident-rich-profile.test.ts",
+      "sha256": "8708ff7f32293f3bb97917f1e60d872280a7c9e072b8ce838819466798772443"
+    },
+    {
+      "path": "packages/contracts/src/resident-rich-profile.ts",
+      "sha256": "89c65f485ef448b084f741d666ab75db79fba9adf5b3ef0bd7a9ed951df892cb"
+    },
+    {
+      "path": "packages/db/migrations/0067_resident_rich_review_corrections.sql",
+      "sha256": "7f79f93ef2cf00a79b3740472147c0e650abf154b545fec34be9b0d443ae8422"
+    },
+    {
+      "path": "packages/db/migrations/meta/0067_snapshot.json",
+      "sha256": "37fee0f597aaee54127c47461f9ee674db668280c1703ac5ecf2861bd371071a"
+    },
+    {
+      "path": "packages/db/migrations/meta/_journal.json",
+      "sha256": "3153806972b037474e4d7f1e3a40677890cf868bb84fa66a395bfb4428f4165d"
+    },
+    {
+      "path": "packages/db/migrations/state/0067_manifest.json",
+      "sha256": "acfac0882803c6df25917311027e211a818d04d9efe3f3dfe6232f3ba00ecde3"
+    },
+    {
+      "path": "packages/db/migrations/state/0067_sql_objects.json",
+      "sha256": "86770b5ead5c04bd7cd1ac9988fa6e49798ffeef46d065aae5cbffb27ac61e45"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-application-materials.ts",
+      "sha256": "4e22f74aa4f013ed1910f1c61b0d443013cc3d5a0eea1b4d2e1917a914ce44b7"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-card-repository.ts",
+      "sha256": "fda769aaafd6645beea991ac4ad1929160c436019fa52ffdfe2eee4429114b89"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-residency-lifecycle-repository.ts",
+      "sha256": "21be86543bfe0587b339ca67b1cecfd1f44540edf74c6c04d2ffdafc7f5c1d5a"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-residency-main-projection.ts",
+      "sha256": "c8452ceb1967e30c14adcdcbff1f6204155822f2e4435bd2d0684d16437aa1ec"
+    },
+    {
+      "path": "packages/db/src/schema/expert-cards.ts",
+      "sha256": "11370e0a1449c261ce654849d061233fa522786f9f8526f1222b9de7d525946e"
+    },
+    {
+      "path": "tests/integration/resident-rich-onboarding.test.ts",
+      "sha256": "5e24ff1fee71293942ebeed4cee1d806a995e324838bee9b1d9e010ede24dae6"
+    },
+    {
+      "path": "tests/repo/expert-referral-scope-guards.test.ts",
+      "sha256": "0e25aad6e17a45ecd9dfa9cb25279ef38294cfb9b412eafc55f818dcb62252d8"
+    },
+    {
+      "path": "tests/repo/migration-history-integrity.test.ts",
+      "sha256": "7e03520bd0b8d21c90671ae364e4bcc199692e8f5b5f0a2db0b696e9a92db25e"
+    },
+    {
+      "path": "tests/repo/resident-rich-onboarding-state.test.ts",
+      "sha256": "bbc08e6b971471a34d299950e7a6c0826ca312ed3d37741bf4c931ccac872294"
+    },
+    {
+      "path": "tests/repo/support/payment-scope-boundary-core.ts",
+      "sha256": "11264e926cf42f8f7fc4eb93b465b7c3a6aa6dc7682a9960c17e717231ee2d1c"
+    },
+    {
+      "path": "tests/support/resident-rich-document-fixtures.ts",
+      "sha256": "8b610806518f39140c3ebbecba22eebf6a7092cd0466bc12efc51d51b2e817d1"
+    }
+  ],
+  "successfulChecks": [
+    {
+      "artifact": "corrected-rich-integration-final.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "4db1f853c7f844987453b62dd12e5875f1b97d1cd8d0bbe97da372c5e2b26e66"
+    },
+    {
+      "artifact": "final-financial-authority.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo"
+      ],
+      "exitCode": 0,
+      "logSha256": "1fe64ef3625d760dd8afee32826b21cfd785966742fb9aa8210be0e876ec8a50"
+    },
+    {
+      "artifact": "correction-digest-compatibility.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "R7 SQL"
+      ],
+      "exitCode": 0,
+      "logSha256": "2558002b121f6a78120e14e13a78308619d12d61b4b64753c41958ad6b79f2a6"
+    },
+    {
+      "artifact": "corrected-contracts-final.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-rich-profile.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "7cb8430be96e4280c5491c5eb2b410945ebdef6f0977a40b10a482d33a1e73c0"
+    },
+    {
+      "artifact": "affected-unit-proof.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "apps/api/src/expert-card-composition.test.ts",
+        "packages/application/src/expert-card-service.test.ts",
+        "packages/db/src/repositories/expert-residency-main-projection.test.ts",
+        "packages/db/src/repositories/expert-residency-lifecycle-repository.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "b947414cd1c2898192fe705fe910d87f5b82a5e94e563c8c207c50e989787c14"
+    },
+    {
+      "artifact": "populated-upgrade-final.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "--config",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/populated-upgrade.config.ts",
+        "-t",
+        "R13"
+      ],
+      "exitCode": 0,
+      "logSha256": "877e01ffc3a94bd828d643e310facf0529796d25611d67487986dc06f06f7797"
+    },
+    {
+      "artifact": "correction-reconstruction.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/reconstruct.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "d8a598b7fd7c07571926a6bbcc3951277f0acbc219833430672aaa7585e4e9c3"
+    },
+    {
+      "artifact": "final-contract-build.log.gz",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/contracts",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "42866aaf5015ea2b95baf8567e9d76706fe267f0ea18fa199ac03a531b11b692"
+    },
+    {
+      "artifact": "corrective-application-build.log.gz",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/application",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "6980911ec46651543bf7c200bb1705230d3804a52452698dc46ddd7bec947563"
+    },
+    {
+      "artifact": "final-db-build.log.gz",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/db",
+        "build"
+      ],
+      "exitCode": 0,
+      "logSha256": "f6795e5b8c65bb96b39e16986727bee633b3e9a4250f61b40207adb88039a675"
+    },
+    {
+      "artifact": "final-tests-types.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "final-api-types.log.gz",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/api",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "artifact": "final-test-lint-correction2.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/repo/migration-history-integrity.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "artifact": "final-migration-head-proof.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/migration-history-integrity.test.ts",
+        "-t",
+        "pins the newest snapshot"
+      ],
+      "exitCode": 0,
+      "logSha256": "47854a9d355d23c40db88b7b68c4204b43851b0957d60c4fb0dc2150e152b90c"
+    },
+    {
+      "artifact": "final-owned-format-proof.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "apps/api/src/expert-card-composition.ts",
+        "apps/api/src/expert-card-telegram-ingress.ts",
+        "packages/application/src/expert-card-service.ts",
+        "packages/contracts/src/resident-rich-profile.ts",
+        "packages/contracts/src/resident-rich-profile.test.ts",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/db/src/repositories/expert-application-materials.ts",
+        "packages/db/src/repositories/expert-residency-lifecycle-repository.ts",
+        "packages/db/src/repositories/expert-residency-main-projection.ts",
+        "packages/db/src/schema/expert-cards.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/support/resident-rich-document-fixtures.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "docs/runbooks/resident-rich-onboarding.md"
+      ],
+      "exitCode": 0,
+      "logSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20"
+    },
+    {
+      "artifact": "final-evidence-format.log.gz",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--write",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "docs/runbooks/resident-rich-onboarding.md",
+        "docs/test-evidence/residency-rich-onboarding-implementation-2026-10-27.md",
+        "docs/test-evidence/residency-rich-onboarding-corrections-2026-10-27.md",
+        "docs/test-evidence/residency-rich-onboarding-corrections-2026-10-27/README.md"
+      ],
+      "exitCode": 0,
+      "logSha256": "acd8a5e9b0cf941efa446228a9d0bbb7764b6aa52d8dc8ab19a8e5b08ed0e114"
+    },
+    {
+      "artifact": "historical-preservation-audit.log.gz",
+      "command": [
+        "python3",
+        ".superpowers/sdd/rich-onboarding-corrections-20261027/preservation-audit.py"
+      ],
+      "exitCode": 0,
+      "logSha256": "733a392ec272b6ac32b2bf696ee474ad01a6a58bb78674900edcef962fdb4d2e"
+    },
+    {
+      "artifact": "final-whitespace.log.gz",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "guardNote": "Scope/state command recorded155 passing checks and one stale newest-snapshot expectation; final-migration-head-proof corrects and verifies that expectation. Remaining affected lint paths passed in final-owned-lint; two obsolete test imports were removed and their focused rerun passed. All actual failures remain archived.",
+  "historicalPreservation": {
+    "migration0066Sha256": "7c81e8b71f77d256aef1a2fd8c8ee672a15ddb2680855f7c10bf182ec7d4b196",
+    "original85ManifestSha256": "60a8a5a176560f98318545aa010f435e1e8eaa63251d1d19bf542ad4fbe20cc3"
+  }
+}

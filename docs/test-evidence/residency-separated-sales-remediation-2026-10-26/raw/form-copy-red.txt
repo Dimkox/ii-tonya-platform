@@ -1,0 +1,44 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ packages/application/src/resident-verification-service.test.ts (17 tests | 1 failed | 16 skipped) 14ms
+   ↓ renders role union then explicit primary selection with durable revisions
+   ↓ keeps amenities multi-select until Next and allows none
+   ↓ persists a normal edit cursor across calls and keeps exact replay stable
+   ↓ rejects prototype names as permanent invalid edit controls
+   ↓ remediation: text role changes clear incompatible primary and preserve other answers
+   ↓ remediation: rejects unexpected media and empty supplements as permanent corrective responses
+   ↓ remediation: policy mismatch is read-only manual review without new-policy controls
+   ↓ remediation: optional documents can be skipped, removed and replaced at the limit
+   ↓ remediation: confirmation summarizes bounded owned facts without private document IDs
+   ↓ remediation: required document cursor has no skip and rejects a forged back action
+   ↓ remediation: cumulative caption overflow is corrective and preserves the saved draft
+   ↓ remediation: Russian choice labels preserve canonical callback enum values
+   ↓ closure: Unicode URL expansion is a permanent correction and preserves the saved draft
+   ↓ closure: confirmation shows applicant average check 1500050 with integer-safe formatting
+   ↓ closure: confirmation shows applicant average check 999999999999 with integer-safe formatting
+   ↓ closure: confirmation shows applicant average check 0 with integer-safe formatting
+   × sales-first tariff help retains the selected conditions while legacy form remains pre-price 13ms
+     → expected '{"status":"handled","text":"Сначала з…' to contain '/my_tariff'
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/application/src/resident-verification-service.test.ts > sales-first tariff help retains the selected conditions while legacy form remains pre-price
+AssertionError: expected '{"status":"handled","text":"Сначала з…' to contain '/my_tariff'
+
+Expected: "/my_tariff"
+Received: "{"status":"handled","text":"Сначала заполните анкету: /verification. Тарифы появятся после отдельного решения по проверке."}"
+
+ ❯ packages/application/src/resident-verification-service.test.ts:454:124
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 16 skipped (17)
+   Start at  18:47:50
+   Duration  613ms (transform 122ms, setup 0ms, collect 143ms, tests 14ms, environment 0ms, prepare 95ms)
+
+
+[END OF RAW CAPTURE]

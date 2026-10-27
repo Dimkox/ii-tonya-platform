@@ -1,0 +1,28 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  packages/domain/src/expert-separated-sales.test.ts [ packages/domain/src/expert-separated-sales.test.ts ]
+Error: Cannot find module './expert-separated-sales.js' imported from '/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/packages/domain/src/expert-separated-sales.test.ts'
+ ❯ packages/domain/src/expert-separated-sales.test.ts:2:1
+      1| import { describe, expect, it } from "vitest";
+      2| import { calculateExpertBasePrice, calculateSeparatedSalesTerms } from…
+       | ^
+      3| const base = { categoryRateMinor: 1000000n, millionCity: true, onlineO…
+      4| describe("separated sales immutable-base arithmetic", () => {
+
+Caused by: Error: Failed to load url ./expert-separated-sales.js (resolved id: ./expert-separated-sales.js) in /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/packages/domain/src/expert-separated-sales.test.ts. Does the file exist?
+ ❯ loadAndTransform node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  16:50:45
+   Duration  510ms (transform 53ms, setup 0ms, collect 0ms, tests 0ms, environment 0ms, prepare 133ms)
+
+
+[END OF RAW CAPTURE]

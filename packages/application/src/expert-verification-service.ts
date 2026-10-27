@@ -1,0 +1,514 @@
+import type { ResidentMessageInput } from "@ii-tonya/domain";
+export interface ExpertVerificationRepository {
+  invoiceForManager(
+    sessionHash: string,
+    invoiceId: string,
+  ): Promise<{
+    id: string;
+    operationId: string;
+    strictExpiry?: boolean;
+    status: "pending" | "settled" | "cancelled";
+  } | null>;
+  listQueue(
+    sessionHash: string,
+    limit?: number,
+    afterApplication?: string,
+  ): Promise<readonly unknown[]>;
+  applicationDetail(
+    sessionHash: string,
+    applicationId: string,
+    historyCursor?: string,
+  ): Promise<unknown | null>;
+  decide(input: {
+    sessionHash: string;
+    applicationId: string;
+    decision: "approved" | "rejected";
+    reasonCode: string;
+    idempotencyKey: string;
+  }): Promise<{
+    applicationId: string;
+    decision: "approved" | "rejected";
+    invoiceId: string | null;
+    replay: boolean;
+  }>;
+}
+// Merchant confirmation pages may be hosted on yoomoney.ru; this is not the wallet API.
+// https://yookassa.ru/developers/using-api/response-handling/http-codes
+export interface ExpertVerificationCheckout {
+  recoverCheckout(input: {
+    invoiceId: string;
+    operationId: string;
+  }): Promise<
+    | { kind: "ready"; url: string; paymentId: string }
+    | { kind: "pending" | "unavailable" }
+  >;
+  createCheckout(input: {
+    invoiceId: string;
+  }): Promise<{ url: string; paymentId: string }>;
+}
+type Failure = {
+  kind: "disabled" | "forbidden" | "invalid" | "unavailable" | "not_found";
+};
+const uuid =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const validSession = (s: string) => /^sha256:[0-9a-f]{64}$/u.test(s);
+const safeFailure = (e: unknown): Failure => ({
+  kind:
+    e instanceof Error && e.message === "verification_forbidden"
+      ? "forbidden"
+      : "unavailable",
+});
+export function createExpertVerificationService(deps: {
+  enabled: boolean;
+  privateEvidence?: {
+    detail(
+      session: string,
+      applicationId: string,
+      after?: string,
+    ): Promise<unknown>;
+    link(session: string, applicationId: string, id: string): Promise<unknown>;
+    recoveryList(session: string, after?: string): Promise<unknown>;
+    requestRecovery(session: string, id: string): Promise<unknown>;
+  };
+  review?: {
+    closeUnknown(
+      session: string,
+      applicationId: string,
+      eventId: string,
+    ): Promise<unknown>;
+    expireRequests(limit?: number, sessionHash?: string): Promise<number>;
+    preview(
+      session: string,
+      input: ResidentMessageInput & {
+        applicationId: string;
+        expectedRevision: number;
+        expectedGeneration: number;
+      },
+    ): Promise<unknown>;
+    confirm(
+      session: string,
+      applicationId: string,
+      previewId: string,
+      finalHash: string,
+    ): Promise<unknown>;
+  };
+  repository: ExpertVerificationRepository;
+  checkout?: ExpertVerificationCheckout;
+  heldCheckout?: ExpertVerificationCheckout & {
+    recoverProviderObject?(
+      sessionHash: string,
+      invoiceId: string,
+      paymentId: string,
+      requestKey: string,
+    ): Promise<unknown>;
+  };
+  verifyProfile?: (input: {
+    sessionHash: string;
+    userId: string;
+    revision: number;
+  }) => Promise<unknown>;
+}) {
+  const authorize = (sessionHash: string): Failure | undefined =>
+    !deps.enabled
+      ? { kind: "disabled" }
+      : !validSession(sessionHash)
+        ? { kind: "forbidden" }
+        : undefined;
+  return {
+    async privateEvidence(
+      sessionHash: string,
+      applicationId: string,
+      after?: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (
+        !uuid.test(applicationId) ||
+        (after !== undefined && !uuid.test(after))
+      )
+        return { kind: "invalid" } as const;
+      if (!deps.privateEvidence) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.privateEvidence.detail(
+            sessionHash,
+            applicationId,
+            after,
+          ),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async privateDocumentLink(
+      sessionHash: string,
+      applicationId: string,
+      id: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!uuid.test(applicationId) || !uuid.test(id))
+        return { kind: "invalid" } as const;
+      if (!deps.privateEvidence) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.privateEvidence.link(sessionHash, applicationId, id),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async privateRecovery(sessionHash: string, id?: string, after?: string) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (
+        (id !== undefined && !uuid.test(id)) ||
+        (after !== undefined && !uuid.test(after))
+      )
+        return { kind: "invalid" } as const;
+      if (!deps.privateEvidence) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: id
+            ? await deps.privateEvidence.requestRecovery(sessionHash, id)
+            : await deps.privateEvidence.recoveryList(sessionHash, after),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async closeUnknownReview(
+      sessionHash: string,
+      applicationId: string,
+      eventId: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!deps.review) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.review.closeUnknown(
+            sessionHash,
+            applicationId,
+            eventId,
+          ),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async previewReview(
+      sessionHash: string,
+      input: ResidentMessageInput & {
+        applicationId: string;
+        expectedRevision: number;
+        expectedGeneration: number;
+      },
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!deps.review) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.review.preview(sessionHash, input),
+        };
+      } catch (e) {
+        if (
+          e instanceof Error &&
+          e.message === "resident_refund_policy_unavailable"
+        )
+          return {
+            kind: "unavailable",
+            reason: "refund_policy_pending",
+            contentSlot: "TODO: Wait for Refund Policy",
+          } as const;
+        return safeFailure(e);
+      }
+    },
+    async confirmReview(
+      sessionHash: string,
+      applicationId: string,
+      previewId: string,
+      finalHash: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!deps.review) return { kind: "unavailable" } as const;
+      try {
+        return {
+          kind: "ok" as const,
+          item: await deps.review.confirm(
+            sessionHash,
+            applicationId,
+            previewId,
+            finalHash,
+          ),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async recoverHeld(
+      sessionHash: string,
+      invoiceId: string,
+      providerObjectId: string,
+      idempotencyKey: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (
+        !uuid.test(invoiceId) ||
+        !/^[A-Za-z0-9_-]{1,64}$/u.test(providerObjectId) ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u.test(idempotencyKey)
+      )
+        return { kind: "invalid" } as const;
+      if (!deps.heldCheckout?.recoverProviderObject)
+        return { kind: "unavailable" } as const;
+      try {
+        await deps.heldCheckout.recoverProviderObject(
+          sessionHash,
+          invoiceId,
+          providerObjectId,
+          idempotencyKey,
+        );
+        return { kind: "ok" } as const;
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async list(
+      sessionHash: string,
+      input: { limit?: number; afterApplication?: string },
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      const limit = input.limit ?? 50;
+      if (
+        !Number.isSafeInteger(limit) ||
+        limit < 1 ||
+        limit > 50 ||
+        (input.afterApplication !== undefined &&
+          !uuid.test(input.afterApplication))
+      )
+        return { kind: "invalid" } as const;
+      try {
+        await deps.review?.expireRequests(limit, sessionHash);
+        return {
+          kind: "ok" as const,
+          items:
+            input.afterApplication === undefined
+              ? await deps.repository.listQueue(sessionHash, limit)
+              : await deps.repository.listQueue(
+                  sessionHash,
+                  limit,
+                  input.afterApplication,
+                ),
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async detail(
+      sessionHash: string,
+      applicationId: string,
+      historyCursor?: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!uuid.test(applicationId)) return { kind: "invalid" } as const;
+      try {
+        await deps.review?.expireRequests(20, sessionHash);
+        const item = await deps.repository.applicationDetail(
+          sessionHash,
+          applicationId,
+          historyCursor,
+        );
+        return item
+          ? { kind: "ok" as const, item }
+          : { kind: "not_found" as const };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async reverifyProfile(
+      sessionHash: string,
+      applicationId: string,
+      revision: number,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (
+        !uuid.test(applicationId) ||
+        !Number.isSafeInteger(revision) ||
+        revision < 1
+      )
+        return { kind: "invalid" } as const;
+      if (!deps.verifyProfile) return { kind: "unavailable" } as const;
+      try {
+        const item = (await deps.repository.applicationDetail(
+          sessionHash,
+          applicationId,
+        )) as { userId?: unknown; profile?: { revision?: unknown } } | null;
+        if (!item || typeof item.userId !== "string" || !uuid.test(item.userId))
+          return { kind: "not_found" } as const;
+        if (item.profile?.revision !== revision)
+          return { kind: "invalid" } as const;
+        await deps.verifyProfile({
+          sessionHash,
+          userId: item.userId,
+          revision,
+        });
+        return { kind: "ok", applicationId, revision } as const;
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async checkout(sessionHash: string, invoiceId: string) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!uuid.test(invoiceId)) return { kind: "invalid" } as const;
+      try {
+        const invoice = await deps.repository.invoiceForManager(
+          sessionHash,
+          invoiceId,
+        );
+        if (!invoice) return { kind: "not_found" } as const;
+        if (invoice.status !== "pending")
+          return { kind: "ok" as const, payment: { status: invoice.status } };
+        const checkout = invoice.strictExpiry
+          ? deps.heldCheckout
+          : deps.checkout;
+        if (!checkout)
+          return {
+            kind: "ok" as const,
+            payment: { status: "waiting_configuration" as const },
+          };
+        // Recovery owns the same durable operation and its exact-body/GET custody.
+        // Never turn an unknown outcome into another initial POST from this service.
+        const payment = await checkout.recoverCheckout({
+          invoiceId: invoice.id,
+          operationId: invoice.operationId,
+        });
+        if (payment.kind !== "ready")
+          return { kind: "ok" as const, payment: { status: payment.kind } };
+        const url = new URL(payment.url);
+        if (
+          url.protocol !== "https:" ||
+          url.username ||
+          url.password ||
+          url.port ||
+          !["yookassa.ru", "pay.yookassa.ru", "yoomoney.ru"].includes(
+            url.hostname,
+          ) ||
+          !/^[A-Za-z0-9_-]{1,64}$/u.test(payment.paymentId)
+        )
+          throw new Error("verification_checkout_unavailable");
+        return {
+          kind: "ok" as const,
+          payment: {
+            status: "ready" as const,
+            url: url.toString(),
+            paymentId: payment.paymentId,
+          },
+        };
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+    async decide(
+      sessionHash: string,
+      input: {
+        applicationId: string;
+        decision: "approved" | "rejected";
+        reasonCode: string;
+        idempotencyKey: string;
+      },
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      const keys = Object.keys(input).sort().join(",");
+      if (
+        keys !== "applicationId,decision,idempotencyKey,reasonCode" ||
+        !uuid.test(input.applicationId) ||
+        !["approved", "rejected"].includes(input.decision) ||
+        !/^[a-z][a-z0-9_]{0,63}$/u.test(input.reasonCode) ||
+        !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u.test(input.idempotencyKey)
+      )
+        return { kind: "invalid" } as const;
+      // Snapshot trusted session and validated command before any asynchronous work.
+      const command = {
+        sessionHash,
+        applicationId: input.applicationId,
+        decision: input.decision,
+        reasonCode: input.reasonCode,
+        idempotencyKey: input.idempotencyKey,
+      };
+      try {
+        const result = await deps.repository.decide(command);
+        if (result.decision !== "approved" || !result.invoiceId)
+          return { kind: "ok" as const, ...result };
+        if (result.replay)
+          return {
+            kind: "ok" as const,
+            ...result,
+            payment: { status: "not_repeated" as const },
+          };
+        const invoice = await deps.repository.invoiceForManager(
+          sessionHash,
+          result.invoiceId,
+        );
+        const checkout = invoice?.strictExpiry
+          ? deps.heldCheckout
+          : deps.checkout;
+        if (!invoice || !checkout)
+          return {
+            kind: "ok" as const,
+            ...result,
+            payment: { status: "waiting_configuration" as const },
+          };
+        try {
+          const payment = await checkout.createCheckout({
+            invoiceId: result.invoiceId,
+          });
+          const url = new URL(payment.url);
+          if (
+            url.protocol !== "https:" ||
+            url.username ||
+            url.password ||
+            url.port ||
+            !["yookassa.ru", "pay.yookassa.ru", "yoomoney.ru"].includes(
+              url.hostname,
+            ) ||
+            !/^[A-Za-z0-9_-]{1,64}$/u.test(payment.paymentId)
+          )
+            throw new Error("verification_checkout_unavailable");
+          return {
+            kind: "ok" as const,
+            ...result,
+            payment: {
+              status: "ready" as const,
+              url: url.toString(),
+              paymentId: payment.paymentId,
+            },
+          };
+        } catch {
+          return {
+            kind: "ok" as const,
+            ...result,
+            payment: { status: "unavailable" as const },
+          };
+        }
+      } catch (e) {
+        return safeFailure(e);
+      }
+    },
+  };
+}
+export type ExpertVerificationService = ReturnType<
+  typeof createExpertVerificationService
+>;

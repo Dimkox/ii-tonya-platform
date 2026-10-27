@@ -85,6 +85,9 @@ async function fixture() {
   await database.db.execute(
     sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) select expert_service_id,${++account},1,60,'UTC',true,clock_timestamp() from slots where id=${f.command.slotId}::uuid`,
   );
+  await database.db.execute(
+    sql`update slots set observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
+  );
   const bookings = new PostgresBookingRepository(database.db, {
     notificationOrigin: {
       botKey,
@@ -643,4 +646,4 @@ it("post-lock database time rejects expiry crossed during callback row wait desp
     operations: 0,
     transitions: 0,
   });
-});
+}, 15_000);

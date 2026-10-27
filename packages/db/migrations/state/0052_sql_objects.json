@@ -66,6 +66,11 @@
       "definition": "CREATE OR REPLACE FUNCTION public.enforce_expert_campaign_quote_source()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE\n  tariff expert_residency_tariff_versions%ROWTYPE;\n  stage_end timestamptz;\n  expected_expiry timestamptz;\nBEGIN\n  LOCK TABLE consent_document_versions IN SHARE MODE;\n  PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text,0));\n  PERFORM 1 FROM users WHERE id=NEW.user_id AND active=true FOR SHARE;\n  IF NOT FOUND THEN\n    RAISE EXCEPTION 'expert_campaign_source_invalid' USING ERRCODE='23514';\n  END IF;\n  SELECT * INTO tariff FROM expert_residency_tariff_versions WHERE id=NEW.tariff_version_id FOR SHARE;\n  IF NOT FOUND OR tariff.commercial_policy_version <> 'expert_residency_v2'\n    OR NOT isfinite(NEW.quoted_at) OR NEW.quoted_at < tariff.active_from OR NEW.quoted_at >= tariff.active_to\n    OR ROW(NEW.base_monthly_minor,NEW.currency,NEW.display_name,NEW.credit_cap_bps,\n      NEW.individual_services_enabled,NEW.group_event_limit,NEW.statistics_level,NEW.support_priority)\n      IS DISTINCT FROM ROW(tariff.price_minor,tariff.currency,tariff.display_name,tariff.credit_cap_bps,\n      tariff.individual_services_enabled,tariff.group_event_limit,tariff.statistics_level,tariff.support_priority)\n    OR tariff.duration_seconds <> 2592000 THEN\n    RAISE EXCEPTION 'expert_campaign_source_invalid' USING ERRCODE='23514';\n  END IF;\n  stage_end := CASE\n    WHEN NEW.quoted_at - NEW.calculation_timestamp < interval '72 hours' THEN NEW.calculation_timestamp + interval '72 hours'\n    WHEN NEW.quoted_at - NEW.calculation_timestamp < interval '144 hours' THEN NEW.calculation_timestamp + interval '144 hours'\n    WHEN NEW.quoted_at - NEW.calculation_timestamp < interval '216 hours' THEN NEW.calculation_timestamp + interval '216 hours'\n    ELSE 'infinity'::timestamptz END;\n  expected_expiry := least(NEW.quoted_at + interval '15 minutes',date_trunc('milliseconds',tariff.active_to),stage_end);\n  IF NEW.expires_at IS DISTINCT FROM expected_expiry THEN\n    RAISE EXCEPTION 'expert_campaign_expiry_invalid' USING ERRCODE='23514';\n  END IF;\n  RETURN NEW;\nEND $function$\n"
     },
     {
+      "name": "enforce_expert_promo_immutable",
+      "arguments": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.enforce_expert_promo_immutable()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nBEGIN\n  IF TG_TABLE_NAME='expert_promo_registrations' THEN\n   IF NEW.identity_digest IS NULL AND NEW.erased_at IS NOT NULL\n    AND NEW.user_id=OLD.user_id AND NEW.referrer_user_id IS NOT DISTINCT FROM OLD.referrer_user_id\n    AND NEW.created_at=OLD.created_at AND NOT EXISTS(SELECT 1 FROM users WHERE id=OLD.user_id AND active=true) THEN RETURN NEW; END IF;\n  END IF;\n  IF TG_TABLE_NAME='expert_promo_requests' THEN\n   IF NEW.user_id IS NULL AND NEW.request_digest IS NULL AND NEW.erased_at IS NOT NULL\n    AND OLD.user_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM users WHERE id=OLD.user_id AND active=true)\n    AND ROW(NEW.bot_id,NEW.request_key,NEW.operation,NEW.created_at) IS NOT DISTINCT FROM ROW(OLD.bot_id,OLD.request_key,OLD.operation,OLD.created_at) THEN RETURN NEW; END IF;\n  END IF;\n  RAISE EXCEPTION 'expert_promo_immutable' USING ERRCODE='23514';\nEND $function$\n"
+    },
+    {
       "name": "enforce_expert_referral_admin_approval_global_unique",
       "arguments": "",
       "definition": "CREATE OR REPLACE FUNCTION public.enforce_expert_referral_admin_approval_global_unique()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE lock_key bigint;\nBEGIN\n  FOR lock_key IN SELECT DISTINCT hashtextextended(value::text, 928451) AS advisory_key FROM unnest(array[NEW.approval_id,NEW.second_approval_id]) AS approvals(value) WHERE value is not null ORDER BY advisory_key LOOP\n    PERFORM pg_advisory_xact_lock(lock_key);\n  END LOOP;\n  IF EXISTS (SELECT 1 FROM expert_referral_admin_execution_results existing WHERE existing.approval_id in (NEW.approval_id,NEW.second_approval_id) OR existing.second_approval_id in (NEW.approval_id,NEW.second_approval_id)) THEN\n    RAISE EXCEPTION USING ERRCODE='23505', MESSAGE='expert_referral_admin_approval_global_unique';\n  END IF;\n  RETURN NEW;\nEND $function$\n"
@@ -129,11 +134,6 @@
       "name": "payer_receipt_redaction_due",
       "arguments": "contact payer_receipt_contacts",
       "definition": "CREATE OR REPLACE FUNCTION public.payer_receipt_redaction_due(contact payer_receipt_contacts)\n RETURNS boolean\n LANGUAGE sql\n STABLE\nAS $function$\n  SELECT contact.expires_at<=clock_timestamp() OR (\n    NOT EXISTS(SELECT 1 FROM payer_receipt_order_bindings b WHERE b.contact_id=contact.id)\n    AND (EXISTS(SELECT 1 FROM expert_residency_orders o WHERE o.campaign_quote_id=contact.quote_id)\n      OR NOT EXISTS(SELECT 1 FROM expert_campaign_quotes q\n        JOIN users u ON u.id=q.user_id JOIN expert_residency_tariff_versions t ON t.id=q.tariff_version_id\n        WHERE q.id=contact.quote_id AND u.active AND q.expires_at>clock_timestamp()\n          AND t.active_from<=clock_timestamp() AND t.active_to>clock_timestamp())))\n$function$\n"
-    },
-    {
-      "name": "planerka_availability_mapping_invalidate",
-      "arguments": "",
-      "definition": "CREATE OR REPLACE FUNCTION public.planerka_availability_mapping_invalidate()\n RETURNS trigger\n LANGUAGE plpgsql\nAS $function$\nDECLARE affected_services uuid[];\nBEGIN\n  IF TG_OP='UPDATE' AND NEW IS NOT DISTINCT FROM OLD THEN RETURN NEW; END IF;\n  IF TG_OP='INSERT' THEN affected_services := ARRAY[NEW.expert_service_id];\n  ELSE affected_services := ARRAY[OLD.expert_service_id];\n    IF TG_OP='UPDATE' THEN affected_services := array_append(affected_services,NEW.expert_service_id); END IF;\n  END IF;\n  -- The mapping row is already locked by UPDATE/DELETE. Match publication's\n  -- mapping -> service -> expert -> refresh -> slot order.\n  -- Never wait while holding a mapping: booking approval owns these rows before\n  -- requesting its mapping lock. NOWAIT aborts the whole mutation for safe retry.\n  PERFORM 1 FROM expert_services WHERE id=ANY(affected_services) ORDER BY id FOR UPDATE NOWAIT;\n  PERFORM 1 FROM experts WHERE id IN (SELECT expert_id FROM expert_services WHERE id=ANY(affected_services)) ORDER BY id FOR UPDATE NOWAIT;\n  PERFORM 1 FROM planerka_availability_refreshes WHERE expert_service_id=ANY(affected_services) ORDER BY expert_service_id FOR UPDATE NOWAIT;\n  UPDATE planerka_availability_refreshes SET lease_token=NULL,lease_until=NULL,\n    next_attempt_at=clock_timestamp(),reason_code='mapping_invalid'\n    WHERE expert_service_id=ANY(affected_services);\n  PERFORM 1 FROM slots WHERE expert_service_id=ANY(affected_services) AND provider='planerka' ORDER BY id FOR UPDATE NOWAIT;\n  UPDATE slots SET observed_at=NULL WHERE expert_service_id=ANY(affected_services) AND provider='planerka';\n  IF TG_OP='DELETE' THEN RETURN OLD; END IF;\n  RETURN NEW;\nEND $function$\n"
     },
     {
       "name": "planerka_operation_guard",
@@ -368,6 +368,24 @@
       "enabled": "O"
     },
     {
+      "table_name": "expert_promo_codes",
+      "name": "expert_promo_codes_immutable",
+      "definition": "CREATE TRIGGER expert_promo_codes_immutable BEFORE UPDATE ON expert_promo_codes FOR EACH ROW EXECUTE FUNCTION enforce_expert_promo_immutable()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_registrations_immutable",
+      "definition": "CREATE TRIGGER expert_promo_registrations_immutable BEFORE UPDATE ON expert_promo_registrations FOR EACH ROW EXECUTE FUNCTION enforce_expert_promo_immutable()",
+      "enabled": "O"
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_requests_immutable",
+      "definition": "CREATE TRIGGER expert_promo_requests_immutable BEFORE UPDATE ON expert_promo_requests FOR EACH ROW EXECUTE FUNCTION enforce_expert_promo_immutable()",
+      "enabled": "O"
+    },
+    {
       "table_name": "expert_referral_admin_execution_results",
       "name": "expert_referral_admin_approval_global_unique",
       "definition": "CREATE TRIGGER expert_referral_admin_approval_global_unique BEFORE INSERT ON expert_referral_admin_execution_results FOR EACH ROW EXECUTE FUNCTION enforce_expert_referral_admin_approval_global_unique()",
@@ -536,12 +554,6 @@
       "enabled": "O"
     },
     {
-      "table_name": "planerka_service_mappings",
-      "name": "planerka_availability_mapping_invalidation",
-      "definition": "CREATE TRIGGER planerka_availability_mapping_invalidation BEFORE INSERT OR DELETE OR UPDATE ON planerka_service_mappings FOR EACH ROW EXECUTE FUNCTION planerka_availability_mapping_invalidate()",
-      "enabled": "O"
-    },
-    {
       "table_name": "privacy_deletion_jobs",
       "name": "client_booking_privacy_completion_guard",
       "definition": "CREATE TRIGGER client_booking_privacy_completion_guard BEFORE UPDATE OF status ON privacy_deletion_jobs FOR EACH ROW EXECUTE FUNCTION client_booking_guard_privacy_completion()",
@@ -682,12 +694,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approver_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approver_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -734,12 +742,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "requester_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["requester_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -774,12 +778,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "actor_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["actor_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -790,12 +790,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -854,12 +850,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["admin_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -906,12 +898,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["admin_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -958,12 +946,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["admin_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1022,12 +1006,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "consent_decision_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["consent_decision_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1050,12 +1030,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "source_outbox_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["source_outbox_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1090,12 +1066,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "attempt_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["attempt_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1202,12 +1174,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "delivery_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["delivery_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1374,12 +1342,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "delivery_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["delivery_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1390,12 +1354,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "notification_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["notification_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1466,12 +1426,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "client_identity_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["client_identity_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1494,12 +1450,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "client_user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["client_user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1510,12 +1462,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_identity_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_identity_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1538,12 +1486,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1566,12 +1510,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1666,12 +1606,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "provider_operation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["provider_operation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1682,12 +1618,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "recipient_identity_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["recipient_identity_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1710,12 +1642,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "recipient_user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["recipient_user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1726,12 +1654,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1742,12 +1666,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "source_outbox_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["source_outbox_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1854,12 +1774,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1882,12 +1798,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "deletion_job_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["deletion_job_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -1982,12 +1894,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2022,12 +1930,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2086,12 +1990,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "request_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["request_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2102,12 +2002,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "slot_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["slot_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2214,12 +2110,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2266,12 +2158,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "request_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["request_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2342,12 +2230,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2406,12 +2290,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["admin_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -2422,12 +2302,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2462,12 +2338,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["order_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2526,12 +2398,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2578,14 +2446,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "job_id",
-        "user_id"
-      ],
-      "columns_to": [
-        "id",
-        "user_id"
-      ],
+      "columns_from": ["job_id", "user_id"],
+      "columns_to": ["id", "user_id"],
       "expression": null
     },
     {
@@ -2632,12 +2494,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2708,12 +2566,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "session_token_digest"
-      ],
-      "columns_to": [
-        "token_digest"
-      ],
+      "columns_from": ["session_token_digest"],
+      "columns_to": ["token_digest"],
       "expression": null
     },
     {
@@ -2784,12 +2638,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2848,12 +2698,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["order_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2876,14 +2722,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id",
-        "provider_payment_id"
-      ],
-      "columns_to": [
-        "order_id",
-        "provider_payment_id"
-      ],
+      "columns_from": ["order_id", "provider_payment_id"],
+      "columns_to": ["order_id", "provider_payment_id"],
       "expression": null
     },
     {
@@ -2906,14 +2746,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id",
-        "coupon_grant_id"
-      ],
-      "columns_to": [
-        "order_id",
-        "id"
-      ],
+      "columns_from": ["order_id", "coupon_grant_id"],
+      "columns_to": ["order_id", "id"],
       "expression": null
     },
     {
@@ -2936,12 +2770,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "ledger_entry_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["ledger_entry_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -2976,12 +2806,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "package_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["package_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3040,12 +2866,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3068,12 +2890,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "session_token_digest"
-      ],
-      "columns_to": [
-        "token_digest"
-      ],
+      "columns_from": ["session_token_digest"],
+      "columns_to": ["token_digest"],
       "expression": null
     },
     {
@@ -3132,12 +2950,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3208,12 +3022,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3380,12 +3190,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "document_version_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["document_version_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3480,12 +3286,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3508,12 +3310,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "document_version_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["document_version_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3524,12 +3322,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "last_decision_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["last_decision_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3540,12 +3334,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "last_decision_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["last_decision_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3592,12 +3382,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3632,12 +3418,8 @@
       "validated": false,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "document_version_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["document_version_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3648,12 +3430,8 @@
       "validated": false,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "presentation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["presentation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3700,12 +3478,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3716,12 +3490,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "conversation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["conversation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3756,12 +3526,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3772,12 +3538,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "outbox_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["outbox_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3812,12 +3574,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "outbox_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["outbox_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3840,12 +3598,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "dialogue_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["dialogue_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3880,12 +3634,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "outbox_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["outbox_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -3956,12 +3706,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "dialogue_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["dialogue_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4020,12 +3766,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "dialogue_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["dialogue_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4096,12 +3838,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "inbound_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["inbound_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4196,12 +3934,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4308,12 +4042,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4324,16 +4054,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id",
-        "rule_version",
-        "calculation_timestamp"
-      ],
-      "columns_to": [
-        "user_id",
-        "rule_version",
-        "calculation_timestamp"
-      ],
+      "columns_from": ["user_id", "rule_version", "calculation_timestamp"],
+      "columns_to": ["user_id", "rule_version", "calculation_timestamp"],
       "expression": null
     },
     {
@@ -4416,12 +4138,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "tariff_version_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["tariff_version_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4444,12 +4162,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4472,12 +4186,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "settlement_invitee_channel_identity_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["settlement_invitee_channel_identity_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4488,12 +4198,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "settlement_invitee_user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["settlement_invitee_user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4504,12 +4210,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "settlement_inviter_channel_identity_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["settlement_inviter_channel_identity_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4520,12 +4222,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "settlement_inviter_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["settlement_inviter_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4536,12 +4234,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "settlement_inviter_user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["settlement_inviter_user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4588,14 +4282,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "qualifying_order_id",
-        "expert_id"
-      ],
-      "columns_to": [
-        "id",
-        "expert_id"
-      ],
+      "columns_from": ["qualifying_order_id", "expert_id"],
+      "columns_to": ["id", "expert_id"],
       "expression": null
     },
     {
@@ -4618,14 +4306,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "qualifying_payment_attempt_id",
-        "qualifying_order_id"
-      ],
-      "columns_to": [
-        "id",
-        "order_id"
-      ],
+      "columns_from": ["qualifying_payment_attempt_id", "qualifying_order_id"],
+      "columns_to": ["id", "order_id"],
       "expression": null
     },
     {
@@ -4648,14 +4330,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "referral_id",
-        "expert_id"
-      ],
-      "columns_to": [
-        "id",
-        "invitee_expert_id"
-      ],
+      "columns_from": ["referral_id", "expert_id"],
+      "columns_to": ["id", "invitee_expert_id"],
       "expression": null
     },
     {
@@ -4690,12 +4366,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "session_token_digest"
-      ],
-      "columns_to": [
-        "token_digest"
-      ],
+      "columns_from": ["session_token_digest"],
+      "columns_to": ["token_digest"],
       "expression": null
     },
     {
@@ -4733,6 +4405,546 @@
       "columns_from": null,
       "columns_to": null,
       "expression": "isfinite(created_at) AND isfinite(expires_at) AND expires_at > created_at AND expires_at <= (created_at + '00:05:30'::interval)"
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_applications_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_archive_bounds",
+      "kind": "c",
+      "definition": "CHECK (archived_at IS NULL AND archive_until_date IS NULL OR archived_at IS NOT NULL AND archive_until_date IS NOT NULL AND isfinite(archived_at) AND isfinite(archive_until_date) AND archive_until_date >= archived_at AND archive_until_date <= (((archived_at AT TIME ZONE 'UTC'::text) + '3 mons'::interval) AT TIME ZONE 'UTC'::text))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "archived_at IS NULL AND archive_until_date IS NULL OR archived_at IS NOT NULL AND archive_until_date IS NOT NULL AND isfinite(archived_at) AND isfinite(archive_until_date) AND archive_until_date >= archived_at AND archive_until_date <= (((archived_at AT TIME ZONE 'UTC'::text) + '3 mons'::interval) AT TIME ZONE 'UTC'::text)"
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_quote_owner_fk",
+      "kind": "f",
+      "definition": "FOREIGN KEY (campaign_quote_id, user_id) REFERENCES expert_campaign_quotes(id, user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["campaign_quote_id", "user_id"],
+      "columns_to": ["id", "user_id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_stage_valid",
+      "kind": "c",
+      "definition": "CHECK (onboarding_stage = ANY (ARRAY['interview'::text, 'card_draft'::text, 'manager_review'::text, 'promo_check'::text, 'payment_ready'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "onboarding_stage = ANY (ARRAY['interview'::text, 'card_draft'::text, 'manager_review'::text, 'promo_check'::text, 'payment_ready'::text])"
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_user_fk",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_user_unique",
+      "kind": "u",
+      "definition": "UNIQUE (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_verification_valid",
+      "kind": "c",
+      "definition": "CHECK (verification_status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "verification_status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])"
+    },
+    {
+      "table_name": "expert_promo_bonus_indications",
+      "name": "expert_promo_bonus_indications_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_bonus_indications",
+      "name": "expert_promo_bonus_indications_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_bonus_indications",
+      "name": "expert_promo_indication_nonfinancial",
+      "kind": "c",
+      "definition": "CHECK (bonus_points = 100 AND status = 'frozen'::text AND policy_version = 'promo_advance_within_qualified_1000_v1'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "bonus_points = 100 AND status = 'frozen'::text AND policy_version = 'promo_advance_within_qualified_1000_v1'::text"
+    },
+    {
+      "table_name": "expert_promo_codes",
+      "name": "expert_promo_code_namespace",
+      "kind": "c",
+      "definition": "CHECK (ref_code ~ '^promo_[0-9a-f]{32}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "ref_code ~ '^promo_[0-9a-f]{32}$'::text"
+    },
+    {
+      "table_name": "expert_promo_codes",
+      "name": "expert_promo_codes_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_codes",
+      "name": "expert_promo_codes_ref_code_key",
+      "kind": "u",
+      "definition": "UNIQUE (ref_code)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_codes",
+      "name": "expert_promo_codes_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollment_bot",
+      "kind": "c",
+      "definition": "CHECK (bot_id ~ '^[1-9][0-9]{0,19}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "bot_id ~ '^[1-9][0-9]{0,19}$'::text"
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollment_expiry",
+      "kind": "c",
+      "definition": "CHECK (isfinite(expires_at) AND expires_at > created_at AND expires_at <= (created_at + '24:00:00'::interval))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "isfinite(expires_at) AND expires_at > created_at AND expires_at <= (created_at + '24:00:00'::interval)"
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollment_ref",
+      "kind": "c",
+      "definition": "CHECK (ref_code IS NULL OR ref_code ~ '^promo_[0-9a-f]{32}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "ref_code IS NULL OR ref_code ~ '^promo_[0-9a-f]{32}$'::text"
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollment_status",
+      "kind": "c",
+      "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'granted'::text, 'denied'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "status = ANY (ARRAY['pending'::text, 'granted'::text, 'denied'::text])"
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollments_channel_identity_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (channel_identity_id) REFERENCES channel_identities(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["channel_identity_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollments_channel_identity_id_key",
+      "kind": "u",
+      "definition": "UNIQUE (channel_identity_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollments_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollments_presentation_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (presentation_id) REFERENCES consent_presentations(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["presentation_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollments_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_guide_work",
+      "name": "expert_promo_guide_delivery",
+      "kind": "c",
+      "definition": "CHECK (status = 'delivered'::text AND delivered_at IS NOT NULL AND isfinite(delivered_at) AND delivery_receipt IS NOT NULL AND length(delivery_receipt) >= 1 AND length(delivery_receipt) <= 200 OR status <> 'delivered'::text AND delivered_at IS NULL AND delivery_receipt IS NULL)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "status = 'delivered'::text AND delivered_at IS NOT NULL AND isfinite(delivered_at) AND delivery_receipt IS NOT NULL AND length(delivery_receipt) >= 1 AND length(delivery_receipt) <= 200 OR status <> 'delivered'::text AND delivered_at IS NULL AND delivery_receipt IS NULL"
+    },
+    {
+      "table_name": "expert_promo_guide_work",
+      "name": "expert_promo_guide_status",
+      "kind": "c",
+      "definition": "CHECK (status = ANY (ARRAY['waiting_content'::text, 'pending'::text, 'delivered'::text, 'cancelled'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "status = ANY (ARRAY['waiting_content'::text, 'pending'::text, 'delivered'::text, 'cancelled'::text])"
+    },
+    {
+      "table_name": "expert_promo_guide_work",
+      "name": "expert_promo_guide_work_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_guide_work",
+      "name": "expert_promo_guide_work_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_manager_work",
+      "name": "expert_promo_manager_status",
+      "kind": "c",
+      "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'completed'::text, 'cancelled'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "status = ANY (ARRAY['pending'::text, 'completed'::text, 'cancelled'::text])"
+    },
+    {
+      "table_name": "expert_promo_manager_work",
+      "name": "expert_promo_manager_work_application_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (application_id) REFERENCES expert_onboarding_applications(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["application_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_manager_work",
+      "name": "expert_promo_manager_work_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (application_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_manager_work",
+      "name": "expert_promo_manager_work_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_manager_work",
+      "name": "expert_promo_manager_work_user_id_key",
+      "kind": "u",
+      "definition": "UNIQUE (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_identity_digest",
+      "kind": "c",
+      "definition": "CHECK (identity_digest ~ '^[0-9a-f]{64}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "identity_digest ~ '^[0-9a-f]{64}$'::text"
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_no_self",
+      "kind": "c",
+      "definition": "CHECK (user_id IS DISTINCT FROM referrer_user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "user_id IS DISTINCT FROM referrer_user_id"
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_registrations_identity_digest_key",
+      "kind": "u",
+      "definition": "UNIQUE (identity_digest)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_registrations_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (user_id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_registrations_referrer_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (referrer_user_id) REFERENCES users(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["referrer_user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_registrations_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_bot_id",
+      "kind": "c",
+      "definition": "CHECK (bot_id ~ '^[1-9][0-9]{0,19}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "bot_id ~ '^[1-9][0-9]{0,19}$'::text"
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_request_digest",
+      "kind": "c",
+      "definition": "CHECK (request_digest ~ '^[0-9a-f]{64}$'::text)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "request_digest ~ '^[0-9a-f]{64}$'::text"
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_request_erasure",
+      "kind": "c",
+      "definition": "CHECK (user_id IS NOT NULL AND request_digest IS NOT NULL AND erased_at IS NULL OR user_id IS NULL AND request_digest IS NULL AND erased_at IS NOT NULL)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "user_id IS NOT NULL AND request_digest IS NOT NULL AND erased_at IS NULL OR user_id IS NULL AND request_digest IS NULL AND erased_at IS NOT NULL"
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_request_key",
+      "kind": "c",
+      "definition": "CHECK (length(request_key) >= 1 AND length(request_key) <= 200)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "length(request_key) >= 1 AND length(request_key) <= 200"
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_request_operation",
+      "kind": "c",
+      "definition": "CHECK (operation = ANY (ARRAY['register'::text, 'application'::text, 'quote'::text, 'enroll'::text, 'consent'::text, 'tariffs'::text]))",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": "operation = ANY (ARRAY['register'::text, 'application'::text, 'quote'::text, 'enroll'::text, 'consent'::text, 'tariffs'::text])"
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_requests_pkey",
+      "kind": "p",
+      "definition": "PRIMARY KEY (bot_id, request_key)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": null,
+      "columns_to": null,
+      "expression": null
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_requests_user_id_fkey",
+      "kind": "f",
+      "definition": "FOREIGN KEY (user_id) REFERENCES users(id)",
+      "validated": true,
+      "deferrable": false,
+      "initially_deferred": false,
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
+      "expression": null
     },
     {
       "table_name": "expert_referral_abuse_holds",
@@ -4778,12 +4990,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "closed_admin_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["closed_admin_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -4794,12 +5002,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "closed_approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["closed_approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4810,12 +5014,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4826,12 +5026,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "opened_admin_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["opened_admin_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -4842,12 +5038,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "opened_approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["opened_approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4978,12 +5170,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -4994,12 +5182,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "second_approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["second_approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5010,12 +5194,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "requester_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["requester_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -5062,12 +5242,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["admin_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -5078,12 +5254,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5094,12 +5266,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "inviter_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["inviter_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5110,12 +5278,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "issued_by_admin_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["issued_by_admin_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5138,14 +5302,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "batch_id",
-        "inviter_expert_id"
-      ],
-      "columns_to": [
-        "id",
-        "inviter_expert_id"
-      ],
+      "columns_from": ["batch_id", "inviter_expert_id"],
+      "columns_to": ["id", "inviter_expert_id"],
       "expression": null
     },
     {
@@ -5192,12 +5350,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "inviter_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["inviter_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5256,12 +5410,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "revoked_admin_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["revoked_admin_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -5272,12 +5422,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "revoked_approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["revoked_approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5336,12 +5482,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "updated_admin_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["updated_admin_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -5352,12 +5494,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "updated_approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["updated_approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5440,12 +5578,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approval_one_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approval_one_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5456,12 +5590,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approval_two_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approval_two_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5472,12 +5602,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approver_one_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approver_one_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5488,12 +5614,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approver_two_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approver_two_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5504,12 +5626,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "inviter_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["inviter_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5532,12 +5650,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "requester_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["requester_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5548,12 +5662,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "requester_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["requester_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -5576,14 +5686,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "ledger_entry_id",
-        "expert_id"
-      ],
-      "columns_to": [
-        "id",
-        "expert_id"
-      ],
+      "columns_from": ["ledger_entry_id", "expert_id"],
+      "columns_to": ["id", "expert_id"],
       "expression": null
     },
     {
@@ -5606,14 +5710,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reward_grant_id",
-        "expert_id"
-      ],
-      "columns_to": [
-        "id",
-        "expert_id"
-      ],
+      "columns_from": ["reward_grant_id", "expert_id"],
+      "columns_to": ["id", "expert_id"],
       "expression": null
     },
     {
@@ -5708,12 +5806,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "original_entry_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["original_entry_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5724,12 +5818,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["admin_approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5740,12 +5830,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["admin_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -5756,12 +5842,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5772,12 +5854,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["order_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5800,12 +5878,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5910,12 +5984,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "maturity_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["maturity_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -5950,14 +6020,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "referral_id",
-        "expert_id"
-      ],
-      "columns_to": [
-        "id",
-        "inviter_expert_id"
-      ],
+      "columns_from": ["referral_id", "expert_id"],
+      "columns_to": ["id", "inviter_expert_id"],
       "expression": null
     },
     {
@@ -6062,12 +6126,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "invitee_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["invitee_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6078,12 +6138,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "inviter_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["inviter_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6106,14 +6162,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "code_id",
-        "inviter_expert_id"
-      ],
-      "columns_to": [
-        "id",
-        "inviter_expert_id"
-      ],
+      "columns_from": ["code_id", "inviter_expert_id"],
+      "columns_to": ["id", "inviter_expert_id"],
       "expression": null
     },
     {
@@ -6172,12 +6222,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "invitee_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["invitee_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6200,12 +6246,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "inviter_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["inviter_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6240,12 +6282,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "campaign_quote_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["campaign_quote_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6484,12 +6522,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6512,12 +6546,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "tariff_version_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["tariff_version_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6612,12 +6642,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["order_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6688,12 +6714,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["order_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -6788,14 +6810,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "payment_attempt_id",
-        "order_id"
-      ],
-      "columns_to": [
-        "id",
-        "order_id"
-      ],
+      "columns_from": ["payment_attempt_id", "order_id"],
+      "columns_to": ["id", "order_id"],
       "expression": null
     },
     {
@@ -6866,12 +6882,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["order_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7026,12 +7038,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "consent_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["consent_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7078,12 +7086,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7118,12 +7122,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["admin_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -7134,12 +7134,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7306,12 +7302,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7334,12 +7326,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "channel_identity_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["channel_identity_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7362,12 +7350,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7414,12 +7398,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7466,12 +7446,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7530,12 +7506,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "tariff_version_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["tariff_version_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7582,12 +7554,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7622,12 +7590,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7650,12 +7614,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7666,12 +7626,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "incident_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["incident_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7682,12 +7638,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "owner_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["owner_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7734,12 +7686,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "message_event_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["message_event_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7786,12 +7734,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "dialogue_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["dialogue_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -7855,114 +7799,6 @@
       "expression": "length(reconciliation_key) > 0"
     },
     {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_attempt_count_check",
-      "kind": "c",
-      "definition": "CHECK (attempt_count >= 0 AND attempt_count <= 5)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "attempt_count >= 0 AND attempt_count <= 5"
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_cancellation_reason_check",
-      "kind": "c",
-      "definition": "CHECK (cancellation_reason IS NULL OR char_length(cancellation_reason) >= 1 AND char_length(cancellation_reason) <= 64 AND cancellation_reason ~ '^[a-z][a-z0-9_]*$'::text)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "cancellation_reason IS NULL OR char_length(cancellation_reason) >= 1 AND char_length(cancellation_reason) <= 64 AND cancellation_reason ~ '^[a-z][a-z0-9_]*$'::text"
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_lease_check",
-      "kind": "c",
-      "definition": "CHECK (status = 'processing'::text AND lease_token IS NOT NULL AND lease_until IS NOT NULL OR status <> 'processing'::text AND lease_token IS NULL AND lease_until IS NULL)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "status = 'processing'::text AND lease_token IS NOT NULL AND lease_until IS NOT NULL OR status <> 'processing'::text AND lease_token IS NULL AND lease_until IS NULL"
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_occurrence_key_check",
-      "kind": "c",
-      "definition": "CHECK (char_length(occurrence_key) >= 1 AND char_length(occurrence_key) <= 128 AND occurrence_key !~ '[[:cntrl:]]'::text)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "char_length(occurrence_key) >= 1 AND char_length(occurrence_key) <= 128 AND occurrence_key !~ '[[:cntrl:]]'::text"
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_pkey",
-      "kind": "p",
-      "definition": "PRIMARY KEY (id)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": null
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_status_check",
-      "kind": "c",
-      "definition": "CHECK (status = ANY (ARRAY['pending'::text, 'processing'::text, 'retry_wait'::text, 'cancelled'::text, 'succeeded'::text, 'dead_letter'::text]))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "status = ANY (ARRAY['pending'::text, 'processing'::text, 'retry_wait'::text, 'cancelled'::text, 'succeeded'::text, 'dead_letter'::text])"
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_subject_kind_check",
-      "kind": "c",
-      "definition": "CHECK (subject_kind = ANY (ARRAY['reservation'::text, 'user'::text, 'coupon'::text]))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "subject_kind = ANY (ARRAY['reservation'::text, 'user'::text, 'coupon'::text])"
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_subject_type_unique",
-      "kind": "u",
-      "definition": "UNIQUE (subject_kind, subject_id, job_type, occurrence_key)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": null
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_type_check",
-      "kind": "c",
-      "definition": "CHECK (job_type = ANY (ARRAY['booking_reminder_48h'::text, 'booking_reminder_24h'::text, 'booking_reminder_1h'::text, 'weekly_checkup'::text, 'post_visit_feedback'::text, 'coupon_expiry_14d'::text, 'coupon_expiry_7d'::text]))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "job_type = ANY (ARRAY['booking_reminder_48h'::text, 'booking_reminder_24h'::text, 'booking_reminder_1h'::text, 'weekly_checkup'::text, 'post_visit_feedback'::text, 'coupon_expiry_14d'::text, 'coupon_expiry_7d'::text])"
-    },
-    {
       "table_name": "message_events",
       "name": "message_events_pkey",
       "kind": "p",
@@ -7994,12 +7830,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8034,12 +7866,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["admin_approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8050,12 +7878,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_requester_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["admin_requester_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -8066,12 +7890,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "message_event_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["message_event_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8082,12 +7902,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "package_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["package_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8122,12 +7938,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "original_entry_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["original_entry_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8138,12 +7950,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["admin_approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8178,12 +7986,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "admin_requester_session_id_hash"
-      ],
-      "columns_to": [
-        "session_id_hash"
-      ],
+      "columns_from": ["admin_requester_session_id_hash"],
+      "columns_to": ["session_id_hash"],
       "expression": null
     },
     {
@@ -8242,12 +8046,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8258,12 +8058,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "callback_expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["callback_expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8298,12 +8094,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8350,14 +8142,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "participant_id",
-        "participant_kind"
-      ],
-      "columns_to": [
-        "id",
-        "participant_kind"
-      ],
+      "columns_from": ["participant_id", "participant_kind"],
+      "columns_to": ["id", "participant_kind"],
       "expression": null
     },
     {
@@ -8428,12 +8214,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "outbox_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["outbox_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8540,12 +8322,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8628,12 +8406,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "participant_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["participant_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8644,14 +8418,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "participant_id",
-        "partner_kind"
-      ],
-      "columns_to": [
-        "id",
-        "participant_kind"
-      ],
+      "columns_from": ["participant_id", "partner_kind"],
+      "columns_to": ["id", "participant_kind"],
       "expression": null
     },
     {
@@ -8674,12 +8442,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "policy_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["policy_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -8690,14 +8454,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "policy_version_id",
-        "partner_kind"
-      ],
-      "columns_to": [
-        "policy_version_id",
-        "partner_kind"
-      ],
+      "columns_from": ["policy_version_id", "partner_kind"],
+      "columns_to": ["policy_version_id", "partner_kind"],
       "expression": null
     },
     {
@@ -8924,14 +8682,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "quote_id",
-        "user_id"
-      ],
-      "columns_to": [
-        "id",
-        "user_id"
-      ],
+      "columns_from": ["quote_id", "user_id"],
+      "columns_to": ["id", "user_id"],
       "expression": null
     },
     {
@@ -8966,16 +8718,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "contact_id",
-        "quote_id",
-        "user_id"
-      ],
-      "columns_to": [
-        "id",
-        "quote_id",
-        "user_id"
-      ],
+      "columns_from": ["contact_id", "quote_id", "user_id"],
+      "columns_to": ["id", "quote_id", "user_id"],
       "expression": null
     },
     {
@@ -8986,14 +8730,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "order_id",
-        "quote_id"
-      ],
-      "columns_to": [
-        "id",
-        "campaign_quote_id"
-      ],
+      "columns_from": ["order_id", "quote_id"],
+      "columns_to": ["id", "campaign_quote_id"],
       "expression": null
     },
     {
@@ -9043,106 +8781,6 @@
       "columns_from": null,
       "columns_to": null,
       "expression": null
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_account_id_check",
-      "kind": "c",
-      "definition": "CHECK (account_id > 0)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "account_id > 0"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_check",
-      "kind": "c",
-      "definition": "CHECK ((lease_token IS NULL) = (lease_until IS NULL))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "(lease_token IS NULL) = (lease_until IS NULL)"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_check1",
-      "kind": "c",
-      "definition": "CHECK (window_end = (window_start + '168:00:00'::interval))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "window_end = (window_start + '168:00:00'::interval)"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_duration_minutes_check",
-      "kind": "c",
-      "definition": "CHECK (duration_minutes >= 1 AND duration_minutes <= 1440)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "duration_minutes >= 1 AND duration_minutes <= 1440"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_event_type_id_check",
-      "kind": "c",
-      "definition": "CHECK (event_type_id > 0)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "event_type_id > 0"
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_expert_service_id_fkey",
-      "kind": "f",
-      "definition": "FOREIGN KEY (expert_service_id) REFERENCES expert_services(id)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": [
-        "expert_service_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
-      "expression": null
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_pkey",
-      "kind": "p",
-      "definition": "PRIMARY KEY (expert_service_id)",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": null
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_reason_code_check",
-      "kind": "c",
-      "definition": "CHECK (reason_code = ANY (ARRAY['account_rate_limit'::text, 'provider_unavailable'::text, 'invalid_response'::text, 'mapping_invalid'::text, 'slot_conflict'::text, 'database_busy'::text]))",
-      "validated": true,
-      "deferrable": false,
-      "initially_deferred": false,
-      "columns_from": null,
-      "columns_to": null,
-      "expression": "reason_code = ANY (ARRAY['account_rate_limit'::text, 'provider_unavailable'::text, 'invalid_response'::text, 'mapping_invalid'::text, 'slot_conflict'::text, 'database_busy'::text])"
     },
     {
       "table_name": "planerka_booking_operations",
@@ -9284,12 +8922,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9348,12 +8982,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9412,12 +9042,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_service_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_service_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9488,12 +9114,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9504,12 +9126,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "deletion_job_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["deletion_job_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9544,12 +9162,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "deletion_job_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["deletion_job_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9704,12 +9318,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9720,12 +9330,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "outbox_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["outbox_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9748,12 +9354,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reconciliation_run_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reconciliation_run_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9788,12 +9390,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9804,12 +9402,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_service_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_service_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9856,12 +9450,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "slot_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["slot_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9872,12 +9462,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9900,12 +9486,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "conversation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["conversation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -9964,12 +9546,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "request_id"
-      ],
-      "columns_to": [
-        "request_id"
-      ],
+      "columns_from": ["request_id"],
+      "columns_to": ["request_id"],
       "expression": null
     },
     {
@@ -10052,12 +9630,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "approval_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["approval_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10212,12 +9786,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "request_id"
-      ],
-      "columns_to": [
-        "request_id"
-      ],
+      "columns_from": ["request_id"],
+      "columns_to": ["request_id"],
       "expression": null
     },
     {
@@ -10252,14 +9822,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "policy_id",
-        "policy_version"
-      ],
-      "columns_to": [
-        "id",
-        "version"
-      ],
+      "columns_from": ["policy_id", "policy_version"],
+      "columns_to": ["id", "version"],
       "expression": null
     },
     {
@@ -10270,12 +9834,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "dialogue_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["dialogue_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10298,12 +9858,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "policy_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["policy_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10314,12 +9870,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10330,12 +9882,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "dialogue_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["dialogue_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10430,12 +9978,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "expert_service_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["expert_service_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10494,12 +10038,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "redemption_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["redemption_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10510,12 +10050,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10598,14 +10134,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "prompt_asset_id",
-        "prompt_asset_version"
-      ],
-      "columns_to": [
-        "id",
-        "version"
-      ],
+      "columns_from": ["prompt_asset_id", "prompt_asset_version"],
+      "columns_to": ["id", "version"],
       "expression": null
     },
     {
@@ -10700,12 +10230,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "outbox_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["outbox_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10728,12 +10254,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "session_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["session_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -10840,12 +10362,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "reservation_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["reservation_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -11048,12 +10566,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "campaign_version_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["campaign_version_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -11076,12 +10590,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -11176,12 +10686,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "redemption_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["redemption_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -11216,18 +10722,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "dialogue_id",
-        "user_id",
-        "bot_key",
-        "external_chat_id"
-      ],
-      "columns_to": [
-        "id",
-        "user_id",
-        "bot_key",
-        "external_chat_id"
-      ],
+      "columns_from": ["dialogue_id", "user_id", "bot_key", "external_chat_id"],
+      "columns_to": ["id", "user_id", "bot_key", "external_chat_id"],
       "expression": null
     },
     {
@@ -11274,16 +10770,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "redemption_id",
-        "campaign_version_id",
-        "user_id"
-      ],
-      "columns_to": [
-        "id",
-        "campaign_version_id",
-        "user_id"
-      ],
+      "columns_from": ["redemption_id", "campaign_version_id", "user_id"],
+      "columns_to": ["id", "campaign_version_id", "user_id"],
       "expression": null
     },
     {
@@ -11366,12 +10854,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "campaign_version_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["campaign_version_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -11382,12 +10866,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "dialogue_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["dialogue_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -11410,12 +10890,8 @@
       "validated": true,
       "deferrable": false,
       "initially_deferred": false,
-      "columns_from": [
-        "user_id"
-      ],
-      "columns_to": [
-        "id"
-      ],
+      "columns_from": ["user_id"],
+      "columns_to": ["id"],
       "expression": null
     },
     {
@@ -13079,6 +12555,179 @@
       ]
     },
     {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_applications_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_onboarding_applications_pkey ON public.expert_onboarding_applications USING btree (id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_pending_queue_idx",
+      "definition": "CREATE INDEX expert_onboarding_pending_queue_idx ON public.expert_onboarding_applications USING btree (created_at, id) WHERE (verification_status = 'pending'::text)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "timestamptz_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_onboarding_applications",
+      "name": "expert_onboarding_user_unique",
+      "definition": "CREATE UNIQUE INDEX expert_onboarding_user_unique ON public.expert_onboarding_applications USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_bonus_indications",
+      "name": "expert_promo_bonus_indications_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_promo_bonus_indications_pkey ON public.expert_promo_bonus_indications USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_codes",
+      "name": "expert_promo_codes_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_promo_codes_pkey ON public.expert_promo_codes USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_codes",
+      "name": "expert_promo_codes_ref_code_key",
+      "definition": "CREATE UNIQUE INDEX expert_promo_codes_ref_code_key ON public.expert_promo_codes USING btree (ref_code)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "text_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollments_channel_identity_id_key",
+      "definition": "CREATE UNIQUE INDEX expert_promo_enrollments_channel_identity_id_key ON public.expert_promo_enrollments USING btree (channel_identity_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_enrollments",
+      "name": "expert_promo_enrollments_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_promo_enrollments_pkey ON public.expert_promo_enrollments USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_guide_work",
+      "name": "expert_promo_guide_work_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_promo_guide_work_pkey ON public.expert_promo_guide_work USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_manager_work",
+      "name": "expert_promo_manager_work_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_promo_manager_work_pkey ON public.expert_promo_manager_work USING btree (application_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_manager_work",
+      "name": "expert_promo_manager_work_user_id_key",
+      "definition": "CREATE UNIQUE INDEX expert_promo_manager_work_user_id_key ON public.expert_promo_manager_work USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_referrer_idx",
+      "definition": "CREATE INDEX expert_promo_referrer_idx ON public.expert_promo_registrations USING btree (referrer_user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_registrations_identity_digest_key",
+      "definition": "CREATE UNIQUE INDEX expert_promo_registrations_identity_digest_key ON public.expert_promo_registrations USING btree (identity_digest)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "text_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_registrations",
+      "name": "expert_promo_registrations_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_promo_registrations_pkey ON public.expert_promo_registrations USING btree (user_id)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "uuid_ops"
+        }
+      ]
+    },
+    {
+      "table_name": "expert_promo_requests",
+      "name": "expert_promo_requests_pkey",
+      "definition": "CREATE UNIQUE INDEX expert_promo_requests_pkey ON public.expert_promo_requests USING btree (bot_id, request_key)",
+      "columns": [
+        {
+          "position": 1,
+          "opclass": "text_ops"
+        },
+        {
+          "position": 2,
+          "opclass": "text_ops"
+        }
+      ]
+    },
+    {
       "table_name": "expert_referral_abuse_holds",
       "name": "expert_abuse_holds_closed_approval_unique",
       "definition": "CREATE UNIQUE INDEX expert_abuse_holds_closed_approval_unique ON public.expert_referral_abuse_holds USING btree (closed_approval_id) WHERE (closed_approval_id IS NOT NULL)",
@@ -14337,70 +13986,6 @@
       ]
     },
     {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_due_claim_idx",
-      "definition": "CREATE INDEX lifecycle_jobs_due_claim_idx ON public.lifecycle_jobs USING btree (run_at, id) WHERE (status = ANY (ARRAY['pending'::text, 'retry_wait'::text]))",
-      "columns": [
-        {
-          "position": 1,
-          "opclass": "timestamptz_ops"
-        },
-        {
-          "position": 2,
-          "opclass": "uuid_ops"
-        }
-      ]
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_lease_idx",
-      "definition": "CREATE INDEX lifecycle_jobs_lease_idx ON public.lifecycle_jobs USING btree (lease_until, id) WHERE (status = 'processing'::text)",
-      "columns": [
-        {
-          "position": 1,
-          "opclass": "timestamptz_ops"
-        },
-        {
-          "position": 2,
-          "opclass": "uuid_ops"
-        }
-      ]
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_pkey",
-      "definition": "CREATE UNIQUE INDEX lifecycle_jobs_pkey ON public.lifecycle_jobs USING btree (id)",
-      "columns": [
-        {
-          "position": 1,
-          "opclass": "uuid_ops"
-        }
-      ]
-    },
-    {
-      "table_name": "lifecycle_jobs",
-      "name": "lifecycle_jobs_subject_type_unique",
-      "definition": "CREATE UNIQUE INDEX lifecycle_jobs_subject_type_unique ON public.lifecycle_jobs USING btree (subject_kind, subject_id, job_type, occurrence_key)",
-      "columns": [
-        {
-          "position": 1,
-          "opclass": "text_ops"
-        },
-        {
-          "position": 2,
-          "opclass": "uuid_ops"
-        },
-        {
-          "position": 3,
-          "opclass": "text_ops"
-        },
-        {
-          "position": 4,
-          "opclass": "text_ops"
-        }
-      ]
-    },
-    {
       "table_name": "message_events",
       "name": "message_events_pkey",
       "definition": "CREATE UNIQUE INDEX message_events_pkey ON public.message_events USING btree (id)",
@@ -14859,17 +14444,6 @@
         {
           "position": 1,
           "opclass": "int4_ops"
-        }
-      ]
-    },
-    {
-      "table_name": "planerka_availability_refreshes",
-      "name": "planerka_availability_refreshes_pkey",
-      "definition": "CREATE UNIQUE INDEX planerka_availability_refreshes_pkey ON public.planerka_availability_refreshes USING btree (expert_service_id)",
-      "columns": [
-        {
-          "position": 1,
-          "opclass": "uuid_ops"
         }
       ]
     },
@@ -15514,21 +15088,6 @@
         {
           "position": 1,
           "opclass": "uuid_ops"
-        }
-      ]
-    },
-    {
-      "table_name": "slots",
-      "name": "slots_planerka_service_start_idx",
-      "definition": "CREATE INDEX slots_planerka_service_start_idx ON public.slots USING btree (expert_service_id, starts_at) WHERE (provider = 'planerka'::text)",
-      "columns": [
-        {
-          "position": 1,
-          "opclass": "uuid_ops"
-        },
-        {
-          "position": 2,
-          "opclass": "timestamptz_ops"
         }
       ]
     },

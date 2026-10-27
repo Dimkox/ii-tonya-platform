@@ -1,0 +1,31 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/integration/expert-separated-sales-state.test.ts (32 tests) 14394ms
+   ✓ expired waiting payment is GET-verified and canceled, never captured  1315ms
+   ✓ unknown create never becomes a second POST and recovers only through actual GET identity  424ms
+   ✓ proven late money remains immutable recovery work without price lock or interview  334ms
+   ✓ 96h refresh creates one new fixed-fee attempt under the original unchanged form approval  416ms
+   ✓ lost quarter requires explicit monthly choice and reuses the same quality approval  340ms
+   ✓ on-time capture reported after checkout expiry still locks its original bound terms  499ms
+   ✓ a proven capture after erasure retains money and recovery but no paid lock or receipt PII  421ms
+   ✓ erasing the submitted form alone blocks delayed captured money from re-admitting the applicant  417ms
+   ✓ two genuine captures serialize to one lifetime winner and explicit duplicate-fee recovery  692ms
+   ✓ review R3 supplemental answers preserve the submitted approval and capture authority  520ms
+   ✓ review R7 unresolved owner does not abort the scheduler batch  640ms
+   ✓ review R10 R11 reselection cancels superseded notices and queues one replacement  339ms
+   ✓ review R8 R13 lost capture ACK resolves authoritative succeeded without repost  479ms
+   ✓ review R8 R13 lost capture ACK resolves authoritative canceled without repost  456ms
+   ✓ review R13 lost cancel ACK is resolved by GET without repost  424ms
+   ✓ review R2 expired original bridge quote retains finite fiscal custody for later approval and replacement  621ms
+   ✓ review R6 operational recovery requires fresh manager and records the real GET binding  640ms
+   ✓ review R13 normal held composition receives actual HTTP waiting webhook  577ms
+   ✓ review R13 normal held composition receives actual HTTP canceled webhook  379ms
+
+ Test Files  1 passed (1)
+      Tests  32 passed (32)
+   Start at  18:41:42
+   Duration  17.91s (transform 2.07s, setup 0ms, collect 3.04s, tests 14.39s, environment 0ms, prepare 130ms)
+
+
+[END OF RAW CAPTURE]

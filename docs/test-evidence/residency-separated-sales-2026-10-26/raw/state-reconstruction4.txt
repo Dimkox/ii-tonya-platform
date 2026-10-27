@@ -1,0 +1,3 @@
+{"tables":188,"functions":101,"triggers":155,"constraints":1285,"indexes":487,"extensions":2,"snapshotPath":"packages/db/migrations/meta/0059_snapshot.json","objectsPath":"packages/db/migrations/state/0059_sql_objects.json"}
+
+[END OF RAW CAPTURE]

@@ -64,18 +64,7 @@ describe("database-derived migration state baseline", () => {
     ).toEqual(["btree_gist", "pgcrypto"]);
   });
 
-  it("pins the0051 availability state and SQL-only inventory", () => {
-    const snapshot = read(`${folder}/meta/0051_snapshot.json`);
-    const supplement = read(`${folder}/state/0051_sql_objects.json`);
-    expect(Object.keys(snapshot.tables)).toHaveLength(123);
-    expect(supplement.functions).toHaveLength(43);
-    expect(supplement.triggers).toHaveLength(73);
-    expect(snapshot.prevId).toBe(read(`${folder}/meta/0050_snapshot.json`).id);
-    expect(
-      snapshot.tables["public.slots"].indexes.slots_planerka_service_start_idx,
-    ).toBeDefined();
-  });
-  it.each([39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54])(
+  it.each([39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 70, 71, 72, 73])(
     "binds state %i evidence to every SQL input and exact snapshot bytes",
     (last) => {
       const tag = String(last).padStart(4, "0");

@@ -17,7 +17,7 @@ function config() {
   return loadEnv({
     DATABASE_URL: "postgresql://synthetic:synthetic@127.0.0.1:1/synthetic",
     ALLOW_INSECURE_LOCAL_DATABASE: "true",
-    CLIENT_TELEGRAM_BOT_KEY: "client.bot:one",
+    CLIENT_TELEGRAM_BOT_KEY: "client.bot-one",
     TELEGRAM_BOT_TOKEN: token,
     B2_TELEGRAM_DISPATCH_ENABLED: "true",
     TELEGRAM_EGRESS_CONSENT_GATE_ENABLED: "true",

@@ -1,0 +1,29 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/expert-sales-upgrade.test.ts [ tests/integration/expert-sales-upgrade.test.ts ]
+Error: Cannot find module './admin.js' imported from '/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/packages/db/src/schema/expert-separated-sales.ts'
+ ❯ packages/db/src/schema/expert-separated-sales.ts:14:1
+     12| } from "drizzle-orm/pg-core";
+     13| import { users } from "./identity.js";
+     14| import {adminSessions} from "./admin.js";
+       | ^
+     15| import { expertResidencyTariffVersions } from "./expert-residency.js";
+     16| import {
+
+Caused by: Error: Failed to load url ./admin.js (resolved id: ./admin.js) in /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/packages/db/src/schema/expert-separated-sales.ts. Does the file exist?
+ ❯ loadAndTransform node_modules/.pnpm/vite@7.3.6_@types+node@24.13.3_tsx@4.23.1_yaml@2.9.0/node_modules/vite/dist/node/chunks/config.js:22739:33
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  18:40:49
+   Duration  2.19s (transform 598ms, setup 0ms, collect 0ms, tests 0ms, environment 0ms, prepare 125ms)
+
+
+[END OF RAW CAPTURE]

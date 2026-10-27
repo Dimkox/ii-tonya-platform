@@ -1,11 +1,1577 @@
+# Semantic tags ready for mandatory gated push — 2026-10-27
+
+Runtime790d308c accepted by all3 reviewers, R1–R7 closed. Exact registryef94cd03
+and mirrored route inventory84cae640 separately reviewed. Fullgate84cae640 passes
+613/613 plus all static/type checks. Failed610/613 and612/613 retained with focused
+130/130 and13/13 corrections. Spec done with Suggested Review Order.
+Root owns mandatory gated push and DraftPR on codex/residency-rich-onboarding-20261026
+(PR115 OPEN/Draft at254c8c), then native scheduling S4a and lifecycle S4b.
+No active source/test jobs. Keep taskPG/parser/semantic helper for final journey.
+Do not stop at S3b or request routine approval. No provider/deployment activation.
+Prepared S4a/S4b drafts remain in /tmp; S4a now also covers exact/mirrored registry
+updates, initial schedule digest versus later immediate availability revisions,
+readable explicit timezones and mixed native/external occupancy.
+
+# Semantic tags mirrored route guard correction — 2026-10-27
+
+Runtime790d308c accepted, exact registryef94cd03 independently accepted. Second
+fullgate612/613: only mirrored route-set equality in expert-referral-scope-guards
+remained stale. Root adds same2 exact routes; no assertion/classifier/runtime change.
+Focused13/13, lint/whitespace green;8 second failed/focused artifacts retained.
+Await narrow independent review, then rerun fullgate; no activejobs. First failed
+gate610/613 and first focused130/130 also retained. All runtime findings closed.
+No push yet; continue S4a/S4b after gated delivery.
+
+# Semantic tags exact gate registry correction — 2026-10-27
+
+Runtime790d308c accepted by all3 reviewers, R1–R7 closed. Fullgate5bc816f7
+failed only scope registry:610/613 tests, all other checks and full tests typecheck
+passed. Root fixed exact missing2 admin routes,5 helper automation paths/hashes,
+integrations barrel hash and both journal hash entries. No classifier/wildcard/
+feature/provider/runtime changes. Focused scope130/130 plus lint/whitespace green;
+8 failed+focused logs archived in residency-semantic-tags-gate-correction-2026-10-27.
+Root owns this narrow guard delta; independent approval pending, then rerun canonical
+fullgate because a real failure was corrected, mandatorypush/DraftPR. No active jobs.
+Continue full S4a/S4b after delivery; no routine approval/bypass/provider activation.
+
+# Semantic tags accepted; final gate next — 2026-10-27
+
+All3 assigned reviewers accept source790d308c957ca9be8ab83a18ff8f3de6642921b9.
+R1–R7 closed, seven evidence sets313 artifacts preserved and independently verified.
+Final0069 counts213 tables/156 functions/194 triggers/1449 constraints/533 indexes/
+2 extensions. Producer/reviewers idle; no jobs. Same isolated worktree/branch
+codex/residency-semantic-tags-20261027. Root alone runs canonical fullgate then
+mandatory gated push and DraftPR stacked on codex/residency-rich-onboarding-20261026
+(PR115 live OPEN/Draft at254c8c). No bypass/force/merge/provider activation.
+After delivery continue S4a then S4b; approved full package not complete yet.
+Prepared drafts /tmp/spec-residency-native-scheduling-draft-20261027.md and
+/tmp/spec-residency-lifecycle-completion-draft-20261027.md include all prior
+reconnaissance; do not restart. Retain protectedPG, parser and semantic helper for
+final journey. No goal tool, no routine approval/quota loop, no BMad rerender.
+
+# Semantic tags final application review — 2026-10-27
+
+Source790d308c957ca9be8ab83a18ff8f3de6642921b9; producer idle/no jobs. R7 confirm
+precheck now uses established bounded old tag shape (type/control/80chars/20count/
+unique), preserving labels while unchanged SQL enforces genuine strict removal and
+new-invalid/unchanged-invalid/finalization denial. Authentic0068 SAME-service real
+callbacks RED/GREEN1/1, owner10/10, DBbuild/types/tests types/lint/format pass.
+Root verified27 artifacts/2 source pins;5 state pins and prior286 artifacts
+preserved. Entire migration tree unchanged from7b4f79f5; no reconstruction.
+Spec iteration4/in-review; assigned reviewers assess final delta. R1–R6 closed;
+R7 closure pending, then fullgate/push/DraftPR on PR115 and continue S4a/S4b.
+No source jobs, no deployment/provider activation or whole-package completion.
+
+# Semantic tags R7 application-layer completion — 2026-10-27
+
+All3 assessed7b4f79f5. R2 SQL/removal now closed; R7 has one application precheck
+restriction: two invalid legacy labels in SAME service require removal together.
+Spec iteration4 clarifies consistent private strict-subset repair within/across
+scopes, retaining all new-invalid/unchanged-invalid/finalization denials. Same
+producer makes bounded TS+authentic old-schema owner-callback proof correction;
+SQL/state already accepted and need no reconstruction unless actually changed.
+Root owns dirty spec/review/status; all prior286 artifacts/source pins preserved.
+Then assigned closure, fullgate/push/DraftPR, continue S4a/S4b. No permission loop.
+
+# Semantic tags general removal final review — 2026-10-27
+
+Source7b4f79f564aef0d14b5070496a54c682ae616229, producer idle/no heavyjobs. R2c
+strict per-scope deletion now permits active-only/combined removal without additions,
+moves, non-tag edits or invalid finalization. R7 authentic0068 comma/emoji legacy
+upgrade repairs one scope at a time, preserving immutable approval/financial facts;
+new invalid labels denied. Owner10/10,approved/R4 controls2/2,upgrade1/1; final
+state/scope15/15, prior history/scope24/24. Final0069 counts unchanged213/156/194/
+1449/533/2. Root verified48 artifacts/7 source hashes; all prior238 artifacts intact.
+Spec iteration3/in-review; all3 assigned reviewers inspect exact final delta.
+R1/R3–R6 closed; R2/R7 closure pending. Then fullgate/mandatory push/DraftPR on
+PR115 (still OPEN/Draft at254c8c), then S4a/S4b. No whole-package completion yet.
+
+# Semantic tags R2c strict-removal correction — 2026-10-27
+
+All3 assessedc3244a58. Original R2a/R2b now pass; blind found mixed removal
+(inactive catalogue A + active semantic C while inactive staged B remains) still
+blocked because repair insists removed JSON label itself be obsolete. Spec iteration3
+clarifies any strict per-scope subset deletion is safe privately; no additions/moves/
+unrelated edits/invalid confirmation or approval. Same producer makes bounded fix,
+normal-owner witnesses and fresh state if SQL changes. Root owns4 dirty docs.
+Root also found R7: pre0069 free-text tags with comma/emoji are rejected globally
+before subset repair, blocking cross-service cleanup. Same batch adds authentic
+pre0069 upgrade proof and strict repair without allowing new-invalid labels.
+R1/R3–R6 closed; all previous238 artifacts plus source pins preserved/verified.
+No final S3b gate/push/PR; continue S4a/S4b afterwards, no permission/restart loop.
+
+# Semantic tags final R2 reassessment — 2026-10-27
+
+Corrected sourcec3244a5891189c6666c87165672006632463d57c; producer idle, no heavy
+jobs. Root verified38 artifacts/12 source pins; prior101/31/13/55 archives unchanged.
+R2a catalogue-only repair retains actual deleted OLD-row authority and storage
+scopes; R2b retained aliases/choice numbering preserved. Approved→collecting repair
+preserves immutable prior approval; focused owner5/5 and approved/R4 controls2/2,
+state guards24/24. Final0069 counts213 tables/156 functions/194 triggers/1449
+constraints/533 indexes/2 extensions. All3 assigned reviewers reassess final change
+read-only; R1/R3–R6 already closed. Spec iteration2/in-review. Await all results,
+then canonical fullgate, mandatory push, DraftPR on PR115 and continue S4a/S4b.
+No S3b gate/push/PR yet; no provider activation or whole-package completion.
+
+# Semantic tags second bounded correction — 2026-10-27
+
+Sourceeb110d74 reviewed by all3. R1 and R3–R6 closed; R2 has two residual ordinary
+paths: profile confirmation loses deleted legacy catalogue context, and preserved
+active aliases canonicalize into apparent additions during strict repair. See
+residency-semantic-tags-review.md R2a/R2b and spec last section/iteration2. Same
+producer corrects these without restarting or weakening guards. Root verified
+55 archives/13 source hashes, all prior evidence unchanged. OnePG/heavyjobs owner.
+Root owns4 dirty docs; no S3b final gate/push/PR yet. Whole S4a/S4b still follows.
+
+# Semantic tags consolidated corrections — 2026-10-27
+
+All3 initial reviewers finished exact79b5d233. Six unique findings in
+docs/superpowers/implementation-artifacts/residency-semantic-tags-review.md. R1
+ordinary replies fixed9182ab18, accepted by blind+edge reviewers (13 artifacts/4
+source hashes rootverified). R2
+inactive cross-scope removal, R3 punctuation negation, R4 complete-card moderation
+proof, R5 clean-checkout fixture path, R6 inherited richfixture moderation remain.
+Same producer owns one consolidated correction; preserve existing evidence/code,
+no destructive restart or permission loop. Spec iteration1/in-progress. Root alone
+owns docs/review/gates, no competing PG/build. Final gate/push/PR still pending.
+Continue S4a/S4b after accepted delivery; no whole-package completion here.
+
+# Semantic tags independent review — 2026-10-27
+
+Source4a8bd1ac1a11aadd140cd5a287b7f89135083e9b adds ordinary ForceReply custom tags
+over36bedff8. Root found generic Telegram replies were hijacked by this route;
+same semantic_tags_implementer is correcting only that compatibility regression.
+Three fresh read-only reviewers inspect stable exact committed source while the
+producer applies bounded correction. Read exact commit, not mutable source. Root
+owns spec/status/coordinator/review/gates; producer owns source/evidence. No
+concurrent PG/build jobs; no S3b final gate/push/PR yet. Preserve initial101/39 and
+ordinary-input31/11 evidence. Whole approved S4a then S4b still required.
+S4a temp draft additionally clarifies immediate owner-confirmed availability-only
+updates without manager reapproval, distinct from initial card/service review.
+
+# Rich onboarding delivered; semantic tags active — 2026-10-27
+
+S3b initial producer commit36bedff81c47156f443163bce1d522cdd2d8bddd; root independently
+verified101 portable archive/raw pairs. Final helper10/10 and SQL cache-null RED/GREEN,
+state reconstruction/typechecks/lint reported. Before review, root found ordinary
+custom-tag entry required a UUID-bearing command; same implementer is adding a
+readable button/plain-text route with original hidden scope/preview binding. Source
+ownership unchanged, no competing heavy jobs. Await correction commit, then launch
+all three fresh read-only reviewers before triage. No S3b full gate/push/PR yet.
+
+DraftPR115 OPEN/Draft at254c8c169cbb8432654a46de206bd20500cecc3f:
+https://github.com/Dimkox/ii-tonya-platform/pull/115
+Parent codex/residency-private-verification-jobs-20261026 at219f8e0c (PR114).
+Runtime46e03bf0 acceptedR1–R13; exact tail guardfa1a669f accepted separately.
+Full/push611/611, remote/local exact and tree clean at delivery. Failed/successful
+logs and85+125+48 archives retained; push logs archived in this successor branch.
+No S3a source work remains; S4 owner review-status push seam remains explicitly open.
+
+Active branch codex/residency-semantic-tags-20261027 in the SAME isolated
+.worktrees/phase1-owner-plan-20261023. Contract spec-residency-semantic-tags.md:
+actual local semantic/exact matching over164 catalogue, top15 suggestions, aggregate20
+confirmed tags, explicit editable selection, custom moderation and real adminexport.
+Next migration0069. One fresh implementer owns source/evidence; root owns contract,
+master/status/coordinator/review/final gate/push. No descendants or competingheavyjobs.
+No BMad rerender, priorblock restart, permission/quota loop or provideractivation.
+
+RequireDocker preflight passes. Reuse protected rotated0600 config
+/tmp/verification-form-20261026.compose.json only in childmemory; never print env/
+connection URL/processargs. Same onePG17.5 and private parser remain. Model research
+assets/pins outsideGit at /tmp/residency-semantic-model-preparation-20261027; real
+semantic runtime must still be implemented/proven. Continue S4 schedule/lifecycle
+and whole journey after S3b. Pending refund-policy question remains manual; do not reask.
+
+Current S3b implementer: /root/semantic_tags_implementer. Helper9-test GREEN;
+actual local network-none/read-only320MiB helper, PG10/10 GREEN after3 harness
+setup corrections. Normal composed owner pipeline133ms first/72ms warm, cache
+startup1757ms; these are bounded local fixtures, NOT production guarantees. Runtime
+is NOT accepted. Populated 0068→0069 and browser races now pass; supplemental
+safety, callbacks, disabled-tag removal, revocation/erasure and cache restoration
+pass. Longer 741-character service pipeline 248 ms; startup/rebuild about 1.75/1.96 s.
+Final metadata, types/lint/guards/evidence and independent review remain. Root
+must not run competing PG/builds. Root-owned dirty docs: semantic spec/coordinator/
+AGENT-STATUS; producer excludes them. Inherited>20 tags need reachable subset-only
+reduction or explicit full replacement, no addition/final approval above20.
+
+S4 is prepared as sequential bounded drafts (no source yet):
+/tmp/spec-residency-native-scheduling-draft-20261027.md (S4a) and
+/tmp/spec-residency-lifecycle-completion-draft-20261027.md (S4b), with combined original
+/tmp/spec-residency-scheduling-lifecycle-draft-20261027.md and read-only evidence
+/tmp/residency-scheduling-lifecycle-preparation-20261027.md. New concrete seams:
+Planerka-only SQL confirmation, notification capture/eligibility and client booked
+read must gain real native authority; automatic private logistics delivery also
+missing. Read paths need immediate native paid coverage, not only stale activeflag.
+Existing workspace/review notifiers are promo-bot fee/form flows, not work-bot main
+activation/card review. Preserve them and add real S4b sources. No native Temporal
+in Node24.22.1; primary TC39/polyfill research retained. No dependency added by root.
+
+# Rich onboarding ready for gated push — 2026-10-27
+
+Same isolated worktree and codex/residency-rich-onboarding-20261026. Runtime46e03bf0
+acceptedR1–R13; exact journal-tail guardfa1a669f separately accepted. Full gate at
+fa1a669f5b521ec8dbe75216fb35e993aa8d0902 passes611/611 and all checks. Spec done.
+Root owns final mandatory push and DraftPR on codex/residency-private-verification-jobs-20261026
+(PR114 open/Draft at219f8e0c). Preserve failed/successful logs and all priorarchives.
+Continue S3b semantic tags then S4 scheduling/lifecycle without permission loops.
+Next hand migration0069; protected PG/parser resources retained, no provider/live activation.
+
+# Rich onboarding accepted; final gate next — 2026-10-27
+
+Same isolated .worktrees/phase1-owner-plan-20261023, branch
+codex/residency-rich-onboarding-20261026. Runtime46e03bf0db4a751977a494f9c645e165490a6c75
+accepted by all three assigned reviewers; R1–R13 closed. Original85, corrective125,
+second48 archives preserved/verified.0066–0068 are append-only. Producer/reviewers
+stopped; root owns final branch gate, mandatory push and stacked DraftPR on PR114
+(codex/residency-private-verification-jobs-20261026 at219f8e0c, open/Draft verified).
+No gate/push yet for S3a. No competing PG/builds. No routine permission loop.
+Continue whole approved package: S3b semantic tags then S4 schedule/lifecycle;
+/tmp/spec-residency-semantic-tags-draft-20261027.md and corresponding S4 draft
+are prepared, reconcile accepted interfaces and freeze next. S4 review-status push
+remains open. Protected rotated PG config/existing parser retained; no live access.
+
+# Rich onboarding second correction batch — 2026-10-27
+
+Same isolated worktree/branch, HEAD be8a0c7d71cc5ed22b551cc2ce1cc6332adaed3e.
+All three closure reviews complete: ten findings closed; R4 current-photo manager
+preview, R5 historical uppercase service edit/removal and R6 private-approved B
+renewal after another draft C remain. One existing implementer owns bounded fixes,
+RED/GREEN, additive0068 and separately hashed evidence; preserve0066/0067 and85/125
+archives. Root owns dirty status/spec/coordinator/review documents and final gates.
+No gate/push/acceptance yet. Continue S3b and S4 afterwards; earlier instructions,
+protected existing PG/parser and pending manual refund policy remain unchanged.
+
+# Rich onboarding review corrections active — 2026-10-27
+
+Work only in isolated .worktrees/phase1-owner-plan-20261023, branch
+codex/residency-rich-onboarding-20261026. Initial source5602413c7dca6809569d788b9d8254df80846cc8;
+portable85-artifact evidence3d3ca163f34f4cf3fdd8ea772d62a2294987c236;
+root triage controla41652c684f79263350cd2cc2d5573c8f98ec71f. Runtime is NOT accepted.
+Three independent reviewers completed; thirteen concrete defects/proof gaps are
+recorded in docs/test-evidence/residency-rich-onboarding-review-2026-10-27.md.
+One existing implementer owns incremental R1–R13 correction, hand migration0067,
+focused RED/GREEN and separate archived corrective evidence. Preserve0066/original85
+artifacts/all earlier history. Root owns spec/master/status/coordinator/review/gates.
+No source rewrite, BMad rerender, routine permission/quota loop or unchanged broad
+suite repeat. No final branch gate or push yet; wait for assigned review closure.
+
+Reuse one task PG17.5 and existing isolated parser. The task-local DB credential
+was rotated after a diagnostic exposure; updated0600 protected config remains
+/tmp/verification-form-20261026.compose.json. Read it only in child memory; never
+print it or put credential URLs in argv/process diagnostics. Production untouched.
+Root does no competing PG/build work while the implementer verifies corrections.
+
+Continue the WHOLE approved package afterwards: S3b local semantic tags, then S4
+scheduling/lifecycle. Preparations: `/tmp/spec-residency-semantic-tags-draft-20261027.md` and
+`/tmp/spec-residency-scheduling-lifecycle-draft-20261027.md`;
+reconcile final S3a interfaces before freezing. Shared unsolicited owner review-status
+push is explicitly open for S4; /card state/reason and manager queue exist now.
+Refund-policy question remains pending/manual; do not reask or invent approval.
+S0/S0.5/S1/S2a/S2b are delivered; no prior block restart, merge/deploy/provider enablement.
+
+# Private verification delivered; rich onboarding active — 2026-10-26
+
+Draft PR114 OPEN at219f8e0c9d0938fccb4188cf0081f71b3f8b2db9:
+https://github.com/Dimkox/ii-tonya-platform/pull/114
+Base codex/residency-verification-messages-20261026 atf11d5d90 (PR113).
+Runtime b360ac46 acceptedR1–R8; exact guard/example2d943517 separately accepted.
+Full gate and final mandatory push605/605; local/remote HEAD matched, tree clean.
+Original72+corrective46 artifacts and failed/successful gates retained. No source
+work remains for S2b; no merge, deployment or live capability activation.
+
+Active branch codex/residency-rich-onboarding-20261026 uses the same isolated
+.worktrees/phase1-owner-plan-20261023. Contract spec-residency-rich-onboarding.md
+starts S3a detailed profile/services,3 input modes, owner confirmation and versioned
+manager review. Latest materials order is after card approval; earlier parallel
+fee-time jobs must not bypass it. S3b local semantic tags then S4 slots/lifecycle
+remain required. No BMad rerender or previous-block restart. Root owns contract/
+review/gate/push; one implementer owns source and evidence, no descendants.
+One protected PG17.5 and isolated parser remain. Next hand migration0066; preserve
+all historical bytes. Refund policy still pending/manual. Owner autonomy and
+necessary focused-run/splitting override persist; no routine permission loops.
+
+# Private verification jobs ready for gated push — 2026-10-26
+
+Same isolated worktree and codex/residency-private-verification-jobs-20261026.
+Runtime b360ac46 independently acceptedR1–R8; guard/example2d943517 separately
+accepted. Canonical full gate at2d943517 passes605/605 and types/all checks.
+Spec done; failed/successful evidence retained. Root owns final mandatory push and
+DraftPR on codex/residency-verification-messages-20261026 (PR113 open atf11d5d90).
+Continue entire package immediately afterwards: S3a rich profile/services, then
+S3b local tags, S4 slots/lifecycle. Temp S3 spec/preparation remain ready.
+One protected PG17.5 and owned isolated helper; no production/provider activation.
+No routine permission/quota loop. Do not rerender BMad or restart delivered blocks.
+
+# Private verification jobs accepted; final gate next — 2026-10-26
+
+Same isolated .worktrees/phase1-owner-plan-20261023 on
+codex/residency-private-verification-jobs-20261026. Corrective runtime
+b360ac466a5cfb0472b05ae3988931a4be0db405 independently acceptedR1–R8 by the
+three assigned reviewers. Original72 plus corrective46 hashed artifacts retained;
+0064 unchanged, additive0065 state reconstructed. Producer stopped; only root owns
+final gate/docs/push/DraftPR against delivered verification/messagesPR113.
+No hosted CI, production activation or deployment is inferred. Continue entire
+package after delivery: S3a rich onboarding, S3b local tags, S4 slots/lifecycle.
+Read-only S3 preparation and draft contract are under /tmp/residency-rich-onboarding-
+preparation-20261026.md and /tmp/spec-residency-rich-onboarding-draft.md.
+One existing protected PG17.5 and owned isolated parser remain. No quota/reapproval
+loop; BMad already rendered once. Refund policy remains pending/manual.
+
+# Private verification jobs review correction active — 2026-10-26
+
+Same isolated .worktrees/phase1-owner-plan-20261023 directory, branch
+codex/residency-private-verification-jobs-20261026. Initial implementation54d9eb36
+has72 hashed evidence artifacts, PG11 plus6 selected cases, transport26+2,
+actual OCR/sandbox/Chrome, repository26 and builds/types/lint. All evidence retained.
+Three independent read-only reviewers found eight concrete issues, deduplicated in
+verification-private-jobs-review-2026-10-26.md. Runtime is NOT accepted yet.
+Original implementer receives one bounded R1–R8 correction batch; root owns
+specification/review/final gate/push. Preserve0064; next hand migration0065.
+No destructive rederive, quota or permission loop. Reuse protected PG17.5 and
+owned helper ii-tonya-private-parser-20261026; no competing tests or providers.
+BMad already rendered. Continue entire owner package after this block; S3/S4 remain.
+
+# Verification/messages delivered; private verification jobs active — 2026-10-26
+
+Draft PR113 OPEN atf11d5d906acf6e1983fe36739981e31a847207ce:
+https://github.com/Dimkox/ii-tonya-platform/pull/113
+Base codex/residency-content-safety-20261026 at53df4d2f (PR112).
+Runtime3baaf003 independently acceptedR1–R6; guard3c546774 separately accepted.
+Canonical full and mandatory push gates passed592/592; types, PG16/API4/legacy32/
+upgrade1 and actual Chromium evidence retained. No source work remains for S2a.
+
+Active branch codex/residency-private-verification-jobs-20261026 uses the SAME
+isolated .worktrees/phase1-owner-plan-20261023 directory. S2b contract:
+docs/superpowers/implementation-artifacts/spec-verification-private-jobs.md.
+Root reconciled actual0063/source seams and exact dependency/model choices.
+One fresh implementer owns source/tests/migrations and implementation evidence;
+root owns specification, review and final gate/push/PR. No competing source edits.
+Next hand migration0064; one protected existing PG17.5 cluster. Do not rerender
+BMad or restart delivered blocks. Continue full owner package afterwards.
+Refund policy remains pending/manual; owner autonomy/run-count/split opt-out persists.
+No deployment/provider activation/money operations; no routine permission loops.
+
+# Verification/messages accepted; delivery next — 2026-10-26
+
+Active isolated branch codex/residency-verification-messages-20261026 in
+.worktrees/phase1-owner-plan-20261023. Runtime3baaf003 acceptedR1–R6 by all three
+independent reviewers. Guard-only3c546774 separately accepted; canonical full gate
+at3c5467746efedf7fdce6721527ba2965eb5c46d0 passed592/592 plus tests typecheck and
+all other checks. Failed gate and precise correction remain archived. Spec is done.
+Root now owns mandatory gated push and DraftPR on codex/residency-content-safety-20261026
+(PR112 still open at53df4d2f). No bypass, merge, deployment or live activation.
+
+Continue the entire approved package: S2b private custody/extraction/OCR/social
+jobs is next, then rich onboarding/tags and scheduling/lifecycle. Existing draft and
+preparation need reconciliation with accepted0063; next hand migration0064.
+One existing protected PostgreSQL17.5 cluster, no competing test commands.
+Refund policy remains pending/manual; no repeated question or routine permission loop.
+BMad already rendered once; preserve owner autonomy and bounded-test override.
+
+# Verification/messages review correction active — 2026-10-26
+
+Same isolated worktree .worktrees/phase1-owner-plan-20261023, active branch
+codex/residency-verification-messages-20261026. Implementation27d4851c and evidence
+977c1b65 received three independent read-only reviews. Root accepted six concrete
+findings in final-verification-messages-review-2026-10-26.md; triage a3c91dd8.
+Original implementer owns one bounded correction batch: reachable terminal delivery
+recovery, bounded history pages, non-poisoning blocked-identity expiry, asynchronous
+editor fencing, production calendar witnesses and real applicant command witnesses.
+Use additive0063 if SQL changes; preserve0062. No destructive rederive/new review quota.
+Reviewers are idle until assigned closure at the corrective SHA. Root owns final
+gate/push/PR; none has run for this S2a block yet. Runtime remains default-off.
+
+Original96 logs are archived with hashes under docs/test-evidence/
+final-verification-messages-2026-10-26; remediation logs use .superpowers/sdd/
+verification-messages-remediation-20261026. One existing protected PG17.5 cluster,
+no competing commands. Refund policy question remains pending/manual; do not reask.
+S2b draft/private-jobs preparation exists, with verified temporary OCR assets/public
+preview evidence, but is not started. Continue the complete owner package after S2a.
+BMad already rendered once; owner autonomy and bounded-run/split override persist.
+
+# Content safety delivered; final verification/messages next — 2026-10-26
+
+Draft PR112 OPEN at53df4d2fbbe09038bde2298e4642cee4247fbe2b:
+https://github.com/Dimkox/ii-tonya-platform/pull/112
+Base codex/separated-residency-sales-20261026 at1ac20917 (PR111 still open).
+Runtime2419347c independently acceptedR1–R4; R5 was disproved/rejected. Full gate
+and mandatory push578/578, PG14/14, browser26/26; retained failed/passing evidence.
+No source work remains for safety. No merge/deployment/provider activation.
+
+Active branch codex/residency-verification-messages-20261026 uses the same isolated
+.worktrees/phase1-owner-plan-20261023 directory. Next approved blockS2: final dynamic
+verification and communication templates. Owner sources/master plan control;
+latest sales order overrides older no-invoice/tariff-after-verification wording.
+Reuse existing form/manager/worker authority; no second stack or Phase2 Kanban.
+Root prepares contract after read-only bounded audits, then assigns one implementer.
+BMad workflow is already rendered once; do not rerender or restart core/sales/safety.
+User autonomy and run-count/split/approval opt-out persist. Reuse one protected
+PG17.5 task cluster; next hand migration0062. No live commands/reviewers currently.
+
+# Content safety accepted; delivery next — 2026-10-26
+
+Current isolated worktree .worktrees/phase1-owner-plan-20261023 on
+codex/residency-content-safety-20261026. Runtime2419347c independently accepted:
+R1–R4 closed by three reviewers; coordinator R5 disproved and rejected. PG14/14,
+browser26/26, prior publication20/20; core16pass/1existing Python skip. Final full
+gate at a790589c passed578/578 and full tests typecheck. Spec content-safety is done
+for development; no deployment/live activation. Root now sends mandatory gated push
+and creates draft PR stacked on111 (still open at1ac20917). Continue the full owner
+package afterwards: final verification/communications, rich onboarding/local tags,
+dynamic scheduling/lifecycle. Do not restart delivered core/sales or review loops.
+One task-owned PG remains for following blocks. No test/process/reviewer is running.
+BMad workflow already rendered; do not rerender. User autonomy remains authorized.
+
+# Sales delivered; blocking content safety next — 2026-10-26
+
+Draft PR111 is OPEN/mergeable at1ac2091735836fe2a07ed0e8d95bd749f5617e80:
+https://github.com/Dimkox/ii-tonya-platform/pull/111
+Base codex/residency-foundation-20261026 at66cb3fd5 (DraftPR110 still open).
+All14 sales review groups closed. Canonical full gate and mandatory push gate
+passed575/575; full tests typecheck passed. Failed checks and exact corrections
+are retained. Sales source is complete; no live activation, deployment or merge.
+
+Active branch codex/residency-content-safety-20261026 uses the SAME isolated
+.worktrees/phase1-owner-plan-20261023 directory. Next block is the approved
+content_safety_filter from docs/source/residency-phase1-owner-2026-10-26.
+Do not restart completed sales/core work. Read-only preparation is in
+/tmp/phase1-next-safety-preparation-20261026.md. Next hand SQL migration0061.
+Continue BMad's already-rendered workflow, not a new render or recursive lead.
+Root owns specification/review/delivery; assign explicit nonoverlapping source
+ownership. Owner autonomy, bounded tests and no routine approval loops persist.
+Reuse one task-owned PG17.5 cluster and protected compose configuration.
+
+# Separated sales verified; push next — 2026-10-26
+
+Active isolated worktree: .worktrees/phase1-owner-plan-20261023, branch
+codex/separated-residency-sales-20261026. Reviewed runtime source8bd15f1f; all
+R1–R14 closed. Exact guard inventory correction independently reviewed. Full
+canonical gate at `91fa6ca127d6ddd0b4a421e90c53ff4e30f473df` passed575/575 plus tests typecheck and
+all seven checks. Spec-residency-separated-sales.md is done for development.
+Root is recording acceptance then pushing through the active mandatory hook and
+creating the authorized draft PR against codex/residency-foundation-20261026.
+PR110 is still Draft/open at66cb3fd5; confirm remote state if it changes.
+No hosted CI, deployment, provider activation or actual money operation inferred.
+
+Continue the full owner package after delivery: blocking resident content safety,
+final verification/templates, rich onboarding, local tags, dynamic slots/lifecycle.
+Use existing master/source docs and one task-owned PG cluster; preserve original
+consent/erasure, financial gates and owner autonomy. No repeated permission, split
+or run-count loops; no unneeded reruns. BMad is already rendered once. Root has
+read-only next-safety preparation at /tmp/phase1-next-safety-preparation-20261026.md.
+Sales reviewers/implementer are completed; no source work remains assigned to them.
+
+# Separated sales active; stabilization delivered — 2026-10-26
+
+Draft PR110 is open at66cb3fd5d2bf18ce3da29d3cca17cbe39ab8aa7b:
+https://github.com/Dimkox/ii-tonya-platform/pull/110
+Base codex/phase1-owner-plan-20261023 atd83977c9 after owner merged PR108.
+Final mandatory push gate passed567/567, no bypass; runtime independent review,
+PG17/17, Python12/12 and recovery fixture33/33 evidence is retained. No merge or
+provider/deployment activation by this agent. Production parser remains unavailable.
+
+Active branch codex/separated-residency-sales-20261026 in the same isolated worktree.
+Approved next contract: docs/superpowers/implementation-artifacts/spec-residency-separated-sales.md.
+Latest source order supersedes old pre-price/no-auto-invoice: base-only→explicit
+positive→separate promo/base+period choice→form/manager→fixed3000→paid lifetime lock.
+Three read-only scouts mapped pricing, real flow and provider gaps. One fresh
+implementer owns source/tests/migrations/evidence; root owns final review/gate/PR.
+Do not rerender BMad, restart completed core or recursively launch another lead.
+Owner autonomy/run-count/splitting opt-out persists; no routine permission loops.
+
+Use the existing ONE task-owned running PG17.5 cluster/config stated in the spec;
+never print protected config or URLs, never use stale container credentials.
+Strict new-expiry fee collection requires supported held-payment capability;
+local expiration is not provider pending cancellation. No fabricated checkout,
+paid lock, provider status, prompt authority or receipt-disclosure grace period.
+Continue the complete package after this block. Website audit is completed;
+latest main13edda58 is a tooling-only successor with identical apps/web and lockfile
+versus the earlier audited9385b9b8. No new build or deployment is inferred.
+
+# Stabilization accepted; delivery base updated — 2026-10-26
+
+Core runtime R1–R13 is independently accepted at401e1bb. Full gate567/567 plus
+focused PG17/17, Python12/12 and callback composition10/10 are retained. Initial
+push d52cc37a succeeded through mandatory hook. Owner merged PR108 and removed
+its head; surviving base codex/phase1-owner-plan-20261023 atd83977c9 has the exact
+same tree as old567e71b4. Merge a8804087 records ancestry without tree changes.
+A repeated hook exposed a timing-dependent existing recovery drill. Its simulated
+candidate-only wait is now deterministic; full focused33/33 and independent review
+pass, production deadlines unchanged. Final hook/PR delivery is root-owned.
+
+Latest owner precedence and website audit remain in the master plan. Next approved
+increment is separated sales and lifetime terms on verified3000 fee, not earlier
+verification-before-price. Three read-only audits are complete; root prepared the
+bounded next contract. No deployment/provider activation or production change.
+
+# Core stabilization R1–R13 remediation ready — 2026-10-26
+
+The single accepted-finding batch against390613bc is implemented. Prepared handoff
+links commit before disclosure while final send retains the subject privacy lock;
+prior links survive failed notifications and genuine owner /work_handoff recovers
+unknown work without resend. Tag callbacks now have real trusted ACK, durable
+replay, bounded actual pagination and removable inactive selections. Archive view
+parity is restored. Secure XML parsing and real subprocess main() limit tests
+correct the file-size-vs-sandbox guarantee; production parser remains unavailable.
+
+Final focused PostgreSQL/Fastify17/17 and Python12/12 passed; exact changed-view
+metadata and source guards are reconciled. Evidence and retained RED/GREEN logs:
+`docs/test-evidence/residency-core-stabilization-remediation-2026-10-26.md`.
+Root owns bounded independent R1–R13 closure, exact-source final gate and draft PR.
+No new quota, deployment, provider activation or downstream product scope added.
+
+# Core stabilization source ready for review — 2026-10-26
+
+The assigned codex/residency-foundation-20261026 source candidate implements shared
+transactional interview activation/audit, durable owner-bound promo notification,
+bounded optional local PDF/DOCX parsing with durable manual fallback, and private
+164-entry/7-category draft tag selection. Public-card and financial gates remain.
+New tag/notification flags default false; Python execution remains unavailable in
+the existing Node-only256MiB production worker. No provider/deployment mutation.
+
+Focused acceptance: stabilization PostgreSQL/Fastify10/10, canonical settlement
+regression23/23, real locked Python5/5 and Node parser3/3. Narrow behavioral
+RED/GREEN closes honest unknown reporting and first-completion replay. Replay is
+59migrations/176tables; metadata and individual guard registrations are retained.
+Affected builds/types, full test types and static checks are recorded in
+`docs/test-evidence/residency-core-stabilization-implementation-2026-10-26.md`.
+
+Root owns independent review, final exact-source gate, its new-owner documentation
+checkpoint and draft STABILIZATION PR. Source is in-review, not release-complete.
+New owner sales precedence belongs to the root's separate master-plan addendum.
+Do not rerun unchanged broad checks or mistake optional local helper evidence for
+production isolation. Preserve failed logs and current task-owned PG configuration.
+
+# Core stabilization active — 2026-10-26
+
+Branch codex/residency-foundation-20261026 in the existing isolated worktree.
+Baseline 567e71b4dea4bd2720da452c8049916f9d2b437c is the delivered PR108 head.
+Seven new whitespace-normalized owner specifications are archived with hashes under
+docs/source/residency-phase1-owner-2026-10-26. Final verification supersedes
+its prior protocol. Ordered package: stabilization, guardrails, final verification
+and communications, onboarding/taxonomy, schedule/lifecycle. Continue authorized
+work without routine approval pauses. No deployment or provider activation.
+
+Contract: docs/superpowers/implementation-artifacts/spec-residency-core-stabilization.md
+Master: docs/superpowers/plans/2026-10-26-residency-phase1-final-package.md
+RequireDocker preflight passed Node24.22.1/pnpm11.9.0. Three independent read-only
+foundation audits completed. Root owns final review/gate/push/draft PR; a fresh
+implementer owns source, tests and implementation evidence. Do not recursively
+launch another implementation lead or re-render the already loaded Bmad workflow.
+
+Reuse the stopped task-owned PostgreSQL17.5 cluster and protected configuration
+specified in the contract; no extra cluster or secret output. Existing owner
+run-count opt-out persists; preserve failures and avoid unchanged broad repeats.
+Manager prepayment exception has no genuine producer yet and must remain denied.
+Python parser production execution stays unavailable until reviewed runtime proof.
+
+# Resident verification first PR delivered — 2026-10-26
+
+Draft PR108 is open: https://github.com/Dimkox/ii-tonya-platform/pull/108
+Branch codex/verification-schema-form-20261026; base codex/phase1-owner-plan-20261023
+at1a006fff4e2985fd83b72f3c67a66823fab87078. Reviewed implementation
+5e2bb8e336812197ad4105bbae9addfdd957da7f; final canonical full gate at
+6583f08d1cb3aa65ba18ec859dcc65a258de770d passed all seven checks, including
+repository558/558. The first gate's exact unique-constraint expectation drift
+was diagnosed/fixed, focused12/12 and independently reviewed; failed evidence stays.
+
+The first push's mandatory hook also passed. A final documentation-only checkpoint
+records this delivery; confirm live PR/remote head rather than trusting copied SHA.
+Working source contains Schema+Form Logic only. Manager decisions, automatic
+OCR/social checks, S3/LLM ingestion, callback acknowledgement transport and staging
+evidence remain later work. Feature defaults false. No merge, deploy or provider
+activation occurred. Do not restart completed verification without a new reason.
+
+Contract: docs/superpowers/implementation-artifacts/spec-verification-schema-form.md
+Evidence: docs/test-evidence/verification-schema-form-coordinator-2026-10-26.md
+
+# Resident verification review closed; final delivery pending — 2026-10-26
+
+Reviewed source5e2bb8e336812197ad4105bbae9addfdd957da7f on
+codex/verification-schema-form-20261026; base1a006fff. Three independent review
+layers and bounded remediation closure have no accepted finding left open.
+PostgreSQL21/21 plus actual composed Fastify/PG1/1, focused units, affected builds,
+types and static checks pass. Source is default-off and contains Schema+Form Logic
+only, not full automatic verification or manager decisions.
+
+Root is running the final clean-commit gate and then owns authorized push/draft PR
+against codex/phase1-owner-plan-20261023. Confirm live remote/PR state before any
+continuation. No deploy/provider activation or staging evidence is claimed.
+Evidence: docs/test-evidence/verification-schema-form-coordinator-2026-10-26.md.
+
+# Resident verification review remediation ready — 2026-10-26
+
+Accepted P1–P11 fixes implemented against8fc8e34. The rejected P1 clone-loss
+mechanism was absent in committed source; text role normalization is fixed while
+preserving deletion/fingerprint semantics. Document cursor integrity, correction
+controls, bounded frozen-snapshot supplements, manual policy-change response,
+URL/control parity,64000-byte draft bound, subject erasure index, stable flag-off
+pricing denial, symmetric capability ceiling and Russian saved-fact confirmation
+are covered. No approval, price, provider, OCR, S3 or live transport was added.
+
+Focused PostgreSQL21/21 and real Fastify+PG composition acceptance pass. Final
+SQL replay:58migrations,174tables,9functions/5triggers,43constraints/12indexes.
+See docs/test-evidence/verification-schema-form-remediation-2026-10-26.md.
+Root owns final accepted-patch review, branch gate and draft PR; do not claim
+release completion or rerun unchanged PostgreSQL coverage without a new defect.
+
+# Resident verification source ready for review — 2026-10-26
+
+Schema+Form Logic is implemented on codex/verification-schema-form-20261026 in
+the assigned isolated worktree. Default-off, private promo-bot/consent/owner-bound
+intake precedes pricing. All six role flows persist, with explicit primary role,
+conditional documents, durable edit cursor and pending checks. No manager outcome,
+OCR/social processing, document fetch, S3 upload, price/invoice or activation was
+implemented. Existing authoritative offers retain their original clocks.
+
+PostgreSQL17.5 focused acceptance15/15 PASS; metadata replay58migrations,
+174tables,8newfunctions/5triggers,42additiveconstraints/11indexes. Actual erasure,
+consent withdrawal and user-stage reset covered. Cohort survives PII deletion and
+UI disablement, maintaining the pricing fence. Relevant package builds/types,
+full tests typecheck, focused unit results and exact guards are evidenced in
+docs/test-evidence/verification-schema-form-implementation-2026-10-26.md.
+
+Root owns independent review, final full branch gate and authorized draft PR;
+these remain pending. No deployment, provider call or feature activation occurred.
+Do not repeat completed PG/files without a new defect. Owner task-wide routine
+approval/run-count opt-out persists; all failed logs remain retained.
+
+# Resident verification Schema+Form Logic starting — 2026-10-26
+
+Active branch codex/verification-schema-form-20261026 in this existing isolated
+worktree; baseline1a006fff4e2985fd83b72f3c67a66823fab87078 is pushed on
+origin/codex/phase1-owner-plan-20261023. The owner requests a first-part draft PR
+containing schema and real dynamic form, not OCR/social/LLM provider activation.
+New order is verification BEFORE pricing; new approval must not call the old
+invoice-producing decision. Preserve issued quotes, paid access and audit history.
+
+Contract: docs/superpowers/implementation-artifacts/spec-verification-schema-form.md
+Plan: docs/superpowers/plans/2026-10-26-verification-schema-form.md
+RequireDocker preflight passed Node24.22.1/pnpm11.9.0/PG-compatible Docker tools;
+no.env or credentials were used. Schema/form and identity audits are complete.
+Existing owner opt-out from routine approvals/focused run-count questions persists.
+No blind repeats or weakened checks. Push+draft PR are authorized by this request;
+merge/deploy/live activation are not. Root owns coordinator evidence/final gate;
+fresh implementer owns source, plan/status and implementation evidence.
+
+# Owner payment/offer corrections locally complete — 2026-10-23
+
+Verified implementation:3466408a54fb6796b386d0c1da428ae283e40dd1 on
+codex/phase1-owner-plan-20261023. All seven final checks passed using the same
+pre-push gate checks with diagnostic log retention; tests/repo553/553. Two earlier
+canonical gate runs failed tests/repo but discarded detailed logs; their exact
+cause remains unproven. An intervening standalone553/553 run also passed. No
+assertion, timeout, feature gate or source changed between these runs.
+
+Full workspace build, package/test types, focused PostgreSQL and independent
+reviews passed. See docs/test-evidence/residency-offer-corrections-coordinator-2026-10-23.md
+and docs/test-evidence/residency-offer-corrections-2026-10-23.md.
+The final documentation checkpoint records source acceptance only. No push,
+deploy, external prompt publication or provider activation occurred for this
+increment. PDF, announcement assets and interview prompts remain intentionally
+pending; live merchant/webhook/custody and release evidence remain separate.
+
+# Owner payment/offer corrections starting — 2026-10-23
+
+New user specification supersedes conflicting old funnel/pricing details.
+Baseline0d004a71689393f65605703193e728ebdfa44057 was pushed successfully to
+origin/codex/phase1-owner-plan-20261023 after the previous local acceptance.
+Current isolated worktree remains the authorized development tree; append commits,
+do not rewrite shared history. New specification/plan:
+docs/superpowers/implementation-artifacts/spec-residency-offer-corrections.md and
+docs/superpowers/plans/2026-10-23-residency-offer-corrections.md.
+
+Read-only audits complete: fixed3000 fee/main separation already exists; real gaps
+are parallel pre-card materials, application promo proof, exact placeholders,
+Telegram staff actions, archive read fences, v2 pricing/automatic link lifecycle,
+and working prompt assets. Legacy pricing72/144/216h/15minTTL and archived source
+hashes remain immutable. New full-day schedule uses96/168/240h, separate monthly/
+package totals/floors, existing approved base rates and structured qualifications.
+No implementation tests have run yet. RequireDocker preflight passed Node24.22.0,
+pnpm11.9.0, Docker29.9.2/Compose5.6.1; no.env or live provider action.
+
+The existing owner opt-out from per-step approvals and focused count limits
+continues for these same residency-plan corrections. No blind test repetition.
+Root owns coordinator/final gate; a fresh implementation lead will own source,
+plan/status/test records and disjoint within-block assignments. No push/deploy or
+actual Telegram/provider send is authorized by this development increment.
+
+# Approved Phase0–Phase2 local work complete; final gate PASS — 2026-10-23
+
+Verified source checkpoint: 8d72381ed1e92cd984930c5cbfa06a195ac88871.
+Coordinator final full branch gate2 exited0, all seven checks passed, on the exact
+031ae46065b58223a2b6cd47e002b388a41ec89c..8d72381ed1e92cd984930c5cbfa06a195ac88871
+range. Log /tmp/phase1-through-phase2-final-gate-2.log; durable evidence:
+docs/test-evidence/phase1-through-phase2-final-gate-2026-10-23.md.
+
+Local PostgreSQL acceptance: A15/15, B23/23, C20/20, D12/12, Phase2 slots2/2,
+client reads8/8, final receipt-consent4/4. VK/MAX57 focused tests; all independent
+reviews and relevant builds/types/static checks closed. No required local code
+work remains. Final documentation checkpoint only records these results; it does
+not change runtime source. Do not restart completed checks without a new reason.
+
+Worktree codex/phase1-owner-plan-20261023 stays separate. No push, merge, deploy,
+live provider request or feature activation occurred. Missing PDF/content and
+reviewed first-send custody, merchant/public webhook, processor/backup erasure and
+release proof remain external/default-off gates, not local success claims.
+Phase3 remains excluded. Task-wide focused run-count override persists only for
+this task; preserve logs and avoid unchanged repetitions.
+
+# Final gate correction checkpoint ready — 2026-10-23
+
+Allsix90495c finalgatedefectsclosed+independentreviewaccepted. Focusedactualgreens:
+scope123/expertinventory10/DBparity12/hybrid3/env2/consentboundary7. NEWreceipt
+semanticPGFIRST4/4PASS lead1650 /tmp/phase-final-receipt-consent-pg1.log4.00s.
+Preserves tiedDENY/currentexactdecision/oldcontactnonrevival/newestrevoked nofallback;
+no guardexception/classifierwidening/oldA–D/P2functionalPG reruns.
+
+DBnormalbuild44834/DBtypes/fullteststypes59555/lint/format/diffPASS. Wronginitial
+TSconfigpathTS5058 correctedwithoutsourceorpolicyweakening. Exactinventory/grouped
+provenance: docs/spec/phase-final-guard-reconciliation.md. Runtimeandfailedgate
+record: docs/test-evidence/phase-final-guard-reconciliation-2026-10-23.md.
+Allsourcewriters/commandsended. Committingcorrection thenSTOPsources; rootowns
+finalcleancommitgate rerun+overallreport. External/provider/releasegates unchanged.
+
+# Final branch gate corrections active — 2026-10-23
+
+First rootfullgate90495c EXIT1: sixrepoguardfiles deterministicfail; shell/format/
+whitespace/evidence/changedeslint/teststypesPASS. Sixfocusedrootdiagnosticsretained
+/tmp/phase-final-*-diagnostic.log; no repeatedPGphasefunctionalfile.
+
+Leadowns exactliteralinventorytest/barrelhash+rationale/evidence; rootindependent
+reviewaccepted no classifierwidening/assertionremoval. Focusedscope55211 andexact
+inventory32861 active. AuditownerexactDBparity12/hybrid3PASS (historical0041kept,
+0055tailchecked), envowner2placeholdernamesfix/envpolicy2PASS, ownersended.
+Storageownercanonical current-consentdecisionhelper/receiptcontactrefactor+NEW
+focusedsemanticPGfixtureactive; preserve tiedDENY/latestmoment/oldcontactnonrevival.
+Inheritedduplicate momentderivation is real; consentguardnotweakened/excepted.
+LeadsolePGlauncherafterready; rootowns narrowsemanticreview andfinalgatererun
+onlyafterallconcretefailuresclosed. AllpriorA–D/P2integrationpassesremainvalid.
+
+# Approved local implementation through Phase2 accepted — 2026-10-23
+
+A15/15, B23/23, Cfull20/20, Dfirst12/12, Phase2slotRED1→GREEN2/2 andclientFIRST8/8
+allactualisolatedPG17.5. Latestclientlead29407 EXIT0 log/tmp/phase2-client-account-pg1.log
+11.99s; no retry/probe. Connectors57focusedunits+relevantnormalbuilds/types/lint/
+format/diff+independentreviewsPASS. No activeowners/sessions orrequiredsourcework.
+
+Finallocalcheckpoint beingcommitted; rootowns singlefinalverify:gate afterward.
+Coverage: docs/test-evidence/phase1-through-phase2-coverage-2026-10-23.md. Newruntime
+featuresdefaultoff; VK/MAXalwaysinactive. MissingPDF/templates/scriptcontent typed
+slots, P0.4publicreachability/actualmerchant/strictfirstsendcustody/processorbackup
+andreleaseproofremainexternalunverified. No provider/push/deploy/Phase3/margin guarantee.
+
+PerfilePGactualcounts A5/B2/C8(incldiagnostic)/D1/P2slot2/P2client1; currenttask
+explicitowner countoverride supersedes historicalcaps. No unnecessaryunchanged
+runs orrepeattool>3. Protectedrotatedsyntheticconfigmemoryonly, neverDockerEnv.
+Allsourceownershipended; rootmayfinalizebranchgate/report, no approvalloop.
+
+# Final Phase2 client PG active — 2026-10-23
+
+NEWtests/integration/phase2-client-account.test.ts FIRSTinvocation actuallystarted
+lead29407, /tmp/phase2-client-account-pg1.log8cases. Allsourceownersended;
+fulltestsTypeScript/focusedlint/format/diff andindependentfixture/source reviews
+PASS. No duplicatefunctionalrun. ClientsecretRED→GREENconfig11/composition2/
+normalwiring3 accepted; finalAPI/DB/config/app/integrationsnormalbuildsPASS.
+
+SlotRED1→GREEN2 realPG2/2 accepted, connectors57unitcases accepted. Waitactual
+clientterminal thenclosePhase2coverage/evidence/masterstatus/localcommit androot
+singleverify:gate. No new source/testscope unlessactualfailure. Externalcontent/
+strictcustody/merchant/processorbackup/release gates remainoff/unverified.
+Taskwidecountoverridevalid, no unnecessaryunchangedruns/approvalloops.
+
+# Phase2 finite acceptance gates — 2026-10-23 19:49 UTC
+
+Slot focused PG actualRED1 both cases admitted expiredchoices/effects, thenGREEN2
+2/2PASS (/tmp/phase2-slot-clock-green2.log9.61s). Exactreviewedtwo-casefixture
+frozen; no additional tests. Independentpost-lock SQLclock/owner/rawprecision/
+replay/drain reviewaccepted. FinalDBnormalbuild73489PASS. Slotownerended.
+
+Client source rootsecurityrereviewaccepted; service12/config5/DBmutation4/
+composition2/actualdisabledroute4 andleadnormalwiring2PASS. Narrowwiringreview
+thenfoundmanualemptysecret startupgap. ActualleadnegativeRED1+configRED6 prove
+it; enabledsharedsecretvalidation32..256/nonplaceholderfix+configbuildactive.
+Leadwillrungreen3afterfreshconfig. NEWclientPG8-casefixtureauthoractive, PG0.
+
+ConnectorsfinalVK23/MAX26/disabled4eachPASS, finalintegrationsbuild/types/lint/
+format/diffPASS andindependentreviewaccepted, allownersended. No liveIO/flags.
+Rootfinalsingleverify:gate reservedafterPhase2cleancommit. Fulltaskcountoverride
+remains, no approvals/unnecessaryunchangedsuites. Allsource/testlocalonly.
+
+# Phase2 active — 2026-10-23
+
+D accepted locally at552b40dd3aceb7b00479ff9d7bff7ef11ee6281b: first focused
+PG12/12PASS (/tmp/phase1-d-lifecycle-pg1.log). C8full20/20 accepted earlier.
+Current Phase2 owns only slot post-lock clock correction, private client reads,
+and always-inactive VK/MAX pure contract modules. No provider/push/live action.
+
+Lead owns spec/status/app-server wiring/evidence and all PG launchers. Slot owner
+block_a_storage has unchanged timing baseline plus NEW phase2-slot-clock fixture;
+readonly block_a_storage_review reviews before first RED. Client owner
+block_a_composition owns contracts/repository/service/config/route/composition;
+service11/config5/driver3 green, config/application builds pass; root snapshot,
+coupons_balance and disabled-command no-LLM findings being fixed. Connector owner
+block_b_payment_verifier owns pure builders/parsers and always-disabled adapters:
+VK23 plus disabled4/provider green, MAX pure RED underway. PG author
+block_c_pg_test_author owns NEW phase2-client-account file. Phase2 PG0 each.
+
+Task-wide explicit human count override remains; no count approval loop, no
+unnecessary unchanged runs or repeat tool count>3. Protected current Compose JSON
+memory only, never obsolete Docker env/secret output. Root final verify:gate once
+Phase2 ready. Existing strict custody/content/merchant/release gates remain off.
+
+# Block D first integrated PG active — 2026-10-23 19:16 UTC
+
+NEWtests/integration/phase1-residency-lifecycle.test.ts invocation1 NOWstarting12cases,
+log/tmp/phase1-d-lifecycle-pg1.log. Leadsolelauncher, no duplicate/probe. Task-wide
+countoverrideapplies; preserveactualattempts and onlytargetedneededverification.
+
+Allfinitepregatesclosed: fairscanRED1/37→GREEN37/sourceaccepted; finalDBbuild50244
+EXIT0, appworkerfinaltypes/buildEXIT0; fulltesttypes/lint/format+fixture12reviewPASS;
+leadAPIwiring5/ingress23+14+11+11/worker25/finance12+2+3GREEN. RequireDockerD45472
+EXIT0. Actual0055state155/67/109ready; stagedscopeFIRST123/123/historyFIRST8/8PASS,
+no retries. SQLff08821b unchanged. Allotherowners/commandsended(exceptrationaleappend).
+
+D1usesuniqueprovisionalbill+freshowneraccept+sameorderactualconfiguredlink; nofake
+acceptance/updates. Currentcoveragechain/paused/futuregap financialtruth preserved;
+legacyrequires_card explicit. No monetaryhistory/clockoverride/provider/liveflag.
+Readactualsessioncompletion, reportactualresult andcomprehensivediagnosisiffail;
+no permissionloop or speculativeunchangedsuite repetition. AfterDcommitPhase2next.
+
+# Block D final first-PG gates — 2026-10-23
+
+C localacceptance checkpoint35f341c0e5c5bc1507f46a0cf87250f92b186eeb complete;
+Dspec/plan/source active, NEWphase1-residency-lifecycle.test.ts12cases DPG0.
+Explicitcurrent-task verificationcountoverride remains; no countpermissionloop,
+no unnecessaryunchangedreruns/repeat-tool>3. No provider/push/deploy/liveflag.
+
+Disjointowners: storage lifecycle/0055/contracts/privacy (finalfairscanfix), finance
+mainacceptedbill/projection/canonicalearlysubject (ended/rootreviewaccepted), ingress
+application/config/Dcomposition/route (ended), worker actualrunner/main/runtime
+(ended), schema/state/guards owner (ready), Dfixtureauthor (finalstatic/assertions),
+lead actualapp/server/wiring/evidence/integratedlauncher. Reviewers readonly.
+
+Observedgreens: storage36 (finalfairscanregressionpending), finance12+2+3, worker25,
+service23/config14/actualroute11/normalcomposition11, leadnormalAPIwiring5. Relevant
+modulebuild/types/lintpassed; leadDBbuild34711PASS butfinalDBartifactafterfairscan
+needed. NewDfixture12types/lintpriorPASS, finalassertionchecksactive; no executions.
+Rootfinancialchain/gap/earlybarrier sourcefindingsallclosed. StoragereviewNULLbill/
+legacyrequires_card/noticeauthorityclosed. WorkerreviewONLYremainingblocker:
+futurepausedrowsmustadvancescanupdated_at toavoidstarvinglateroverdue residents;
+storagefix/regressionactive. No schemachangeexpected.
+
+0055frozenff08821bc86ffb3157fa759419251dbb5e68167629cf8e1d8114826e42be74d1;
+actual56migrationstate155tables/67functions/109triggers/1057constraints/418indexes,
+2extensions, onlyoldCHECKdeltaCrequestoperations. State/pinsready, Dscope/history0
+awaitfinalstage. Afterfairnesssourcefix+review, finalDB/appworkerartifactchecks,
+fixturehandoff+review, stageguards and FIRSTDfocusedPG promptly. Allsetupintracked
+hooks; actualfinancialintervals/DBclock unmodified, lawfulshortlegacytestfixture
+limitation explicit. Cmainresidentsfullrenewal; legacynewDfinancialflowrequiresreal
+Ccard (typedgate), oldgenericlegacycheckout/navigationpreserved.
+
+# Block C locally accepted; continue D then Phase2 — 2026-10-23
+
+C8 lead37597 EXIT0 FULL20/20 (started18:13:50UTC); log/tmp/phase1-c-card-pg8-traced.log,
+71.57stotal/4.30scollection. C7 filtereddiagnostic1PASS/19filtered remainsseparate.
+Alloriginal5sbodylimits/15squoteexpiryoverride/real3sTTL/assertions/drain unchanged.
+Gatedtest-onlysafephase trace found allconfiguredawaitsfinite; C6isolatedtimeoutcause
+unproven, no runtimebugclaim/globalbudgetincrease. Lowspycleanupfixedunconditional
+finally, independentlyaccepted; finaltesttypes/lint/format/diffPASS. No unchanged
+fullrerun. Priorprod/package/state/scope/history/reviews remainvalidrecorded.
+
+Cspecstatusdone LOCALONLY, mainexecutionamendmentrecords task-wide countoverride.
+Actualperfilecounts retained A5/B2/C8(includingdiagnostic7), helper3. Ownerexplicit
+current-task override supersedes historicalcountapprovalrestrictions below; NOmore
+countpermissionloops. Necessarytargetedverification only, repeat-toolcount<=3,
+no weakening/unnecessaryunchangedrepetition. Rootcoordinatorrecordread/included.
+
+AllCfileowners/commandsended. ThislocalcheckpointclosesCbeforeDimplementation.
+Next: proportionalDreuseaudit/spec/plan then actualworker+workbotrenewal/reminders,
+overduevisibility/access, archive<=3calendarmonths andtransactionalaudit-backed
+paid-entitlementreevaluation; neverrewrite settledperiods or grantunpaidreturn.
+ThenPhase2slotreuse/clientbotreadmethods/inactiveVKMAXofficialcontracts. Continue
+underexistingallplanauthority, no approvalloop. Parentavailableentitlementreview.
+
+Strictfirstsendcustody/content/merchant/processorbackup/exactSHArelease remain
+separate/defaultoff. No provider/push/deploy/liveflag. FreshprotectedrotatedCompose
+JSON MEMORYONLY, neverDockerEnv/secretoutput. SeeCevidencefullchronology.
+
+# C7 focused phase diagnostic active; task-wide override — 2026-10-23
+
+C6 root89705 EXIT1 17/20PASS: configurednormal5s timeout+2sdrain poisonedlast2.
+Log/tmp/phase1-c-card-pg6.log88.45s. No countapprovalneeded: explicit task-wide
+owner override remains. Lead nowsoleverificationowner; no rootduplicate launches.
+
+Systematicdebugging: readonlycallgraph found no demonstratednestedtransaction or
+lockcycle; configuredbody executes3HTTPmutations+3standalonefinancialgatechecks.
+Legacyoperation/pool/port potentialunboundedwaits remainrisks, notproven currentcause.
+Hypothesis cumulative intendedwork vs single stalledawait. C7 filtereddiagnostic
+ONLYconfigurednormal nowstarting withUNCHANGED5000ms, safephase labels/durations
+(noIDs/URLs/params); log/tmp/phase1-c-card-pg7-diagnostic.log. This is NOT fullCacceptance.
+FreshcurrentprivateJSON memoryonly, noDockerEnv/secretoutput. Nohelper/probe/rerun
+othercases. Sourceinstrumentationtestonly/typeslintPASS; preserveallassertions.
+Afterevidence identifyrootcause, independentlyreview any explicitcasebudget rationale;
+no globaltimeout/runtime/SLO weakening. D/Phase2awaitCclosure.
+
+# Task-wide verification count override; C6 active — 2026-10-23
+
+The owner explicitly answered “разрешаю, что за бесконечный цикл” to the coordinator's
+request to override verification run-count limits for this entire current task.
+This user authority supersedes the historical three-run and exact-extra-run approval
+restrictions recorded below. Do not ask for count approval again. Preserve actual
+per-file run facts and failed logs. Run only checks justified by source changes,
+failures or unresolved acceptance; keep repeat-tool count at most3, existing runtime
+limits/assertions and all financial/privacy/release boundaries intact.
+
+Root solely launched C invocation6: session89705, log/tmp/phase1-c-card-pg6.log,
+on82b72348349fd9f8ba66b7082c991130a45b6b0c after RequireDockerPASS. Active; no result
+claimed. Do not duplicate, probe or run the unchanged helper while root owns this
+session. Current private rotated Compose JSON stays memory-only, never DockerEnv.
+Only this status/authority record changes while the C test source runs unchanged.
+
+After actualPASS close C evidence/local checkpoint, then implement proportional
+D→Phase2 autonomously under existing all-plan authority. On a failure diagnose the
+whole concrete source/fixture issue before targeted verification; no piecemeal
+prep fixes or repeated approval loop. C remains in-progress until actual result.
+No provider call, remote push, deployment or live flag follows from this override.
+
+# Block C comprehensive fixture WIP ready for exact extra6 request — 2026-10-23
+
+Allfileowners/reviewers/commandsended. CsourceNOTaccepted; D/Phase2NOTstarted.
+CfocusedPGall5CONSUMED. Lastrootrun69562 on572c7a5b EXIT1 19/20PASS, solequalified
+reward5000ms timeout; log/tmp/phase1-c-card-pg5.log. NO6/filter/manualprobe/equivalent
+withoutEXPLICITnewownerauthority. Helper3/3CONSUMED/unchanged; NOhelper4.
+Userlimitquestionwasnotanoverride; parentowns exactpermissionquestion/anynewlaunch.
+
+Comprehensivefixtureaudit CLOSED/sourceaccepted: all20expandedcases audited, ordinary
+heavyactor/provider/HTTPsetup nowintrackedboundedhooks, includingfullqualification
+inviter/3referrals/frozen100precondition/control/checkout/provider andbothconfigured
+checkoutvariants. No readyCard/approvedCard/interview/checkout/providercomposition
+orGETproof preparation remains in timedcase bodies. Actualcallbacks/races/money/
+maturity/immutability/erasure/lateGET/replay assertions retained; necessarypostmarker
+sessionseeding staysbehavior. Same20originalittitles/default5000ms/existing15000
+quoteexpiryoverride/real3sTTL/2smonotonicdrain. Nohelper/prod/SQL/state changes.
+Fulltesttypes/lint/format/diffPASS; independent20casefixture reviewACCEPTED.
+Logs/tmp/phase1-c-pg5-fixture-{types,lint}-final.log emptyEXIT0. RevisedfixtureUNEXECUTED.
+Audit20rowtable in docs/test-evidence/phase1-block-c-2026-10-23.md. No furtherchecks
+or codeplanned beforeconcreteownerask; unchangedscope/historynotrepeated.
+
+Parentmayask EXACTLYONE extra
+pnpm exec vitest run tests/integration/phase1-card-publication.test.ts
+oncurrentlocalWIPHEAD. Rootsolepreflight/launch/log withfreshprotectedrotatedCompose
+JSON MEMORYONLY, neverDockerEnv/secretoutput. Noimplicit6or7. AfteractualPASS closeC
+checkpoint thenproportionalD→Phase2 underexistingallplanauthority. Strictproduction
+firstsend/content/merchant/exactSHArelease gates separate/defaultoff. No provider/
+push/deploy/liveflag. A5/B2unchanged.
+
+# Block C extra5 consumed; complete setup audit/repair — 2026-10-23
+
+Ownerexplicitoneextra5 ranbyroot69562 on572c7a5b EXIT1:19/20PASS, solequalified
+1000rewardcase timeout5000 (6484ms total). Log/tmp/phase1-c-card-pg5.log126.03s,
+collect10.21s. Allprevious canonicalexpiry/legacy/maincheckout/erasure/noticecasesPASS.
+ALL5CslotsCONSUMED; NO6/filter/manualprobe/equivalent withoutEXPLICITnewowner
+permission. Helper3/3CONSUMED/unchanged; NOhelper4. CNOTcomplete; D/Phase2NOTstarted.
+
+Authorizedfix owner block_c_pg_test_author ONLYCfile: coherentfullqualifiedprepayment
+setup→trackedboundedhook (inviter/consent/reg,readyCard,2extraregs,featurecontrol,
+checkout/providerfixture/frozen100precondition). ALLmoney/maturity/immutability/
+erasure/lateproof assertions retained. AUDITall20case setup/bodyboundaries andmove
+same remainingnormalheavyfixtureprep tohooks comprehensively; no newbehavior.
+Preserve20/default5000/real3sTTL/drain/helper/prod/SQL/state. No execution/probe.
+Independentreadonlyreview owner block_a_ingress_review awaitsfinalsource+20caseaudit.
+Finaltypes/lint/format/diff+review/evidence/localWIP beforeparentexact6request.
+Userquestionaboutlimitdoesnotcancel task orauthorize6; rootowns anyfuturelaunch.
+
+# Block C revised WIP ready for exact extra5 request — 2026-10-23
+
+Allfileowners/reviewers/commandsended; onlyCfixture+evidencechanged since921d108d.
+CurrentcheckpointNOTCacceptance, D/Phase2NOTstarted. Parentowns finalpermissionask.
+CfocusedPGall4CONSUMED; NO5/filter/manualprobe/equivalent withoutEXPLICITnewowner
+authority. Helperall3CONSUMED/unchanged; NOhelper4. Lastrootrun66416 EXIT1 12/20PASS,
+8FAIL/tmp/phase1-c-card-pg4.log; priorlogs1..3preserved, no duplicate/probe.
+
+Concretefixturefix CLOSED/sourceaccepted: deadlinecases assert exactcanonical
+ExpertResidencySettlementError+EXPERT_RESIDENCY_PAYMENT_EXPIRED aftercommit and
+continueALLexistingexpired/nointerval/inbox/noactive/nopub DBtruthchecks. Production
+settle592-600unchanged. Remainingpublication1/3+firstsource heavysetup moved to
+boundedtrackedhooks. Same20cases/default5000ms/existing15000override/real3sTTL/
+assertions and2smonotonicdrain unchanged. No helper/prod/SQL/statechange.
+Finalfulltesttypes/lint/format/diffPASS; independentfixture revieweraccepted.
+Logs/tmp/phase1-c-pg4-fixture-{types,lint}-done.log emptyEXIT0. RevisedfixturehasNOT
+beenexecuted. Previoushelperfinal5/5remainsvalidunchanged, nohelperrerun.
+
+Parentmaynowask EXACTLYONE extra invocation of
+pnpm exec vitest run tests/integration/phase1-card-publication.test.ts
+oncurrentlocalWIPHEAD. Rootsolelaunch/preflight/log withfreshprotectedrotated
+ComposeJSON memoryonly/noDockerEnv/secretoutput. Noimplicit5 or6 authority.
+AfteractualPASS closeC evidence/localcheckpoint then proportionalD→Phase2 under
+existingallplanauthority. Strictproductionfirstsend/content/merchant/exactSHArelease
+remainseparate/defaultoff; no provider/push/deploy/liveflag. A5/B2unchanged.
+
+# Block C extra4 consumed; caller-contract/setup repair — 2026-10-23
+
+OwnerexplicitlyauthorizedoneextraCrun; rootsolelaunch66416 on921d108d EXIT1:
+12/20PASS,8FAIL, log/tmp/phase1-c-card-pg4.log (103.68s/4.38scollect).
+ALL4CinvocationsCONSUMED. NO5/filter/manualprobe/equivalent withoutnewownerexplicit
+authority. Helper3/3consumed/untouched. CNOTaccepted; D/Phase2NOTstarted.
+
+Concretefailures: publication1month timeout5000; two observeddeadlinecases expose
+correct canonical EXPERT_RESIDENCY_PAYMENT_EXPIRED rejection after committedexpiry
+(thefixtureincorrectlyexpectedresolvedexpired); legacy/priorineligible5000timeouts;
+priorineligiblebodyoutlived2sdrain, correctlypoisoningnext3cases beforeDBreset.
+Canonicalsettle592-600mustremainunchanged: commitmoneytruth/releases, thenreject.
+
+Authorizedfix owner block_c_pg_test_author ONLYCtestfile: assert exactexpiredcode
+rejection and continueEVERYexistingDBtruth assertion; move remainingpublication/
+firstsource heavysetup toboundedtrackedhooks. Preserve20cases/default5000/3sTTL,
+allassertions/drain; no helper/prod/SQL/statechange, no functionalexecution.
+Independentreadonlyreview owner block_a_ingress_review waitingready. Lead evidence/
+status/localWIPcheckpoint aftertypes/lint/format/diff+review; parentowns exactextra5
+permissionquestion onlywhenconcrete. No scope/history repeatneeded unchangedinputs.
+
+# Block C WIP checkpoint ready; extra PG authority required — 2026-10-23
+
+HEAD checkpoint contains Cimplementation and reviewed fixture repair, NOT Cacceptance.
+Allfileowners/reviewers/commands/builders/DBsessions ended. Cspec remainsin-progress;
+D and Phase2 NOTstarted. Parent coordinator owns finalexactpermissionquestion.
+
+C PGfile tests/integration/phase1-card-publication.test.ts all3slotsCONSUMED:
+1 collectionfailure(configimportfixed);2 SQLAREfailure(fixed+38nonPGgreen+state);
+3 EXIT1 15/20PASS,5default5000msTIMEOUTS. Logs/tmp/phase1-c-card-pg{1,2,3}.log.
+NO4, filtered/manualequivalent or SQLprobe without explicit newownerauthority.
+Passingfinancial/publication/qualifiederasure cases do NOT establishfullacceptance.
+
+Finalfixturefix verifiedNONPG only: tests/support/async-case-drain.ts tracks whole
+bodies+setup; afterEach2smonotonicdrain/failclosedpoison prevents nextDBreset while
+oldbodycontinues. Heavysetup movedtoboundedhooks for timeoutcases. Same20cases,
+default5000ms, existing15000quoteexpiryoverride, real3sTTL/assertions unchanged.
+Helperunitall3runsCONSUMED; final3PASS5/5, fulltesttypes/lint/format/diffPASS;
+independentfixture sourceaccepted. Nohelper4 withoutnewauthority either.
+
+CorrectedSQL frozen526ac3bd5fa9ac6edfee72128d2898ae19b1ea6555161091b897db0ed1f860f8;
+actualmetadata150tables/63functions/105triggers recaptured, schema/DBbuildPASS.
+Finalscope3PASS123/123 (scope2timeoutpreserved), history2PASS8/8. No guard weakening.
+Pinnedpnpm11.9.0 cacherepaired exactversion; RequireDockerPASS, no deps/lockchanges.
+Hostpressure correlates withtiming butsolecauseunproven; ownedPGhealthy0restarts.
+
+Ifownergrants exactlyoneextraCfocusedfileinvocation, use freshprotectedrotated
+/tmp/phase1-promo-owner-recovery.compose.json MEMORYONLY, neverDockerEnv(oldinvalid
+password)/config/URLoutput. Existing/tmp/phase1-c-pg-launch.py rejects4 untilnew
+explicitauthoritychangesitsallowedcounter; preserveslogs(nooverwrite). AfterPASS,
+closeC evidence/review/localcommit then proportionalD→Phase2 underalreadyexisting
+allplanauthority. Strictproductionfirstsendcustody/content/merchant/exactSHAgates
+remainseparate/defaultoff. No provider/push/deploy/liveflag. A5/B2unchanged.
+
+# Block C all three PG slots consumed — fixture repair/WIP pending — 2026-10-23
+
+PG3 session48536 EXIT1:15/20PASS,5default5000msTIMEOUTS; no assertion/SQLfailures.
+Log/tmp/phase1-c-card-pg3.log,182.17stotal/53.01scollection. PASS includes real1/3main
+publication, erasure/lateGET, qualified100000pending/noextra100, consentepochretry,
+legacyfirstsource/priorineligible andunknownPOSTnoresend. Fiveuncompletedcases:
+HTTPSpublicboundary, originalinvoice replaynewquote, deadlinewait±withdrawal,
+configuredsuccessfulcheckout. Do NOTclaimCcomplete/startD. NO4/probe/equivalent
+withoutEXPLICITownernewauthority. Parentowns finalexactpermissionquestion only
+AFTERconcretereviewableWIPfix/evidence/commit.
+
+Authorizedordinaryfixturefix activeowner block_c_pg_test_author: full-case bounded
+asyncdrain/rejectionobservation/failclosed nextsetup beforeDBreset; move normalsetup
+of timeoutcases toboundednestedhooks while retaining5000ms testcase,3secondsynthetic
+TTL/actualLock/deadline assertions. NewnonPGhelperregression only, noPGexecution.
+Independentfixtureonlyreview owner block_a_ingress_review waitingreadyfiles.
+Lead owns evidence/status/environmentread-only/WIPcommit. Nootherfilewriters.
+
+Hosttiminginflation iscorrelation, notprovenrootcause; ownedPGhealthy0restarts,1CPU/
+1GiB. Concretefixturebudget anduncancelled-body cleanuphazard identified. Current
+prodSQL526ac3bd/state/build/nonPG38/staticguards remainreviewed; preservefailedlogs.
+No source/provider/liveflag/deployment/push authority beyondlocal. A5/B2unchanged.
+
+# Block C final focused PG3 starting — 2026-10-23 17:15 UTC
+
+QuietscopeCrun3PASS123/123 (scan11.407s unchanged30stimeout); historyrun2PASS8/8.
+Fulltesttypes, SQLAREregression38/38, schema lint/types, DBbuild, repairedRequireDocker,
+actualcorrected0054state/pins and parentnarrowreview allPASS. FrozenSQL526ac3bd.
+NEWCfile invocation3 NOWstarting20cases, log/tmp/phase1-c-card-pg3.log. Lastslot:
+all3consumedwhenlaunched, NO4 withoutownerexplicitauthorization. Resumeactualsession,
+neverduplicate. FreshprotectedrotatedComposeJSON memoryonly/noDockerEnv/secretoutput.
+PG1collectionerror andPG2SQLAREfailure preserved. Nootherourcommandsactive.
+NoDstartuntilactualCcriticalgates/review/commit; no providers/liveflags/push/deploy.
+
+# Block C corrected-source static timing gate — 2026-10-23 17:15 UTC
+
+CorrectedAREsource/state complete:38/38nonPG, parentreviewaccepted, actualrecapture
+150tables/63functions/105triggers, schema lint/types+finalDBbuild+fulltesttypesPASS.
+HistoryCrun2PASS8/8. ScopeCrun2:122/123, existing30s tracked-production scan timed
+out37s underhostload13.38 (priorwholefile5s); no concreteviolation. Preservedfailure.
+Allourcommands nowended; parentauthorizedONE quiet focusedscoperetry (Cscope3)
+owned block_a_audit, no timeout/guardweakening, no historyrepeat/externalprocesskill.
+PG3stillUNUSED/HELDuntilactualstaticpass/environmentcoherent. No functionalDB/probes.
+A5/B2unchanged, noDstart/provider/liveflag/push/deploy. FrozenSQL526ac3bd unchanged.
+
+# Block C final-slot preparation after reviewed ARE fix — 2026-10-23
+
+Cbudget2/3consumed; finalPG3UNUSED, no activefunctionalDB. SQLfixed/frozen SHA256
+526ac3bd5fa9ac6edfee72128d2898ae19b1ea6555161091b897db0ed1f860f8.
+ParentnarrowreviewACCEPTED explicitnonnull+charset+total15..526 onentry/proof;
+allremainingboundedAREcounts<=199. Storageowner exactnonPGregressionGREEN pending;
+schemaowner actualmetadatarecapture33811 active afterCHECKparity/types/lint.
+
+Unexpected pinnedpnpmcache lostdist but retainedmarker; causeunconfirmed. Preserved
+incompletecache/tmp/phase1-pnpm-11.9.0-incomplete-20261023, exactcorepackprepare
+11.9.0repairEXIT0/versionconfirmed; no source/dependency/lockchanges. Repaired
+RequireDockerenvironment70084EXIT0. Launchfailureswerenotfunctionalinvocations.
+Need recapturedstate/pins+nonPGgreen, finalDBbuild/types/review andchangedstaticguards
+beforePG3. NoextraSQLprobes/manualequivalents. Preserveallpriorreviewedboundaries;
+A5/B2unchanged, noDstart/provider/liveflag/push/deploy.
+
+# Block C PG2 failed; concrete SQL ARE fix before final slot — 2026-10-23 17:02 UTC
+
+PG2 session27795 EXIT1,18failed/2passed20; log/tmp/phase1-c-card-pg2.log.
+SharedapprovedCard private text/photo/document insertion returns503 before review;
+no downstreammoney/publicationclaim. Ownerbinding/replay+legacyfence cases passed.
+Existingserverlogs/source CONFIRM PostgreSQL ARE invalid repetitioncount:
+0054entry/proof patterns use{1,512}, whileARE upperboundmax255. StorageSOLEDDLowner
+fixes charset+ with explicit15..526totalcharlength preserving512fileID/nullguards;
+newnonPGboundary+SQLpatternregression and all0054regexaudit before finalPG3.
+Metadataowner resumes schemaCHECKparity+actualstate/hashrecapture afternewSQLfreeze.
+Parentnarrowreadonlyfixreview pending. NO extraDB/SQLprobe/manualfunctionalexecution.
+
+Cbudget2/3consumed (PG1collectionfailure included), final3UNUSED/RESERVED.
+Do not launchuntilactualfix/nonPG/review/state/build/typegatesclose. A5/B2unchanged.
+NoDstartuntilClocalcriticalgates+commit. No providers/liveflags/push/deploy.
+
+# Block C PG2 starting after collection-import correction — 2026-10-23 17:00 UTC
+
+PG1 session14754 EXIT1 beforecollection: directroottest @ii-tonya/config unresolved;
+zero tests/DBsetup executed, stillcountedconsumed. Log/tmp/phase1-c-card-pg1.log.
+Exactline8 nowrelative actualconfigsource; no runner/alias/guardchange. Independent
+importgraphreviewaccepted, fulltesttypes/scopedlintPASS. Integrationproofbrand alias
+unchanged. NEWCfile invocation2 nowstarting20cases; log/tmp/phase1-c-card-pg2.log.
+Resumeactualsession; finalslot3reserved, neverduplicatelostoutput. ProtectedfreshJSON
+memoryonly. NoDstart/PG3untilactualresultreview. A5/B2unchanged, no providers/liveflags.
+
+# Block C first integrated PG invocation starting — 2026-10-23 16:57 UTC
+
+NEW tests/integration/phase1-card-publication.test.ts invocation1 authorized by
+standing Cbudget,20cases; log /tmp/phase1-c-card-pg1.log. Resume actual session,
+neverduplicate. Remaining2/3 slots, final3reserved for actualcorrections.
+All finalsource/fixture independentreviews accepted. Stagedscope123/123 and
+history8/8 firstinvocationPASS. Fulltesttypes/lint/diffPASS. RequireDockerPASS;
+normalDB/integration/application/config/workerbuilds and relevanttypesPASS.
+Fresh protectedrotatedComposeJSON parsedmemoryonly; no DockerEnv/secretoutput.
+No provider/liveflag/push/deploy. A5exhausted/B2unchanged. Do not startD untilC
+actualPG/localcriticalgates/review/commit close.
+
+# Block C final pre-PG staging — 2026-10-23
+
+C functional PG 0/3; no active run. Actualmetadata capture150tables/63functions/
+105triggers complete, exact0054pins ready. Source finalreviews accepted financial,
+materials, staff, ingress/config/composition, actualapp/server and privacytombstones.
+Finalservice42/config28/workroute20/normalcomposition9/wiring6 PASS; app/config/
+DB/integrations/worker builds and relevanttypes PASS; fullwebtypes PASS.
+
+Only NEW C testauthor finalfulltesttypes/lint and narrowassertionrereview pending;
+20expandedcases include configuredrealadapterbinding/recovery/unknownPOST,
+observeddeadlinewait±withdrawal, consentepochretry, legacyfirstsource, qualified
+100000pending/noadditional100, actualpublished/qualifiederasure+lateGET+oldstart.
+Afterhandoff stagefinalsource, run scope/history eachonce, then firstPGfocusedfile.
+LeadsolePGlauncher mustreadcurrentprotectedComposeJSON memoryonly, notDockerEnv.
+Strictproductionfirstsendcustody remainsoff; configuredsyntheticfixture does NOT
+prove cancellation. No providers/push/deploy/liveflags. A5consumed; B2/3unchanged.
+
+# Block C frozen SQL, checkout/replay/privacy closure — 2026-10-23
+
+C PG file remains 0/3; no active functional DB invocation. Actual isolated metadata
+reconstruction active52164, owned block_a_audit; source0054 frozen SHA256
+4820d720ccf047a84cdea0aa3fe6b1c0dc4ce0a824e423ab8eabbabe838e6ed9.
+15 new tables,17 new functions plus one narrow0048 replacement,21 triggers.
+Consent epoch schema/22 coreCHECK parity complete. Integrations/DB normal builds
+PASS; DB rebuild needed only after pending privacy copied-name clear.
+
+C5 owner-bound checkout pre/post DB verification now25/25 unit, types/lint PASS;
+root narrow review accepted. Ingress owner implements strict configured sameorder
+link/recovery, legacy receipt fence, replay reply suppression and actual app/server
+wiring. Original firstsend custody runtime remains defaultoff. Testauthor adding
+configured checkout case;17 expanded integratedcases independently reviewed before
+any PG. Reviewer caught standalone template/notice leakage and unhandled race
+promises; fixtures corrected. Actual publication→erase assertion added and caught
+copied experts.public_display_name surviving erasure; storage owner fixing same-tx.
+
+Staff interface independent review/full webtypes PASS. Transport/receipt final
+review accepted bounded monotonic deadline, exact multipart receipt and template
+relock. Manager facade null edit regression RED1/11→GREEN11/11; own lint/diff PASS.
+No providers/push/deploy/liveflags. A5 exhausted; B2/3 unchanged. Continue allplan.
+
+# Block C source integration and review — 2026-10-23
+
+Baseline 656cf89a025d46dfa6bc8e0cf92a3e6eee355c21; source uncommitted.
+NEW tests/integration/phase1-card-publication.test.ts: 0/3 invocations, no active PG.
+A all five consumed/no sixth; B 2/3 with 23/23 PASS, no unchanged third.
+
+Lead remaining_plan_implement coordinates C and owns manager application/API and
+status/evidence. block_a_composition exclusively owns actual app/server C wiring,
+work ingress/config/service; block_a_storage owns card repository/privacy/0054 SQL;
+block_c_main_financial financial source ready, ownership ended pending findings;
+block_a_audit owns card schema then actual metadata reconstruction after SQL freeze;
+block_c_pg_test_author owns only new integrated C test. Staff UI, real materials
+transport and actual worker source owners ended; independent final reviews active.
+
+Observed greens: financial command18/helper3, card contract36, config24/service28/
+work route17/source composition9, manager facade10/API7, staff client10/view10/
+shared session2, actual transport26, worker20. Relevant source types/lint passed.
+Root narrow financial review accepted exact event/order binding, publication guard,
+all post-lock deadline paths and canonical clock refresh. No provider calls.
+
+Remaining critical gates: actual app/server wiring, consent-document epoch barrier
+and matching schema, final integrated test/source review, rebuilt package artifacts,
+actual isolated PG17.5 metadata recapture, C focused PG and final checks/review/commit.
+Test author covers observed lock-wait expiry with withdrawal, new approved notice
+bounded SERIALIZABLE retry, legacy source precedence, pending1000 reward and actual
+privacy erasure/late proof. No fabricated delivery/content/consent or early active.
+Protected rotated private Compose config must be read fresh memory-only, never
+Docker Env or printed values. Continue C→D→Phase2 after C local gates, no approval loop.
+
+# BlockC implementation started — 2026-10-23
+
+Bsource dd73dfb30be327d1e3e86458826c956375834ece, docs656cf89a025d46dfa6bc8e0cf92a3e6eee355c21, cleanbaseline.
+Cspec/plan nowpresent. New CPGfile0/3; no BPG3 or A6. MaincontractC→D→Phase2 remains.
+Cowners beingassigned disjoint cardstorage/PIIerasure, actualmainpayment/corebridge,
+workbot/config/application and staffreviewUI. Existinggeneric financialmint forbidden.
+Cmainactivation only after verifiedpayment+allcard/promo/delivery/ownerquote gates;
+no earlyactiveflags. Promoqualifiedsource explicitauditedvariant, cross-sourceunique,
+canonical1000/30day/debt/abuse retained; no legacycodeautoissue or doublecount100.
+Parentavailable for independentbridge/entitlement audit. No provider/push/deploy.
+
+# BlockB local gates PASS; source committed, continue C — 2026-10-23
+
+B source commit dd73dfb30be327d1e3e86458826c956375834ece. PG2 session88902 EXIT0:
+23/23 at15:33:05UTC, /tmp/phase1-b-verification-pg2.log. Only2/3consumed; thirdUNUSED,
+no unchangedrerun. PG1rawDatebug fixed in production SQLunderlocks/DBclock withfinite
+expiry/MFA, regression10/10 and independentreviewaccepted. A5consumed/no6 unchanged.
+
+ActualstaffUI /admin/expert-verification complete: client10/binding8/build/typesPASS;
+MFAissuedtokenmemoryonly, escapedtext, asyncPIIclear, normalapproveauto invoice/link,
+existing-ID exceptionrecovery afterlostresponse/relogin. UI rereviewaccepted. Native
+Nginx staff/APIcache1/1 and managerHTTP10 no-store; merchantHTTP6, service15,
+verifier32, capability11, config24, normalcomposition16PASS. Relevantbuilds,
+API/web/DBtypes/testsTypeScript/scopedlint/format/whitespacePASS; edgeformatwarning
+corrected. Finalstagedscope123/history8; actualcatalog135tables/46functions/84triggers.
+AllBfileowners/reviewers/builders/commandsended. NoBcriticalgate remainsopen.
+
+Evidence docs/test-evidence/phase1-block-b-2026-10-23.md. A docs-update script failed
+syntax immediately before sourcecommit, leaving conservative oldprogress text; this
+followup corrects documentation only, no productcode or runtimeevidence changed.
+Proceed C→D→Phase2 perallplanauthority, noapprovalloop. No push/deploy/provider/liveflag.
+Strictfirstsendcustody, realmerchant/processorbackup/exactSHArelease gates separate.
+ProtectedrotatedPGconfig memoryonly, notDockerEnv; incident retiredlocalvalue only.
+
+# BlockB PG2 active after DBclock/finiteauth review — 2026-10-23 15:33 UTC
+
+NEWphase1-verification.test.ts invocation2 ACTIVE session88902,
+log/tmp/phase1-b-verification-pg2.log.23cases. Run1CONSUMED21fail sharedrawtimestamp
+bug. Actualproduction manager andcaptureauthorization nowSQLunderlocks/fullprecision,
+finiteexpiry/MFA predicates in TS+0053; newnonPGregression10/10, independentreview
+accepted. Lastslot3reserved after finalreview, noPG3yet. Read/resumerun2 output;
+neverduplicate. FreshcurrentprotectedComposeJSON parsedmemoryonly, no credentialURL
+orDockerEnvoutput. RelevantDB/applicationbuilds/APItypesgreen; globalteststypes wait
+staffUIowner's newtest/sourcecompletion, no backendTSerrors.
+
+ActualstaffUI nowrequiredandactiveowner block_b_manager_ui: apps/web newclient/view/
+tests+main.ts only. LeadnativeNginx no-store staffshellandprotectedAPI testRED→GREEN1/1;
+no deploy. API no-store10/10, terminalrefundretry6/6, documentedconfirmationhost
+positive/negative service15/15. Guardfiniteauthscope refresh123/123; historyprior8/8
+stillvalid, no repeat.0053recaptureactualfunctionfiniteconstraints complete.
+NoBcommit/Cstartyet. ContinueB→C→D→Phase2 onlyafteractualcriticalgateclosure.
+
+# BlockB PG1 failed shared manager bootstrap; sourcefix active — 2026-10-23 15:16 UTC
+
+NEWphase1-verification.test.ts invocation1 CONSUMED session1462 EXIT1:21failed,
+1unhandledrejection. Log/tmp/phase1-b-verification-pg1.log. FreshrotatedPGauth and
+migrations succeeded; no PGSQLerror/crash logged. Shared boundedmanager failure
+prevented downstream acceptance; DO NOTclaimmoney/GETcases passed. Storageowner
+investigates rawDrizzle timestamptz string vs Date.getTime assumptions; nonPG
+regression/sourcefix before run2. Remaining2/3 slots, final3reserved. No rerunyet.
+StaticB scope123/123 andhistory8/8 firsttryPASS. Metadata/pins135tablesstable.
+Leadlintfixedunusedtestlocal; testsTypeScriptgreen. Sourceowners/reviewsongoing,
+noBcommit/Cstart/provider/push/liveflag. Parentcoordinatorinformedactualfailure.
+
+# BlockB first integrated PG run active — 2026-10-23 15:13 UTC
+
+NEW tests/integration/phase1-verification.test.ts invocation1 ACTIVE session1462,
+log /tmp/phase1-b-verification-pg1.log.21cases; remaining2/3 slots, final3reserved.
+Resume/read completedoutput, never rerun on lostoutput. Freshprotected recoveryJSON
+read only in memory, rotatedcredentials and loopback55483; no URL/envvalues printed.
+No DockerConfig.Env used (obsolete invalidpassword). Parentcontainment record in
+coordinator evidence; storage accidental localfixtureprint retired by role rotation.
+
+B latestlocalgreens: GETverifier32, webhook11, manager service13, managerroute9,
+merchantroute5, config24, standardcomposition16. Relevantbuilds/typesgreen; leadlint
+one unusedtestlocal corrected, finalcheckpending. Independentstorage source/test
+review accepted after fixing testshop literal BEFOREPG1; no guardweakening.
+Admit→physicalerase→sameproof replay now tested alongside latebind/latepayment.
+Metadata isolated54SQLreplay:135tables/46functions/84triggers; exactpinsready for
+staging/staticguards. Scope/historyruns not yet invoked for B. No Bcommit yet.
+C/D/Phase2 have NOT started until Bcriticalgates close. No provider/push/liveflag.
+
+# BlockB implementation active — 2026-10-23 14:57 UTC
+
+BlockA accepted by owner-authorized5:15/15; all5consumed/no6. CurrentBbaseline
+is e880246f641ede57b4ab0512dccbd1031226dacb. Mainexecutioncontract stillrequires
+B→C→D→Phase2; Phase3excluded. Sourcework localonly, no provider/liveflag/push.
+
+Lead remaining_plan_implement owns B applicationservice, managerAPI, merchantcallback
+route integration and overallstatus/evidence. block_a_storage owns new0053SQL/journal,
+expert-verification schema/repo, privacydisposition and NEWphase1-verification PGfile.
+block_b_payment_verifier owns narrowGET/privateproof and onboardingwebhookcapability
+plus NEWunitfiles. block_a_composition owns Bconfig+composition/tests; its initial
+app/serverregistration edits complete, leadnowowns their callbackwiring sections.
+No sharedfile editing. Scope/state reconstruction owner will be assigned afterSQLsettles.
+
+NonPGtestfacts: actualGET verifier32/32 GREEN; managerapplicationservice11/11 GREEN;
+newconfig22/22 GREEN including existingpaymentverification with newcheckout/manageroff.
+Webhookcapabilityunit GREENpending. NEW BPGfile invocations0/3, first integratedrun
+will follow independent sourcereview; don't rerun any A/exhaustedlegacy/providerfile.
+Relevant configbuild/types/lintgreen. Preflight RequireDocker82299 checked baseline.
+
+Bfinancialboundary: separate purposeonboarding invoice/operation300000RUBkopecks;
+NEVER expert_residency_order or active/verifiedexpert. PrivateGETproof must bind stored
+invoice/application/user/op/mode/providerid. Actualsettlement opens interviewonly;
+no residencyinterval/firstmarker/referralgrant. ApplicationliveFK nullable for erasure,
+financialauditUUID retained; lateactualpayment recorded but erasure/withdrawal blocks
+access without resurrectingapp. Acceptedmainquote cannot be replaced afterdecision.
+Strict firstsenddeletion/custody productiongap remains defaultoff, no leaseexception.
+
+# BlockA local gate PASS; continue BlockB — 2026-10-23
+
+Owner explicitly authorized one further focused invocation after infrastructure
+failure4. Coordinator invocation5 of tests/integration/phase1-promo.test.ts on
+fresh owned PostgreSQL17.5 project ii-tonya-phase1-promo-owner-recovery-20261023
+exited0:15/15PASS,19.60seconds. Corrected expiredquote fixture executed and rejected
+actual expiredquote. Log /tmp/phase1-promo-owner-extra5.log. Source unchangedfrom
+reviewedWIP2ceedcf92052f1d51e502a08cc5e8520022f6e93; latestpre-run docs80313bf6.
+
+All5 invocations consumed (3original+2specificownergrants). Do not run6/equivalent
+functionalprobe/oldfullprovidersuites. FreshisolatedPGavailable for NEW independent
+blockfocusedfiles with their own boundedbudgets. OriginalfailedPGretainedforensics.
+Private config /tmp/phase1-promo-owner-recovery.compose.json mode0600 holds only
+synthetic taskcredentials; neverprint/copy/commitvalues.
+
+BlockA locallyverified/reviewed, not releaseaccepted. Previoussourcechecks service25,
+route10, config16, composition8, scope123/history8 and relevanttypes/lint/formatgreen
+remain applicable; thisnewrun closed remainingPGgate. Continue B thenC/D/Phase2 per
+ownerall-planinstruction; Phase3excluded. No push/deploy/provider/liveflag authority.
+
+# Owner extra5 authorized and CONSUMED — 2026-10-23
+
+Owner explicitly authorized ONE further invocation of phase1-promo.test.ts after
+infrastructure isolation. Coordinator starts invocation5 on healthy task-owned
+fresh PostgreSQL17.5 project ii-tonya-phase1-promo-owner-recovery-20261023 only.
+Do NOT rerun6 or infer broader authority. Resume current command/read
+/tmp/phase1-promo-owner-extra5.log if output is lost. Source unchanged80313bf6.
+No old/full/provider suite, push/deployment/liveflag permission follows.
+
+# Owner extra4 consumed; fresh isolated PG ready, extra5 NOT authorized — 2026-10-23
+
+Owner answered «разрешаю» for exactly ONE extra phase1-promo.test.ts invocation.
+Coordinator ran4 once: exit1,15skipped; beforeAll CREATE DATABASE connection died.
+No migration/application case or correctedfixture executed. Existingowned PG17.5
+backend9942 exited2 and internallyrecovered; rootcause unknown, not a source failure
+or PASS. DirectComposeIP(3) vs loopbackpublishedport(4) difference is not proven causal.
+Log /tmp/phase1-promo-owner-extra4.log. Invocation4 authority is fully consumed.
+
+Parent prepared separate owned Compose project
+`ii-tonya-phase1-promo-owner-recovery-20261023`, samepostgres17.5bookworm,
+loopback55483, dedicatedgeneratedvolume,1CPU/1GiB/256MiBshm. Privategenerated
+configuration /tmp/phase1-promo-owner-recovery.compose.json mode0600 contains
+syntheticcredentials: never print/copy/commit its values. Originalproject retained.
+Infrastructure-only actual17.5 TCP+uniqueemptyDB CREATE/DROP PASS; no domainSQL,
+migrations/testfile/assertions executed. Log /tmp/phase1-promo-infrastructure-recovery.log.
+Detailed evidence docs/test-evidence/phase1-block-a-owner-extra4-2026-10-23.md.
+
+Source/test still reviewed WIP2ceedcf92052f1d51e502a08cc5e8520022f6e93 plus prior
+docsbea76b2748aa030494f172c58aac43ed15694d7e; parent only changedstatus/evidence.
+Need explicit exactlyONE new focusedfile invocation5 authority, not elapsedtime or
+ordinarycontinuation. No equivalentprobe, old/full/provider run. All commands and
+childowners terminal; B/C/D/Phase2 stillrequired but blocked by A runtimegate.
+
+# Owner extra PG invocation4 authorized and CONSUMED — 2026-10-23
+
+Owner explicitly answered «разрешаю» to exactly ONE extra invocation of
+`pnpm exec vitest run tests/integration/phase1-promo.test.ts`.
+Coordinator is starting that invocation on the existing task-owned synthetic
+PostgreSQL17.5 Compose project only. Authority is consumed; do not run5 or retry
+on missing output. Resume the running command/read /tmp/phase1-promo-owner-extra4.log.
+Source is bea76b2748aa030494f172c58aac43ed15694d7e with corrected ::text fixture.
+No broader/old/full/provider/production authority. B starts only after actualPASS.
+
+# Reviewable BlockA WIP saved; exact extra-run request ready — 2026-10-23 14:35 UTC
+
+Source WIP commit:2ceedcf92052f1d51e502a08cc5e8520022f6e93 on thisisolatedbranch.
+This is explicitly PENDING PostgreSQL verification, NOT BlockAcomplete. Parent
+permitted a local WIPcheckpoint because the repository3run cap is now the solegate.
+All childfileowners/reviewers are terminal; no builder/test/probe/session remains.
+Owned synthetic PG17.5 Compose infrastructure remains for an authorized followup.
+
+Correctedfixture exactlocation: tests/integration/phase1-promo.test.ts:335 adds only
+`${randomUUID()}::text` for jsonb_build_object idempotency_key. Readonly independent
+block_a_storage_review accepted this cast and confirmed otherparameters alreadyhave
+UUID/typedcolumn/interval types; no further typeinference gaps found. It performed
+NO runtimeprobe. Correctedfile lint/format/testsTypeScript/diffchecks PASS; source
+reviews accepted all actualcode/guards. Scope123/history8 remainverified as below.
+
+Requested permission is EXACTLY ONE additional local invocation of
+`pnpm exec vitest run tests/integration/phase1-promo.test.ts` on taskowned synthetic
+PG17.5 only. All3 original slots CONSUMED; final3 produced14/15. No answer yet.
+Do not run4, equivalentSQLprobe, old/full/provider suites or beginBlockB without
+actualowneranswer. Source/metadata/evidence are concrete and reviewable. No push,
+merge, deploy, paidprovider or liveflag authority follows. Remaining B/C/D/Phase2
+are still required after this predecessor gate closes; Phase3 remains excluded.
+
+# BlockA corrected fixture awaiting one extra PG run — 2026-10-23 14:33 UTC
+
+All3 invocations of NEW tests/integration/phase1-promo.test.ts are CONSUMED.
+Final3 session7976 at14:32:01UTC:14passed/1failed. The new expiredquote fixture
+failed PostgreSQL42P18 (`jsonb_build_object` idempotency-key parameter had no SQLtype).
+Lead added explicit `::text` to that syntheticfixture parameter only; no productcode,
+guard or expectation weakened. Correctedfixture has NOT run. Do NOT run4 or equivalent
+SQLprobe without explicit owner authorization. Parent coordinator informed and asked
+to request exactly ONE additional invocation of this file on the sameowned PG17.5.
+No old/full/provider suite permission follows. Source reviewers rechecking exactcast;
+TypeScript/scopedlint/format checks active29147 (read logs before rerun).
+
+The14passing cases include real enrollment/consent/candidate preservation/denyreplay,
+identity and ownership conflicts, two-referral concurrency, privacy erasure and oldstart
+replay fence, forced inviter inactivation race. Earlier quote/handoff checks in the
+remaining case passed before fixturecreationfailed; expiredquote rejection unverified.
+A critical verification gate remains OPEN, so A is uncommitted and B/C/D/Phase2 have
+NOT started. No independent implementation remains before this gate; await actualowner
+extra-run answer, never infer approval from elapsedtime/automaticcontinuation.
+Owned Compose project ii-tonya-phase1-promo-20261023 remains for authorized followup;
+no customerdata/secrets/providers/liveflags involved. Other worktrees untouched.
+
+# BlockA final verification checkpoint — 2026-10-23 14:30 UTC
+
+Source and final independent reviews accepted, except pending runtime finalPG3.
+Relevant db/application/config builds, APItypes, testsTypeScript, scopedlint passed.
+Scope123/123 PASS; historyRED7/8→correctnewest52→GREEN8/8. Newservice25/25,
+route10/10, config16/16, composition8/8. PG GREEN2 consumed:11pass/4fixturefail;
+fixtures corrected preserving immutableguards. Final3 NOT yet consumed; storage
+adds actualexpiredquote rejection case before lead-owned single finalrun. No Bwork.
+Metadata0052 reconstructed130tables/43functions/75triggers, exactcatalogue/pins
+independently accepted. See docs/test-evidence/phase1-block-a-2026-10-23.md.
+Storage finaldbbuild55440 exited0; no distwriter active. Lead earlierbuild94304
+pipeline exited0. No providers/deployment/push. A remains uncommitted until final3.
+
+## BlockA review checkpoint — 2026-10-23 14:20 UTC
+
+Current service23/23 and route10/10 green after real new source changes; config16/16,
+composition8/8 green. Config builds/types and owned scoped lint are locally verified.
+Storage independent review fixed quote wrapper snapshot/error sanitization, quote
+replay flag, inviter erasure locking and consent timeout regressions before PGgreen.
+Remaining review fixes actively owned by block_a_storage: retain firstreferrer and
+stable event receipt even when approvednotice missing; exact denieddecision replay;
+24h pending renewal preserving candidate; erasure-safe PII-minimal bot/update tombstone
+so oldaccepted/start cannot recreate deleted user. PG remains RED1 only, GREEN2 pending,
+final3 reserved. Metadata/schema guard finalization waits source SQLsettled. No Acommit
+yet. B/C/D/Phase2 remain unstarted; no production/provider action.
+
+# Phase1 BlockA implementation active — 2026-10-23 14:15 UTC
+
+Execution owner: coordinator child `remaining_plan_implement`; keep this isolated
+worktree/branch. Source baseline8b41802cd0156f8596fbf0e1ba67890f2ed969f2.
+Main contract: docs/superpowers/implementation-artifacts/spec-phase1-through-phase2-execution.md.
+BlockA spec/plan present; B/C/D/Phase2 have NOT started because A critical storage,
+enrollment and review gates remain open. Do not duplicate active implementation.
+
+Within A, disjoint child owners: block_a_storage owns0052 SQL/schema/metadata,
+PostgresExpertPromoRepository, quote-transaction reuse, consent presentation reuse,
+privacy erasure and NEW tests/integration/phase1-promo.test.ts. block_a_composition
+owns config + app/server composition. block_a_audit owns exact scope/history guard
+registrations/rationale. Lead owns application service and dedicated promo route.
+Read-only block_a_ingress_review found global replay/quote authorization/duplicate
+reply gaps; remediation is active. Reviewers never edit source.
+
+New service tests: initial GREEN15/15; review RED6fail/11pass then GREEN17/17;
+enrollment RED then current GREEN21/21. New dedicated route RED then GREEN9/9.
+New config helper RED then GREEN15/15; composition GREEN awaits db/app builds.
+NEW PG file: RED1 consumed; GREEN2 pending; final3 reserved after independentreview.
+No existing exhausted PG/provider/verifier files, full suite or multi-path run.
+Preflight PASS Node24.22.0/pnpm11.9.0. No providers, secret copying, pushes or deploys.
+
+First unknown private/start requires approved document presentation and explicit
+bound-token consent; missing approved copy stays inactive TODO. No attribution,
+bonus or guide work before consent. Preserve first deep-link candidate until grant.
+Single event receipt must bind stable numeric receivingbotId/update to owner/digest
+across command types. Dedicated promo scope must differ from client/workbot.
+Quotes reuse existing immutable campaign engine; no new prices or ledger credit.
+Guide PDF absent: waiting_content; frozen100points is indication within1000RUB
+qualified reward (not additional available balance), no margin guarantee.
+
+# Phase0 guards repaired; continue approved plan — 2026-10-23
+
+Owner explicitly instructed: implement the entire approved plan in order and fix
+findings along the way. Continue this isolated worktree; no new per-step approval.
+Current source repair: see docs/test-evidence/phase0-guard-reconciliation-2026-10-23.md.
+Scope123/123 and migration-history8/8 now PASS; earlier red status below is historical.
+New verifier-authority10/10 and import-boundary41/41 PASS, three independent reviews.
+No old exhausted test/PG rerun, provider request, push, deploy or feature activation.
+Next: BlockA, then B/C/D and Phase2 backlog; preserve Phase3 exclusions.
+Owner delegated bonus economics: use one-time100 frozen bonus points for2unique
+promo leads, included within existing1000RUB qualified referral reward, never100+1000.
+Registration alone cannot create available financial balance. PDF absent: prepare
+pending delivery/content slots, do not mark pdf_sent or fabricate a guide.
+External merchant, processor/backup and exact-SHA release gates remain separate.
+
+# Phase 0 isolated continuation — 2026-10-23
+
+This checkout is `codex/phase1-owner-plan-20261023`, based on
+`031ae46065b58223a2b6cd47e002b388a41ec89c`. The owner explicitly requested an
+isolated tree, recording the approved Phase 1 plan, then executing Phase 0.
+Plan commit: `d32da25dcdaf54ceb2039049ab348b3b54e9e2d4`.
+Implementation: `be3dfb270680aeed748e1769088fd7dbe573a51b`; clean committed technical
+review with MIGRATION-COMPATIBILITY marker is recorded in the evidence report.
+Focused PG schema18/18, atomic deletion10/10, payment16/16+16/16 and Telegram43/43
+passed. Both new PG-file three-invocation budgets are consumed; do not rerun.
+Scope121/123 and history7/8 remain failing, including inherited registration debt
+propagated into the new full snapshot. No full or multi-path suite was run.
+
+New continuation truth is scoped to this local Phase 0 work. The primary checkout's
+uncommitted provider/evidence changes were preserved; do not copy or amend them.
+See `docs/test-evidence/phase0-local-2026-10-23.md`, the execution plan and two
+`spec-phase0-*-foundation.md` files for implementation, review and bounded tests.
+The owner approved existing financial authority plus an application table and has
+a test YooKassa merchant; protected runtime settings are supplied separately.
+
+No push, merge, deployment, shared-database migration, provider request or live
+flag change is included. Physical erasure/backup proof and external YooKassa
+delivery remain gates. Existing scope/history guard drift must not be hidden by
+rebaselining unrelated artifacts. No exact-SHA CI or release acceptance is claimed.
+The prior provider-specific blocked goal is historical context, not automatically
+resumed by this separate request. Do not repeat its exhausted suites.
+
 # Agent status — owner-spec 2026-09-16
 
-## Main integration in progress — 2026-10-27
+## Main integration verified for publication — 2026-10-27
 
-Owner authorized consolidation of all nine open PRs101,106,110–116 into main.
-Integration branch codex/unify-main-20261027 preserves original dirty checkout.
-Historical entries below are dated evidence, not current release readiness.
-No deployment or provider activation is authorized by source integration.
+Owner authorized consolidation of all nine PRs101,106,110–116 into main.
+Integration worktree is `codex/unify-main-20261027`; original dirty checkout is
+preserved. Full build, lint, TypeScript, formatting and whitespace pass. Initial
+bounded aggregate retained50failed/541passedfiles; failures were repaired and
+individually verified. See `docs/test-evidence/main-unification-2026-10-27.md`.
+Independent source/history/financial review accepted final corrections.
+
+Owner authorized exactly ONE extra invocation EACH for card-publication and
+residency-lifecycle. Both run4 allowances are CONSUMED:20/20and12/12passed.
+Overlapping replies do not authorize more runs. Do not repeat the full suite or
+exhausted focused files; all budgets/evidence are recorded in the integration
+checkpoint and DB evidence. Canonical migration history is residency0..69,
+RC availability70, main lifecycle/waitlist/reschedule71..73. Existing old-main
+and native RC51 databases deliberately fail closed pending operator-reviewed
+reconciliation; no deployment or provider activation follows from source merge.
+
+This is the pre-publication source checkpoint. Final delivery truth is live
+GitHub main and PR states; verify them rather than treating historical sections
+below as current. Repository pre-push gate remains installed and is the final
+publication check. No hosted CI success or commercial acceptance is claimed.
 
 ## Trusted peer verified; review exposure assessed
 

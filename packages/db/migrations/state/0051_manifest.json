@@ -1,7 +1,7 @@
 {
   "databaseVersion": "170005",
   "drizzleKitVersion": "0.31.10",
-  "method": "SQL replay through 0051; database introspection normalized against positional catalog data",
+  "method": "Hand-authored additive snapshot from 0050; full-chain PostgreSQL 17.5 replay verified complete constraint/index catalogue equality, including exact UTC archive timestamp bounds",
   "generatePermitted": false,
   "migrations": [
     {
@@ -261,10 +261,10 @@
     },
     {
       "idx": 51,
-      "tag": "0051_planerka_availability",
-      "sha256": "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e"
+      "tag": "0051_expert_onboarding_applications",
+      "sha256": "e244079a72a25c2707a30864c704c0ce692e96ee1f39eefc8a4203536cb99a64"
     }
   ],
-  "snapshotSha256": "3dec3981713de32d2b1364d00c15dac3b69c112c4daf9229a44b2e96e9f2e9d0",
-  "sqlObjectsSha256": "f23ca8d3c899704fd3752b0f0afec92e41eb100ad9680e418c1517ba359bc01f"
+  "snapshotSha256": "0c16dd5981f99e2b018dad31c7ab4d867c1c68e7beb2cf206fe5fbb05ffff681",
+  "sqlObjectsSha256": "0a203b2d46e09d345a19c0c71bbe849cc35e4164800689d0739ba4cd16af957a"
 }

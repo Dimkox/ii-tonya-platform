@@ -20,8 +20,16 @@ const setup = async (denied = false, missing = false) => {
       resolve: async () =>
         denied ? { kind: "denied" } : { kind: "resolved", principal },
     },
-    bookings: { list, reserve: vi.fn(), cancel: vi.fn() },
+    bookings: {
+      list,
+      reserve: vi.fn(),
+      cancel: vi.fn(),
+      reschedule: vi.fn(async () => {
+        throw new Error("unexpected_reschedule");
+      }),
+    },
     reserveEnabled: false,
+    waitlistEnabled: false,
   });
   return { app, list };
 };

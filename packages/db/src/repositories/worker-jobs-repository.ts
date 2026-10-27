@@ -120,10 +120,11 @@ export class PostgresWorkerJobsRepository {
             topics.topic,
             jsonb_build_object(
               'reservationId', expired.id::text,
-              'slotId', expired.slot_id::text,
               'version', expired.version,
               'charge', 0
-            ),
+            ) || case when topics.topic = 'waitlist.promote.v1'
+              then jsonb_build_object('slotId', expired.slot_id::text)
+              else '{}'::jsonb end,
             'reservation-expiry:' || expired.id::text || ':' || expired.version::text,
             'booking:' || expired.id::text,
             'sha256:' || encode(digest(convert_to(

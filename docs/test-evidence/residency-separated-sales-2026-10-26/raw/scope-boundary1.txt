@@ -1,0 +1,14 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/repo/scope-boundary.test.ts (130 tests) 4074ms
+   ✓ MVP scope boundary > contains no inbound Make or Sheets Fastify route  440ms
+   ✓ MVP scope boundary > recursively rejects forbidden tracked production artifacts  3452ms
+
+ Test Files  1 passed (1)
+      Tests  130 passed (130)
+   Start at  17:57:44
+   Duration  5.12s (transform 151ms, setup 0ms, collect 559ms, tests 4.07s, environment 0ms, prepare 134ms)
+
+
+[END OF RAW CAPTURE]

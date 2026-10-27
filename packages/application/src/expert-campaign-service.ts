@@ -18,7 +18,10 @@ export interface SavedExpertCampaignQuote {
   id: string;
   userId: string;
   tariffVersionId: string;
-  ruleVersion: "expert_energy_start_v1";
+  ruleVersion:
+    | "expert_energy_start_v1"
+    | "expert_energy_start_v2"
+    | "expert_separated_sales_v3";
   calculationTimestamp: string;
   quotedAt: string;
   expiresAt: string;

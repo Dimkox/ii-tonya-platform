@@ -163,17 +163,18 @@ let currentRepositorySchemaApplied = false;
 it.each(legacyStates)(
   "preserves legacy %s semantics in the active client list after migration0043",
   async (status) => {
-    // Snapshot assertions above intentionally stop at0043. Current producer code
-    // needs0044; apply it only for the subsequent repository behavior cases.
+    // Snapshot/catalogue assertions above intentionally stop at0043. Current
+    // repository code requires the full canonical schema, including current
+    // residency visibility. Upgrade only after the exact historical assertions.
     if (!currentRepositorySchemaApplied) {
-      await database!.db.execute(
-        sql.raw(
-          readFileSync(
-            `${folder}/0044_booking_notification_delivery.sql`,
-            "utf8",
-          ),
-        ),
-      );
+      const journal = read(`${folder}/meta/_journal.json`);
+      for (const entry of journal.entries.filter(
+        (entry: { idx: number }) => entry.idx > 43,
+      )) {
+        await database!.db.execute(
+          sql.raw(readFileSync(`${folder}/${entry.tag}.sql`, "utf8")),
+        );
+      }
       currentRepositorySchemaApplied = true;
     }
     const fixture = legacyFixtures.get(status)!;

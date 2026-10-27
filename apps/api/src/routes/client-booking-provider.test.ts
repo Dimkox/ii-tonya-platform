@@ -31,8 +31,12 @@ it("returns calendar pending and asynchronous cancellation honestly without prov
         throw new Error("unexpected");
       },
       cancel: async () => ({ bookingHandle, state: "cancellation_pending" }),
+      reschedule: async () => {
+        throw new Error("unexpected_reschedule");
+      },
     },
     reserveEnabled: false,
+    waitlistEnabled: false,
   });
   try {
     const headers = { authorization: `Bearer cs1.${"B".repeat(43)}` };

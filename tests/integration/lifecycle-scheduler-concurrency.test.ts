@@ -55,4 +55,28 @@ describe("lifecycle scheduler concurrent claims", () => {
       sequence: "1",
     });
   });
+  it("does not schedule a reminder when an equal-time denial ties a grant", async () => {
+    const tied = await seedLifecycleFixture(database);
+    await database.db.execute(sql`
+      with instant as materialized (select clock_timestamp() as at)
+      insert into consents(id,user_id,consent_type,decision,policy_version,created_at)
+      select decisions.id::uuid,${tied.userId}::uuid,'client_messaging',
+        decisions.decision,'client-messaging-v1',instant.at
+      from instant cross join (values
+        ('ffffffff-ffff-4fff-8fff-ffffffffffff','granted'),
+        ('00000001-0000-4000-8000-000000000001','denied')
+      ) as decisions(id,decision)
+    `);
+    expect(
+      await tied.repository.scheduleReservationLifecycle(tied.reservationId),
+    ).toBe(0);
+    expect(
+      (
+        await database.db.execute(sql`
+      select count(*)::int n from lifecycle_jobs
+      where subject_id=${tied.reservationId}::uuid
+    `)
+      ).rows[0]?.n,
+    ).toBe(0);
+  });
 });

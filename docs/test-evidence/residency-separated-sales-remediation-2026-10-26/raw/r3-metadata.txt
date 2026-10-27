@@ -1,0 +1,13 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/repo/migration-history-integrity.test.ts (9 tests) 27ms
+ ✓ tests/repo/residency-separated-sales-boundary.test.ts (8 tests) 201ms
+
+ Test Files  2 passed (2)
+      Tests  17 passed (17)
+   Start at  18:57:01
+   Duration  1.17s (transform 163ms, setup 0ms, collect 606ms, tests 229ms, environment 1ms, prepare 233ms)
+
+
+[END OF RAW CAPTURE]

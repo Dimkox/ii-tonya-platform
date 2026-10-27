@@ -1,3 +1,4 @@
+import { privateObjectErasureSubjectKey } from "./resident-private-erasure.js";
 import { lockBookingNotificationSubjects } from "./booking-notification-authority.js";
 import {
   eraseBookingNotificationRecipients,
@@ -261,6 +262,13 @@ async function requireCompletedErasureWork(
     where deletion_job_id=${jobId}::uuid order by processor for update
   `)
   ).rows;
+  const privateObjects = (
+    await tx.execute(
+      sql`select d.custody_id from resident_object_deletions d left join privacy_deletion_jobs related on related.id=d.deletion_job_id join privacy_deletion_jobs current_job on current_job.id=${jobId}::uuid where d.delete_state<>'verified' and (related.user_id=current_job.user_id or d.subject_erasure_key=encode(digest('resident-private:'||current_job.user_id::text,'sha256'),'hex')) for update of d`,
+    )
+  ).rows;
+  if (privateObjects.length)
+    throw new Error("Private object erasure is incomplete");
   const bookings = (
     await tx.execute<{ phase: string }>(sql`
     select phase from client_booking_erasure_work where deletion_job_id=${jobId}::uuid for update
@@ -357,8 +365,31 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}::uuid::text, 0))`,
         );
-        if (command.purpose === "client_messaging")
+        if (command.purpose === "client_messaging") {
           await stopBookingNotificationRecipients(tx, command.targetUserId);
+          await tx.execute(
+            sql`update experts set active=false,updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid and active`,
+          );
+          await tx.execute(
+            sql`update expert_residency_lifecycle_notices set status='cancelled' where user_id=${command.targetUserId}::uuid and status<>'delivered'`,
+          );
+          await tx.execute(
+            sql`update experts_published set active=false,updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid and active=true`,
+          );
+          await tx.execute(
+            sql`update expert_card_material_jobs set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('waiting_content','pending','unknown_outcome')`,
+          );
+
+          await tx.execute(
+            sql`update expert_verification_work set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+          );
+          await tx.execute(
+            sql`update expert_onboarding_invoices set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+          );
+          await tx.execute(
+            sql`update expert_onboarding_payment_operations set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome')`,
+          );
+        }
         // RIGHTS-08 + EVID-01: отзыв PreviouslyGranted != первоначальный отказ.
         const consent = one(
           (
@@ -922,6 +953,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           ).rows,
           "privacy deletion job",
         );
+        // Bind prior consent-withdrawal tombstones as well as still-attached objects.
+        await tx.execute(
+          sql`update resident_object_deletions set deletion_job_id=${job.id}::uuid,subject_erasure_key=null where subject_erasure_key=${privateObjectErasureSubjectKey(command.targetUserId)} and deletion_job_id is null`,
+        );
         await tx.execute(sql`
         insert into client_booking_erasure_work (deletion_job_id,phase)
         values (${job.id}::uuid,'cancel_active')
@@ -938,6 +973,91 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         `);
         }
         // Manifests exist before any deletable local mapping/content is cleared.
+        // Lifecycle routing/schedules are not financial retention data. Immutable
+        // renewal attempts retain only the canonical financial UUID bindings.
+        await tx.execute(
+          sql`delete from expert_residency_lifecycle_notices where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_residency_lifecycle_audits where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_residency_lifecycle where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_residency_renewal_bills set user_id=null where user_id=${command.targetUserId}::uuid`,
+        );
+        // Card raw entries, private media/proofs, approved public payload and live
+        // publication have no financial retention authority. Financial C bindings
+        // retain UUID/digest audit facts via nullable live FKs, never raw content.
+        await tx.execute(
+          sql`update experts set public_display_name=null,active=false,verified=false,updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from experts_published where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_card_handoffs where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_card_requests set user_id=null,request_digest=null,semantic_digest=null,result_id=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from resident_safety_outcomes where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_card_drafts where user_id=${command.targetUserId}::uuid`,
+        );
+        // Preserve immutable onboarding financial facts and audit UUIDs. Nullable
+        // live application FKs are cleared by its physical deletion below; late
+        // verified payment remains financial truth but can never recreate admission.
+        await tx.execute(
+          sql`delete from expert_verification_work where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_onboarding_invoices set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+        );
+        await tx.execute(
+          sql`update expert_onboarding_payment_operations set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome')`,
+        );
+        // Promo acquisition has no financial retention authority. Remove queued
+        // sends, pending enrollment and direct identity digests; keep only inactive
+        // UUID ownership tombstones so an erased inviter can never be reassigned.
+        // New intake PII and private Telegram references disappear before identity deletion.
+        // Retain only erased request tombstones so delayed updates cannot resurrect data.
+        await tx.execute(
+          sql`delete from residents_applications where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update resident_verification_requests set user_id=null,request_digest=null,result=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_guide_work where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_manager_work where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_enrollments where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_promo_requests set user_id=null,request_digest=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_bonus_indications where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_codes where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`update expert_promo_registrations set identity_digest=null,erased_at=clock_timestamp() where user_id=${command.targetUserId}::uuid and identity_digest is not null`,
+        );
+        // Applicant workflow metadata has no financial retention authority.
+        // Remove it atomically before identity mappings, preserving quote/ledger facts.
+        await tx.execute(sql`
+        delete from expert_onboarding_applications
+        where user_id = ${command.targetUserId}::uuid
+      `);
         const content = await tx.execute<{ id: string }>(sql`
         update conversation_messages cm set content_ref = null
         from conversations c where cm.conversation_id = c.id and c.user_id = ${command.targetUserId}::uuid
@@ -955,8 +1075,17 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         delete from client_profiles where user_id = ${command.targetUserId}::uuid returning user_id as "userId"
       `);
         await eraseBookingNotificationRecipients(tx, command.targetUserId);
+        // A first-settlement snapshot retains its immutable channel UUID FK.
+        // Remove session PII and all unreferenced mappings; referenced identities
+        // become blocked, content-free financial tombstones, never live transport.
         await tx.execute(
-          sql`delete from channel_identities where user_id = ${command.targetUserId}::uuid`,
+          sql`delete from expert_sessions where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from channel_identities ci where ci.user_id=${command.targetUserId}::uuid and not exists(select 1 from expert_first_residency_settlements f where f.settlement_invitee_channel_identity_id=ci.id or f.settlement_inviter_channel_identity_id=ci.id)`,
+        );
+        await tx.execute(
+          sql`update channel_identities set external_id='erased:'||id::text,bot_key=null,external_chat_id=null,status='blocked',updated_at=clock_timestamp() where user_id=${command.targetUserId}::uuid`,
         );
         await tx.execute(
           sql`delete from provider_subject_mappings where user_id = ${command.targetUserId}::uuid`,
@@ -1013,6 +1142,8 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     status: ErasureJob["status"],
   ): Promise<ErasureJob> {
     const job = await loadBackupJob(tx, jobId, true);
+    if (status === "processor_complete" || status === "backup_verified")
+      await requireCompletedErasureWork(tx, jobId);
     if (status === "backup_verified") {
       const activePolicy =
         this.options.privacyMutationCapability?.activeBackupPolicyVersion;
@@ -1094,8 +1225,12 @@ export class PostgresPrivacyWorkflowRepository {
       await tx.execute(sql`set local statement_timeout='2000ms'`);
       await tx.execute(sql`set local lock_timeout='1000ms'`);
       const row = await loadBackupJob(tx, jobId, true);
-      if (row.status === "backup_verified") {
+      if (
+        row.status === "processor_complete" ||
+        row.status === "backup_verified"
+      )
         await requireCompletedErasureWork(tx, jobId);
+      if (row.status === "backup_verified") {
         await requirePersistedBackupProof(tx, row);
       }
       return backupJobState(row);

@@ -1,8 +1,13 @@
 export { computeReservedUntil, transitionReservation } from "./reservation.js";
-export { calculateExpertCampaignPrice } from "./expert-campaign-price.js";
+export {
+  calculateExpertCampaignPrice,
+  calculateExpertCampaignPriceV2,
+} from "./expert-campaign-price.js";
 export type {
   ExpertCampaignPrice,
   ExpertCampaignPriceInput,
+  ExpertCampaignPriceV2,
+  ExpertCampaignPriceV2Input,
 } from "./expert-campaign-price.js";
 export type { ReservationAction, ReservationStatus } from "./reservation.js";
 export { chargeDelta, choosePackage, derivePackageBalance } from "./billing.js";
@@ -90,3 +95,11 @@ export type {
   RewardReversalInput,
   RewardStatus,
 } from "./expert-referral.js";
+
+export * from "./resident-verification-form.js";
+export {
+  calculateExpertBasePrice,
+  calculateSeparatedSalesTerms,
+} from "./expert-separated-sales.js";
+
+export * from "./resident-review-message.js";

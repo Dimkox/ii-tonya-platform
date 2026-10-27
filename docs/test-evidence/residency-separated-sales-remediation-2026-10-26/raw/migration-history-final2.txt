@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/repo/migration-history-integrity.test.ts (9 tests) 34ms
+
+ Test Files  1 passed (1)
+      Tests  9 passed (9)
+   Start at  18:47:07
+   Duration  567ms (transform 66ms, setup 0ms, collect 59ms, tests 34ms, environment 0ms, prepare 111ms)
+
+
+[END OF RAW CAPTURE]

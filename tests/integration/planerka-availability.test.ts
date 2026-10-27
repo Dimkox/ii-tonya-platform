@@ -943,23 +943,23 @@ it("availability performs no HTTP and returns a fixed result while the durable a
     await transaction;
   }
 }, 2000);
-it("pins database-derived0051 metadata, SQL objects, predecessor and all input hashes", async () => {
+it("pins canonical0073 metadata including Planerka availability, SQL objects, predecessor and all input hashes", async () => {
   const read = (p: string) =>
     JSON.parse(readFileSync(`packages/db/migrations/${p}`, "utf8"));
-  const snapshot = read("meta/0051_snapshot.json");
-  expect(Object.keys(snapshot.tables)).toHaveLength(123);
+  const snapshot = read("meta/0073_snapshot.json");
+  expect(Object.keys(snapshot.tables)).toHaveLength(218);
   expect(
     snapshot.tables["public.slots"].indexes.slots_planerka_service_start_idx,
   ).toBeDefined();
-  expect(snapshot.prevId).toBe(read("meta/0050_snapshot.json").id);
+  expect(snapshot.prevId).toBe(read("meta/0072_snapshot.json").id);
   expect(
     snapshot.tables["public.planerka_availability_refreshes"],
   ).toBeDefined();
-  const manifest = read("state/0051_manifest.json");
+  const manifest = read("state/0073_manifest.json");
   expect(manifest.databaseVersion).toBe("170005");
   for (const [path, hash] of [
-    ["meta/0051_snapshot.json", manifest.snapshotSha256],
-    ["state/0051_sql_objects.json", manifest.sqlObjectsSha256],
+    ["meta/0073_snapshot.json", manifest.snapshotSha256],
+    ["state/0073_sql_objects.json", manifest.sqlObjectsSha256],
   ])
     expect(
       createHash("sha256")
@@ -972,9 +972,9 @@ it("pins database-derived0051 metadata, SQL objects, predecessor and all input h
         .update(readFileSync(`packages/db/migrations/${m.tag}.sql`))
         .digest("hex"),
     ).toBe(m.sha256);
-  const state = read("state/0051_sql_objects.json");
-  expect(state.functions).toHaveLength(43);
-  expect(state.triggers).toHaveLength(73);
+  const state = read("state/0073_sql_objects.json");
+  expect(state.functions).toHaveLength(158);
+  expect(state.triggers).toHaveLength(196);
   expect((await database.db.execute(sql.raw(constraintStateSql))).rows).toEqual(
     state.constraints,
   );

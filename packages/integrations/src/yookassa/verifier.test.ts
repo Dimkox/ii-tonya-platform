@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createCanonicalExpertResidencyPaymentEventVerifier } from "../expert-residency/verified-event.js";
+import { assertVerifiedExpertResidencyPaymentEvent } from "../expert-residency/verified-event.js";
 import type { YooKassaClient } from "./client.js";
 import type { YooKassaOperation } from "./operation-port.js";
 import { YooKassaPaymentVerifier } from "./verifier.js";
@@ -52,16 +52,19 @@ const operationPort = () => ({
   resolve: vi.fn(async () => undefined),
 });
 
-const canonical = () => {
-  const verifier = createCanonicalExpertResidencyPaymentEventVerifier();
-  return { verifyCanonical: vi.fn(verifier.verifyCanonical) };
-};
-
 const client = (overrides: Partial<YooKassaClient>): YooKassaClient => ({
-  createPayment: async () => { throw new Error("unused"); },
-  getPayment: async () => { throw new Error("unused"); },
-  createRefund: async () => { throw new Error("unused"); },
-  getRefund: async () => { throw new Error("unused"); },
+  createPayment: async () => {
+    throw new Error("unused");
+  },
+  getPayment: async () => {
+    throw new Error("unused");
+  },
+  createRefund: async () => {
+    throw new Error("unused");
+  },
+  getRefund: async () => {
+    throw new Error("unused");
+  },
   ...overrides,
 });
 
@@ -69,23 +72,18 @@ describe("YooKassaPaymentVerifier", () => {
   it("brands a deterministic settlement without resolving before durable delivery", async () => {
     const provider = client({ getPayment: async () => payment });
     const operations = operationPort();
-    const eventVerifier = canonical();
-    const verifier = new YooKassaPaymentVerifier(
-      provider,
-      operations,
-      eventVerifier,
-    );
-    await expect(verifier.verifyPayment(operation)).resolves.toMatchObject({
+    const verifier = new YooKassaPaymentVerifier(provider, operations);
+    const event = await verifier.verifyPayment(operation);
+    expect(event).toMatchObject({
       kind: "settled",
       provider: "yookassa",
       paymentId: payment.id,
       orderId: operation.orderId,
       amountMinor: "50000",
     });
-    expect(eventVerifier.verifyCanonical).toHaveBeenCalledWith(
-      expect.objectContaining({ occurredAt: payment.capturedAt }),
-      expect.any(Object),
-    );
+    assertVerifiedExpertResidencyPaymentEvent(event);
+    expect(Object.isFrozen(event)).toBe(true);
+    expect(event.occurredAt).toBe(payment.capturedAt);
     expect(operations.resolve).not.toHaveBeenCalled();
   });
 
@@ -93,7 +91,6 @@ describe("YooKassaPaymentVerifier", () => {
     const verifier = new YooKassaPaymentVerifier(
       client({ getPayment: async () => payment }),
       operationPort(),
-      createCanonicalExpertResidencyPaymentEventVerifier(),
     );
 
     const first = await verifier.verifyPayment(operation);
@@ -119,7 +116,6 @@ describe("YooKassaPaymentVerifier", () => {
       const verifier = new YooKassaPaymentVerifier(
         client({ getPayment: async () => changed }),
         operationPort(),
-        createCanonicalExpertResidencyPaymentEventVerifier(),
       );
       await expect(verifier.verifyPayment(operation)).rejects.toThrow(
         "yookassa_payment_binding_mismatch",
@@ -138,7 +134,6 @@ describe("YooKassaPaymentVerifier", () => {
         }),
       }),
       operations,
-      createCanonicalExpertResidencyPaymentEventVerifier(),
     );
 
     await expect(verifier.verifyPayment(operation)).resolves.toBeNull();
@@ -156,7 +151,6 @@ describe("YooKassaPaymentVerifier", () => {
         }),
       }),
       operations,
-      createCanonicalExpertResidencyPaymentEventVerifier(),
     );
 
     await expect(verifier.verifyPayment(operation)).resolves.toBeNull();
@@ -167,10 +161,13 @@ describe("YooKassaPaymentVerifier", () => {
     const operations = operationPort();
     const verifier = new YooKassaPaymentVerifier(
       client({
-        getPayment: async () => ({ ...payment, status: "canceled", paid: false }),
+        getPayment: async () => ({
+          ...payment,
+          status: "canceled",
+          paid: false,
+        }),
       }),
       operations,
-      createCanonicalExpertResidencyPaymentEventVerifier(),
     );
 
     await expect(
@@ -181,36 +178,29 @@ describe("YooKassaPaymentVerifier", () => {
 
   it("brands a deterministic refund without resolving before durable delivery", async () => {
     const operations = operationPort();
-    const eventVerifier = canonical();
     const provider = client({
       getRefund: vi.fn(async () => refund),
       getPayment: vi.fn(async () => payment),
     });
-    const verifier = new YooKassaPaymentVerifier(
-      provider,
-      operations,
-      eventVerifier,
-    );
+    const verifier = new YooKassaPaymentVerifier(provider, operations);
 
-    await expect(verifier.verifyRefund(refundOperation)).resolves.toMatchObject(
-      {
-        kind: "refunded",
-        provider: "yookassa",
-        paymentId: refundOperation.parentPaymentId,
-        orderId: refundOperation.orderId,
-        amountMinor: refundOperation.amountMinor,
-      },
-    );
+    const event = await verifier.verifyRefund(refundOperation);
+    expect(event).toMatchObject({
+      kind: "refunded",
+      provider: "yookassa",
+      paymentId: refundOperation.parentPaymentId,
+      orderId: refundOperation.orderId,
+      amountMinor: refundOperation.amountMinor,
+    });
     expect(provider.getRefund).toHaveBeenCalledWith(
       refundOperation.providerObjectId,
     );
     expect(provider.getPayment).toHaveBeenCalledWith(
       refundOperation.parentPaymentId,
     );
-    expect(eventVerifier.verifyCanonical).toHaveBeenCalledWith(
-      expect.objectContaining({ occurredAt: refund.createdAt }),
-      expect.any(Object),
-    );
+    assertVerifiedExpertResidencyPaymentEvent(event);
+    expect(Object.isFrozen(event)).toBe(true);
+    expect(event.occurredAt).toBe(refund.createdAt);
     expect(operations.resolve).not.toHaveBeenCalled();
   });
 
@@ -247,7 +237,6 @@ describe("YooKassaPaymentVerifier", () => {
           getPayment: async () => changedPayment,
         }),
         operations,
-        createCanonicalExpertResidencyPaymentEventVerifier(),
       );
       await expect(verifier.verifyRefund(refundOperation)).rejects.toThrow(
         "yookassa_refund_binding_mismatch",
@@ -264,7 +253,6 @@ describe("YooKassaPaymentVerifier", () => {
         getPayment: async () => payment,
       }),
       operations,
-      createCanonicalExpertResidencyPaymentEventVerifier(),
     );
 
     await expect(verifier.verifyRefund(refundOperation)).resolves.toBeNull();
@@ -279,7 +267,6 @@ describe("YooKassaPaymentVerifier", () => {
         getPayment: async () => payment,
       }),
       operations,
-      createCanonicalExpertResidencyPaymentEventVerifier(),
     );
 
     await expect(verifier.verifyRefund(refundOperation)).resolves.toBeNull();
@@ -297,12 +284,87 @@ describe("YooKassaPaymentVerifier", () => {
         getPayment: async () => payment,
       }),
       operations,
-      createCanonicalExpertResidencyPaymentEventVerifier(),
     );
 
     await expect(
       verifier.verifyRefund({ ...refundOperation, status: "canceled" }),
     ).resolves.toBeNull();
     expect(operations.resolve).not.toHaveBeenCalled();
+  });
+});
+
+describe("authoritative capture-wait acknowledgment", () => {
+  it.each(["waiting_for_capture", "succeeded", "canceled"] as const)(
+    "acknowledges %s repeatedly without financial events or writes",
+    async (status) => {
+      const operations = operationPort();
+      const verifier = new YooKassaPaymentVerifier(
+        client({
+          getPayment: async () => ({
+            ...payment,
+            status,
+            paid: status !== "canceled",
+          }),
+        }),
+        operations,
+      );
+      await expect(
+        verifier.verifyWaitingForCapture(operation),
+      ).resolves.toBeUndefined();
+      await verifier.verifyWaitingForCapture({
+        ...operation,
+        status: "canceled",
+      });
+      expect(operations.resolve).not.toHaveBeenCalled();
+    },
+  );
+  it("rejects pending, unpaid holds, binding mismatches and provider failures without effects", async () => {
+    for (const changed of [
+      { ...payment, status: "pending" as const, paid: false },
+      { ...payment, status: "waiting_for_capture" as const, paid: false },
+      { ...payment, id: "foreign" },
+      { ...payment, metadata: { order_id: "foreign" } },
+      { ...payment, amount: { value: "500.01", currency: "RUB" as const } },
+      { ...payment, amount: { value: "500.00", currency: "USD" as never } },
+      { ...payment, test: false },
+      null,
+    ]) {
+      const operations = operationPort();
+      const verifier = new YooKassaPaymentVerifier(
+        client({
+          getPayment: async () => {
+            if (changed === null) throw new Error("provider_unavailable");
+            return changed;
+          },
+        }),
+        operations,
+      );
+      await expect(
+        verifier.verifyWaitingForCapture(operation),
+      ).rejects.toThrow();
+      expect(operations.resolve).not.toHaveBeenCalled();
+    }
+  });
+});
+
+describe("capture-wait terminal consistency", () => {
+  it("rejects inconsistent terminal facts without financial events or writes", async () => {
+    const { capturedAt, ...uncaptured } = payment;
+    expect(capturedAt).toBeDefined();
+    for (const changed of [
+      { ...payment, status: "canceled" as const, paid: true },
+      { ...payment, status: "succeeded" as const, paid: false },
+      uncaptured,
+    ]) {
+      const operations = operationPort();
+      const verifier = new YooKassaPaymentVerifier(
+        client({ getPayment: async () => changed }),
+        operations,
+      );
+      await expect(verifier.verifyWaitingForCapture(operation)).rejects.toThrow(
+        "yookassa_payment_binding_mismatch",
+      );
+      expect(operations.resolve).not.toHaveBeenCalled();
+    }
   });
 });

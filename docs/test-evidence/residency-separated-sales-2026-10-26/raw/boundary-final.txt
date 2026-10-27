@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ tests/repo/residency-separated-sales-boundary.test.ts (7 tests) 165ms
+
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  17:57:51
+   Duration  1.15s (transform 136ms, setup 0ms, collect 549ms, tests 165ms, environment 0ms, prepare 145ms)
+
+
+[END OF RAW CAPTURE]

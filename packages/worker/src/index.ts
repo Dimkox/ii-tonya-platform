@@ -46,3 +46,14 @@ export {
   type YooKassaBoundReconciliationDependencies,
 } from "./yookassa-bound-reconciliation.js";
 export * from "./planerka-availability.js";
+
+export * from "./expert-card-materials.js";
+
+export * from "./expert-residency-lifecycle.js";
+
+export {
+  createExpertPersonalOfferRunner,
+  type ExpertCardMainCheckout,
+} from "@ii-tonya/application";
+
+export * from "./resident-private-jobs.js";

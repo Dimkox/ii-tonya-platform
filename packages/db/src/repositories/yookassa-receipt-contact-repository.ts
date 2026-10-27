@@ -4,7 +4,7 @@ import type {
   YooKassaReceiptContactAuthority,
 } from "@ii-tonya/integrations";
 import type { DrizzleDb } from "../client.js";
-import { currentConsentGrantedSql } from "./consent-current.js";
+import { currentConsentDecisionIsCurrentSql } from "./consent-current.js";
 
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -92,13 +92,9 @@ export class PostgresYooKassaReceiptContactAuthority implements YooKassaReceiptC
         and consent.decision = 'granted'
         and contact.verified_at is not null
         and contact.revoked_at is null
-        and consent.created_at = (
-          select max(candidate.created_at) from consents candidate
-          where candidate.user_id = subject.id
-            and candidate.consent_type = ${consentPurpose}
-        )
-        and ${currentConsentGrantedSql({
+        and ${currentConsentDecisionIsCurrentSql({
           userExpression: sql`subject.id`,
+          decisionExpression: sql`consent.id`,
           purpose: consentPurpose,
           policyVersion: sql`${policyVersion}`,
         })}

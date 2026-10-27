@@ -1,3 +1,31 @@
+import {
+  expertManagerTelegramRoutes,
+  type ExpertManagerTelegramCapability,
+} from "./routes/expert-manager-telegram.js";
+import {
+  assertClientBotAccountCapability,
+  type ClientBotAccountCapability,
+} from "./client-bot-account-composition.js";
+import {
+  assertExpertResidencyLifecycleCapability,
+  type ExpertResidencyLifecycleCapability,
+} from "./expert-residency-lifecycle-composition.js";
+import { expertCardAdminRoutes } from "./routes/expert-cards.js";
+import {
+  assertExpertCardCapability,
+  type ExpertCardCapability,
+} from "./expert-card-composition.js";
+import { expertVerificationRoutes } from "./routes/expert-verification.js";
+import {
+  assertExpertVerificationCapability,
+  type ExpertVerificationCapability,
+} from "./expert-verification-composition.js";
+import {
+  expertApplicantTelegramRoutes,
+  type ExpertApplicantTelegramCapability,
+} from "./routes/expert-applicant-telegram.js";
+import { assertExpertApplicantCapability } from "./expert-applicant-composition.js";
+import type { TelegramDeletionCapability } from "./telegram-deletion.js";
 import { createRequire } from "node:module";
 import { expertSessionRoutes } from "./routes/expert-sessions.js";
 import {
@@ -39,6 +67,7 @@ import {
   httpErrorStatus,
   httpRetryAfter,
   recordClientSessionMetric,
+  recordClientBookingMetric,
   type Logger,
 } from "@ii-tonya/observability";
 import Fastify, {
@@ -104,6 +133,12 @@ type ClientSessionRevocation = {
   ): Promise<{ readonly kind: "revoked" } | { readonly kind: "denied" }>;
 };
 export interface AppDependencies {
+  expertManagerTelegram?: ExpertManagerTelegramCapability;
+  clientAccountQueries?: ClientBotAccountCapability;
+  expertResidencyLifecycle?: ExpertResidencyLifecycleCapability;
+  expertCard?: ExpertCardCapability;
+  expertVerification?: ExpertVerificationCapability;
+  expertApplicantTelegram?: ExpertApplicantTelegramCapability;
   expertSession?: ExpertBrowserOptions;
   config: RuntimeConfig;
   conversationService: ConversationService;
@@ -111,6 +146,7 @@ export interface AppDependencies {
   catalogService: CatalogService;
   privacyService: PrivacyService;
   erasureRequests?: ErasureRequestService;
+  telegramDeletion?: TelegramDeletionCapability | undefined;
   consentEvidence?:
     | {
         issuePresentation(command: {
@@ -255,6 +291,31 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertClientBotAccountCapability(deps.config, deps.clientAccountQueries);
+  if (
+    deps.config.features.clientAccountQueries === true &&
+    (deps.telegramWebhookSecret !== deps.config.telegramWebhookSecret ||
+      deps.clientBotId !== deps.clientAccountQueries?.botId ||
+      deps.clientBotKey !== deps.clientAccountQueries?.botKey)
+  )
+    throw new Error("client_account_queries_webhook_scope_conflict");
+  assertExpertResidencyLifecycleCapability(
+    deps.config,
+    deps.expertResidencyLifecycle,
+  );
+  if (
+    deps.config.features.expertResidencyLifecycleCommands === true &&
+    deps.expertResidencyLifecycle?.webhookSecret !== deps.telegramWebhookSecret
+  )
+    throw new Error("expert_residency_lifecycle_webhook_scope_conflict");
+  assertExpertCardCapability(deps.config, deps.expertCard);
+  if (
+    deps.config.features.expertCard === true &&
+    deps.expertCard?.webhookSecret !== deps.telegramWebhookSecret
+  )
+    throw new Error("expert_card_webhook_scope_conflict");
+  assertExpertVerificationCapability(deps.config, deps.expertVerification);
+  assertExpertApplicantCapability(deps.config, deps.expertApplicantTelegram);
   if (
     deps.config.features.expertSession === true &&
     (!deps.expertSession?.sessions ||
@@ -375,6 +436,25 @@ export async function buildApp(
       deps.config.features.b2SensitiveRetention !== true)
   )
     throw new Error("Test expert residual runtime capability is required");
+  if (
+    deps.config.expertVerification?.paymentVerificationEnabled &&
+    (!deps.config.features.yookassa ||
+      !deps.expertVerification?.onboardingWebhook ||
+      deps.yookassaWebhook?.onboarding !==
+        deps.expertVerification.onboardingWebhook)
+  )
+    throw new Error("expert_verification_merchant_callback_required");
+  if (
+    deps.config.features.expertCard === true &&
+    deps.config.expertCard?.mainCheckoutEnabled &&
+    (!deps.config.features.yookassa || !deps.yookassaWebhook)
+  )
+    throw new Error("expert_card_merchant_callback_required");
+  if (
+    deps.config.expertResidencyLifecycle?.renewalCheckoutEnabled &&
+    (!deps.config.features.yookassa || !deps.yookassaWebhook)
+  )
+    throw new Error("expert_residency_lifecycle_merchant_callback_required");
   const yookassaEnabled = deps.config.features.yookassa === true;
   if (
     yookassaEnabled !== deps.config.integrations.payments ||
@@ -497,19 +577,19 @@ export async function buildApp(
       bookings: deps.clientBookingService,
       principals: deps.clientBookingPrincipal,
       reserveEnabled: deps.config.features.clientBookingReserve === true,
+      metrics: {
+        record: (labels) => {
+          if (labels.operation === "reserve" || labels.operation === "cancel")
+            recordClientBookingMetric({
+              ...labels,
+              operation: labels.operation,
+            });
+        },
+      },
       waitlistEnabled: deps.config.features.clientWaitlist === true,
       ...(deps.clientWaitlistService === undefined
         ? {}
         : { waitlist: deps.clientWaitlistService }),
-    });
-  }
-  if (
-    deps.config.features.clientPrivacy === true &&
-    deps.clientPrincipal !== undefined
-  ) {
-    await app.register(clientPrivacyRoutes, {
-      privacy: deps.privacyService,
-      principals: deps.clientPrincipal,
     });
   }
   if (
@@ -587,7 +667,71 @@ export async function buildApp(
     },
     rateLimiter: deps.rateLimiter,
   });
+  await app.register(expertCardAdminRoutes, {
+    enabled: deps.config.features.expertCard === true,
+    ...(deps.expertCard ? { service: deps.expertCard.admin } : {}),
+  });
+  if (deps.expertManagerTelegram) {
+    const manager = deps.expertManagerTelegram.service;
+    let managerTimer: ReturnType<typeof setInterval> | undefined;
+    let managerRunning = false;
+    const drainManager = async () => {
+      if (managerRunning) return;
+      managerRunning = true;
+      try {
+        await manager.tick();
+      } catch {
+        /* retain durable pending/quarantined work */
+      } finally {
+        managerRunning = false;
+      }
+    };
+    app.addHook("onReady", async () => {
+      await drainManager();
+      managerTimer = setInterval(() => {
+        void drainManager();
+      }, 15 * 60_000);
+      managerTimer.unref();
+    });
+    app.addHook("onClose", async () => {
+      if (managerTimer) clearInterval(managerTimer);
+    });
+  }
+  await app.register(expertManagerTelegramRoutes, {
+    ...(deps.expertManagerTelegram
+      ? { capability: deps.expertManagerTelegram }
+      : {}),
+  });
+  await app.register(expertVerificationRoutes, {
+    enabled: deps.config.features.expertVerification === true,
+    ...(deps.expertVerification
+      ? { service: deps.expertVerification.service }
+      : {}),
+  });
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: deps.config.features.expertApplicant === true,
+    ...(deps.expertApplicantTelegram
+      ? { capability: deps.expertApplicantTelegram }
+      : {}),
+  });
   await app.register(telegramWebhookRoutes, {
+    clientAccountQueriesEnabled:
+      deps.config.features.clientAccountQueries === true,
+    ...(deps.clientAccountQueries
+      ? { clientAccountQueries: deps.clientAccountQueries }
+      : {}),
+    expertResidencyLifecycleEnabled:
+      deps.config.features.expertResidencyLifecycleCommands === true,
+    ...(deps.expertResidencyLifecycle
+      ? { expertResidencyLifecycle: deps.expertResidencyLifecycle }
+      : {}),
+    expertCardEnabled: deps.config.features.expertCard === true,
+    ...(deps.expertCard ? { expertCard: deps.expertCard } : {}),
+    ...(deps.config.features.clientPrivacy === true &&
+    deps.config.features.clientErasureRequests === true &&
+    deps.telegramDeletion
+      ? { deletion: deps.telegramDeletion }
+      : {}),
     bookingCallbacksEnabled: deps.config.features.bookingCallbacks === true,
     ...(deps.bookingCallbacks === undefined
       ? {}
@@ -778,6 +922,7 @@ export type TestApp = FastifyInstance & {
 };
 export async function buildTestApp(
   options: {
+    telegramDeletion?: TelegramDeletionCapability;
     callbackVerified?: boolean;
     authorizedIdentity?: boolean;
     telegramFailOnce?: boolean;
@@ -885,6 +1030,9 @@ export async function buildTestApp(
         throw new Error("disabled");
       },
     },
+    ...(options.telegramDeletion
+      ? { telegramDeletion: options.telegramDeletion }
+      : {}),
     telegramCallbacks: telegram,
     readiness: {
       check: async () => ({

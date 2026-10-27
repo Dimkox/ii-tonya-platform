@@ -23,15 +23,17 @@ afterAll(() => {
 
 describe("production SEO shell", () => {
   it("publishes canonical and complete social metadata", () => {
-    expect(document).toContain(
-      '<link rel="canonical" href="https://ii-tonya.ru/">',
+    expect(document).toMatch(
+      /<link\s+rel="canonical"\s+href="https:\/\/ii-tonya\.ru\/"\s*\/?>/u,
     );
-    expect(document).toContain(
-      '<meta property="og:url" content="https://ii-tonya.ru/">',
+    expect(document).toMatch(
+      /<meta\s+property="og:url"\s+content="https:\/\/ii-tonya\.ru\/"\s*\/?>/u,
     );
     expect(document).toContain('property="og:image"');
     expect(document).toContain('property="og:image:alt"');
-    expect(document).toContain('name="twitter:card" content="summary_large_image"');
+    expect(document).toContain(
+      'name="twitter:card" content="summary_large_image"',
+    );
     expect(document).toContain('name="twitter:image"');
   });
 
@@ -55,9 +57,9 @@ describe("production SEO shell", () => {
     expect(readFileSync(join(outputDirectory, "robots.txt"), "utf8")).toContain(
       "Sitemap: https://ii-tonya.ru/sitemap.xml",
     );
-    expect(readFileSync(join(outputDirectory, "sitemap.xml"), "utf8")).toContain(
-      "<loc>https://ii-tonya.ru/</loc>",
-    );
+    expect(
+      readFileSync(join(outputDirectory, "sitemap.xml"), "utf8"),
+    ).toContain("<loc>https://ii-tonya.ru/</loc>");
     expect(existsSync(join(outputDirectory, "favicon.png"))).toBe(true);
   });
 });

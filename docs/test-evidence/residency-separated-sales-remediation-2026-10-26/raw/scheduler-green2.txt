@@ -1,0 +1,96 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts (26 tests | 3 failed | 23 skipped) 3367ms
+   ↓ explicit choices deny foreign ownership, stale revision, replay conflict and base-quarter SKU
+   ↓ scheduler does not disclose promotion or invoice to a silent owner, and unpaid erasure removes sales PII
+   ↓ expired waiting payment is GET-verified and canceled, never captured
+   ↓ unknown create never becomes a second POST and recovers only through actual GET identity
+   ↓ deletion during pre-send decryption cancels actual first disclosure
+   ↓ proven late money remains immutable recovery work without price lock or interview
+   ↓ 96h refresh creates one new fixed-fee attempt under the original unchanged form approval
+   ↓ lost quarter requires explicit monthly choice and reuses the same quality approval
+   ↓ day10 silence stays base-only; explicit base selection remains monthly and unlocked
+   ↓ 24h reminders have one durable scoped receipt and revoked owners receive nothing
+   ↓ an explicit unpaid intake transition preserves the original form and enters separated sales
+   ↓ on-time capture reported after checkout expiry still locks its original bound terms
+   ↓ a proven capture after erasure retains money and recovery but no paid lock or receipt PII
+   ↓ checkout TTL refreshes before the commercial stage without repricing or a new manager decision
+   ↓ erasing the submitted form alone blocks delayed captured money from re-admitting the applicant
+   ↓ two genuine captures serialize to one lifetime winner and explicit duplicate-fee recovery
+   ↓ review R3 supplemental answers preserve the submitted approval and capture authority
+   ↓ review R4 quarter to month before first manager approval uses the new explicit period
+   ↓ review R5 expired monthly selection refreshes inside the real form submit transaction
+   × review R7 unresolved owner does not abort the scheduler batch 630ms
+     → expected 1 to be 2 // Object.is equality
+   × review R9 preparation failure retries definitely unsent notice 285ms
+     → expected +0 to be 1 // Object.is equality
+   × review R10 R11 reselection cancels superseded notices and queues one replacement 353ms
+     → Failed query: insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6) returning id
+params: 41c8d579-1b1b-4b50-848b-7c79729bc4bc,41c8d579-1b1b-4b50-848b-7c79729bc4bc,4a9aaf7e-c7cb-4776-a2d2-44557b4c8f5d,a266706b-d9bc-4ac9-93e4-675e1e437de4,test,2
+   ↓ review R8 R13 lost capture ACK resolves authoritative succeeded without repost
+   ↓ review R8 R13 lost capture ACK resolves authoritative canceled without repost
+   ↓ review R13 lost cancel ACK is resolved by GET without repost
+   ↓ review R2 expired original bridge quote retains finite fiscal custody for later approval and replacement
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R7 unresolved owner does not abort the scheduler batch
+AssertionError: expected 1 to be 2 // Object.is equality
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts:855:652
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R9 preparation failure retries definitely unsent notice
+AssertionError: expected +0 to be 1 // Object.is equality
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/integration/expert-separated-sales-state.test.ts:856:846
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/integration/expert-separated-sales-state.test.ts > review R10 R11 reselection cancels superseded notices and queues one replacement
+Error: Failed query: insert into expert_onboarding_invoices(application_id,application_audit_id,user_id,decision_id,provider_mode,sales_attempt_number) values($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5,$6) returning id
+params: 41c8d579-1b1b-4b50-848b-7c79729bc4bc,41c8d579-1b1b-4b50-848b-7c79729bc4bc,4a9aaf7e-c7cb-4776-a2d2-44557b4c8f5d,a266706b-d9bc-4ac9-93e4-675e1e437de4,test,2
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:73:11
+ ❯ issueSeparatedSalesFeeAttempt packages/db/src/repositories/expert-separated-sales-repository.ts:400:5
+
+ ❯ packages/db/src/repositories/expert-separated-sales-repository.ts:234:9
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ tests/integration/expert-separated-sales-state.test.ts:857:271
+
+Caused by: error: expert_sales_invoice_source
+ ❯ node_modules/.pnpm/pg@8.22.0/node_modules/pg/lib/client.js:652:17
+ ❯ node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:149:14
+ ❯ NodePgPreparedQuery.queryWithCache node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/pg-core/session.ts:71:12
+ ❯ issueSeparatedSalesFeeAttempt packages/db/src/repositories/expert-separated-sales-repository.ts:400:5
+ ❯ packages/db/src/repositories/expert-separated-sales-repository.ts:234:9
+ ❯ NodePgSession.transaction node_modules/.pnpm/drizzle-orm@0.45.2_@opentelemetry+api@1.9.1_@types+pg@8.20.0_pg@8.22.0/node_modules/src/node-postgres/session.ts:259:19
+ ❯ tests/integration/expert-separated-sales-state.test.ts:857:271
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+Serialized Error: { length: 154, severity: 'ERROR', code: 'P0001', detail: undefined, hint: undefined, position: undefined, internalPosition: undefined, internalQuery: undefined, where: 'PL/pgSQL function expert_sales_invoice_source() line 4 at RAISE', schema: undefined, table: undefined, dataType: undefined, constraint: undefined, file: 'pl_exec.c', routine: 'exec_stmt_raise' }
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 23 skipped (26)
+   Start at  18:35:05
+   Duration  6.69s (transform 1.29s, setup 0ms, collect 2.90s, tests 3.37s, environment 0ms, prepare 101ms)
+
+
+[END OF RAW CAPTURE]

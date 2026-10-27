@@ -42,3 +42,12 @@ export {
 export * from "./client-account-packages.js";
 export { serializeBookingNotificationWire } from "./booking-notification-wire.js";
 export * from "./expert-campaign-quotes.js";
+
+export * from "./expert-residency-lifecycle.js";
+
+export * from "./client-bot-account.js";
+
+export { canonicalPrivateProfile } from "./private-profile-key.js";
+
+export * from "./resident-rich-profile.js";
+export * from "./resident-semantic-tags.js";

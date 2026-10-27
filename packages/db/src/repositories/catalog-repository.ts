@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 
 import type { DrizzleDb } from "../client.js";
 
@@ -65,6 +65,18 @@ const UUID_PATTERN =
 const finiteDate = (value: Date): boolean =>
   value instanceof Date && Number.isFinite(value.getTime());
 
+/** Current archive/pause authority is checked on every read, before worker projection. */
+export const currentExpertResidencyVisibleSql = (userId: SQL): SQL => sql`
+  not exists (
+    select 1 from expert_onboarding_applications archive
+    where archive.user_id=${userId}
+      and (archive.archived_at is not null or archive.archive_until_date is not null)
+  ) and not exists (
+    select 1 from expert_residency_lifecycle lifecycle
+    where lifecycle.user_id=${userId} and lifecycle.status='paused'
+  )
+`;
+
 export class PostgresCatalogRepository {
   constructor(private readonly db: Pick<DrizzleDb, "execute">) {}
 
@@ -92,6 +104,7 @@ export class PostgresCatalogRepository {
       join experts e on e.id = es.expert_id
       where e.active = true
         and e.verified = true
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
         and es.active = true
         and es.code is not null
         and es.language is not null
@@ -139,6 +152,7 @@ export class PostgresCatalogRepository {
       join experts e on e.id = es.expert_id
       where e.active = true
         and e.verified = true
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
         and es.active = true
         and es.code is not null
         and es.language is not null
@@ -209,6 +223,7 @@ export class PostgresCatalogRepository {
         and s.ends_at>s.starts_at and s.capacity>0
         and ${providerEligible}
         and ${noExpertOverlap(input.databaseNow)}
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
       group by s.id,s.starts_at,s.observed_at,s.capacity
       having s.capacity>count(r.id)
       order by s.starts_at,s.id

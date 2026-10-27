@@ -6,6 +6,7 @@ import { loadEnv } from "../../packages/config/src/env.js";
 import { buildApp } from "../../apps/api/src/app.js";
 import { createDefaultLifecycle } from "../../apps/api/src/server.js";
 import { ExpertCodeCrypto } from "../../packages/application/src/expert-code-crypto.js";
+import { PostgresExpertCampaignQuoteRepository } from "../../packages/db/src/repositories/expert-campaign-quote-repository.js";
 import { PostgresExpertReferralRepository } from "../../packages/db/src/repositories/expert-referral-repository.js";
 import {
   startExpertReferralTestDatabase,
@@ -81,6 +82,17 @@ async function setup(referrals = false) {
     priceMinor: 999000,
     durationSeconds: 2592000,
   });
+  // Current offers require saved participant facts. This neutral profile keeps
+  // the base999000 and first-stage40% discount:599400 minor units.
+  await new PostgresExpertCampaignQuoteRepository(database.db).saveProfile({
+    userId: owner.userId,
+    cityCode: "kazan",
+    millionCity: false,
+    serviceFormat: "offline",
+    ticketMinor: "300000",
+    participantKind: "expert",
+    idempotencyKey: randomUUID(),
+  });
   const deps = await createDefaultLifecycle(
     referrals
       ? { expertCodeSecretResolver: { resolve: () => referralKeyring } }
@@ -152,6 +164,8 @@ it("ordinary tariff HTTP labels the base price explicitly and distinguishes the 
     expect(offer.statusCode).toBe(200);
     expect(offer.json()).toMatchObject({
       baseMonthlyMinor: "999000",
+      ruleVersion: "expert_energy_start_v2",
+      profileRevision: 1,
       priceMinor: "599400",
     });
   } finally {
@@ -347,6 +361,8 @@ it("ordinary signed-session HTTP persists and replays saved quotes; unavailable 
     expect(first.json()).toMatchObject({
       id: expect.any(String),
       termMonths: 1,
+      ruleVersion: "expert_energy_start_v2",
+      profileRevision: 1,
       priceMinor: "599400",
       expiresAt: expect.any(String),
       calculationTimestamp: expect.any(String),

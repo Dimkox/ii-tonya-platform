@@ -1,0 +1,17 @@
+{
+  "key": "expert.functional",
+  "version": 3,
+  "status": "inactive",
+  "ruleVersion": "expert_separated_sales_v3",
+  "assets": [
+    {
+      "path": "docs/prompts/residency-separated-sales-v3.md",
+      "sha256": "74fd69d07ed8285eb34d5fdd2266e49f97f266329216e1b065fba8cd5e2ea89d"
+    }
+  ],
+  "activationRequirements": [
+    "approved_prompt_copy",
+    "official_selarti_contract",
+    "provider_activation_gate"
+  ]
+}

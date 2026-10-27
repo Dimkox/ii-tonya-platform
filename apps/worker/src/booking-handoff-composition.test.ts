@@ -28,7 +28,12 @@ afterEach(() => {
 it("runs the actual local revocation repository from main with all sending flags off", async () => {
   const execute = vi.fn(async () => ({ rows: [] }));
   const end = vi.fn(async () => {});
-  injected.db = { execute, $client: { end } };
+  injected.db = {
+    execute,
+    transaction: async (work: (tx: { execute: typeof execute }) => unknown) =>
+      work({ execute }),
+    $client: { end },
+  };
   // Unrelated cycle jobs are outside this test. The local withdrawal repository
   // remains real and executes its candidate query against the database boundary.
   vi.spyOn(

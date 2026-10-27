@@ -217,6 +217,7 @@ describe("client booking application boundary", () => {
     }));
     const service = createClientBookingService({
       repository: {
+        listOwnedActive: vi.fn(),
         reserveProtectedChoice: vi.fn(),
         cancelOwnedByHandle: vi.fn(),
         rescheduleOwnedByHandle,

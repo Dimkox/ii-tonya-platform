@@ -1,0 +1,12 @@
+
+ RUN  v3.2.7 /home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023
+
+ ✓ packages/application/src/resident-verification-service.test.ts (16 tests) 24ms
+
+ Test Files  1 passed (1)
+      Tests  16 passed (16)
+   Start at  18:45:02
+   Duration  564ms (transform 118ms, setup 0ms, collect 143ms, tests 24ms, environment 0ms, prepare 97ms)
+
+
+[END OF RAW CAPTURE]

@@ -77,7 +77,8 @@ beforeEach(() => {
       text.includes("reconciliation_lease_expired")
     ) {
       const scoped =
-        text.includes("and topic") || text.includes("scoped_dialogue.bot_key");
+        /\band topic (?:=|in\b)/u.test(text) ||
+        text.includes("scoped_dialogue.bot_key");
       if (!scoped) {
         fixture.otherBotState = "unknown_outcome";
         fixture.unscopedRecoveries++;
@@ -118,6 +119,7 @@ describe("production factory recovery ownership (non-PG)", () => {
       const runtime = await factory.create({
         databaseUrl: "unused-boundary",
         clientTelegramBotKey: "synthetic-bot",
+        integrations: { payments: false },
         features: {
           b2TelegramDispatch: true,
           telegramEgressConsentGate: true,
@@ -153,6 +155,7 @@ describe("production factory recovery ownership (non-PG)", () => {
   it("preserves fallback recovery when no filtered runner owns the work", async () => {
     const runtime = await createProductionWorkerRuntimeFactory().create({
       databaseUrl: "unused-boundary",
+      integrations: { payments: false },
       features: {},
     } as never);
     await runtime.runOnce();

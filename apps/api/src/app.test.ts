@@ -303,7 +303,7 @@ describe("API boundary", () => {
           payload: { update_id: 99 },
         })
       ).statusCode,
-    ).toBe(500);
+    ).toBe(503);
     expect(
       (
         await app.inject({
@@ -703,7 +703,7 @@ describe("API boundary", () => {
   });
 
   it("sanitizes expert session lookup failures in the composed path", async () => {
-    const token = "A".repeat(32);
+    const token = `es1.${"A".repeat(43)}`;
     const app = await buildTestApp({
       expertApi: testExpertApi({
         principals: createExpertBearerPrincipalResolver({

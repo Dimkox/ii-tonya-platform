@@ -362,29 +362,162 @@
     {
       "idx": 51,
       "version": "7",
-      "when": 1791849600000,
-      "tag": "0051_planerka_availability",
+      "when": 1791763200008,
+      "tag": "0051_expert_onboarding_applications",
       "breakpoints": true
     },
     {
       "idx": 52,
       "version": "7",
-      "when": 1793059200000,
-      "tag": "0052_lifecycle_scheduler_c1",
+      "when": 1791763200009,
+      "tag": "0052_expert_promo_applicants",
       "breakpoints": true
     },
     {
       "idx": 53,
       "version": "7",
-      "when": 1793059200001,
-      "tag": "0053_booking_waitlist_d1",
+      "when": 1791763200010,
+      "tag": "0053_expert_verification_onboarding",
       "breakpoints": true
     },
     {
       "idx": 54,
       "version": "7",
-      "when": 1793059200002,
-      "tag": "0054_booking_reschedule_replay",
+      "when": 1791763200011,
+      "tag": "0054_expert_card_publication",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791763200012,
+      "tag": "0055_expert_residency_lifecycle",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1792713600000,
+      "tag": "0056_residency_offer_corrections",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1792972800000,
+      "tag": "0057_resident_verification_form",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1792972800001,
+      "tag": "0058_residency_core_stabilization",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1793030400000,
+      "tag": "0059_residency_separated_sales",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1793041200000,
+      "tag": "0060_separated_sales_review_corrections",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1793041200001,
+      "tag": "0061_resident_content_safety",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1793044800000,
+      "tag": "0062_resident_verification_messages",
+      "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1793044801000,
+      "tag": "0063_resident_verification_review_corrections",
+      "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1793044801001,
+      "tag": "0064_resident_private_jobs",
+      "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1793056800000,
+      "tag": "0065_resident_private_recovery_fences",
+      "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1793059200000,
+      "tag": "0066_resident_rich_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1793145600000,
+      "tag": "0067_resident_rich_review_corrections",
+      "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1793149200000,
+      "tag": "0068_resident_latest_approved_publication",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1793152800000,
+      "tag": "0069_resident_semantic_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1793152800001,
+      "tag": "0070_planerka_availability",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1793152800002,
+      "tag": "0071_lifecycle_scheduler_c1",
+      "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1793152800003,
+      "tag": "0072_booking_waitlist_d1",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1793152800004,
+      "tag": "0073_booking_reschedule_replay",
       "breakpoints": true
     }
   ]

@@ -1,7 +1,7 @@
 {
   "databaseVersion": "170005",
   "drizzleKitVersion": "0.31.10",
-  "method": "SQL replay through 0053; database introspection normalized against positional catalog data",
+  "method": "Full-chain hand-authored SQL replay on isolated PostgreSQL17.5; fresh empty-directory introspection normalized against exact positional constraint/index catalogue. SQL-only functions/triggers retained separately.",
   "generatePermitted": false,
   "migrations": [
     {
@@ -261,20 +261,20 @@
     },
     {
       "idx": 51,
-      "tag": "0051_planerka_availability",
-      "sha256": "d8d48425445b6bc80e7b1d027a5141b433507db725b9673a8e516e177008c89e"
+      "tag": "0051_expert_onboarding_applications",
+      "sha256": "e244079a72a25c2707a30864c704c0ce692e96ee1f39eefc8a4203536cb99a64"
     },
     {
       "idx": 52,
-      "tag": "0052_lifecycle_scheduler_c1",
-      "sha256": "32f260d7e4dcbc73a490266165156bf525ab0aa6aa7bd2496ee65bec1a18b71d"
+      "tag": "0052_expert_promo_applicants",
+      "sha256": "bc75a0731f408194741548f4bb7a9342aa0fbc4e2d1dad52d97dceb325b933f1"
     },
     {
       "idx": 53,
-      "tag": "0053_booking_waitlist_d1",
-      "sha256": "22822e0fa1c386b72f345e63f508b53a07e65210434259d65ef501f041b9d7b8"
+      "tag": "0053_expert_verification_onboarding",
+      "sha256": "28563c02972211e931645521b2a5f1f36668c2c621813c1a942850120803b182"
     }
   ],
-  "snapshotSha256": "09fee4d65422ba1f0cf2b6ba08cc0222664a288e809f58ce65e57d12bd997dd8",
-  "sqlObjectsSha256": "4a981f10e49f18e4c273c794db26a555d312537125612abec8933e7d71b10639"
+  "snapshotSha256": "455be9c95a7e086ce42d1b432176f7fc07368d0846c400386bb036b8ad8f8dbb",
+  "sqlObjectsSha256": "f56c527a2794a5f3fe71b155bb4133d012d56225ac240c11faa0980259ac3f75"
 }
