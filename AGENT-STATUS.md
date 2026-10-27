@@ -1,3 +1,18 @@
+# Semantic tags accepted; final gate next — 2026-10-27
+
+All3 assigned reviewers accept source790d308c957ca9be8ab83a18ff8f3de6642921b9.
+R1–R7 closed, seven evidence sets313 artifacts preserved and independently verified.
+Final0069 counts213 tables/156 functions/194 triggers/1449 constraints/533 indexes/
+2 extensions. Producer/reviewers idle; no jobs. Same isolated worktree/branch
+codex/residency-semantic-tags-20261027. Root alone runs canonical fullgate then
+mandatory gated push and DraftPR stacked on codex/residency-rich-onboarding-20261026
+(PR115 live OPEN/Draft at254c8c). No bypass/force/merge/provider activation.
+After delivery continue S4a then S4b; approved full package not complete yet.
+Prepared drafts /tmp/spec-residency-native-scheduling-draft-20261027.md and
+/tmp/spec-residency-lifecycle-completion-draft-20261027.md include all prior
+reconnaissance; do not restart. Retain protectedPG, parser and semantic helper for
+final journey. No goal tool, no routine approval/quota loop, no BMad rerender.
+
 # Semantic tags final application review — 2026-10-27
 
 Source790d308c957ca9be8ab83a18ff8f3de6642921b9; producer idle/no jobs. R7 confirm

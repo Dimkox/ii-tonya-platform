@@ -152,3 +152,14 @@ and R4 controls2/2, authentic0068 syntax upgrade1/1 with RED/GREEN, final state/
 pins; prior238 artifacts unchanged.0069 final counts remain213/156/194/1449/533/2.
 All assigned reviewers will inspect this exact bounded delta. Source producer idle;
 no competing PG/build, final gate or provider activation.
+
+## Final independent acceptance
+
+All three reviewers accept runtime790d308c957ca9be8ab83a18ff8f3de6642921b9;
+R1–R7 closed. Final application precheck aligns bounded legacy input with the
+accepted SQL strict-removal authority. Same-service authentic callbacks1/1 and
+owner regressions10/10 pass; SQL/state remains byte-identical to7b4f79f5. Root
+and reviewers verified final27 artifacts/2 source pins/5 unchanged-state pins.
+All seven sets313 artifacts retain previous failures and passing evidence.
+Hook check confirms the executable clone-wide pre-push gate. Root now owns
+canonical fullgate and mandatory push, then DraftPR and sequential S4a/S4b.

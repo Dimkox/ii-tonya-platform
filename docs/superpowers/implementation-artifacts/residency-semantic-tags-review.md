@@ -13,6 +13,7 @@ mutating resources. All were launched before triage; all finals received.
 | R4 | gap | medium / bad_spec | Tests show pending decisions/UI but never exercise whole-card SQL approval. Prove pending/rejected/stale rejection and current-approved immutable snapshot through actualPG review. | Closed: gap PASS eb110d74 |
 | R5 | gap | medium / patch | tests/integration/resident-semantic-tags.test.ts:455 writes to an untracked directory, failing clean checkout withENOENT. Make optional export or created temporary destination. | Closed: gap PASS eb110d74 |
 | R6 | gap | high / patch | Existing rich-onboarding fixture uses custom «поддержка» without current custom approval, so its approval/renewal/photo scenarios now fail. Update fixture through legitimate authority and run affected focused cases. | Closed: gap PASS eb110d74 |
+| R7 | root, blind, edge, gap | high / bad_spec | Legacy syntax repair must work across and within services through actual owner callbacks while new-invalid content and invalid finalization remain denied. | Closed: all assigned reviewers PASS790d308c |
 
 R2/R4 clarify non-frozen verification/repair requirements already implied by owner
 intent. No owner decision is missing. Preserve current working implementation and
@@ -96,3 +97,19 @@ One focused application/legacy-owner proof correction remains. SQL/state need no
 change if existing authority suffices. R2 is closed at7b4f79f5; R7 remains pending
 this narrow usability/compatibility completion. All48 artifacts/7 pins independently
 verified by the assigned reviewers. No new business decision or approval is needed.
+
+## Final independent acceptance
+
+All three assigned reviewers accept source
+790d308c957ca9be8ab83a18ff8f3de6642921b9. R1–R7 are closed; prior accepted
+behavior remains intact. Final assessment verifies the bounded application delta
+and authentic same-scope old-schema callback witness1/1, owner regressions10/10,
+27 archives/2 changed source pins/5 unchanged-state pins/six prior manifests.
+All reviews were read-only; no independent reviewer silently edited or reran tests.
+Root also verified every archived raw/compressed pair and source pin against its
+recorded implementation commit. Seven evidence sets retain313 artifacts including
+real failures, diagnostic harness corrections and final passing results.
+
+Canonical full branch gate and mandatory push remain the coordinator's final steps.
+No hosted CI, deployment or live-provider certification follows from these checks.
+Native scheduling/booking and lifecycle completion remain the next approved work.
