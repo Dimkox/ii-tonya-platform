@@ -155,3 +155,12 @@ The reason is also recorded in the integration PR description. The shared hook
 remains active. This is not a claimed successful final aggregate hook invocation:
 the complete final evidence is the retained passing components, diagnostic
 repository output and corrected140-case focused scope run.
+
+## GitHub publication mechanism
+
+Repository API confirms allow_merge_commit=false, allow_rebase_merge=false,
+allow_squash_merge=true. Merge-commit attempt was refused without mutating main.
+PR117 therefore publishes by the supported squash method. Verify exact tree
+equality against its reviewed head, retain the integration branch containing
+all nine source heads, and close the original PRs as incorporated rather than
+claiming individual merge events. No shared history is rewritten.

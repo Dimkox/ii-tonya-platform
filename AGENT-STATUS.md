@@ -1568,6 +1568,11 @@ RC availability70, main lifecycle/waitlist/reschedule71..73. Existing old-main
 and native RC51 databases deliberately fail closed pending operator-reviewed
 reconciliation; no deployment or provider activation follows from source merge.
 
+GitHub repository policy permits only squash merging (merge commits and
+rebases are disabled). PR117 publishes the reviewed union tree to main;
+original source ancestry is preserved in codex/unify-main-20261027, and the nine
+original PRs are closed as incorporated after exact main tree verification.
+
 This is the pre-publication source checkpoint. Final delivery truth is live
 GitHub main and PR states; verify them rather than treating historical sections
 below as current. Repository pre-push gate remains installed. First normal push was rejected

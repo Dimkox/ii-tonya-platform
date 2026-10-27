@@ -61,7 +61,7 @@ review_loop_iteration: 0
 
 **Acceptance Criteria:**
 
-- Given the two main-target PRs, when integration completes, then their original heads are ancestors of main and neither remains pending.
+- Given the two main-target PRs, when integration completes, then main exactly matches the reviewed union tree, original heads remain reachable in the preserved integration branch, and no original PR remains pending.
 - Given current main functionality, when combined sources build and are checked, then landing/lifecycle behavior and privacy/payment safeguards remain represented and tested.
 - Given divergent migration histories, when migration starts, then unknown history is rejected before any SQL application.
 - Given unfinished draft PRs, when consolidation completes, then their work is retained and their status is reported accurately.
@@ -85,7 +85,7 @@ Both PRs conflict with main and cannot be accepted with a blanket choice of one 
 - One bounded test invocation selected after final conflict resolution, plus focused PostgreSQL replay checks up to3 total.
 - `git diff --check`, repository pre-push gate: whitespace, policy and automation checks.
 - Read-only independent adversarial review: exact merged tree, migration compatibility, authorization and lost-main-feature checks.
-- GitHub API and commit ancestry after merge: main contains both original heads, PR states terminal.
+- GitHub API and exact tree equality after squash: main matches the reviewed union, source ancestry is retained in the integration branch, and original PR states are terminal.
 
 ## Pre-publication verification checkpoint
 
@@ -93,3 +93,12 @@ All source fixes have focused green evidence and independent scoped review.
 Owner-authorized additional run4 passed20/20and12/12; allowances consumed.
 Final build/lint/full types/format/whitespace pass. Publishing and live GitHub
 ancestry/PR-state verification remain the final execution task.
+
+## Repository merge policy
+
+GitHub rejected merge-commit publication because this repository allows only
+squash (merge commits and rebases both disabled). Publish through PR117 using
+squash, verify exact tree equality with the reviewed integration commit, then
+close the nine original PRs as incorporated by117. Preserve the integration
+branch so all nine original source heads remain reachable without rewriting
+shared history. This changes the delivery mechanism, not the approved union.
