@@ -232,3 +232,15 @@ All three final assigned reports PASS46e03bf0db4a751977a494f9c645e165490a6c75.
 All13 findings closed; no further source correction or unchanged focused rerun.
 Root owns documentation checkpoint and canonical full gate, then mandatory push
 and stackedDraftPR on PR114. No hosted CI/release evidence is implied.
+
+## Canonical gate failure and exact journal-tail correction
+
+Full gate at405add47 returned610/611: the sole failure was
+tests/repo/hybrid-message-gateway-schema-parity.test.ts expecting0065 as current
+journal tail. Bash syntax/format/whitespace/evidence/lint/tests typecheck passed.
+Root updated only the exact tail index/tag/timestamp to independently accepted0068;
+historical0041 and B1 assertions remain unchanged. Focused file3/3, lint/format/diff
+pass. Failed full/repository logs and4 corrective logs are retained under
+residency-rich-onboarding-gate-correction-2026-10-27/manifest.json. No runtime change.
+Assigned gap reviewer will close this bounded test-only correction before another
+canonical gate; necessary failure correction follows existing owner authorization.
