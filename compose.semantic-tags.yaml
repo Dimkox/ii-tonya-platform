@@ -1,0 +1,26 @@
+# Separately provisioned, no Node subprocess/container control. No runtime downloads.
+services:
+  semantic-tags:
+    image: ii-tonya-semantic-tags:1
+    labels:
+      ii-tonya.owner: residency-semantic-tags-20261027
+    user: "1000:1000"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 320m
+    memswap_limit: 320m
+    pids_limit: 16
+    cpus: 1
+    environment:
+      SEMANTIC_MODEL_PATH: /models/navec-news.tar
+      OPENBLAS_NUM_THREADS: "1"
+      OMP_NUM_THREADS: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ${SEMANTIC_SOCKET_DIR:?required}:/run/semantic-tags
+      - ${SEMANTIC_MODEL_PATH:?required}:/models/navec-news.tar:ro
+    tmpfs:
+      - /tmp:size=8m,mode=1777,noexec,nosuid
+    restart: "no"

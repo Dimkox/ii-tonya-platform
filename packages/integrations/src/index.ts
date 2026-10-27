@@ -330,3 +330,4 @@ export * from "./documents/verification-extraction.js";
 export * from "./documents/isolated-document-parser.js";
 
 export * from "./documents/resident-geocode.js";
+export * from "./documents/isolated-semantic-tags.js";

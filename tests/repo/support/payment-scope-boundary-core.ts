@@ -97,6 +97,7 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0069_resident_semantic_tags.sql",
   "packages/db/migrations/0060_separated_sales_review_corrections.sql",
   "packages/db/migrations/0061_resident_content_safety.sql",
   "packages/db/migrations/0062_resident_verification_messages.sql",
@@ -179,6 +180,8 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "resident_private_objects",
   "resident_card_media",
   "resident_card_versions",
+  "resident_tag_decisions",
+  "tag_embeddings_cache",
   "resident_review_events",
   "resident_document_access_audit",
   "resident_evidence_jobs",
@@ -903,6 +906,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0069_resident_semantic_tags.sql",
+    "8276018079004255ddb41588749e8203ebb49ec0e0403cd6c1f5c7869bc184e2",
+  ],
+  [
+    "packages/db/migrations/meta/0069_snapshot.json",
+    "9a615842c6e52de4ab820fda86b5048607470731a585c9019ae2c25096a80919",
+  ],
+  [
+    "packages/db/migrations/state/0069_sql_objects.json",
+    "e2c9c5219dd0d01687fda9596b09d0e0f16a33bfe43141d899d3fe968c1ec129",
+  ],
+  [
+    "packages/db/migrations/state/0069_manifest.json",
+    "83dfba213ec2a3caed91fb12fe1d5b66ed4943a45dbecdbd6be4425c917c10cc",
+  ],
+
   [
     "packages/db/migrations/0068_resident_latest_approved_publication.sql",
     "573c612c1c00841f38929ec89eee01b1e27ef6a5dab11bc4d8b032f535ca98f9",

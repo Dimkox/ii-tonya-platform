@@ -1,3 +1,18 @@
+import { lockCatalogueAuthority } from "./catalogue-authority.js";
+import {
+  tagCatalogue,
+  catalogueDigest,
+  recommendTags,
+} from "./resident-semantic-tags.js";
+import {
+  tagSelectionSchema,
+  tagLabelSchema,
+  normalizeTag,
+  canonicalTag,
+  type TagPreview,
+  type SemanticHelper,
+  type TagCandidate,
+} from "@ii-tonya/contracts";
 import { privateObjectErasureSubjectKey } from "./resident-private-erasure.js";
 import {
   emptyRichProfile,
@@ -622,6 +637,7 @@ export interface CardPhotoCustody {
 const shaBytes = (bytes: Uint8Array) =>
   createHash("sha256").update(bytes).digest("hex");
 export class PostgresExpertCardRepository {
+  private readonly semanticHelper: SemanticHelper | undefined;
   private readonly richOnboarding: boolean;
   private readonly photoCustody: CardPhotoCustody | undefined;
   private readonly geocode:
@@ -643,6 +659,7 @@ export class PostgresExpertCardRepository {
       workBotId: string;
       workBotKey: string;
       materialTransport?: ExpertCardMaterialTransport;
+      semanticHelper?: SemanticHelper;
       richOnboarding?: boolean;
       photoCustody?: CardPhotoCustody;
       geocode?: (
@@ -659,6 +676,7 @@ export class PostgresExpertCardRepository {
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(options.workBotKey)
     )
       fail("card_invalid_configuration");
+    this.semanticHelper = options.semanticHelper;
     this.richOnboarding = options.richOnboarding ?? false;
     this.photoCustody = options.photoCustody;
     this.geocode = options.geocode;
@@ -684,6 +702,22 @@ export class PostgresExpertCardRepository {
       if (error instanceof ExpertCardError) throw error;
       if (error instanceof ExpertManagerAuthorityError)
         throw new ExpertCardError("card_forbidden");
+      let cause: unknown = error;
+      for (
+        let depth = 0;
+        depth < 3 && cause instanceof Error;
+        depth++, cause = cause.cause
+      ) {
+        const count = /card_tag_aggregate_limit:(\d+)\/20/u.exec(cause.message);
+        if (count)
+          throw new ExpertCardError(
+            `card_fields:Выбрано ${count[1]} уникальных тегов; общий предел 20. Снимите лишние теги и подтвердите набор снова.`,
+          );
+        if (cause.message.includes("card_custom_tags_pending"))
+          throw new ExpertCardError(
+            "card_fields:Собственные теги ждут текущего решения менеджера.",
+          );
+      }
       throw new ExpertCardError("card_storage_unavailable");
     }
   }
@@ -746,7 +780,7 @@ export class PostgresExpertCardRepository {
         assistanceRequested: boolean;
         returnReason: string | null;
       }>(
-        sql`select (select r.return_reason from expert_card_reviews r where r.draft_id=d.id and r.revision=d.revision and r.action='return_changes' order by r.created_at desc,r.id desc limit 1) as "returnReason",(d.assistance_requested_at is not null and d.assistance_resolved_at is null) as "assistanceRequested",d.id as "draftId",d.revision,d.status,(select count(*)::int from expert_card_entries e where e.draft_id=d.id) as "entryCount",coalesce((select case when j.status='cancelled' then 'none' else j.status end from expert_card_material_jobs j where j.review_id=d.approved_review_id),'none') as "materialStatus",expert_card_activation_gate_valid(d.user_id,d.approved_review_id) as "promoConfirmed" from expert_card_drafts d where d.user_id=${userId}::uuid and d.application_id=${applicationId}::uuid`,
+        sql`select coalesce((select r.return_reason from expert_card_reviews r where r.draft_id=d.id and r.revision=d.revision and r.action='return_changes' order by r.created_at desc,r.id desc limit 1),(select 'Уточните или удалите тег '||substr(identity,8)||': '||reason from resident_tag_decisions where draft_id=d.id and revision=d.revision and decision='reject' order by created_at desc limit 1)) as "returnReason",(d.assistance_requested_at is not null and d.assistance_resolved_at is null) as "assistanceRequested",d.id as "draftId",d.revision,d.status,(select count(*)::int from expert_card_entries e where e.draft_id=d.id) as "entryCount",coalesce((select case when j.status='cancelled' then 'none' else j.status end from expert_card_material_jobs j where j.review_id=d.approved_review_id),'none') as "materialStatus",expert_card_activation_gate_valid(d.user_id,d.approved_review_id) as "promoConfirmed" from expert_card_drafts d where d.user_id=${userId}::uuid and d.application_id=${applicationId}::uuid`,
       )
     ).rows[0];
     const active =
@@ -1755,6 +1789,347 @@ export class PostgresExpertCardRepository {
       return assessment.blocked ? ("manual_fallback" as const) : true;
     });
   }
+  async initializeTagCache(): Promise<"semantic" | "exact-only"> {
+    try {
+      return await this.tx(
+        async (tx) =>
+          (
+            await recommendTags(
+              tx,
+              await tagCatalogue(tx),
+              "",
+              this.semanticHelper,
+            )
+          ).mode,
+      );
+    } catch {
+      return "exact-only";
+    }
+  }
+  async tagAction(
+    raw: ExpertCardEvent & {
+      action: "recommend" | "toggle" | "confirm" | "custom";
+      scope?: string;
+      token?: string;
+      index?: number;
+      label?: string;
+    },
+  ) {
+    const event = normalizeCardEvent(raw);
+    if (!this.work(event)) return fail("card_forbidden");
+    return this.tx(async (tx) => {
+      const started = await beginCardRequest(tx, event, "entry", {
+        tags: raw.action,
+        scope: raw.scope ?? null,
+        token: raw.token ?? null,
+        index: raw.index ?? null,
+        label: raw.label ?? null,
+      });
+      const identity = await owner(
+        tx,
+        event,
+        this.policy.messagingConsentPolicyVersion,
+      );
+      if (!identity) return fail("card_forbidden");
+      const d = await this.ensureDraft(tx, identity.userId, event);
+      if (started.replay) return { replay: true, preview: null };
+      if (!["collecting", "changes_requested", "approved"].includes(d.status))
+        return fail("card_state_conflict");
+      const row = (
+        await tx.execute<{
+          profile: RichProfile | null;
+          guided: GuidedService;
+          pending: GuidedService[];
+          tags: string[];
+          preview: TagPreview | null;
+          city: string | null;
+        }>(
+          sql`select rich_profile as profile,rich_guided as guided,rich_pending_services as pending,semantic_tags as tags,tag_preview as preview,public_payload->>'city' as city from expert_card_drafts where id=${d.id}::uuid`,
+        )
+      ).rows[0]!;
+      const catalogue = await tagCatalogue(tx),
+        registry = catalogueDigest(catalogue);
+      const safety = await assessResidentContent(tx, {}, d.revision);
+      let preview = row.preview;
+      if (raw.action === "recommend") {
+        const scope = raw.scope ?? "profile";
+        let service: GuidedService | undefined,
+          scopeLabel = "Теги профиля",
+          selected = [
+            ...row.tags,
+            ...(
+              await tx.execute<{ label: string }>(
+                sql`select h.display_label as label from expert_card_draft_tags dt join hashtags_db h on h.id=dt.tag_id where dt.draft_id=${d.id}::uuid`,
+              )
+            ).rows.map((t) => t.label),
+          ];
+        if (scope === "guided") {
+          service = row.guided;
+          scopeLabel = "Текущая заполняемая услуга";
+        } else if (scope.startsWith("service:")) {
+          service = row.profile?.services[Number(scope.slice(8)) - 1];
+          scopeLabel = `Услуга ${scope.slice(8)}: ${service?.title ?? ""}`;
+        } else if (scope.startsWith("pending:")) {
+          service = row.pending[Number(scope.slice(8)) - 1];
+          scopeLabel = `Ожидающая услуга ${scope.slice(8)}: ${service?.title ?? ""}`;
+        } else if (scope !== "profile") return fail("card_invalid_tags");
+        if (scope !== "profile" && !service) return fail("card_invalid_tags");
+        if (service) selected = service.tags ?? [];
+        const text = service
+          ? [
+              service.title,
+              service.description,
+              service.audience,
+              service.result,
+              ...(service.tags ?? []),
+            ]
+              .filter(Boolean)
+              .join("; ")
+          : [row.profile?.specialization, row.profile?.bio, ...row.tags]
+              .filter(Boolean)
+              .join("; ");
+        const result = await recommendTags(
+          tx,
+          catalogue,
+          text,
+          this.semanticHelper,
+        );
+        const candidates: TagCandidate[] = [...result.candidates];
+        // Approved source association, explicitly advisory. It never asserts competence.
+        if (
+          candidates.some(
+            (c) => c.score === 100 && normalizeTag(c.label) === "кпт",
+          )
+        ) {
+          for (const name of ["тревожность", "депрессия", "фобии"]) {
+            const t = catalogue.find(
+              (t) => normalizeTag(t.tagValue) === name && t.isActive,
+            );
+            if (t && !candidates.some((c) => c.id === t.id))
+              candidates.push({
+                id: t.id,
+                label: t.displayLabel,
+                weight: t.weightScore,
+                score: 0,
+                evidence:
+                  "Смежная тема к КПТ; hashtaxonomy-v2 раздел3. Подтвердите ваш выбор, это не квалификация",
+                cosine: null,
+                kind: "related",
+              });
+          }
+        }
+        const services = service
+          ? [service]
+          : [...(row.profile?.services ?? []), row.guided, ...row.pending];
+        if (
+          services.some((s) =>
+            ["ONLINE", "HYBRID"].includes(
+              s.format === "EVENT" ? (s.eventDelivery ?? "") : (s.format ?? ""),
+            ),
+          )
+        )
+          candidates.push({
+            id: "format:online",
+            label: "#онлайн",
+            weight: 5,
+            score: 100,
+            evidence: "Указанный вами формат",
+            cosine: null,
+            kind: "format",
+          });
+        if (
+          row.city &&
+          services.some((s) =>
+            ["OFFLINE", "HYBRID"].includes(
+              s.format === "EVENT" ? (s.eventDelivery ?? "") : (s.format ?? ""),
+            ),
+          )
+        )
+          candidates.push({
+            id: "format:offline",
+            label: "#офлайн_" + row.city,
+            weight: 5,
+            score: 100,
+            evidence: "Город текущей карточки и указанный формат",
+            cosine: null,
+            kind: "format",
+          });
+        const top = candidates
+          .sort(
+            (a, b) =>
+              b.score - a.score ||
+              b.weight - a.weight ||
+              a.id.localeCompare(b.id),
+          )
+          .slice(0, 15);
+        const unique = new Map<string, string>();
+        for (const label of [...selected, ...top.map((c) => c.label)])
+          unique.set(canonicalTag(label, catalogue), label);
+        preview = {
+          token: randomUUID(),
+          revision: d.revision,
+          scope,
+          scopeLabel,
+          selected: [...unique.values()],
+          choices: [...unique.values()],
+          candidates: top,
+          mode: result.mode,
+          generation: result.generation,
+          registry,
+          safety: safety.digest,
+        };
+      } else {
+        if (
+          !preview ||
+          preview.token !== raw.token ||
+          preview.revision !== d.revision ||
+          preview.registry !== registry ||
+          preview.safety !== safety.digest
+        )
+          return fail("card_revision_conflict");
+        if (preview.mode === "semantic") {
+          const state = await this.semanticHelper?.call("state");
+          if (state?.generation !== preview.generation)
+            return fail("card_revision_conflict");
+        }
+        const choices = preview.choices;
+        if (raw.action === "toggle") {
+          if (
+            !Number.isInteger(raw.index) ||
+            raw.index! < 0 ||
+            raw.index! >= choices.length
+          )
+            return fail("card_invalid_tags");
+          const label = choices[raw.index!]!;
+          preview.selected = preview.selected.includes(label)
+            ? preview.selected.filter((x) => x !== label)
+            : [...preview.selected, label];
+        } else if (raw.action === "custom") {
+          const parsed = tagLabelSchema.safeParse(raw.label);
+          if (!parsed.success) return fail("card_invalid_tags");
+          const candidate = parsed.data;
+          const assessment = await assessResidentContent(
+            tx,
+            { "custom-tag": candidate },
+            d.revision + 1,
+          );
+          if (assessment.blocked) {
+            await recordResidentSafety(
+              tx,
+              d,
+              `owner:${event.requestKey}`,
+              assessment,
+            );
+            await finishCardRequest(tx, started, d.id);
+            return { replay: false, preview, safetyBlocked: true };
+          }
+          if (
+            !preview.selected.some(
+              (s) =>
+                canonicalTag(s, catalogue) ===
+                canonicalTag(candidate, catalogue),
+            )
+          ) {
+            const existing = preview.choices.find(
+              (s) =>
+                canonicalTag(s, catalogue) ===
+                canonicalTag(candidate, catalogue),
+            );
+            preview.selected.push(existing ?? candidate);
+            if (!existing) preview.choices.push(candidate);
+          }
+          if (preview.selected.length > 35 || preview.choices.length > 35)
+            return fail("card_invalid_tags");
+        } else if (raw.action === "confirm") {
+          const parsed = tagSelectionSchema.safeParse(preview.selected);
+          if (!parsed.success) return fail("card_tag_limit");
+          const selected = parsed.data;
+          let profile = row.profile,
+            guided = row.guided,
+            pending = row.pending,
+            tags = row.tags;
+          if (preview.scope === "profile") {
+            tags = selected;
+            await tx.execute(
+              sql`delete from expert_card_draft_tags where draft_id=${d.id}::uuid`,
+            );
+          } else if (preview.scope === "guided")
+            guided = { ...guided, tags: selected };
+          else if (preview.scope.startsWith("service:")) {
+            if (!profile) return fail("card_invalid_tags");
+            const n = Number(preview.scope.slice(8)) - 1;
+            profile = {
+              ...profile,
+              services: profile.services.map((s, i) =>
+                i === n ? { ...s, tags: selected } : s,
+              ),
+            };
+          } else {
+            const n = Number(preview.scope.slice(8)) - 1;
+            pending = pending.map((s, i) =>
+              i === n ? { ...s, tags: selected } : s,
+            );
+          }
+          await tx.execute(
+            sql`update expert_card_drafts set semantic_tags=${JSON.stringify(tags)}::jsonb,rich_profile=${profile ? JSON.stringify(profile) : null}::jsonb,rich_guided=${JSON.stringify(guided)}::jsonb,rich_pending_services=${JSON.stringify(pending)}::jsonb,revision=revision+1,status='collecting',approved_review_id=null,owner_confirmed_digest=null,tag_preview=null where id=${d.id}::uuid`,
+          );
+          await this.invalidateJobs(tx, d.id);
+          preview = null;
+        }
+        if (preview) preview.token = randomUUID();
+      }
+      if (preview)
+        await tx.execute(
+          sql`update expert_card_drafts set tag_preview=${JSON.stringify(preview)}::jsonb where id=${d.id}::uuid`,
+        );
+      await finishCardRequest(tx, started, d.id);
+      return { replay: false, preview };
+    });
+  }
+  async decideCustomTag(
+    input: StaffCommand & {
+      identity: string;
+      decision: "approve" | "reject";
+      reason: string;
+    },
+  ) {
+    if (
+      !input.identity.startsWith("custom:") ||
+      input.identity.length > 200 ||
+      !["approve", "reject"].includes(input.decision) ||
+      !input.reason.trim() ||
+      input.reason.length > 1000
+    )
+      return fail("card_invalid_tags");
+    return this.staffAction(
+      input,
+      "edit_public",
+      {
+        customTag: input.identity,
+        decision: input.decision,
+        reason: input.reason,
+      },
+      async (tx, d, managerId) => {
+        await tx.execute(
+          sql`insert into resident_tag_decisions(draft_id,revision,identity,decision,reason,manager_id,session_hash) values(${d.id}::uuid,${d.revision},${input.identity},${input.decision},${input.reason},${managerId}::uuid,${input.sessionHash})`,
+        );
+        if (input.decision === "reject")
+          await tx.execute(
+            sql`update expert_card_drafts set status='changes_requested',approved_review_id=null where id=${d.id}::uuid`,
+          );
+        return undefined;
+      },
+    );
+  }
+  async exportTagCatalogue(sessionHash: string) {
+    return this.tx(async (tx) => {
+      await lockCatalogueAuthority(tx, sessionHash);
+      const items = await tagCatalogue(tx);
+      if (items.length > 512) return fail("card_state_conflict");
+      await lockCatalogueAuthority(tx, sessionHash);
+      return items;
+    });
+  }
   async getDraftTags(scope: ExpertPromoScope, page = 0) {
     if (!this.work(scope) || !Number.isInteger(page) || page < 0 || page > 100)
       fail("card_invalid_tags");
@@ -1768,7 +2143,7 @@ export class PostgresExpertCardRepository {
       const draft = await this.ensureDraft(tx, identity.userId, scope);
       if (!["collecting", "changes_requested"].includes(draft.status))
         fail("card_state_conflict");
-      const visible = sql`h.is_active or exists(select 1 from expert_card_draft_tags t where t.draft_id=${draft.id}::uuid and t.tag_id=h.id)`;
+      const visible = sql`h.is_active or exists(select 1 from expert_card_draft_tags t where t.draft_id=${draft.id}::uuid and t.tag_id=h.id) or exists(select 1 from expert_card_drafts d cross join lateral jsonb_array_elements_text(d.semantic_tags) st where d.id=${draft.id}::uuid and resident_tag_identity(st)='catalogue:'||h.id::text)`;
       const total = (
         await tx.execute<{ n: number }>(
           sql`select count(*)::int n from hashtags_db h where ${visible}`,
@@ -1783,12 +2158,12 @@ export class PostgresExpertCardRepository {
           selected: boolean;
           active: boolean;
         }>(
-          sql`select h.id,h.display_label as label,h.is_active as active,exists(select 1 from expert_card_draft_tags t where t.draft_id=${draft.id}::uuid and t.tag_id=h.id) as selected from hashtags_db h where ${visible} order by h.parent_category,h.sub_category,h.tag_value,h.id limit 8 offset ${actualPage * 8}`,
+          sql`select h.id,h.display_label as label,h.is_active as active,(exists(select 1 from expert_card_draft_tags t where t.draft_id=${draft.id}::uuid and t.tag_id=h.id) or exists(select 1 from expert_card_drafts d cross join lateral jsonb_array_elements_text(d.semantic_tags) st where d.id=${draft.id}::uuid and resident_tag_identity(st)='catalogue:'||h.id::text)) as selected from hashtags_db h where ${visible} order by h.parent_category,h.sub_category,h.tag_value,h.id limit 8 offset ${actualPage * 8}`,
         )
       ).rows;
       const labels = (
         await tx.execute<{ label: string }>(
-          sql`select h.display_label as label from expert_card_draft_tags t join hashtags_db h on h.id=t.tag_id where t.draft_id=${draft.id}::uuid order by h.display_label`,
+          sql`select distinct label from (select h.display_label as label from expert_card_draft_tags t join hashtags_db h on h.id=t.tag_id where t.draft_id=${draft.id}::uuid union all select jsonb_array_elements_text(semantic_tags) as label from expert_card_drafts where id=${draft.id}::uuid) tags order by label`,
         )
       ).rows.map((r) => r.label);
       return {
@@ -1797,6 +2172,11 @@ export class PostgresExpertCardRepository {
         pages,
         tags,
         tags_array: labels,
+        selectedCount: (
+          await tx.execute<{ n: number }>(
+            sql`select count(distinct identity)::int n from expert_card_drafts d cross join lateral resident_selected_tags(d) t where d.id=${draft.id}::uuid`,
+          )
+        ).rows[0]!.n,
       };
     });
   }
@@ -1804,7 +2184,7 @@ export class PostgresExpertCardRepository {
     raw: ExpertCardEvent & { expectedRevision: number; tagId: string },
   ) {
     const expected = raw.expectedRevision,
-      tagId = raw.tagId;
+      tagId = String(raw.tagId).toLowerCase();
     this.revision(expected);
     if (!id.test(tagId)) fail("card_invalid_tags");
     return this.ownerAction(
@@ -1822,7 +2202,12 @@ export class PostgresExpertCardRepository {
         ).rows;
         if (tag.length !== 1) fail("card_invalid_tags");
         const fields = await residentSafetyFields(tx, draft.id);
-        const selectedBefore = `tag:${tagId}` in fields;
+        const selectedBefore =
+          (
+            await tx.execute(
+              sql`select 1 from expert_card_drafts d where d.id=${draft.id}::uuid and (exists(select 1 from expert_card_draft_tags where draft_id=d.id and tag_id=${tagId}::uuid) or exists(select 1 from jsonb_array_elements_text(d.semantic_tags) t where resident_tag_identity(t)='catalogue:'||${tagId}))`,
+            )
+          ).rows.length > 0;
         if (selectedBefore) delete fields[`tag:${tagId}`];
         else {
           const value = (
@@ -1840,19 +2225,17 @@ export class PostgresExpertCardRepository {
           draft.revision + 1,
         );
         if (assessment.blocked) return assessment;
-        const selected = (
-          await tx.execute(
-            sql`delete from expert_card_draft_tags where draft_id=${draft.id}::uuid and tag_id=${tagId}::uuid returning tag_id`,
-          )
-        ).rows;
-        if (!selected.length && tag[0]?.is_active !== true)
+        await tx.execute(
+          sql`delete from expert_card_draft_tags where draft_id=${draft.id}::uuid and tag_id=${tagId}::uuid returning tag_id`,
+        );
+        if (!selectedBefore && tag[0]?.is_active !== true)
           fail("card_invalid_tags");
-        if (!selected.length)
+        if (!selectedBefore)
           await tx.execute(
             sql`insert into expert_card_draft_tags(draft_id,user_id,tag_id) values(${draft.id}::uuid,${draft.userId}::uuid,${tagId}::uuid)`,
           );
         await tx.execute(
-          sql`update expert_card_drafts set revision=revision+1,public_payload=null,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+          sql`update expert_card_drafts set semantic_tags=case when ${selectedBefore} then (select coalesce(jsonb_agg(t),'[]'::jsonb) from jsonb_array_elements_text(semantic_tags) t where resident_tag_identity(t)<>'catalogue:'||${tagId}) else semantic_tags end,revision=revision+1,public_payload=null,approved_review_id=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
         );
         await this.invalidateJobs(tx, draft.id);
         return assessment;
@@ -2030,6 +2413,11 @@ export class PostgresExpertCardRepository {
       return {
         ...(await this.workflow(tx, draft.userId, draft.applicationId)),
         entries,
+        semanticTags: (
+          await tx.execute(
+            sql`select t.identity,t.label,coalesce(c.decision,'pending') as decision,c.reason from expert_card_drafts d cross join lateral resident_selected_tags(d) t left join resident_tag_decisions c on c.draft_id=d.id and c.revision=d.revision and c.identity=t.identity where d.id=${draft.id}::uuid order by t.identity,t.label`,
+          )
+        ).rows,
         assistance: (
           await tx.execute(
             sql`select assistance_requested_at as "requestedAt",assistance_revision as revision,assistance_resolved_at as "resolvedAt" from expert_card_drafts where id=${draft.id}::uuid`,

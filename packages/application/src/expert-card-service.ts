@@ -1,5 +1,6 @@
 import {
   richChecklist,
+  type TagPreview,
   proposeRichFields,
   richProfilePatchSchema,
   richServiceSchema,
@@ -45,6 +46,7 @@ export interface ExpertCardWorkflow extends CardSafetyResult {
   activeResident?: boolean;
 }
 export interface DraftTagPage {
+  selectedCount?: number;
   revision: number;
   page: number;
   pages: number;
@@ -57,6 +59,19 @@ export interface DraftTagPage {
   tags_array: readonly string[];
 }
 export interface ExpertCardRepository {
+  tagAction?(
+    input: ExpertCardEvent & {
+      action: "recommend" | "toggle" | "confirm" | "custom";
+      scope?: string;
+      token?: string;
+      index?: number;
+      label?: string;
+    },
+  ): Promise<{
+    replay: boolean;
+    preview: TagPreview | null;
+    safetyBlocked?: boolean;
+  }>;
   ingestRichPhoto?(
     input: ExpertCardEvent & {
       expectedRevision: number;
@@ -454,6 +469,132 @@ export function createExpertCardService(deps: {
         requestDigest: input.requestDigest,
       };
       try {
+        if (
+          input.callbackData?.startsWith("ct2:") ||
+          /^\/tags_(?:recommend|custom)(?:\s|$)/u.test(text)
+        ) {
+          if (!deps.draftTagsEnabled || !deps.repository.tagAction)
+            return reply("Подбор тегов пока недоступен; каталог: /tags.");
+          let command: Parameters<
+            NonNullable<ExpertCardRepository["tagAction"]>
+          >[0];
+          if (input.callbackData) {
+            const m = /^ct2:(t|c):([0-9a-f-]{36})(?::([0-9]{1,2}))?$/u.exec(
+              input.callbackData,
+            );
+            if (!m) return { status: "rejected" };
+            command = {
+              ...event,
+              action: m[1] === "t" ? "toggle" : "confirm",
+              token: m[2]!,
+              ...(m[1] === "t" ? { index: Number(m[3]) } : {}),
+            };
+          } else if (text.startsWith("/tags_custom ")) {
+            const m = /^\/tags_custom ([0-9a-f-]{36}) (.+)$/u.exec(text);
+            if (!m)
+              return reply(
+                "Используйте команду своего тега из текущего предложения.",
+              );
+            command = {
+              ...event,
+              action: "custom",
+              token: m[1]!,
+              label: m[2]!,
+            };
+          } else {
+            const scopeText = text.slice("/tags_recommend".length).trim();
+            const service = /^услуга ([1-8])$/u.exec(scopeText),
+              pending = /^ожидающая ([1-8])$/u.exec(scopeText);
+            const scope = service
+              ? "service:" + service[1]
+              : pending
+                ? "pending:" + pending[1]
+                : scopeText === "текущая"
+                  ? "guided"
+                  : "profile";
+            if (
+              scopeText &&
+              !service &&
+              !pending &&
+              !["профиль", "текущая"].includes(scopeText)
+            )
+              return reply(
+                "Выберите: /tags_recommend профиль, /tags_recommend услуга 1 или /tags_recommend текущая для заполняемой услуги.",
+              );
+            command = { ...event, action: "recommend", scope };
+          }
+          const r = await deps.repository.tagAction(command);
+          if (r.replay)
+            return {
+              status: "duplicate",
+              ...(input.callbackData ? { tagCallbackAuthorized: true } : {}),
+            };
+          if (r.safetyBlocked)
+            return reply(
+              "Этот тег не прошёл проверку безопасности. Остальные ответы сохранены.",
+            );
+          if (!r.preview)
+            return {
+              ...reply(
+                "Показанный набор тегов сохранён. Новые собственные теги ждут решения менеджера. Продолжить ответы: /card_mode.",
+              ),
+              ...(input.callbackData
+                ? { tagCallbackAuthorized: true as const }
+                : {}),
+            };
+          const p = r.preview;
+          const note =
+            p.mode === "semantic"
+              ? "Локальные рекомендации"
+              : "Доступны точные совпадения и ручной выбор; подбор по смыслу временно недоступен";
+          return {
+            status: "handled",
+            text: `${p.scopeLabel}. ${note}.\nПолная замена только этого раздела: ${p.selected.join(", ") || "пустой набор"}. Выбрано ${p.selected.length}; общий предел профиля и услуг — 20 уникальных тегов.\n${[
+              "Прямое совпадение / синоним: " +
+                p.candidates
+                  .filter((c) => c.score === 100 && c.kind !== "format")
+                  .map((c) => p.choices.indexOf(c.label) + 1)
+                  .join(", "),
+              "Смысловая близость: " +
+                p.candidates
+                  .filter((c) => c.score === 50 && c.kind !== "related")
+                  .map((c) => p.choices.indexOf(c.label) + 1)
+                  .join(", "),
+              "Связь с КПТ (каталог, раздел 3; подтвердите): " +
+                p.candidates
+                  .filter((c) => c.kind === "related")
+                  .map((c) => p.choices.indexOf(c.label) + 1)
+                  .join(", "),
+              "Ваш формат: " +
+                p.candidates
+                  .filter((c) => c.kind === "format")
+                  .map((c) => p.choices.indexOf(c.label) + 1)
+                  .join(", "),
+            ].join(
+              "\n",
+            )}\nЭто предложения для вашего подтверждения, а не доказательство квалификации. Свой тег (модерация): /tags_custom ${p.token} ваш тег. Каталог: /tags.`,
+            inlineKeyboard: [
+              ...p.choices.map((label, i) => [
+                {
+                  text:
+                    `${i + 1}. ` +
+                    (p.selected.includes(label) ? "☑ " : "☐ ") +
+                    label,
+                  callback_data: `ct2:t:${p.token}:${i}`,
+                },
+              ]),
+              [
+                {
+                  text: "Подтвердить показанный набор",
+                  callback_data: `ct2:c:${p.token}`,
+                },
+              ],
+            ],
+            ...(input.callbackData
+              ? { tagCallbackAuthorized: true as const }
+              : {}),
+          };
+        }
         if (input.callbackData !== undefined || text === "/tags") {
           if (
             !deps.draftTagsEnabled ||
@@ -513,7 +654,7 @@ export function createExpertCardService(deps: {
           if (navigation.length) buttons.push(navigation);
           return {
             status: "handled",
-            text: `Теги: ${result.tags_array.length}/20. Страница ${page + 1}/${result.pages}. ${result.tags_array.join(", ")} Теги не подтверждают квалификацию.`,
+            text: `Теги: ${result.selectedCount ?? result.tags_array.length}/20. Страница ${page + 1}/${result.pages}. ${result.tags_array.join(", ")} Теги не подтверждают квалификацию. Подобрать: /tags_recommend профиль или /tags_recommend текущая.`,
             inlineKeyboard: buttons,
             ...(input.callbackData !== undefined
               ? { tagCallbackAuthorized: true as const }

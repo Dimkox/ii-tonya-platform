@@ -11,6 +11,14 @@ type Command = {
   idempotencyKey: string;
 };
 export interface ExpertCardAdminRepository {
+  exportTagCatalogue?(sessionHash: string): Promise<unknown>;
+  decideCustomTag?(
+    input: Command & {
+      identity: string;
+      decision: "approve" | "reject";
+      reason: string;
+    },
+  ): Promise<unknown>;
   richMediaLink?(
     sessionHash: string,
     applicationId: string,
@@ -53,6 +61,7 @@ const failure = (e: unknown) => {
           ? "conflict"
           : [
                 "card_invalid_event",
+                "card_invalid_tags",
                 "card_invalid_entry",
                 "card_invalid_public_payload",
                 "card_invalid_proof",
@@ -102,6 +111,58 @@ export function createExpertCardAdminService(deps: {
     };
   };
   return {
+    async exportTags(sessionHash: string) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      try {
+        if (!deps.repository.exportTagCatalogue)
+          return { kind: "unavailable" as const };
+        return {
+          kind: "ok" as const,
+          items: await deps.repository.exportTagCatalogue(sessionHash),
+        };
+      } catch (e) {
+        return failure(e);
+      }
+    },
+    async decideTag(
+      sessionHash: string,
+      input: Omit<Command, "sessionHash"> & {
+        identity: string;
+        decision: "approve" | "reject";
+        reason: string;
+      },
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      const base = command(sessionHash, input, [
+        "identity",
+        "decision",
+        "reason",
+      ]);
+      if (
+        !base ||
+        typeof input.identity !== "string" ||
+        typeof input.reason !== "string" ||
+        !["approve", "reject"].includes(input.decision)
+      )
+        return { kind: "invalid" as const };
+      try {
+        if (!deps.repository.decideCustomTag)
+          return { kind: "unavailable" as const };
+        return {
+          kind: "ok" as const,
+          item: await deps.repository.decideCustomTag({
+            ...base,
+            identity: input.identity,
+            decision: input.decision,
+            reason: input.reason,
+          }),
+        };
+      } catch (e) {
+        return failure(e);
+      }
+    },
     async mediaLink(
       sessionHash: string,
       applicationId: string,

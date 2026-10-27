@@ -158,6 +158,14 @@ const HAND_SQL_FUNCTIONS = [
   "resident_safety_publication_authorize",
   "resident_safety_publish",
   "resident_safety_subject_guard",
+  "resident_selected_tags",
+  "resident_tag_aggregate_guard",
+  "resident_tag_before_write",
+  "resident_tag_cache_valid",
+  "resident_tag_decision_guard",
+  "resident_tag_identity",
+  "resident_tag_labels_valid",
+  "resident_tag_normalize",
   "resident_terminal_decision_guard",
   "resident_verification_consent_cleanup",
   "resident_verification_draft_v2_valid",
@@ -332,6 +340,10 @@ const HAND_SQL_TRIGGERS = [
   "resident_safety_publication_authorize",
   "resident_safety_publication_immutable",
   "resident_safety_rules_immutable",
+  "resident_tag_aggregate_draft",
+  "resident_tag_aggregate_selection",
+  "resident_tag_before_write",
+  "resident_tag_decision_source",
   "resident_terminal_decision_guard",
   "resident_verification_anchor_guard",
   "resident_verification_consent_cleanup",
@@ -415,7 +427,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(68);
+    expect(newest).toBe(69);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -530,7 +542,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0066 adds immutable reviewed card versions and private photo custody.
-    expect(declared.size).toBe(211);
+    // 0069 adds public vector cache and revision-bound custom tag decisions.
+    expect(declared.size).toBe(213);
   });
 });

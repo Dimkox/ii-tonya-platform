@@ -18,7 +18,7 @@ type Pending = (
 ) &
   CardRevisionCommand;
 export function renderExpertCardReview(): string {
-  return `<section data-expert-card-root aria-labelledby="card-review-title"><h2 id="card-review-title">Карточки экспертов</h2><p>Защищённые материалы интервью доступны только в действующем сеансе сотрудника. Фото карточки открываются по защищённой временной ссылке после проверки сеанса.</p><button type="button" data-card-refresh disabled>Открыть / обновить очередь карточек</button><p data-card-status role="status" aria-live="polite">Для работы используйте административный сеанс выше.</p><section data-card-queue aria-label="Очередь карточек"></section><section data-card-detail aria-label="Защищённый черновик"></section><fieldset><legend>Публичная профессиональная карточка</legend><p>Заполните только согласованное публичное описание, без контактов и ссылок. Приватные ответы автоматически не переносятся.</p><label>Отображаемое имя <input data-card-displayName maxlength="80" disabled></label><label>Профессия <input data-card-profession maxlength="120" disabled></label><label>Город <input data-card-city maxlength="80" disabled></label><label>Краткое описание одним абзацем <textarea data-card-summary maxlength="2000" rows="5" placeholder="TODO: Wait for Content Spec" disabled></textarea></label><button type="button" data-card-save disabled>Сохранить публичные поля</button></fieldset><label><input type="checkbox" data-card-warning-ack disabled> Я лично прочитал(а) текущие предупреждения и соответствующие поля.</label><button type="button" data-card-approve disabled>Утвердить текущую ревизию</button><label>Причина возврата <textarea data-card-return-reason maxlength="2000" disabled></textarea></label><button type="button" data-card-return disabled>Вернуть на доработку</button><button type="button" data-card-promo disabled>Подтвердить промо по текущим доказательствам</button><p>Подтверждение промо доступно только после реальной доставки материалов для утверждённой ревизии. Сотрудник не может отметить оплату, доставку или активацию вручную.</p></section>`;
+  return `<section data-expert-card-root aria-labelledby="card-review-title"><h2 id="card-review-title">Карточки экспертов</h2><p>Защищённые материалы интервью доступны только в действующем сеансе сотрудника. Фото карточки открываются по защищённой временной ссылке после проверки сеанса.</p><button type="button" data-card-refresh disabled>Открыть / обновить очередь карточек</button><p data-card-status role="status" aria-live="polite">Для работы используйте административный сеанс выше.</p><button type="button" data-card-tag-export disabled>Экспорт каталога тегов</button><pre data-card-tag-export-result></pre><section data-card-queue aria-label="Очередь карточек"></section><section data-card-detail aria-label="Защищённый черновик"></section><fieldset><legend>Публичная профессиональная карточка</legend><p>Заполните только согласованное публичное описание, без контактов и ссылок. Приватные ответы автоматически не переносятся.</p><label>Отображаемое имя <input data-card-displayName maxlength="80" disabled></label><label>Профессия <input data-card-profession maxlength="120" disabled></label><label>Город <input data-card-city maxlength="80" disabled></label><label>Краткое описание одним абзацем <textarea data-card-summary maxlength="2000" rows="5" placeholder="TODO: Wait for Content Spec" disabled></textarea></label><button type="button" data-card-save disabled>Сохранить публичные поля</button></fieldset><label><input type="checkbox" data-card-warning-ack disabled> Я лично прочитал(а) текущие предупреждения и соответствующие поля.</label><button type="button" data-card-approve disabled>Утвердить текущую ревизию</button><label>Причина возврата <textarea data-card-return-reason maxlength="2000" disabled></textarea></label><button type="button" data-card-return disabled>Вернуть на доработку</button><button type="button" data-card-promo disabled>Подтвердить промо по текущим доказательствам</button><p>Подтверждение промо доступно только после реальной доставки материалов для утверждённой ревизии. Сотрудник не может отметить оплату, доставку или активацию вручную.</p></section>`;
 }
 export function bindExpertCardReview(
   root: HTMLElement,
@@ -84,6 +84,8 @@ export function bindExpertCardReview(
     const enabled = active && !!deps.getClient(),
       command = pending.get(selected?.applicationId ?? "");
     refresh.disabled = !enabled || busy;
+    const exporter = el<HTMLButtonElement>("tag-export");
+    if (exporter) exporter.disabled = !enabled || busy;
     for (const f of Object.values(fields))
       f.disabled = !enabled || busy || !selected || !!command;
     save.disabled =
@@ -94,6 +96,9 @@ export function bindExpertCardReview(
     approve.disabled =
       !review ||
       selected?.safety?.blocked === true ||
+      !!selected?.semanticTags?.some(
+        (t) => t.identity.startsWith("custom:") && t.decision !== "approve",
+      ) ||
       (!!selected?.safety?.issues.length && !warningAck?.checked) ||
       !selected?.publicCard ||
       (!!command &&
@@ -117,6 +122,8 @@ export function bindExpertCardReview(
     if (returnReason) returnReason.value = "";
     if (warningAck) warningAck.checked = false;
     detail.replaceChildren();
+    const exportView = el("tag-export-result");
+    if (exportView) exportView.textContent = "";
     for (const f of Object.values(fields)) f.value = "";
     controls();
   }
@@ -158,6 +165,61 @@ export function bindExpertCardReview(
         detail,
         `Владелец просит помощи. Ревизия ${item.assistance.revision}, ${item.assistance.requestedAt}. Требуется ответ менеджера.`,
       );
+    for (const tag of item.semanticTags ?? []) {
+      text(
+        detail,
+        `${tag.label} — ${tag.identity.startsWith("custom:") ? ({ pending: "На модерации", approve: "Одобрен", reject: "Отклонён" }[tag.decision] ?? "На модерации") : "каталог"}${tag.reason ? ": " + tag.reason : ""}`,
+      );
+      if (!tag.identity.startsWith("custom:") || tag.decision !== "pending")
+        continue;
+      const reason = doc.createElement("input");
+      reason.maxLength = 1000;
+      reason.placeholder = "Причина решения о собственном теге";
+      reason.setAttribute("aria-label", `Причина решения ${tag.label}`);
+      detail.append(reason);
+      for (const decision of ["approve", "reject"] as const) {
+        const button = doc.createElement("button");
+        button.type = "button";
+        button.textContent =
+          decision === "approve"
+            ? `Одобрить ${tag.label}`
+            : `Отклонить ${tag.label}`;
+        button.onclick = async () => {
+          const client = deps.getClient(),
+            epoch = generation;
+          if (
+            !client?.decideTag ||
+            busy ||
+            !active ||
+            selected !== item ||
+            !reason.value.trim()
+          )
+            return;
+          busy = true;
+          controls();
+          try {
+            await client.decideTag(item.applicationId, {
+              expectedRevision: item.revision,
+              idempotencyKey: crypto.randomUUID(),
+              identity: tag.identity,
+              decision,
+              reason: reason.value.trim(),
+            });
+            if (!current(client, epoch)) return;
+            const fresh = await client.read(item.applicationId);
+            if (current(client, epoch) && selected === item) render(fresh);
+          } catch (error) {
+            if (current(client, epoch)) failed(error);
+          } finally {
+            if (current(client, epoch)) {
+              busy = false;
+              controls();
+            }
+          }
+        };
+        detail.append(button);
+      }
+    }
     if (item.rich?.enabled) {
       text(
         detail,
@@ -475,6 +537,28 @@ export function bindExpertCardReview(
     }
   }
   if (warningAck) warningAck.onchange = controls;
+  const exporter = el<HTMLButtonElement>("tag-export"),
+    exportResult = el("tag-export-result");
+  if (exporter)
+    exporter.onclick = async () => {
+      const client = deps.getClient(),
+        epoch = generation;
+      if (!client?.exportTags || busy || !active) return;
+      busy = true;
+      controls();
+      try {
+        const value = await client.exportTags();
+        if (current(client, epoch) && exportResult)
+          exportResult.textContent = value;
+      } catch (error) {
+        if (current(client, epoch)) failed(error);
+      } finally {
+        if (current(client, epoch)) {
+          busy = false;
+          controls();
+        }
+      }
+    };
   refresh.onclick = () => void load();
   save.onclick = () => void mutate("edit");
   approve.onclick = () => void mutate("approve");

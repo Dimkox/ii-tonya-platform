@@ -3,6 +3,7 @@ import {
   createTelegramDocumentReader,
   createIsolatedDocumentParser,
   createResidentGeocoder,
+  createIsolatedSemanticTags,
 } from "@ii-tonya/integrations";
 import { createBookingCallbackAck } from "./booking-callback-ack.js";
 import type { ExpertCardLegacyReplayRead } from "./expert-card-telegram-ingress.js";
@@ -23,6 +24,7 @@ import {
   sql,
 } from "@ii-tonya/db";
 export interface ExpertCardCapability {
+  initializeTags?: () => Promise<"semantic" | "exact-only">;
   answerTagCallback?: (input: {
     botId: string;
     callbackQueryId: string;
@@ -126,6 +128,13 @@ export function createExpertCardComposition(
       : undefined);
   const repository = new PostgresExpertCardRepository(db, {
     richOnboarding: true,
+    ...(config.residentSemanticSocket
+      ? {
+          semanticHelper: createIsolatedSemanticTags(
+            config.residentSemanticSocket,
+          ),
+        }
+      : {}),
     ...(photoCustody ? { photoCustody } : {}),
     ...(options.geocode
       ? { geocode: options.geocode }
@@ -195,6 +204,7 @@ export function createExpertCardComposition(
         )
       : undefined;
   return {
+    initializeTags: () => repository.initializeTagCache(),
     ...(acknowledge
       ? {
           answerTagCallback: async (input: {

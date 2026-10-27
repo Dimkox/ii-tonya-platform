@@ -35,6 +35,11 @@ export const expertCardDrafts = pgTable(
       .references(() => users.id),
     revision: integer("revision").notNull().default(0),
     status: text("status").notNull().default("collecting"),
+    semanticTags: jsonb("semantic_tags")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    tagPreview: jsonb("tag_preview"),
     richMode: boolean("rich_mode").notNull().default(false),
     richProfile:
       jsonb("rich_profile").$type<import("@ii-tonya/contracts").RichProfile>(),

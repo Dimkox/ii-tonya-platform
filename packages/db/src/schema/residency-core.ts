@@ -8,8 +8,10 @@ import {
   pgTable,
   primaryKey,
   text,
+  timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
+import { users } from "./identity.js";
 import { expertCardDrafts } from "./expert-cards.js";
 export const hashtagsDb = pgTable(
   "hashtags_db",
@@ -19,6 +21,7 @@ export const hashtagsDb = pgTable(
     subCategory: text("sub_category").notNull(),
     tagValue: text("tag_value").notNull().unique("hashtags_db_tag_value_key"),
     displayLabel: text("display_label").notNull(),
+    synonymProvenance: jsonb("synonym_provenance").notNull().default([]),
     synonymsJson: jsonb("synonyms_json").$type<{ term: string }[]>().notNull(),
     weightScore: integer("weight_score").notNull().default(5),
     isActive: boolean("is_active").notNull().default(true),
@@ -61,4 +64,32 @@ export const expertCardDraftTags = pgTable(
       foreignColumns: [expertCardDrafts.id, expertCardDrafts.userId],
     }).onDelete("cascade"),
   ],
+);
+
+export const tagEmbeddingsCache = pgTable("tag_embeddings_cache", {
+  singleton: boolean("singleton").primaryKey().default(true),
+  generation: text("generation").notNull(),
+  modelDigest: text("model_digest").notNull(),
+  taxonomyDigest: text("taxonomy_digest").notNull(),
+  cache: jsonb("cache").notNull(),
+});
+export const residentTagDecisions = pgTable(
+  "resident_tag_decisions",
+  {
+    draftId: uuid("draft_id")
+      .notNull()
+      .references(() => expertCardDrafts.id, { onDelete: "cascade" }),
+    revision: integer("revision").notNull(),
+    identity: text("identity").notNull(),
+    decision: text("decision").notNull(),
+    reason: text("reason").notNull(),
+    managerId: uuid("manager_id")
+      .notNull()
+      .references(() => users.id),
+    sessionHash: text("session_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.draftId, t.revision, t.identity] })],
 );

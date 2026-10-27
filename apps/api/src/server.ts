@@ -605,6 +605,7 @@ export const createDefaultLifecycle = (
       config,
       options.expertCard,
     );
+    await expertCard?.initializeTags?.();
     let expertAiIngress = options.expertAiComposition?.ingress;
     if (config.features.expertAiIngress === true && expertCard) {
       if (

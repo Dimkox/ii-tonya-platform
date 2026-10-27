@@ -415,6 +415,7 @@ export type RuntimeConfig = {
   clientAccountQueries?: ClientAccountQueriesConfig;
   payerReceipt?: PayerReceiptConfig;
   expertApplicant?: ExpertApplicantConfig;
+  residentSemanticSocket?: string;
   residentGeocode?: { key: string };
   privateVerification?: {
     bucket: string;
@@ -922,6 +923,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
     ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
       ? { privateVerification: privateVerificationConfig(source) }
+      : {}),
+    ...(source.RESIDENT_SEMANTIC_SOCKET
+      ? { residentSemanticSocket: source.RESIDENT_SEMANTIC_SOCKET }
       : {}),
     ...(source.RESIDENT_GEOCODE_ENABLED === "true"
       ? {

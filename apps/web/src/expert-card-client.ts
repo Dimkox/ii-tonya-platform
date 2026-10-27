@@ -16,6 +16,12 @@ export interface ExpertCardWorkflow {
   promoConfirmed: boolean;
 }
 export interface ExpertCardDraft extends ExpertCardWorkflow {
+  semanticTags?: {
+    identity: string;
+    label: string;
+    decision: string;
+    reason: string | null;
+  }[];
   assistance?: {
     requestedAt: string | null;
     revision: number | null;
@@ -80,6 +86,15 @@ export interface CardRevisionCommand {
   idempotencyKey: string;
 }
 export interface ExpertCardAdminClient {
+  exportTags?(): Promise<string>;
+  decideTag?(
+    id: string,
+    input: CardRevisionCommand & {
+      identity: string;
+      decision: "approve" | "reject";
+      reason: string;
+    },
+  ): Promise<unknown>;
   mediaLink?(
     id: string,
     mediaId: string,
@@ -248,7 +263,7 @@ function draft(v: unknown): v is ExpertCardDraft {
   if (
     v.effectiveFields !== undefined &&
     (!obj(v.effectiveFields) ||
-      Object.keys(v.effectiveFields).length > 125 ||
+      Object.keys(v.effectiveFields).length > 160 ||
       !Object.values(v.effectiveFields).every(
         (x) => typeof x === "string" && x.length <= 64000,
       ))
@@ -303,6 +318,20 @@ function draft(v: unknown): v is ExpertCardDraft {
     )
       return false;
   }
+  if (
+    v.semanticTags !== undefined &&
+    (!Array.isArray(v.semanticTags) ||
+      v.semanticTags.length > 400 ||
+      !v.semanticTags.every(
+        (t) =>
+          obj(t) &&
+          text(t.identity, 200) &&
+          text(t.label, 101) &&
+          ["approve", "reject", "pending"].includes(String(t.decision)) &&
+          (t.reason === null || text(t.reason, 1000)),
+      ))
+  )
+    return false;
   const m = v.materials;
   return (
     m === null ||
@@ -364,6 +393,19 @@ export function createExpertCardClient(
     return { ...v, replay: v.replay };
   };
   return {
+    async exportTags() {
+      const r = await request("/catalogue-export");
+      if (!Array.isArray(r.items) || r.items.length > 512) return invalid();
+      return JSON.stringify(r.items, null, 2);
+    },
+    async decideTag(id, input) {
+      command(
+        id,
+        input,
+        "decision,expectedRevision,idempotencyKey,identity,reason",
+      );
+      return request(`/${id}/tags/review`, input);
+    },
     async mediaLink(id, mediaId) {
       if (!uuid(id) || !uuid(mediaId)) return invalid();
       const r = await request(`/${id}/media/${mediaId}/link`, {});

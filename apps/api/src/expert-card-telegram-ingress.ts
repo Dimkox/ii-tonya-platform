@@ -50,7 +50,7 @@ export function parseExpertCardTelegramUpdate(
   const callback = record(root.callback_query);
   if (
     root.callback_query &&
-    (typeof callback?.data !== "string" || !callback.data.startsWith("ct1:"))
+    (typeof callback?.data !== "string" || !/^ct[12]:/u.test(callback.data))
   )
     return { kind: "unhandled" };
   const message = callback ? record(callback.message) : record(root.message);
@@ -59,7 +59,7 @@ export function parseExpertCardTelegramUpdate(
   if (
     typeof message.text === "string" &&
     message.text.startsWith("/") &&
-    !/^\/(?:card|card_mode|card_service_add|card_photo_remove|card_manager|card_checklist|card_geocode|card_answer|card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm|card_answers|card_correct|card_document|card_submit|promo_proof|my_tariff|main_tariff|main_accept|main_invoice|tags)(?:\s|$)|^\/start card_/u.test(
+    !/^\/(?:card|card_mode|card_service_add|card_photo_remove|card_manager|card_checklist|card_geocode|card_answer|card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm|card_answers|card_correct|card_document|card_submit|promo_proof|my_tariff|main_tariff|main_accept|main_invoice|tags|tags_recommend|tags_custom)(?:\s|$)|^\/start card_/u.test(
       message.text,
     ) &&
     !(options.lifecycleCommands && isExpertResidencyLifecycleUpdate(root))

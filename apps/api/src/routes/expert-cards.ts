@@ -41,7 +41,9 @@ export const expertCardAdminRoutes: FastifyPluginAsync<{
     ExpertCardAdminService,
     "list" | "detail" | "edit" | "review" | "confirmPromo"
   > &
-    Partial<Pick<ExpertCardAdminService, "mediaLink">>;
+    Partial<
+      Pick<ExpertCardAdminService, "mediaLink" | "decideTag" | "exportTags">
+    >;
 }> = async (app, deps) => {
   if (!deps.enabled) return;
   const service = deps.service;
@@ -69,6 +71,43 @@ export const expertCardAdminRoutes: FastifyPluginAsync<{
       .code(code < 500 ? 400 : 503)
       .send({ error: "card_service_unavailable" });
   });
+  app.get("/v1/admin/expert-cards/catalogue-export", async (req, reply) => {
+    if (!service.exportTags)
+      return reply.code(503).send({ error: "unavailable" });
+    const r = await service.exportTags(session(req.headers.authorization)!);
+    if (r.kind !== "ok")
+      return reply.code(status(r.kind)).send({ error: r.kind });
+    reply.header(
+      "Content-Disposition",
+      'attachment; filename="expert-tags.json"',
+    );
+    return r;
+  });
+  app.post<{ Params: { applicationId: string }; Body: unknown }>(
+    "/v1/admin/expert-cards/:applicationId/tags/review",
+    { bodyLimit: 4096 },
+    async (req, reply) => {
+      if (!service.decideTag)
+        return reply.code(503).send({ error: "unavailable" });
+      if (
+        !uuid.test(req.params.applicationId) ||
+        !mutation(req.body, ["identity", "decision", "reason"]) ||
+        !object(req.body)
+      )
+        return reply.code(400).send({ error: "invalid_request" });
+      const body = req.body as Omit<
+        Parameters<ExpertCardAdminService["decideTag"]>[1],
+        "applicationId"
+      >;
+      const r = await service.decideTag(session(req.headers.authorization)!, {
+        ...body,
+        applicationId: req.params.applicationId,
+      });
+      return r.kind === "ok"
+        ? r
+        : reply.code(status(r.kind)).send({ error: r.kind });
+    },
+  );
   app.get<{ Querystring: { limit?: string } }>(
     "/v1/admin/expert-cards",
     async (req, reply) => {
