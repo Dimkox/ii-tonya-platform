@@ -1,7 +1,7 @@
 /** Small synthetic documents: generated locally, contain no personal data. */
-export function richDocumentFixtures() {
-  const text =
-    "fullName: Anna\nspecialization: Consultant\nbio: I help adults explore their questions and choose practical next steps in a consultation.";
+export function richDocumentFixtures(
+  text = "fullName: Anna\nspecialization: Consultant\nbio: I help adults explore their questions and choose practical next steps in a consultation.",
+) {
   const content =
     "BT /F1 10 Tf 40 750 Td 14 TL " +
     text

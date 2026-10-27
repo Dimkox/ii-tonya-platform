@@ -38,7 +38,7 @@ const date = z
     return Number.isFinite(+d) && d.toISOString().slice(0, 10) === v;
   }, "Дата YYYY-MM-DD");
 export const richServiceSchema = z.strictObject({
-  id: z.uuid(),
+  id: z.uuid().transform((v) => v.toLowerCase()),
   title: text(160),
   format: z.enum(["ONLINE", "OFFLINE", "HYBRID", "EVENT"]),
   eventDelivery: z.enum(["ONLINE", "OFFLINE", "HYBRID"]).nullable(),
@@ -71,7 +71,13 @@ export const richProfileSchema = z
     fullName: text(160),
     specialization: text(240),
     bio: text(2000),
-    photos: z.array(z.uuid()).max(10),
+    photos: z
+      .array(z.uuid().transform((v) => v.toLowerCase()))
+      .max(10)
+      .refine(
+        (a) => new Set(a).size === a.length,
+        "Фото не должны повторяться",
+      ),
     socialLinks: z.array(url).max(8),
     onlineRoomType: z.enum(["STATIC_LINK", "UNDECIDED"]),
     staticRoomLink: url.nullable(),
@@ -118,7 +124,10 @@ export function richProfileGaps(p: RichProfile): string[] {
   for (const key of ["fullName", "specialization"] as const)
     if (!p[key].trim()) gaps.push(key);
   if (p.bio.trim().length < 50) gaps.push("bio");
-  if (new Set(p.photos).size < 3 || new Set(p.photos).size !== p.photos.length)
+  if (
+    new Set(p.photos.map((v) => v.toLowerCase())).size < 3 ||
+    new Set(p.photos.map((v) => v.toLowerCase())).size !== p.photos.length
+  )
     gaps.push("photos");
   if (!p.socialLinks.length) gaps.push("socialLinks");
   if (!p.services.length) gaps.push("services");
@@ -158,6 +167,7 @@ const labels: Record<string, string> = {
   arrival: "Как добраться",
   yandexMapsUrl: "Ссылка Яндекс.Карт",
   services: "Услуги",
+  partialServices: "Услуги, требующие дополнения",
   id: "Номер услуги",
   title: "Название услуги",
   format: "Формат",
@@ -227,7 +237,12 @@ export function richPreviewPages(
 export const richProfilePatchSchema = z
   .strictObject(richProfileSchema.shape)
   .partial();
-export type GuidedService = Partial<RichService>;
+export const partialRichServiceSchema = richServiceSchema.partial();
+export const richProposalSchema = richProfilePatchSchema.extend({
+  partialServices: z.array(partialRichServiceSchema).max(8).optional(),
+});
+export type RichProposal = z.infer<typeof richProposalSchema>;
+export type GuidedService = z.infer<typeof partialRichServiceSchema>;
 const modes: Record<string, RichService["format"]> = {
   онлайн: "ONLINE",
   очно: "OFFLINE",
@@ -275,7 +290,13 @@ const serviceFields = [
 function nextService(s: GuidedService) {
   return serviceFields.find(
     (k) =>
-      (k !== "eventDelivery" || s.format === "EVENT") && s[k] === undefined,
+      (k !== "eventDelivery" || s.format === "EVENT") &&
+      (s[k] === undefined ||
+        (["title", "audience", "result"].includes(k) &&
+          !String(s[k] ?? "").trim()) ||
+        (k === "description" && String(s[k] ?? "").trim().length < 50) ||
+        (k === "tags" && (!s.tags?.length || s.tags.some((t) => !t.trim()))) ||
+        (k === "eventDelivery" && s.eventDelivery === null)),
   );
 }
 function nextField(p: RichProfile, s: GuidedService): string {
@@ -297,7 +318,7 @@ function nextField(p: RichProfile, s: GuidedService): string {
     if (!p.address.trim()) return "address";
     if (!p.arrival.trim()) return "arrival";
   }
-  if (new Set(p.photos).size < 3) return "photos";
+  if (new Set(p.photos.map((v) => v.toLowerCase())).size < 3) return "photos";
   return "complete";
 }
 const questions: Record<string, string> = {
@@ -407,24 +428,36 @@ export function guidedRichAnswer(
   return { profile, staged: s };
 }
 /** Explicit labels only; no guesses, URL fetching or runtime LLM. */
-export function proposeRichFields(input: string): Partial<RichProfile> {
+export function proposeRichFields(
+  input: string,
+  idForService: (index: number) => string = () => crypto.randomUUID(),
+): RichProposal {
   if (input.length > 64000) return {};
   const result: Record<string, unknown> = {};
   let service: Record<string, unknown> = {};
   const services: RichService[] = [];
+  const partialServices: GuidedService[] = [];
+  let serviceIndex = 0;
   const russian = Object.fromEntries(
     Object.entries(labels).map(([k, v]) => [v.toLowerCase(), k]),
   );
   const flush = () => {
     if (!Object.keys(service).length) return;
     const parsed = richServiceSchema.safeParse({
-      id: crypto.randomUUID(),
+      id: idForService(serviceIndex++),
       eventDelivery: null,
       expiryDate: null,
       detailsUrl: null,
       ...service,
     });
-    if (parsed.success) services.push(parsed.data);
+    if (parsed.success && !nextService(parsed.data)) services.push(parsed.data);
+    else
+      partialServices.push(
+        partialRichServiceSchema.parse({
+          id: idForService(serviceIndex - 1),
+          ...service,
+        }),
+      );
     service = {};
   };
   for (const line of input.split("\n")) {
@@ -481,7 +514,8 @@ export function proposeRichFields(input: string): Partial<RichProfile> {
   }
   flush();
   if (services.length) result.services = services;
-  return result as Partial<RichProfile>;
+  if (partialServices.length) result.partialServices = partialServices;
+  return richProposalSchema.parse(result);
 }
 export function richChecklist(): string {
   return `# Карточка резидента — мастер-чек-лист

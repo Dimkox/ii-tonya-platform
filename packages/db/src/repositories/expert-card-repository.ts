@@ -3,6 +3,8 @@ import {
   emptyRichProfile,
   richProfileSchema,
   richProfilePatchSchema,
+  richProposalSchema,
+  type RichProposal,
   richServiceSchema,
   richProfileGaps,
   richPreviewPages,
@@ -489,7 +491,7 @@ export async function lockCardActivationGate(
       publicDigest: string;
       messagingConsentPolicyVersion: string;
     }>(
-      sql`select d.application_id as "applicationId",d.user_id as "userId",d.id as "draftId",r.id as "reviewId",r.revision,r.public_payload as "publicPayload",r.public_digest as "publicDigest",d.messaging_policy_version as "messagingConsentPolicyVersion" from expert_card_drafts d join expert_card_reviews r on r.id=${input.reviewId ? sql`${input.reviewId}::uuid` : sql`coalesce(d.approved_review_id,(select p.review_id from experts_published p join resident_card_versions v on v.review_id=p.review_id where p.draft_id=d.id))`} and r.draft_id=d.id and r.user_id=d.user_id and (r.id=d.approved_review_id or exists(select 1 from resident_card_versions v where v.review_id=r.id)) where d.application_id=${input.applicationId}::uuid and d.user_id=${input.userId}::uuid ${input.reviewId ? sql`and r.id=${input.reviewId}::uuid` : sql``} for update of d for share of r`,
+      sql`select d.application_id as "applicationId",d.user_id as "userId",d.id as "draftId",r.id as "reviewId",r.revision,r.public_payload as "publicPayload",r.public_digest as "publicDigest",d.messaging_policy_version as "messagingConsentPolicyVersion" from expert_card_drafts d join expert_card_reviews r on r.id=${input.reviewId ? sql`${input.reviewId}::uuid` : sql`coalesce((select v.review_id from resident_card_versions v where v.draft_id=d.id order by v.revision desc limit 1),d.approved_review_id)`} and r.draft_id=d.id and r.user_id=d.user_id and (r.id=d.approved_review_id or exists(select 1 from resident_card_versions v where v.review_id=r.id)) where d.application_id=${input.applicationId}::uuid and d.user_id=${input.userId}::uuid ${input.reviewId ? sql`and r.id=${input.reviewId}::uuid` : sql``} for update of d for share of r`,
     )
   ).rows;
   const row = rows[0];
@@ -909,6 +911,12 @@ export class PostgresExpertCardRepository {
         )
       ).rows;
       if (entry.length !== 1) fail("card_forbidden");
+      const rich = (
+        await tx.execute<{ enabled: boolean }>(
+          sql`select rich_mode as enabled from expert_card_drafts where id=${d.id}::uuid`,
+        )
+      ).rows[0]!;
+      if (!rich.enabled) return { id: "", state: "legacy", fresh: false };
       const prior = (
         await tx.execute<{
           id: string;
@@ -923,6 +931,24 @@ export class PostgresExpertCardRepository {
       if (prior) {
         if (prior.size !== raw.size || prior.mimeType !== raw.mimeType)
           fail("card_invalid_entry");
+        if (prior.state === "verified" && prior.writeState === "settled") {
+          const profile = (
+            await tx.execute<{ profile: RichProfile }>(
+              sql`select rich_profile as profile from expert_card_drafts where id=${d.id}::uuid`,
+            )
+          ).rows[0]!.profile;
+          if (!profile.photos.some((p) => p.toLowerCase() === prior.id)) {
+            const active = (
+              await tx.execute<{ n: number }>(
+                sql`select count(*)::int n from resident_card_media m where m.draft_id=${d.id}::uuid and (m.state<>'verified' or m.id=any(${"{" + profile.photos.join(",") + "}"}::uuid[]))`,
+              )
+            ).rows[0]!.n;
+            if (active >= 10) fail("card_state_conflict");
+            await tx.execute(
+              sql`update expert_card_drafts set rich_profile=${JSON.stringify({ ...profile, photos: [...profile.photos, prior.id] })}::jsonb,revision=revision+1 where id=${d.id}::uuid`,
+            );
+          }
+        }
         return {
           id: prior.id,
           state: prior.state,
@@ -930,9 +956,13 @@ export class PostgresExpertCardRepository {
             prior.state === "allocated" && prior.writeState === "allocated",
         };
       }
+      // Only settled, unselected objects with no immutable approval reference may leave custody.
+      await tx.execute(
+        sql`delete from resident_card_media m using resident_object_deletions o,expert_card_drafts d where m.draft_id=${d.id}::uuid and d.id=m.draft_id and o.custody_id=m.id and o.write_state='settled' and m.state='verified' and not exists(select 1 from jsonb_array_elements_text(d.rich_profile->'photos') p where p::uuid=m.id) and not exists(select 1 from resident_card_versions v,jsonb_array_elements_text(v.profile->'photos') p where v.draft_id=d.id and p::uuid=m.id)`,
+      );
       const count = (
         await tx.execute<{ n: number }>(
-          sql`select count(*)::integer n from resident_card_media where draft_id=${d.id}::uuid`,
+          sql`select count(*)::integer n from resident_card_media m join expert_card_drafts d on d.id=m.draft_id where m.draft_id=${d.id}::uuid and (m.state<>'verified' or exists(select 1 from jsonb_array_elements_text(d.rich_profile->'photos') p where p::uuid=m.id))`,
         )
       ).rows[0]!.n;
       if (count >= 10) fail("card_state_conflict");
@@ -949,9 +979,11 @@ export class PostgresExpertCardRepository {
       return {
         id: allocated.id,
         state:
-          allocated.state === "verified"
-            ? ("verified" as const)
-            : ("unavailable" as const),
+          allocated.state === "legacy"
+            ? ("legacy" as const)
+            : allocated.state === "verified"
+              ? ("verified" as const)
+              : ("unavailable" as const),
       };
     // Persist the possible write before any network request. Failure never drops the deletion obligation.
     await this.tx(async (tx) => {
@@ -1074,6 +1106,7 @@ export class PostgresExpertCardRepository {
         | "patch"
         | "service"
         | "remove_service"
+        | "remove_photo"
         | "propose"
         | "accept_proposal"
         | "preview"
@@ -1084,6 +1117,7 @@ export class PostgresExpertCardRepository {
         | "manager"
         | "guided_answer"
         | "service_add";
+      automaticRevision?: boolean;
       value?: unknown;
       page?: number;
       token?: string;
@@ -1102,7 +1136,8 @@ export class PostgresExpertCardRepository {
     return this.tx(async (tx) => {
       const started = await beginCardRequest(tx, event, "entry", {
         rich: raw.action,
-        revision: raw.expectedRevision,
+        revision: raw.automaticRevision ? null : raw.expectedRevision,
+        automaticRevision: raw.automaticRevision ?? false,
         value: raw.value ?? null,
         page: raw.page ?? null,
         token: raw.token ?? null,
@@ -1124,17 +1159,33 @@ export class PostgresExpertCardRepository {
         await tx.execute<{
           profile: RichProfile;
           guided: GuidedService;
-          proposal: Partial<RichProfile> | null;
+          proposal: RichProposal | null;
+          pending: GuidedService[];
           page: number | null;
           token: string | null;
           digest: string | null;
           currentDigest: string;
         }>(
-          sql`select rich_profile as profile,rich_guided as guided,rich_proposal as proposal,preview_page as page,preview_token_digest as token,preview_content_digest as digest,resident_rich_digest(expert_card_drafts) as "currentDigest" from expert_card_drafts where id=${d.id}::uuid`,
+          sql`select rich_profile as profile,rich_guided as guided,rich_pending_services as pending,rich_proposal as proposal,preview_page as page,preview_token_digest as token,preview_content_digest as digest,resident_rich_digest(expert_card_drafts) as "currentDigest" from expert_card_drafts where id=${d.id}::uuid`,
         )
       ).rows[0]!;
       let profile = row.profile ?? emptyRichProfile();
       let guided = row.guided;
+      let pending = row.pending;
+      const proposalFields = (proposal: RichProposal | null) => {
+        const { partialServices, ...patch } = proposal ?? {};
+        return {
+          ...richSafetyFields(
+            richProfileSchema.parse({ ...profile, ...patch }),
+          ),
+          ...Object.fromEntries(
+            (partialServices ?? []).map((v, i) => [
+              "rich:pending:" + i,
+              JSON.stringify(v),
+            ]),
+          ),
+        };
+      };
       let pageText: string | undefined;
       if (row.profile === null && d.approvedReviewId)
         await tx.execute(
@@ -1154,11 +1205,17 @@ export class PostgresExpertCardRepository {
         const isProposal = raw.action === "proposal_preview";
         const assessment = await assessResidentContent(
           tx,
-          richSafetyFields(
-            isProposal
-              ? richProfileSchema.parse({ ...profile, ...row.proposal })
-              : profile,
-          ),
+          isProposal
+            ? proposalFields(row.proposal)
+            : {
+                ...richSafetyFields(profile),
+                ...Object.fromEntries(
+                  pending.map((v, i) => [
+                    "rich:pending:" + i,
+                    JSON.stringify(v),
+                  ]),
+                ),
+              },
           d.revision,
         );
         if (assessment.blocked) {
@@ -1180,6 +1237,14 @@ export class PostgresExpertCardRepository {
           ? richReadablePages(row.proposal)
           : [
               ...richPreviewPages(profile, d.publicCard),
+              ...(pending.length || Object.keys(guided).length
+                ? richReadablePages({
+                    partialServices: [
+                      ...(Object.keys(guided).length ? [guided] : []),
+                      ...pending,
+                    ],
+                  })
+                : []),
               ...profile.photos.map((_, i) => `Фото ${i + 1}`),
             ];
         const textPageCount = isProposal
@@ -1195,7 +1260,7 @@ export class PostgresExpertCardRepository {
             sha(raw.token) !== row.token
           )
             fail("card_preview_incomplete");
-          if (Object.keys(guided).length)
+          if (Object.keys(guided).length || pending.length)
             throw new ExpertCardError(
               "card_fields:завершите услугу через /card_mode",
             );
@@ -1240,7 +1305,10 @@ export class PostgresExpertCardRepository {
               key: "custody/" + mediaId,
               custodyId: mediaId,
             });
-            displayed += ` — откройте и проверьте изображение. Закрытая ссылка действует 2 минуты, не пересылайте её:\n${link}`;
+            displayed += `
+Убрать это фото из черновика: /card_photo_remove ${d.revision} ${page - textPageCount + 1}
+Для замены сначала уберите фото, затем пришлите новое. Утверждённая версия сохранится до проверки.
+ — откройте и проверьте изображение. Закрытая ссылка действует 2 минуты, не пересылайте её:\n${link}`;
           }
           const token = randomUUID();
           await tx.execute(
@@ -1264,11 +1332,10 @@ export class PostgresExpertCardRepository {
               ? `Проверьте предложенную карту: /card_proposal ${d.revision + 1}`
               : "Геокодирование недоступно или адрес неоднозначен. Адрес сохранён. Исправьте адрес или задайте ссылку Яндекс.Карт вручную через /card_set.";
         } else if (raw.action === "propose") {
-          const patch = richProfilePatchSchema.parse(raw.value);
-          const proposed = richProfileSchema.parse({ ...profile, ...patch });
+          const patch = richProposalSchema.parse(raw.value);
           const assessment = await assessResidentContent(
             tx,
-            richSafetyFields(proposed),
+            proposalFields(patch),
             d.revision + 1,
           );
           if (assessment.blocked) {
@@ -1295,7 +1362,7 @@ export class PostgresExpertCardRepository {
             pageText = `Предложение сохранено. Откройте /card_proposal ${d.revision + 1} для полного просмотра.`;
         } else {
           if (raw.action === "service_add") {
-            if (profile.services.length >= 8)
+            if (profile.services.length + pending.length >= 8)
               throw new ExpertCardError("card_fields:не более восьми услуг");
             if (!Object.keys(guided).length) guided = { id: randomUUID() };
           }
@@ -1309,6 +1376,8 @@ export class PostgresExpertCardRepository {
               );
               profile = r.profile;
               guided = r.staged;
+              if (!Object.keys(guided).length && pending.length)
+                guided = pending.shift()!;
             } catch (error) {
               throw new ExpertCardError(
                 "card_fields:" +
@@ -1331,8 +1400,23 @@ export class PostgresExpertCardRepository {
           if (raw.action === "remove_service")
             profile = richProfileSchema.parse({
               ...profile,
-              services: profile.services.filter((s) => s.id !== raw.value),
+              services: profile.services.filter(
+                (s) => s.id !== String(raw.value).toLowerCase(),
+              ),
             });
+          if (raw.action === "remove_photo") {
+            const index = Number(raw.value) - 1;
+            if (
+              !Number.isInteger(index) ||
+              index < 0 ||
+              index >= profile.photos.length
+            )
+              fail("card_invalid_entry");
+            profile = {
+              ...profile,
+              photos: profile.photos.filter((_, i) => i !== index),
+            };
+          }
           if (raw.action === "accept_proposal") {
             const pages = richReadablePages(row.proposal);
             if (
@@ -1343,13 +1427,35 @@ export class PostgresExpertCardRepository {
               sha(raw.token) !== row.token
             )
               fail("card_preview_incomplete");
-            profile = richProfileSchema.parse({ ...profile, ...row.proposal });
+            const { partialServices = [], ...patch } = richProposalSchema.parse(
+              row.proposal,
+            );
+            profile = richProfileSchema.parse({
+              ...profile,
+              ...patch,
+              services: [...profile.services, ...(patch.services ?? [])].filter(
+                (v, i, a) => a.findIndex((x) => x.id === v.id) === i,
+              ),
+            });
+            pending = [...pending, ...partialServices];
+            if (
+              profile.services.length +
+                pending.length +
+                (Object.keys(guided).length ? 1 : 0) >
+              8
+            )
+              throw new ExpertCardError("card_fields:не более восьми услуг");
+            if (!Object.keys(guided).length && pending.length)
+              guided = pending.shift()!;
           }
           const fields = await residentSafetyFields(tx, d.id);
           for (const key of Object.keys(fields))
             if (key.startsWith("rich:")) delete fields[key];
           Object.assign(fields, richSafetyFields(profile), {
             "rich:guided": JSON.stringify(guided),
+            ...Object.fromEntries(
+              pending.map((v, i) => ["rich:pending:" + i, JSON.stringify(v)]),
+            ),
           });
           const assessment = await assessResidentContent(
             tx,
@@ -1372,7 +1478,7 @@ export class PostgresExpertCardRepository {
             };
           }
           await tx.execute(
-            sql`update expert_card_drafts set rich_mode=true,rich_profile=${JSON.stringify(profile)}::jsonb,rich_guided=${JSON.stringify(guided)}::jsonb,rich_proposal=null,revision=revision+1,status='collecting',approved_review_id=null,updated_at=clock_timestamp() where id=${d.id}::uuid`,
+            sql`update expert_card_drafts set rich_mode=true,rich_profile=${JSON.stringify(profile)}::jsonb,rich_guided=${JSON.stringify(guided)}::jsonb,rich_pending_services=${JSON.stringify(pending)}::jsonb,rich_proposal=null,revision=revision+1,status='collecting',approved_review_id=null,updated_at=clock_timestamp() where id=${d.id}::uuid`,
           );
           const gaps = richProfileGaps(profile);
           pageText = `Сохранено. Ревизия ${d.revision + 1}. ${guidedRichQuestion(profile, guided)}`;
@@ -1425,7 +1531,16 @@ export class PostgresExpertCardRepository {
         sql`insert into expert_card_entries(draft_id,user_id,revision,kind,text_content,media_reference) values(${draft.id}::uuid,${draft.userId}::uuid,${draft.revision + 1},${entry.kind},${entry.kind === "text" ? entry.text : null},${entry.kind === "text" ? null : entry.reference})`,
       );
       await tx.execute(
-        sql`update expert_card_drafts set revision=revision+1,status='collecting',input_mode='INTERVIEW',document_proposal=null,document_import_revision=null,rich_proposal=case when rich_mode then ${entry.kind === "text" ? JSON.stringify(proposeRichFields(entry.text)) : null}::jsonb else null end,public_payload=null,approved_review_id=null,messaging_policy_version=${this.policy.messagingConsentPolicyVersion},updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+        sql`update expert_card_drafts set revision=revision+1,status='collecting',input_mode='INTERVIEW',document_proposal=null,document_import_revision=null,rich_proposal=case when rich_mode then ${
+          entry.kind === "text"
+            ? JSON.stringify(
+                proposeRichFields(entry.text, (i) => {
+                  const h = sha(event.requestDigest + ":" + i);
+                  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+                }),
+              )
+            : null
+        }::jsonb else null end,public_payload=null,approved_review_id=null,messaging_policy_version=${this.policy.messagingConsentPolicyVersion},updated_at=clock_timestamp() where id=${draft.id}::uuid`,
       );
       await this.invalidateJobs(tx, draft.id);
       return assessment;
@@ -1623,7 +1738,16 @@ export class PostgresExpertCardRepository {
       );
       const accepted = assessment.blocked ? null : proposal;
       await tx.execute(
-        sql`update expert_card_drafts set document_import_revision=${expected},input_mode=${accepted ? "DOCUMENT_PROPOSAL" : "INTERVIEW"},document_proposal=${accepted ? JSON.stringify(accepted) : null}::jsonb,rich_proposal=case when rich_mode then ${accepted ? JSON.stringify(proposeRichFields(accepted.content)) : null}::jsonb else null end,owner_confirmed_digest=null,preview_page=null,preview_token_digest=null,preview_content_digest=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
+        sql`update expert_card_drafts set document_import_revision=${expected},input_mode=${accepted ? "DOCUMENT_PROPOSAL" : "INTERVIEW"},document_proposal=${accepted ? JSON.stringify(accepted) : null}::jsonb,rich_proposal=case when rich_mode then ${
+          accepted
+            ? JSON.stringify(
+                proposeRichFields(accepted.content, (i) => {
+                  const h = sha(event.requestDigest + ":" + i);
+                  return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+                }),
+              )
+            : null
+        }::jsonb else null end,owner_confirmed_digest=null,preview_page=null,preview_token_digest=null,preview_content_digest=null,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
       );
       return assessment.blocked ? ("manual_fallback" as const) : true;
     });
@@ -1912,10 +2036,12 @@ export class PostgresExpertCardRepository {
           await tx.execute<{
             enabled: boolean;
             profile: RichProfile | null;
-            proposal: Partial<RichProfile> | null;
+            proposal: RichProposal | null;
+            pending: GuidedService[];
+            guided: GuidedService;
             confirmed: boolean | null;
           }>(
-            sql`select rich_mode as enabled,rich_profile as profile,rich_proposal as proposal,owner_confirmed_digest=resident_rich_digest(expert_card_drafts) as confirmed from expert_card_drafts where id=${draft.id}::uuid`,
+            sql`select rich_mode as enabled,rich_profile as profile,rich_guided as guided,rich_pending_services as pending,rich_proposal as proposal,owner_confirmed_digest=resident_rich_digest(expert_card_drafts) as confirmed from expert_card_drafts where id=${draft.id}::uuid`,
           )
         ).rows[0],
         previousVersion:
@@ -2167,10 +2293,22 @@ export class PostgresExpertCardRepository {
             sql`update expert_card_drafts set status='approved',approved_review_id=${review.id}::uuid,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
           );
           await tx.execute(
-            sql`update experts_published p set review_id=${review.id}::uuid,revision=${draft.revision},public_payload=r.public_payload,public_digest=r.public_digest,updated_at=clock_timestamp() from expert_card_reviews r join resident_card_versions v on v.review_id=r.id where r.id=${review.id}::uuid and p.draft_id=${draft.id}::uuid`,
+            sql`update experts_published p set review_id=${review.id}::uuid,revision=${draft.revision},public_payload=r.public_payload,public_digest=r.public_digest,updated_at=clock_timestamp() from expert_card_reviews r join resident_card_versions v on v.review_id=r.id where r.id=${review.id}::uuid and p.draft_id=${draft.id}::uuid and p.active and exists(select 1 from expert_residency_current_coverage(p.expert_id) c where c.source_order_id=p.paid_order_id and c.ends_at=p.next_billing_date) and exists(select 1 from experts e where e.id=p.expert_id and e.active and e.verified) and not exists(select 1 from expert_referral_abuse_holds where expert_id=p.expert_id and status='open') and not exists(select 1 from expert_residency_lifecycle where expert_id=p.expert_id and status='paused')`,
+          );
+          await tx.execute(
+            sql`update experts_published p set active=false,updated_at=clock_timestamp() where p.draft_id=${draft.id}::uuid and p.active and (not exists(select 1 from expert_residency_current_coverage(p.expert_id)) or exists(select 1 from expert_residency_lifecycle where expert_id=p.expert_id and status='paused') or exists(select 1 from expert_referral_abuse_holds where expert_id=p.expert_id and status='open'))`,
+          );
+          await tx.execute(
+            sql`update experts e set active=false,updated_at=clock_timestamp() from experts_published p where p.expert_id=e.id and p.draft_id=${draft.id}::uuid and not p.active and (not exists(select 1 from expert_residency_current_coverage(e.id)) or exists(select 1 from expert_residency_lifecycle where expert_id=e.id and status='paused') or exists(select 1 from expert_referral_abuse_holds where expert_id=e.id and status='open'))`,
+          );
+          await tx.execute(
+            sql`update experts e set public_display_name=p.public_payload->>'displayName',updated_at=clock_timestamp() from experts_published p where p.expert_id=e.id and p.draft_id=${draft.id}::uuid and p.review_id=${review.id}::uuid and p.active`,
           );
           await tx.execute(
             sql`insert into expert_card_material_jobs(draft_id,user_id,review_id,revision,target_bot_id,target_chat_id) select ${draft.id}::uuid,${draft.userId}::uuid,${review.id}::uuid,${draft.revision},${draft.botId},${draft.chatId} where not exists(select 1 from expert_application_material_jobs where application_id=${draft.applicationId}::uuid and (status='delivered' or attempt_id is not null)) and not exists(select 1 from experts_published where draft_id=${draft.id}::uuid) and not exists(select 1 from expert_card_material_jobs where draft_id=${draft.id}::uuid and status='unknown_outcome')`,
+          );
+          await tx.execute(
+            sql`update expert_application_material_jobs g set status='cancelled' where g.application_id=${draft.applicationId}::uuid and g.attempt_id is null and g.status in ('waiting_content','pending') and exists(select 1 from expert_card_material_jobs j where j.draft_id=${draft.id}::uuid and j.review_id=${review.id}::uuid)`,
           );
           await tx.execute(
             sql`update expert_onboarding_applications set onboarding_stage='promo_check',updated_at=clock_timestamp() where id=${draft.applicationId}::uuid and not exists(select 1 from experts_published where draft_id=${draft.id}::uuid)`,
@@ -2481,7 +2619,7 @@ export class PostgresExpertCardRepository {
         payloadDigest: string | null;
         policy: string;
       }>(
-        sql`select j.id,j.user_id as "userId",j.draft_id as "draftId",j.review_id as "reviewId",j.revision,j.status,j.attempt_id as "attemptId",j.content_version as "contentVersion",j.template_id as "templateId",d.work_bot_id as "botId",d.work_bot_key as "botKey",d.work_chat_id as "chatId",r.public_payload as "publicCard",j.payload_digest as "payloadDigest",d.messaging_policy_version as policy from expert_card_material_jobs j join expert_card_drafts d on d.id=j.draft_id and d.user_id=j.user_id and d.approved_review_id=j.review_id and d.revision=j.revision and d.status='approved' join expert_card_reviews r on r.id=j.review_id and r.draft_id=d.id and r.revision=d.revision and r.action='approve' join users u on u.id=j.user_id and u.active=true where j.id=${jobId}::uuid and j.target_bot_id=d.work_bot_id and j.target_chat_id=d.work_chat_id for update of j,d for share of r,u`,
+        sql`select j.id,j.user_id as "userId",j.draft_id as "draftId",j.review_id as "reviewId",j.revision,j.status,j.attempt_id as "attemptId",j.content_version as "contentVersion",j.template_id as "templateId",d.work_bot_id as "botId",d.work_bot_key as "botKey",d.work_chat_id as "chatId",r.public_payload as "publicCard",j.payload_digest as "payloadDigest",d.messaging_policy_version as policy from expert_card_material_jobs j join expert_card_drafts d on d.id=j.draft_id and d.user_id=j.user_id and d.approved_review_id=j.review_id and d.revision=j.revision and d.status='approved' join expert_card_reviews r on r.id=j.review_id and r.draft_id=d.id and r.revision=d.revision and r.action='approve' join users u on u.id=j.user_id and u.active=true where j.id=${jobId}::uuid and j.target_bot_id=d.work_bot_id and j.target_chat_id=d.work_chat_id and not exists(select 1 from expert_application_material_jobs g where g.application_id=d.application_id and (g.attempt_id is not null or g.status='delivered')) for update of j,d for share of r,u`,
       )
     ).rows[0];
     if (

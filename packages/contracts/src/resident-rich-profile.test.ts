@@ -173,3 +173,51 @@ it("guides a service in Russian without JSON or user UUID, preserving exact pric
   expect(view).toContain("Стоимость");
   expect(view).not.toContain('"minRub"');
 });
+it("R5 treats mixed-case UUID photo and service aliases as one identity", () => {
+  const a = "abcdefab-cdef-4abc-8def-abcdefabcdef";
+  expect(
+    richProfileGaps({
+      ...profile,
+      photos: [a, a.toUpperCase(), "Abcdefab-cdef-4abc-8def-abcdefabcdef"],
+    }),
+  ).toContain("photos");
+  expect(() =>
+    richProfileSchema.parse({
+      ...profile,
+      services: [
+        { ...service, id: a },
+        { ...service, id: a.toUpperCase() },
+      ],
+    }),
+  ).toThrow();
+  expect(
+    richProfileSchema.parse({
+      ...profile,
+      services: [{ ...service, id: a.toUpperCase() }],
+    }).services[0]!.id,
+  ).toBe(a);
+});
+it("R10 preserves every valid Russian partial service field without invented price or duration", () => {
+  const r = proposeRichFields(
+    "Название услуги: Первая\nФормат: онлайн\nДлительность, минут: 45\nОписание услуги: " +
+      bio +
+      "\nТемы и теги: поддержка\nНазвание услуги: Вторая\nСтоимость, рублей: 2100,25\nДля кого: Взрослые",
+  );
+  expect(r).toMatchObject({
+    partialServices: [
+      {
+        title: "Первая",
+        format: "ONLINE",
+        durationMinutes: 45,
+        description: bio,
+        tags: ["поддержка"],
+      },
+      {
+        title: "Вторая",
+        price: { kind: "exact", minRub: "2100.25", maxRub: null },
+        audience: "Взрослые",
+      },
+    ],
+  });
+  expect(JSON.stringify(r)).not.toContain('"durationMinutes":60');
+});

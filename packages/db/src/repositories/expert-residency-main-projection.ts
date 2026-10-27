@@ -54,7 +54,7 @@ export async function restoreSettledMainCardProjection(
   if (!source || source.orderId !== coverage.sourceOrderId) return false;
   const currentReview = (
     await tx.execute<{ reviewId: string }>(
-      sql`select p.review_id as "reviewId" from experts_published p join resident_card_versions v on v.review_id=p.review_id where p.user_id=${input.userId}::uuid and p.expert_id=${input.expertId}::uuid`,
+      sql`select v.review_id as "reviewId" from resident_card_versions v join expert_card_drafts d on d.id=v.draft_id where d.user_id=${input.userId}::uuid order by v.revision desc limit 1`,
     )
   ).rows[0]?.reviewId;
   const gate = await lockCardActivationGate(tx, {
@@ -87,7 +87,13 @@ export async function restoreSettledMainCardProjection(
   await tx.execute(
     sql`update experts set active=true,verified=true,public_display_name=${gate.publicPayload.displayName},updated_at=clock_timestamp() where id=${input.expertId}::uuid and user_id=${input.userId}::uuid`,
   );
-  if (currentReview) {
+  const existingPublication =
+    (
+      await tx.execute(
+        sql`select 1 from experts_published where expert_id=${input.expertId}::uuid and user_id=${input.userId}::uuid`,
+      )
+    ).rows.length === 1;
+  if (existingPublication) {
     await tx.execute(
       sql`update experts_published set draft_id=${gate.draftId}::uuid,review_id=${gate.reviewId}::uuid,revision=${gate.revision},public_payload=${JSON.stringify(gate.publicPayload)}::jsonb,public_digest=${gate.publicDigest},paid_order_id=${source.orderId}::uuid,next_billing_date=${source.endsAt}::timestamptz,active=true,updated_at=clock_timestamp() where expert_id=${input.expertId}::uuid and user_id=${input.userId}::uuid`,
     );

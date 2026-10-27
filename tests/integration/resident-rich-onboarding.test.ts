@@ -1,3 +1,8 @@
+import {
+  createExpertCardComposition,
+  type ExpertCardCapability,
+} from "../../apps/api/src/expert-card-composition.js";
+import type { RuntimeConfig } from "../../packages/config/src/index.js";
 import { PostgresPrivacyRepository } from "../../packages/db/src/repositories/privacy-repository.js";
 import { richDocumentFixtures } from "../support/resident-rich-document-fixtures.js";
 import { createRequire } from "node:module";
@@ -174,17 +179,17 @@ async function paid() {
   await verification.settleVerified(proof);
   return { ...f, proof };
 }
-function cards() {
+function cards(richOnboarding = true) {
   return new PostgresExpertCardRepository(database.db, {
-    richOnboarding: true,
+    richOnboarding,
     messagingConsentPolicyVersion: "client-messaging-v1",
     workBotId: workScope.botId,
     workBotKey: workScope.botKey,
   });
 }
-async function linked() {
+async function linked(richOnboarding = true) {
   const f = await paid();
-  const card = cards();
+  const card = cards(richOnboarding);
   const token = await card.issueWorkHandoff(event(f.scope));
   if (token.kind !== "issued") throw new Error("fixture_handoff_missing");
   const scope = {
@@ -408,6 +413,7 @@ it("real private photo adapter, complete owner confirmation, manager version and
     { bytes: Buffer; headers: Record<string, string> }
   >();
   let base = "";
+  let objectWrites = 0;
   const server = createServer(async (req, res) => {
     const path = new URL(req.url!, base).pathname;
     if (path.endsWith("/getFile")) {
@@ -433,6 +439,7 @@ it("real private photo adapter, complete owner confirmation, manager version and
       return;
     }
     if (req.method === "PUT") {
+      objectWrites++;
       const chunks: Buffer[] = [];
       for await (const c of req) chunks.push(c);
       const headers: Record<string, string> = {};
@@ -502,25 +509,51 @@ it("real private photo adapter, complete owner confirmation, manager version and
       });
     let revision = 0;
     const photos: string[] = [];
-    for (let i = 0; i < 3; i++) {
-      const entry = event(f.work),
-        reference = "telegram:file:photo_" + i;
-      const r = await repo.addEntry({
-        ...entry,
-        expectedRevision: revision,
-        entry: { kind: "photo", reference },
-      });
-      const photo = await repo.ingestRichPhoto({
-        ...entry,
-        expectedRevision: r.revision,
-        reference,
-        size: bytes.length,
-        mimeType: "image/jpeg",
-      });
-      expect(photo.state).toBe("verified");
-      photos.push(photo.id);
-      revision = r.revision + 1;
+    const photoApp = await workHttp(
+      repo,
+      undefined,
+      undefined,
+      normalComposition(base),
+    );
+    try {
+      for (let i = 0; i < 3; i++) {
+        const update = ++sequence;
+        const response = await photoApp.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: {
+            "x-telegram-bot-api-secret-token":
+              "synthetic-core-webhook-secret-12345678",
+          },
+          payload: {
+            update_id: update,
+            message: {
+              message_id: update,
+              from: { id: Number(f.work.chatId) },
+              chat: { id: Number(f.work.chatId), type: "private" },
+              photo: [
+                {
+                  file_id: "photo_" + i,
+                  file_unique_id: "unique_" + i,
+                  width: 20,
+                  height: 20,
+                  file_size: bytes.length,
+                },
+              ],
+            },
+          },
+        });
+        expect(response.json().text).toContain("закрытом хранилище");
+      }
+    } finally {
+      await photoApp.close();
     }
+    const photoDraft = (await repo.readDraft(
+      manager.sessionHash,
+      f.applicationId,
+    ))!;
+    photos.push(...photoDraft.rich!.profile!.photos);
+    revision = photoDraft.revision;
     expect(objects.size).toBe(3);
     const bio =
       "Помогаю разобраться в задачах и выбрать собственные следующие шаги без обещаний результата.";
@@ -730,6 +763,20 @@ it("real private photo adapter, complete owner confirmation, manager version and
       )
     ).rows[0]!;
     expect(paidBefore.reviewId).toBe(approved.reviewId);
+    const { PostgresCatalogRepository } =
+      await import("../../packages/db/src/repositories/catalog-repository.js");
+    const serviceId = (
+      await database.db.execute<{ id: string }>(
+        sql`insert into expert_services(expert_id,code,language,name,duration_minutes,active) values(${paidBefore.expertId}::uuid,'consultation','ru','Консультация',60,true) returning id`,
+      )
+    ).rows[0]!.id;
+    const catalog = new PostgresCatalogRepository(database.db);
+    const catalogName = async () =>
+      (await catalog.listPublicServices({ limit: 20 })).find(
+        (x) => x.sourceKey === serviceId,
+      )?.displayName;
+    expect(await catalogName()).toBe("Анна");
+
     r = await repo.richAction({
       ...event(f.work),
       expectedRevision: revision,
@@ -744,6 +791,40 @@ it("real private photo adapter, complete owner confirmation, manager version and
     await expect(
       repo.reviewCard({ ...staffCommand(), action: "approve" }),
     ).rejects.toThrow();
+    const removed = await repo.richAction({
+      ...event(f.work),
+      expectedRevision: r.revision,
+      action: "remove_photo",
+      value: 1,
+    });
+    const reselectEvent = event(f.work);
+    const reselectedEntry = await repo.addEntry({
+      ...reselectEvent,
+      expectedRevision: removed.revision,
+      entry: { kind: "photo", reference: "telegram:file:photo_0" },
+    });
+    expect(
+      await repo.ingestRichPhoto({
+        ...reselectEvent,
+        expectedRevision: reselectedEntry.revision,
+        reference: "telegram:file:photo_0",
+        size: bytes.length,
+        mimeType: "image/jpeg",
+      }),
+    ).toMatchObject({ id: photos[0], state: "verified" });
+    expect(objectWrites).toBe(3);
+    expect(
+      (
+        await database.db.execute<{ profile: { photos: string[] } }>(
+          sql`select profile from resident_card_versions where review_id=${approved.reviewId!}::uuid`,
+        )
+      ).rows[0]!.profile.photos,
+    ).toEqual(photos);
+    expect(
+      (await repo.readDraft(manager.sessionHash, f.applicationId))!.rich!
+        .profile!.photos,
+    ).toContain(photos[0]);
+    r = { ...r, ...(await repo.getWorkflow(f.work))! };
     const { lockCardActivationGate } =
       await import("../../packages/db/src/repositories/expert-card-repository.js");
     expect(
@@ -761,18 +842,68 @@ it("real private photo adapter, complete owner confirmation, manager version and
         )
       ).rows[0]?.ready,
     ).toBe(true);
-    const renewalQuote = await financial.quoteMain({
-      ...event(f.work),
-      tariffVersionId: tariffId,
-      termMonths: 1,
+    const { PostgresExpertResidencyLifecycleRepository } =
+      await import("../../packages/db/src/repositories/expert-residency-lifecycle-repository.js");
+    const { createExpertResidencyLifecycleService } =
+      await import("../../packages/application/src/expert-residency-lifecycle-service.js");
+    const lifecycle = new PostgresExpertResidencyLifecycleRepository(
+      database.db,
+      {
+        workBotId: workScope.botId,
+        workBotKey: workScope.botKey,
+        messagingConsentPolicyVersion: "client-messaging-v1",
+      },
+    );
+    // Synthetic calendar positioning only: retain the real settled order, duration, tariff, provider facts and admissions; all SQL constraints/triggers stay enabled.
+    await database.db.execute(
+      sql`update expert_residency_orders set settled_at=settled_at-interval '30 days'+interval '20 seconds',residency_starts_at=residency_starts_at-interval '30 days'+interval '20 seconds',residency_ends_at=residency_ends_at-interval '30 days'+interval '20 seconds' where id=${paidBefore.paidOrderId}::uuid`,
+    );
+    await database.db.execute(
+      sql`update experts_published p set next_billing_date=o.residency_ends_at from expert_residency_orders o where p.paid_order_id=o.id and o.id=${paidBefore.paidOrderId}::uuid`,
+    );
+    await lifecycle.processLifecycleBatch(10);
+    expect(await lifecycle.readLifecycle(f.work)).toMatchObject({
       revision,
+      bill: { readiness: "ready" },
     });
-    await financial.acceptMain({
-      ...event(f.work),
-      quoteId: renewalQuote.id,
-      revision,
+    const renewal = createExpertResidencyLifecycleService({
+      enabled: true,
+      workBotId: workScope.botId,
+      workBotKey: workScope.botKey,
+      paymentMode: "test",
+      repository: lifecycle,
+      financial,
     });
+    const renew = async (text: string) =>
+      renewal.handleWork({
+        ...f.work,
+        updateId: String(++sequence),
+        requestDigest: hash(sequence + text),
+        content: { kind: "text", text },
+      });
+    expect((await renew("/renewal")).text).toContain("Счёт продления");
+    expect((await renew(`/renewal_quote ${tariffId} 1`)).text).toContain(
+      "Предложение продления",
+    );
+    const bill = (await lifecycle.readLifecycle(f.work))!.bill!;
+    expect((await renew(`/renewal_accept ${bill.quoteId}`)).text).toContain(
+      "Счёт продления",
+    );
+    expect((await renew("/renewal_invoice")).text).toContain("Счёт продления");
+    const renewalOrder = (await lifecycle.readLifecycle(f.work))!.bill!
+      .orderId!;
     revision = r.revision;
+    revision = (
+      await repo.editPublicCard({
+        ...staffCommand(),
+        publicCard: {
+          displayName: "Анна Обновлённая",
+          profession: "Консультант",
+          city: "Казань",
+          summary: bio,
+        },
+      })
+    ).revision;
     let second = await repo.richAction({
       ...event(f.work),
       expectedRevision: revision,
@@ -803,13 +934,20 @@ it("real private photo adapter, complete owner confirmation, manager version and
       action: "return_changes",
       returnReason: "Уточните описание",
     });
+    expect(await lifecycle.readLifecycle(f.work)).toMatchObject({
+      revision: approved.revision,
+      bill: { readiness: "ready", orderId: renewalOrder },
+    });
+    expect((await renew("/renewal")).text).toContain("Счёт продления");
+    expect((await renew("/renewal_invoice")).text).toContain("Счёт продления");
     const ownerApp = await workHttp(repo);
     try {
       const notice = await ownerApp.inject({
         method: "POST",
         url: "/v1/webhooks/telegram",
         headers: {
-          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+          "x-telegram-bot-api-secret-token":
+            "synthetic-core-webhook-secret-12345678",
         },
         payload: {
           update_id: ++sequence,
@@ -842,6 +980,7 @@ it("real private photo adapter, complete owner confirmation, manager version and
         }),
       ),
     ).toMatchObject({ reviewId: approved.reviewId });
+    expect(await catalogName()).toBe("Анна");
     await repo.submitDraft({ ...event(f.work), expectedRevision: revision });
     const current = await repo.readDraft(manager.sessionHash, f.applicationId);
     const update = await repo.reviewCard({
@@ -858,6 +997,7 @@ it("real private photo adapter, complete owner confirmation, manager version and
       review_id: update.reviewId,
       paid_order_id: paidBefore.paidOrderId,
     });
+    expect(await catalogName()).toBe("Анна Обновлённая");
     const { restoreSettledMainCardProjection } =
       await import("../../packages/db/src/repositories/expert-residency-main-projection.js");
     expect(
@@ -875,6 +1015,102 @@ it("real private photo adapter, complete owner confirmation, manager version and
         )
       ).rows[0]?.review_id,
     ).toBe(update.reviewId);
+    await database.db.execute(
+      sql`select pg_sleep(least(21,greatest(0,extract(epoch from(residency_ends_at-clock_timestamp())))+0.03)) from expert_residency_orders where id=${paidBefore.paidOrderId}::uuid`,
+    );
+    revision = (
+      await repo.editPublicCard({
+        ...staffCommand(),
+        publicCard: {
+          displayName: "Анна После Продления",
+          profession: "Консультант",
+          city: "Казань",
+          summary: bio,
+        },
+      })
+    ).revision;
+    let expiredPreview = await repo.richAction({
+      ...event(f.work),
+      expectedRevision: revision,
+      action: "preview",
+    });
+    while (
+      expiredPreview.pageText!.split("\n").at(-1)!.startsWith("/card_preview")
+    ) {
+      const c = expiredPreview.pageText!.split("\n").at(-1)!.split(" ");
+      expiredPreview = await repo.richAction({
+        ...event(f.work),
+        expectedRevision: revision,
+        action: "preview",
+        page: Number(c[2]),
+        token: c[3]!,
+      });
+    }
+    await repo.richAction({
+      ...event(f.work),
+      expectedRevision: revision,
+      action: "confirm",
+      token: expiredPreview.pageText!.split(" ").at(-1)!,
+    });
+    await repo.submitDraft({ ...event(f.work), expectedRevision: revision });
+    const privateApproval = await repo.reviewCard({
+      ...staffCommand(),
+      action: "approve",
+      warningAcknowledgment: (await repo.readDraft(
+        manager.sessionHash,
+        f.applicationId,
+      ))!.safety.digest,
+    });
+    expect(privateApproval.status).toBe("approved");
+    expect(
+      (
+        await database.db.execute(
+          sql`select active from experts_published where user_id=${f.userId}::uuid`,
+        )
+      ).rows[0]?.active,
+    ).toBe(false);
+    expect(await catalogName()).toBeUndefined();
+    const renewalCash = (
+      await database.db.execute<{ cash: string }>(
+        sql`select cash_minor::text cash from expert_residency_orders where id=${renewalOrder}::uuid`,
+      )
+    ).rows[0]!.cash;
+    const renewalClaim = await operations.claim({
+      commandId: randomUUID(),
+      orderId: renewalOrder,
+      kind: "create_payment",
+      mode: "test",
+      amountMinor: renewalCash,
+      currency: "RUB",
+      requestDigest: "sha256:" + hash(renewalOrder),
+    });
+    const renewalPaymentId = "synthetic_" + randomUUID();
+    const renewalOperation = await operations.bindProviderObject(
+      renewalClaim.id,
+      renewalPaymentId,
+    );
+    const renewalProof = await new YooKassaPaymentVerifier(
+      client(providerPayment(renewalPaymentId, renewalOrder, renewalCash)),
+      operations,
+    ).verifyPayment(renewalOperation);
+    if (!renewalProof) throw Error("renewal_proof_missing");
+    expect(
+      await new PostgresExpertResidencyProviderInboxRepository(
+        database.db,
+      ).settle(renewalProof),
+    ).toMatchObject({ kind: "settled" });
+    expect(
+      (
+        await database.db.execute(
+          sql`select review_id,active,paid_order_id from experts_published where user_id=${f.userId}::uuid`,
+        )
+      ).rows[0],
+    ).toEqual({
+      review_id: privateApproval.reviewId,
+      active: true,
+      paid_order_id: renewalOrder,
+    });
+    expect(await catalogName()).toBe("Анна После Продления");
     expect(
       (
         await database.db.execute(
@@ -889,6 +1125,7 @@ it("real private photo adapter, complete owner confirmation, manager version and
         )
       ).rows[0]?.n,
     ).toBe(1);
+
     const privacy = new PostgresPrivacyRepository(database.db, {
       privacyMutationCapability: {
         enabled: true,
@@ -956,7 +1193,7 @@ it("real private photo adapter, complete owner confirmation, manager version and
   } finally {
     await new Promise<void>((r, j) => server.close((e) => (e ? j(e) : r())));
   }
-});
+}, 45000);
 
 const Fastify = createRequire(import.meta.url)("fastify");
 async function workHttp(
@@ -969,6 +1206,7 @@ async function workHttp(
     callbackQueryId: string;
     signal: AbortSignal;
   }) => Promise<void>,
+  capability?: ExpertCardCapability,
 ) {
   const service = createExpertCardService({
     enabled: true,
@@ -986,7 +1224,7 @@ async function workHttp(
   });
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
-    secret: "synthetic-core-webhook-secret",
+    secret: "synthetic-core-webhook-secret-12345678",
     clientIngressEnabled: false,
     clientHybridRoutingEnabled: false,
     clientBotKey: "disabled-client",
@@ -1005,9 +1243,9 @@ async function workHttp(
     expertCardEnabled: true,
     expertCard: {
       ...{ workBotId: workScope.botId, workBotKey: workScope.botKey },
-      webhookSecret: "synthetic-core-webhook-secret",
-      service,
-      legacyReplay: { read: async () => "absent" },
+      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      service: capability?.service ?? service,
+      legacyReplay: capability?.legacyReplay ?? { read: async () => "absent" },
       ...(answerTagCallback ? { answerTagCallback } : {}),
     },
   });
@@ -1018,7 +1256,7 @@ it("authenticated real Telegram route delivers master checklist and guided/propo
     app = await workHttp(f.card);
   const send = (
     text: string,
-    secret = "synthetic-core-webhook-secret",
+    secret = "synthetic-core-webhook-secret-12345678",
     chat = f.work.chatId,
   ) =>
     app.inject({
@@ -1063,15 +1301,10 @@ it.skipIf(!process.env.II_TONYA_PRIVATE_PARSER_TEST_SOCKET)(
   "original-bot PDF and DOCX pass the isolated parser into reviewed proposals, failed files retain raw entry",
   async () => {
     const { createServer } = await import("node:http");
-    const { createTelegramDocumentReader } =
-      await import("../../packages/integrations/src/documents/private-verification.js");
-    const { createIsolatedDocumentParser } =
-      await import("../../packages/integrations/src/documents/isolated-document-parser.js");
-    const parser = createIsolatedDocumentParser({
-      socketPath: process.env.II_TONYA_PRIVATE_PARSER_TEST_SOCKET!,
-      ocr: false,
-    });
     const files = richDocumentFixtures();
+    files.docx = richDocumentFixtures(
+      "fullName: Anna\nspecialization: Consultant\nНазвание услуги: Полная\nФормат: онлайн\nДлительность, минут: 45\nСтоимость, рублей: 1200,50\nОписание услуги: Помогаю разобраться в жизненных задачах и выбрать собственные следующие шаги.\nДля кого: Взрослые\nОжидаемый результат: План\nТемы и теги: поддержка\nДействует до: нет\nПодробнее об услуге: нет\nНазвание услуги: Дополнить\nФормат: очно\nСтоимость, рублей: 2100,25\nТемы и теги: развитие\nПолный адрес: Казань, улица Центральная, 1\nКак добраться: Главный вход",
+    ).docx;
     let chosen: keyof typeof files = "pdf";
     const server = createServer((q, s) => {
       const bytes = files[chosen];
@@ -1091,11 +1324,6 @@ it.skipIf(!process.env.II_TONYA_PRIVATE_PARSER_TEST_SOCKET)(
     await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
     const base =
       "http://127.0.0.1:" + (server.address() as { port: number }).port;
-    const reader = createTelegramDocumentReader({
-      botId: workScope.botId,
-      token: workScope.botId + ":synthetic",
-      fetch: (url, init) => fetch(base + new URL(String(url)).pathname, init),
-    });
     try {
       for (const type of ["pdf", "docx", "bad"] as const) {
         chosen = type;
@@ -1104,35 +1332,22 @@ it.skipIf(!process.env.II_TONYA_PRIVATE_PARSER_TEST_SOCKET)(
           type === "docx"
             ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             : "application/pdf";
-        const app = await workHttp(f.card, {
-          read: (input) =>
-            f.card.readOwnedDocument(input, async () => {
-              const r = await reader.read({
-                ...input,
-                fileId: input.reference.slice(14),
-                size: files[type].length,
-                mimeType,
-              });
-              return r.kind === "read"
-                ? { bytes: r.bytes, type: type === "docx" ? "docx" : "pdf" }
-                : null;
-            }),
-          parser: {
-            parse: async (input) => {
-              const r = await parser.parse(input);
-              return r?.coverage === "complete"
-                ? { source: input.type, content: r.content }
-                : null;
-            },
-          },
-        });
+        const app = await workHttp(
+          f.card,
+          undefined,
+          undefined,
+          normalComposition(
+            base,
+            process.env.II_TONYA_PRIVATE_PARSER_TEST_SOCKET!,
+          ),
+        );
         try {
           const response = await app.inject({
             method: "POST",
             url: "/v1/webhooks/telegram",
             headers: {
               "x-telegram-bot-api-secret-token":
-                "synthetic-core-webhook-secret",
+                "synthetic-core-webhook-secret-12345678",
             },
             payload: {
               update_id: ++sequence,
@@ -1165,11 +1380,37 @@ it.skipIf(!process.env.II_TONYA_PRIVATE_PARSER_TEST_SOCKET)(
               fullName: "Anna",
               specialization: "Consultant",
             });
+            if (type === "docx")
+              expect(detail!.rich?.proposal).toMatchObject({
+                services: [
+                  {
+                    title: "Полная",
+                    durationMinutes: 45,
+                    price: { minRub: "1200.50" },
+                    tags: ["поддержка"],
+                  },
+                ],
+                partialServices: [
+                  {
+                    title: "Дополнить",
+                    format: "OFFLINE",
+                    price: { minRub: "2100.25" },
+                    tags: ["развитие"],
+                  },
+                ],
+                address: "Казань, улица Центральная, 1",
+                arrival: "Главный вход",
+              });
             const p = await f.card.richAction({
               ...event(f.work),
               expectedRevision: 1,
               action: "proposal_preview",
             });
+            if (type === "docx") {
+              expect(p.pageText).toContain("Дополнить");
+              expect(p.pageText).toContain("1200.50");
+              expect(p.pageText).toContain("2100.25");
+            }
             await f.card.richAction({
               ...event(f.work),
               expectedRevision: 1,
@@ -1198,7 +1439,8 @@ it("guided Russian bot questions complete a service without JSON, revision or UU
       method: "POST",
       url: "/v1/webhooks/telegram",
       headers: {
-        "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+        "x-telegram-bot-api-secret-token":
+          "synthetic-core-webhook-secret-12345678",
       },
       payload: {
         update_id: ++sequence,
@@ -1251,6 +1493,602 @@ it("guided Russian bot questions complete a service without JSON, revision or UU
     expect(page.json().text).toContain("Название услуги");
     expect(page.json().text).not.toContain('"minRub"');
     expect((await send("/card_mode")).json().text).toContain("три разных фото");
+  } finally {
+    await app.close();
+  }
+});
+it("R1/R2 actual repeated automatic guided input and full service imports change revision only once", async () => {
+  const f = await linked(),
+    app = await workHttp(f.card);
+  const send = (text: string, update = ++sequence) =>
+    app.inject({
+      method: "POST",
+      url: "/v1/webhooks/telegram",
+      headers: {
+        "x-telegram-bot-api-secret-token":
+          "synthetic-core-webhook-secret-12345678",
+      },
+      payload: {
+        update_id: update,
+        message: {
+          message_id: update,
+          from: { id: Number(f.work.chatId) },
+          chat: { id: Number(f.work.chatId), type: "private" },
+          text,
+        },
+      },
+    });
+  try {
+    for (const text of ["/card_mode", "/card_answer Анна"]) {
+      const update = ++sequence;
+      const first = await send(text, update);
+      expect(first.json().text).toContain("Сохранено");
+      const before = (await f.card.getWorkflow(f.work))!.revision;
+      expect((await send(text, update)).json().duplicate).toBe(true);
+      expect((await f.card.getWorkflow(f.work))!.revision).toBe(before);
+      expect(
+        (await send(text + " изменено", update)).json().duplicate,
+      ).not.toBe(true);
+    }
+    const rev = (await f.card.getWorkflow(f.work))!.revision;
+    const text = `/card_import ${rev} Название услуги: Консультация\nФормат: онлайн\nДлительность, минут: 60\nСтоимость, рублей: 1000\nОписание услуги: Подробное описание консультации без обещаний и гарантированных результатов.\nДля кого: Взрослые\nОжидаемый результат: План\nТемы и теги: поддержка\nДействует до: нет\nПодробнее об услуге: нет`;
+    const update = ++sequence;
+    expect((await send(text, update)).json().text).toContain("Предложение");
+    expect((await send(text, update)).json().duplicate).toBe(true);
+    expect((await f.card.getWorkflow(f.work))!.revision).toBe(rev + 1);
+  } finally {
+    await app.close();
+  }
+});
+it("R7 SQL rejects null price discriminators and R5 mixed-case identity aliases", async () => {
+  const f = await linked();
+  await f.card.richAction({
+    ...event(f.work),
+    expectedRevision: 0,
+    action: "start",
+  });
+  expect(
+    (
+      await database.db.execute(
+        sql`select resident_rich_digest(d)=encode(digest(jsonb_build_object('revision',d.revision,'profile',d.rich_profile,'public',d.public_payload,'proposal',d.rich_proposal,'guided',d.rich_guided)::text,'sha256'),'hex') as compatible from expert_card_drafts d where user_id=${f.userId}::uuid`,
+      )
+    ).rows[0]?.compatible,
+  ).toBe(true);
+  const { emptyRichProfile } =
+    await import("../../packages/contracts/src/index.js");
+  const a = "abcdefab-cdef-4abc-8def-abcdefabcdef";
+  const service = {
+    id: a,
+    title: "Услуга",
+    format: "ONLINE",
+    eventDelivery: null,
+    durationMinutes: 60,
+    price: { kind: null, minRub: "1000.00", maxRub: "2000.00" },
+    description: "Описание",
+    audience: "Все",
+    result: "План",
+    expiryDate: null,
+    detailsUrl: null,
+    tags: ["тема"],
+  };
+  const valid = async (p: unknown) =>
+    (
+      await database.db.execute(
+        sql`select resident_rich_profile_valid(${JSON.stringify(p)}::jsonb,false) valid`,
+      )
+    ).rows[0]?.valid;
+  expect(await valid({ ...emptyRichProfile(), services: [service] })).toBe(
+    false,
+  );
+  expect(
+    await valid({
+      ...emptyRichProfile(),
+      services: [
+        { ...service, price: { kind: "exact", minRub: "1.00", maxRub: null } },
+        {
+          ...service,
+          id: a.toUpperCase(),
+          price: { kind: "exact", minRub: "1.00", maxRub: null },
+        },
+      ],
+    }),
+  ).toBe(false);
+});
+
+function normalComposition(
+  base: string,
+  parserSocket?: string,
+  privateEnabled = true,
+) {
+  const config = {
+    features: { expertCard: true, residentPrivateJobs: privateEnabled },
+    expertCard: {
+      materialDeliveryEnabled: false,
+      mainCheckoutEnabled: false,
+      workBotId: workScope.botId,
+      workBotKey: workScope.botKey,
+      workBotUsername: "synthetic_work_bot",
+      workBotToken: workScope.botId + ":synthetic",
+      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      messagingConsentPolicyVersion: "client-messaging-v1",
+      paymentMode: "test",
+    },
+    privateVerification: {
+      bucket: "rich-cards",
+      region: "ru-local",
+      endpoint: base,
+      credentials: { accessKeyId: "synthetic", secretAccessKey: "synthetic" },
+      dedicatedNonVersionedVerified: true,
+      localEvidence: true,
+      ...(parserSocket ? { parserSocket, ocr: false } : {}),
+    },
+  } as unknown as RuntimeConfig;
+  return createExpertCardComposition(database.db, config, {
+    privateTelegramFetch: (url, init) =>
+      fetch(base + new URL(String(url)).pathname, init),
+  })!;
+}
+
+async function sendText(
+  app: Awaited<ReturnType<typeof workHttp>>,
+  work: { chatId: string },
+  text: string,
+) {
+  const update = ++sequence;
+  return app.inject({
+    method: "POST",
+    url: "/v1/webhooks/telegram",
+    headers: {
+      "x-telegram-bot-api-secret-token":
+        "synthetic-core-webhook-secret-12345678",
+    },
+    payload: {
+      update_id: update,
+      message: {
+        message_id: update,
+        from: { id: Number(work.chatId) },
+        chat: { id: Number(work.chatId), type: "private" },
+        text,
+      },
+    },
+  });
+}
+it("R3 legacy photos retain original input without private write, and erasure removes their reference", async () => {
+  const f = await linked(false);
+  let writes = 0;
+  const repo = new PostgresExpertCardRepository(database.db, {
+    workBotId: workScope.botId,
+    workBotKey: workScope.botKey,
+    messagingConsentPolicyVersion: "client-messaging-v1",
+    photoCustody: {
+      read: async () => new Uint8Array([1]),
+      put: async () => {
+        writes++;
+        return true;
+      },
+      presign: async () => "https://example.com",
+    },
+  });
+  const e = event(f.work),
+    reference = "telegram:file:legacy_photo";
+  const r = await repo.addEntry({
+    ...e,
+    expectedRevision: 0,
+    entry: { kind: "photo", reference },
+  });
+  expect(
+    await repo.ingestRichPhoto({
+      ...e,
+      expectedRevision: r.revision,
+      reference,
+      size: 1,
+      mimeType: "image/jpeg",
+    }),
+  ).toMatchObject({ state: "legacy" });
+  expect(writes).toBe(0);
+  expect(
+    (await repo.readDraft(manager.sessionHash, f.applicationId))!.entries[0],
+  ).toMatchObject({ reference });
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from resident_card_media m join expert_card_drafts d on d.id=m.draft_id where d.user_id=${f.userId}::uuid`,
+      )
+    ).rows[0]?.n,
+  ).toBe(0);
+  const privacy = new PostgresPrivacyRepository(database.db, {
+    privacyMutationCapability: {
+      enabled: true,
+      captureManifests: async () =>
+        ["object_store", "selarti", "planerka", "make_projection"].map(
+          (processor) => ({
+            processor: processor as
+              "object_store" | "selarti" | "planerka" | "make_projection",
+            ciphertext: "ciphertext:" + processor,
+            keyReference: "fixture:" + processor,
+            algorithm: "test-envelope-v1",
+            version: "1",
+            subjectDeletionKeyHash: "sha256:" + processor,
+          }),
+        ),
+      verifyEnvelope: () => true,
+    },
+  });
+  await privacy.startErasureAtomically({
+    targetUserId: f.userId,
+    correlationId: randomUUID(),
+    idempotencyKey: randomUUID(),
+    pseudonym: "hmac:synthetic-legacy-photo",
+  });
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from expert_card_entries e join expert_card_drafts d on d.id=e.draft_id where d.user_id=${f.userId}::uuid`,
+      )
+    ).rows[0]?.n,
+  ).toBe(0);
+});
+it("R4 numbered owner removal permits replacement beyond ten historical uploads and preserves unknown custody", async () => {
+  const f = await linked();
+  let unknown = false;
+  const repo = new PostgresExpertCardRepository(database.db, {
+    richOnboarding: true,
+    workBotId: workScope.botId,
+    workBotKey: workScope.botKey,
+    messagingConsentPolicyVersion: "client-messaging-v1",
+    photoCustody: {
+      read: async () => new Uint8Array([1]),
+      put: async () => !unknown,
+      presign: async () => "https://example.com/photo",
+    },
+  });
+  const app = await workHttp(repo);
+  let revision = 0;
+  const history: string[] = [];
+  try {
+    for (let i = 0; i < 12; i++) {
+      const e = event(f.work),
+        reference = "telegram:file:replace_" + i;
+      const r = await repo.addEntry({
+        ...e,
+        expectedRevision: revision,
+        entry: { kind: "photo", reference },
+      });
+      const photo = await repo.ingestRichPhoto({
+        ...e,
+        expectedRevision: r.revision,
+        reference,
+        size: 1,
+        mimeType: "image/jpeg",
+      });
+      expect(photo.state).toBe("verified");
+      history.push(photo.id);
+      revision = r.revision + 1;
+      if (i < 11) {
+        expect(
+          (
+            await sendText(app, f.work, `/card_photo_remove ${revision} 1`)
+          ).json().text,
+        ).toContain("Сохранено");
+        revision++;
+      }
+    }
+    expect(
+      (
+        await database.db.execute(
+          sql`select count(*)::int n from resident_object_deletions where custody_id=any(${"{" + history.join(",") + "}"}::uuid[]) and erased and delete_state='pending'`,
+        )
+      ).rows[0]?.n,
+    ).toBe(11);
+    const before = revision;
+    expect(
+      (
+        await sendText(app, f.work, `/card_photo_remove ${revision - 1} 1`)
+      ).json().text ?? "",
+    ).not.toContain("Сохранено");
+    expect((await repo.getWorkflow(f.work))!.revision).toBe(before);
+    unknown = true;
+    const e = event(f.work),
+      reference = "telegram:file:uncertain";
+    const r = await repo.addEntry({
+      ...e,
+      expectedRevision: revision,
+      entry: { kind: "photo", reference },
+    });
+    const photo = await repo.ingestRichPhoto({
+      ...e,
+      expectedRevision: r.revision,
+      reference,
+      size: 1,
+      mimeType: "image/jpeg",
+    });
+    expect(photo.state).toBe("unknown");
+    expect(
+      (
+        await database.db.execute(
+          sql`select erased,write_state from resident_object_deletions where custody_id=${photo.id}::uuid`,
+        )
+      ).rows[0],
+    ).toEqual({ erased: false, write_state: "unknown" });
+  } finally {
+    await app.close();
+  }
+});
+it("R10 multiple partial Russian imports preview every field and guided completion asks only their gaps", async () => {
+  const f = await linked(),
+    app = await workHttp(f.card);
+  const bio =
+    "Помогаю разобраться в задачах и выбрать собственные следующие шаги без обещаний результата.";
+  try {
+    await f.card.richAction({
+      ...event(f.work),
+      expectedRevision: 0,
+      action: "patch",
+      value: {
+        fullName: "Анна",
+        specialization: "Консультант",
+        bio,
+        socialLinks: ["https://example.com/profile"],
+      },
+    });
+    for (const source of [
+      `Название услуги: Первая\nФормат: онлайн\nДлительность, минут: 45\nОписание услуги: ${bio}\nДля кого: Взрослые\nОжидаемый результат: План\nТемы и теги: поддержка\nДействует до: нет\nПодробнее об услуге: нет`,
+      `Название услуги: Вторая\nФормат: очно\nСтоимость, рублей: 2100,25\nОписание услуги: ${bio}\nДля кого: Семьи\nОжидаемый результат: План\nТемы и теги: развитие\nДействует до: нет\nПодробнее об услуге: нет`,
+    ]) {
+      let rev = (await f.card.getWorkflow(f.work))!.revision;
+      expect(
+        (await sendText(app, f.work, `/card_import ${rev} ${source}`)).json()
+          .text,
+      ).toContain("Предложение");
+      rev++;
+      let page = (await sendText(app, f.work, `/card_proposal ${rev}`)).json()
+        .text;
+      let shown = page;
+      while (page.split("\n").at(-1)!.startsWith("/card_proposal")) {
+        page = (await sendText(app, f.work, page.split("\n").at(-1)!)).json()
+          .text;
+        shown += page;
+      }
+      expect(shown).toContain(source.includes("Первая") ? "45" : "2100.25");
+      expect(shown).toContain(
+        source.includes("Первая") ? "поддержка" : "развитие",
+      );
+      expect(shown).toContain(bio);
+      expect(
+        (await sendText(app, f.work, page.split("\n").at(-1)!)).json().text,
+      ).toContain("Стоимость в рублях");
+    }
+    let detail = (await f.card.readDraft(
+      manager.sessionHash,
+      f.applicationId,
+    ))!;
+    expect(detail.rich!.guided).toMatchObject({
+      title: "Первая",
+      durationMinutes: 45,
+    });
+    expect(detail.rich!.pending).toMatchObject([
+      { title: "Вторая", price: { minRub: "2100.25" } },
+    ]);
+    expect(
+      (await sendText(app, f.work, "/card_answer 1000")).json().text,
+    ).toContain("Сколько минут");
+    expect(
+      (await sendText(app, f.work, "/card_answer 90")).json().text,
+    ).toContain("постоянной онлайн-комнаты");
+    detail = (await f.card.readDraft(manager.sessionHash, f.applicationId))!;
+    expect(detail.rich!.profile!.services).toMatchObject([
+      { title: "Первая", durationMinutes: 45, price: { minRub: "1000.00" } },
+      {
+        title: "Вторая",
+        durationMinutes: 90,
+        price: { minRub: "2100.25" },
+        audience: "Семьи",
+      },
+    ]);
+    expect(detail.rich!.pending).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
+it("R8 actual competing generic and card dispatch admits one delivery and retains its receipt", async () => {
+  const f = await linked(false);
+  let revision = (
+    await f.card.addEntry({
+      ...event(f.work),
+      expectedRevision: 0,
+      entry: {
+        kind: "text",
+        text: "Сведения об услуге и профессиональном опыте для проверки менеджером.",
+      },
+    })
+  ).revision;
+  const command = () => ({
+    sessionHash: manager.sessionHash,
+    applicationId: f.applicationId,
+    expectedRevision: revision,
+    idempotencyKey: randomUUID(),
+  });
+  await f.card.submitDraft({ ...event(f.work), expectedRevision: revision });
+  revision = (
+    await f.card.editPublicCard({
+      ...command(),
+      publicCard: {
+        displayName: "Анна",
+        profession: "Консультант",
+        city: "Казань",
+        summary: "Индивидуальные консультации",
+      },
+    })
+  ).revision;
+  await f.card.reviewCard({ ...command(), action: "approve" });
+  await database.db.execute(
+    sql`insert into expert_card_material_templates(content_version,status,text_body) values(${randomUUID()},'approved','Материалы для владельца')`,
+  );
+  const genericId = (
+    await database.db.execute<{ id: string }>(
+      sql`select id from expert_application_material_jobs where application_id=${f.applicationId}::uuid`,
+    )
+  ).rows[0]!.id;
+  const cardId = (
+    await database.db.execute<{ id: string }>(
+      sql`select id from expert_card_material_jobs where user_id=${f.userId}::uuid`,
+    )
+  ).rows[0]!.id;
+  let sends = 0;
+  const transport = {
+    send: async (
+      i: Parameters<
+        NonNullable<
+          ConstructorParameters<
+            typeof PostgresExpertCardRepository
+          >[1]["materialTransport"]
+        >["send"]
+      >[0],
+    ) => {
+      sends++;
+      return {
+        messageIds: ["123"],
+        botId: i.botId,
+        chatId: i.chatId,
+        contentVersion: i.contentVersion,
+        payloadDigest: i.payloadDigest,
+      };
+    },
+  };
+  const { PostgresExpertApplicationMaterials } =
+    await import("../../packages/db/src/repositories/expert-application-materials.js");
+  const generic = new PostgresExpertApplicationMaterials(
+    database.db,
+    "client-messaging-v1",
+    transport,
+  );
+  const card = new PostgresExpertCardRepository(database.db, {
+    workBotId: workScope.botId,
+    workBotKey: workScope.botKey,
+    messagingConsentPolicyVersion: "client-messaging-v1",
+    materialTransport: transport,
+  });
+  const outcomes = await Promise.all([
+    generic.deliver(genericId),
+    card.deliverMaterials(cardId),
+  ]);
+  expect(outcomes).toEqual([{ kind: "cancelled" }, { kind: "delivered" }]);
+  expect(sends).toBe(1);
+  await generic.deliver(genericId);
+  expect(await card.deliverMaterials(cardId)).toMatchObject({
+    kind: "already_delivered",
+  });
+  expect(sends).toBe(1);
+  expect(
+    (
+      await database.db.execute(
+        sql`select delivery_receipt is not null as receipt from expert_card_material_jobs where id=${cardId}::uuid`,
+      )
+    ).rows[0]?.receipt,
+  ).toBe(true);
+});
+
+it("R2 full Russian service import keeps the same server identity on exact original-input replay", async () => {
+  const f = await linked(),
+    app = await workHttp(f.card);
+  const update = ++sequence;
+  const text =
+    "/card_import 0 Название услуги: Консультация\nФормат: онлайн\nДлительность, минут: 60\nСтоимость, рублей: 1000\nОписание услуги: Подробное описание консультации без обещаний и гарантированных результатов.\nДля кого: Взрослые\nОжидаемый результат: План\nТемы и теги: поддержка\nДействует до: нет\nПодробнее об услуге: нет";
+  const request = {
+    method: "POST" as const,
+    url: "/v1/webhooks/telegram",
+    headers: {
+      "x-telegram-bot-api-secret-token":
+        "synthetic-core-webhook-secret-12345678",
+    },
+    payload: {
+      update_id: update,
+      message: {
+        message_id: update,
+        from: { id: Number(f.work.chatId) },
+        chat: { id: Number(f.work.chatId), type: "private" },
+        text,
+      },
+    },
+  };
+  try {
+    expect((await app.inject(request)).json().text).toContain("Предложение");
+    const proposed = (await f.card.readDraft(
+      manager.sessionHash,
+      f.applicationId,
+    ))!.rich!.proposal;
+    expect((await app.inject(request)).json().duplicate).toBe(true);
+    expect(
+      (await f.card.readDraft(manager.sessionHash, f.applicationId))!.rich!
+        .proposal,
+    ).toEqual(proposed);
+    expect((await f.card.getWorkflow(f.work))!.revision).toBe(1);
+  } finally {
+    await app.close();
+  }
+});
+it("R11 disabled normal composition retains originals and truthfully declines private custody and parsing", async () => {
+  const f = await linked(),
+    app = await workHttp(
+      f.card,
+      undefined,
+      undefined,
+      normalComposition("http://127.0.0.1:1", undefined, false),
+    );
+  try {
+    for (const content of [
+      {
+        photo: [
+          {
+            file_id: "disabled_photo",
+            file_unique_id: "disabled_unique",
+            width: 20,
+            height: 20,
+            file_size: 8,
+          },
+        ],
+      },
+      {
+        document: {
+          file_id: "disabled_pdf",
+          file_size: 100,
+          mime_type: "application/pdf",
+        },
+      },
+    ]) {
+      const update = ++sequence;
+      const response = await app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers: {
+          "x-telegram-bot-api-secret-token":
+            "synthetic-core-webhook-secret-12345678",
+        },
+        payload: {
+          update_id: update,
+          message: {
+            message_id: update,
+            from: { id: Number(f.work.chatId) },
+            chat: { id: Number(f.work.chatId), type: "private" },
+            ...content,
+          },
+        },
+      });
+      expect(response.statusCode).toBe(200);
+      expect(response.json().text).toContain(
+        "photo" in content
+          ? "хранилище пока недоступно"
+          : "Не удалось прочитать файл автоматически",
+      );
+    }
+    const detail = (await f.card.readDraft(
+      manager.sessionHash,
+      f.applicationId,
+    ))!;
+    expect(detail.entries).toHaveLength(2);
+    expect(detail.rich!.profile!.photos).toEqual([]);
+    expect(detail.rich!.proposal).toBeNull();
   } finally {
     await app.close();
   }

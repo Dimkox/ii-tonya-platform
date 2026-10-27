@@ -42,6 +42,7 @@ export interface ExpertCardCapability {
 }
 export type ExpertCardCompositionOptions = {
   tagCallbackFetch?: typeof fetch;
+  privateTelegramFetch?: typeof fetch;
   documentImport?: Parameters<
     typeof createExpertCardService
   >[0]["documentImport"];
@@ -105,6 +106,9 @@ export function createExpertCardComposition(
       ? createTelegramDocumentReader({
           botId: settings.workBotId,
           token: settings.workBotToken,
+          ...(options.privateTelegramFetch
+            ? { fetch: options.privateTelegramFetch }
+            : {}),
         })
       : undefined;
   const photoCustody =

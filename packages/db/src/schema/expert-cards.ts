@@ -41,9 +41,12 @@ export const expertCardDrafts = pgTable(
     richGuided: jsonb("rich_guided")
       .notNull()
       .default(sql`'{}'::jsonb`),
+    richPendingServices: jsonb("rich_pending_services")
+      .notNull()
+      .default(sql`'[]'::jsonb`),
     richProposal:
       jsonb("rich_proposal").$type<
-        Partial<import("@ii-tonya/contracts").RichProfile>
+        import("@ii-tonya/contracts").RichProposal
       >(),
     ownerConfirmedDigest: text("owner_confirmed_digest"),
     previewPage: integer("preview_page"),
@@ -68,6 +71,10 @@ export const expertCardDrafts = pgTable(
     updatedAt: time("updated_at").notNull().defaultNow(),
   },
   (t) => [
+    check(
+      "resident_rich_pending_services_shape",
+      sql`jsonb_typeof(rich_pending_services)='array' AND jsonb_array_length(rich_pending_services)<=8 AND octet_length(rich_pending_services::text)<=95000`,
+    ),
     check(
       "expert_card_drafts_rich_guided_check",
       sql`jsonb_typeof(rich_guided)='object' AND octet_length(rich_guided::text)<=16000`,

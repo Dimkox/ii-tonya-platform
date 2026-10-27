@@ -72,6 +72,7 @@ export interface ExpertCardRepository {
         | "patch"
         | "service"
         | "remove_service"
+        | "remove_photo"
         | "propose"
         | "accept_proposal"
         | "preview"
@@ -82,6 +83,7 @@ export interface ExpertCardRepository {
         | "manager"
         | "guided_answer"
         | "service_add";
+      automaticRevision?: boolean;
       value?: unknown;
       page?: number;
       token?: string;
@@ -533,7 +535,7 @@ export function createExpertCardService(deps: {
         }
         if (
           text.startsWith("/") &&
-          !/^\/(?:card|card_mode|card_service_add|card_manager|card_checklist|card_geocode|card_answer|card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm|card_answers|card_correct|card_document|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
+          !/^\/(?:card|card_mode|card_service_add|card_photo_remove|card_manager|card_checklist|card_geocode|card_answer|card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm|card_answers|card_correct|card_document|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
             text,
           )
         )
@@ -545,10 +547,27 @@ export function createExpertCardService(deps: {
         const current = await deps.repository.getWorkflow(s);
         if (!current) return { status: "unhandled" };
         if (text === "/card_checklist") return reply(richChecklist());
+        const removePhoto =
+          /^\/card_photo_remove (0|[1-9][0-9]{0,5}) ([1-9]|10)$/u.exec(text);
+        if (removePhoto && deps.repository.richAction) {
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: Number(removePhoto[1]),
+            action: "remove_photo",
+            value: Number(removePhoto[2]),
+          });
+          return r.replay
+            ? { status: "duplicate" }
+            : reply(
+                r.pageText ??
+                  "Фото убрано из черновика. Пришлите новое фото для замены.",
+              );
+        }
         if (text === "/card_mode" && deps.repository.richAction) {
           const r = await deps.repository.richAction({
             ...event,
             expectedRevision: current.revision,
+            automaticRevision: true,
             action: "start",
           });
           return r.replay
@@ -559,6 +578,7 @@ export function createExpertCardService(deps: {
           const r = await deps.repository.richAction({
             ...event,
             expectedRevision: current.revision,
+            automaticRevision: true,
             action: "manager",
           });
           return r.replay
@@ -569,6 +589,7 @@ export function createExpertCardService(deps: {
           const r = await deps.repository.richAction({
             ...event,
             expectedRevision: current.revision,
+            automaticRevision: true,
             action: "geocode",
           });
           return r.replay
@@ -618,6 +639,7 @@ export function createExpertCardService(deps: {
           const r = await deps.repository.richAction({
             ...event,
             expectedRevision: current.revision,
+            automaticRevision: true,
             action: "guided_answer",
             value: text.slice(13).trim(),
           });
@@ -632,6 +654,7 @@ export function createExpertCardService(deps: {
           const r = await deps.repository.richAction({
             ...event,
             expectedRevision: current.revision,
+            automaticRevision: true,
             action: "service_add",
           });
           return r.replay
@@ -642,6 +665,7 @@ export function createExpertCardService(deps: {
           const r = await deps.repository.richAction({
             ...event,
             expectedRevision: current.revision,
+            automaticRevision: true,
             action: "preview",
           });
           return r.replay
@@ -660,6 +684,7 @@ export function createExpertCardService(deps: {
             | "patch"
             | "service"
             | "remove_service"
+            | "remove_photo"
             | "propose"
             | "accept_proposal"
             | "preview"
@@ -695,7 +720,12 @@ export function createExpertCardService(deps: {
             value = checked.data;
             action = command === "card_set" ? "patch" : "service";
           } else if (command === "card_import") {
-            value = proposeRichFields(tail);
+            value = proposeRichFields(tail, (i) => {
+              const h = createHash("sha256")
+                .update(event.requestDigest + ":" + i)
+                .digest("hex");
+              return `${h.slice(0, 8)}-${h.slice(8, 12)}-4${h.slice(13, 16)}-8${h.slice(17, 20)}-${h.slice(20, 32)}`;
+            });
             action = "propose";
           } else if (command === "card_remove") {
             value = tail;
@@ -957,9 +987,11 @@ export function createExpertCardService(deps: {
               content.mimeType === "image/png" ? "image/png" : "image/jpeg",
           });
           return reply(
-            media.state === "verified"
-              ? `Фото сохранено в закрытом хранилище: ${media.id}. Оно не опубликовано. Откройте /card для актуальной ревизии.`
-              : "Исходное фото сохранено. Закрытое хранилище пока недоступно; фото ещё не принято в карточку.",
+            media.state === "legacy"
+              ? "Фото сохранено как исходный ответ к карточке. Для нового формата заполнения: /card_mode."
+              : media.state === "verified"
+                ? `Фото сохранено в закрытом хранилище: ${media.id}. Оно не опубликовано. Откройте /card для актуальной ревизии.`
+                : "Исходное фото сохранено. Закрытое хранилище пока недоступно; фото ещё не принято в карточку.",
           );
         }
         if (content.kind === "document") {

@@ -63,3 +63,7 @@ The live geocoder, real Telegram/S3 provider accounts and deployment remain unen
 The owner assistance action is explicitly a pending request in the existing protected queue. `/card` exposes review state and return reason. **Unsolicited owner review-status push is not composed in S3a.** The coordinator explicitly assigned this shared durable original-work-bot notification seam to S4 in the same approved package; full-package completion cannot be claimed before it closes. No ad-hoc send authority was added.
 
 A process-status diagnostic accidentally displayed the task-local evidence DB credential in tool output. The coordinator authorized immediate local rotation. Only `/tmp/verification-form-20261026.compose.json` needed updating (mode0600), access was verified, and no production credential or retained diagnostic log was involved. Successor runners read the updated protected file; no credential is reproduced in this evidence.
+
+## Corrective successor
+
+The runtime and counts above describe the preserved5602413c evidence. Independent review accepted R1–R13; their incremental source/migration corrections, exact command outcomes, retained failures and separate archive are documented in [corrective evidence](residency-rich-onboarding-corrections-2026-10-27.md). Historical claims above are not substituted for those corrective witnesses. Independent closure and the final gate remain coordinator-owned.

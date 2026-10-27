@@ -56,6 +56,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0064_resident_private_jobs.sql",
       "packages/db/migrations/0065_resident_private_recovery_fences.sql",
       "packages/db/migrations/0066_resident_rich_onboarding.sql",
+      "packages/db/migrations/0067_resident_rich_review_corrections.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",

@@ -336,7 +336,7 @@ export class PostgresExpertResidencyLifecycleRepository {
         paidUntil: string | Date | null;
         revision: number;
       }>(
-        sql`select l.status,l.paused_until::text as "pausedUntil",coalesce((select ends_at from expert_residency_current_coverage(l.expert_id)),(select max(o.residency_ends_at) from expert_residency_orders o where o.expert_id=l.expert_id and o.status='settled' and o.residency_ends_at<=clock_timestamp())) as "paidUntil",coalesce((select r.revision from expert_card_drafts d join expert_card_reviews r on r.id=coalesce(d.approved_review_id,(select p.review_id from experts_published p join resident_card_versions v on v.review_id=p.review_id where p.draft_id=d.id)) where d.user_id=l.user_id),(select revision from expert_card_drafts where user_id=l.user_id),0) as revision from expert_residency_lifecycle l where l.user_id=${userId}::uuid`,
+        sql`select l.status,l.paused_until::text as "pausedUntil",coalesce((select ends_at from expert_residency_current_coverage(l.expert_id)),(select max(o.residency_ends_at) from expert_residency_orders o where o.expert_id=l.expert_id and o.status='settled' and o.residency_ends_at<=clock_timestamp())) as "paidUntil",coalesce((select r.revision from expert_card_drafts d join expert_card_reviews r on r.id=coalesce((select v.review_id from resident_card_versions v where v.draft_id=d.id order by v.revision desc limit 1),d.approved_review_id) where d.user_id=l.user_id),(select revision from expert_card_drafts where user_id=l.user_id),0) as revision from expert_residency_lifecycle l where l.user_id=${userId}::uuid`,
       )
     ).rows[0];
     if (!row) return fail("residency_unavailable");
@@ -366,7 +366,7 @@ export class PostgresExpertResidencyLifecycleRepository {
     if (bill) {
       const draft = (
         await tx.execute<{ applicationId: string }>(
-          sql`select application_id as "applicationId" from expert_card_drafts where user_id=${userId}::uuid and work_bot_id=${this.policy.workBotId} and work_bot_key=${this.policy.workBotKey} and (status='approved' or exists(select 1 from experts_published p join resident_card_versions v on v.review_id=p.review_id where p.draft_id=expert_card_drafts.id))`,
+          sql`select application_id as "applicationId" from expert_card_drafts where user_id=${userId}::uuid and work_bot_id=${this.policy.workBotId} and work_bot_key=${this.policy.workBotKey} and (status='approved' or exists(select 1 from resident_card_versions v where v.draft_id=expert_card_drafts.id))`,
         )
       ).rows[0];
       if (draft) {

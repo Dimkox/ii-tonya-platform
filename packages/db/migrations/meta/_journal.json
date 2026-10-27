@@ -470,6 +470,13 @@
       "when": 1793059200000,
       "tag": "0066_resident_rich_onboarding",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1793145600000,
+      "tag": "0067_resident_rich_review_corrections",
+      "breakpoints": true
     }
   ]
 }

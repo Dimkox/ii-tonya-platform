@@ -104,6 +104,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0064_resident_private_jobs.sql",
   "packages/db/migrations/0065_resident_private_recovery_fences.sql",
   "packages/db/migrations/0066_resident_rich_onboarding.sql",
+  "packages/db/migrations/0067_resident_rich_review_corrections.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -902,6 +903,23 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0067_resident_rich_review_corrections.sql",
+    "7f79f93ef2cf00a79b3740472147c0e650abf154b545fec34be9b0d443ae8422",
+  ],
+  [
+    "packages/db/migrations/meta/0067_snapshot.json",
+    "37fee0f597aaee54127c47461f9ee674db668280c1703ac5ecf2861bd371071a",
+  ],
+  [
+    "packages/db/migrations/state/0067_sql_objects.json",
+    "86770b5ead5c04bd7cd1ac9988fa6e49798ffeef46d065aae5cbffb27ac61e45",
+  ],
+  [
+    "packages/db/migrations/state/0067_manifest.json",
+    "acfac0882803c6df25917311027e211a818d04d9efe3f3dfe6232f3ba00ecde3",
+  ],
+
+  [
     "packages/db/migrations/0066_resident_rich_onboarding.sql",
     "7c81e8b71f77d256aef1a2fd8c8ee672a15ddb2680855f7c10bf182ec7d4b196",
   ],
@@ -1521,7 +1539,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "55505b31e634aea7350c306087568670cc4f8d0b1224f7045e6f9611b32f5e85",
+    "3153806972b037474e4d7f1e3a40677890cf868bb84fa66a395bfb4428f4165d",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1601,7 +1619,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "55505b31e634aea7350c306087568670cc4f8d0b1224f7045e6f9611b32f5e85",
+    "3153806972b037474e4d7f1e3a40677890cf868bb84fa66a395bfb4428f4165d",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
