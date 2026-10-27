@@ -170,3 +170,23 @@ it("rejects malformed main checkout flag without reflecting it", () => {
     }),
   ).toThrow("expert_card_configuration_invalid");
 });
+it("keeps rich geocoding off until explicitly enabled with server credentials", () => {
+  expect(loadEnv(base).residentGeocode).toBeUndefined();
+  expect(() => loadEnv({ ...base, RESIDENT_GEOCODE_ENABLED: "true" })).toThrow(
+    "resident_geocode_configuration",
+  );
+  expect(() =>
+    loadEnv({
+      ...base,
+      RESIDENT_GEOCODE_ENABLED: "true",
+      RESIDENT_GEOCODE_API_KEY: "__PLACEHOLDER_YANDEX_GEOCODE_KEY__",
+    }),
+  ).toThrow("resident_geocode_configuration");
+  expect(
+    loadEnv({
+      ...base,
+      RESIDENT_GEOCODE_ENABLED: "true",
+      RESIDENT_GEOCODE_API_KEY: "synthetic-server-key",
+    }).residentGeocode,
+  ).toEqual({ key: "synthetic-server-key" });
+});

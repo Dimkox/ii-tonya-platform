@@ -48,7 +48,7 @@ export class PostgresExpertApplicationMaterials {
         sql`select j.id as "jobId",j.created_at as "createdAt" from expert_application_material_jobs j
  join users u on u.id=j.user_id and u.active
  join expert_onboarding_applications a on a.id=j.application_id and a.user_id=j.user_id and a.verification_status='approved' and a.archived_at is null and a.archive_until_date is null
- where j.status in ('waiting_content','pending') and j.attempt_id is null
+ where exists(select 1 from expert_card_drafts d where d.application_id=a.id and d.status='approved' and not d.rich_mode) and j.status in ('waiting_content','pending') and j.attempt_id is null
  and j.target_bot_id is not null and j.target_bot_key is not null and j.target_chat_id is not null
  and (select count(*) from channel_identities ci where ci.user_id=j.user_id and ci.provider='telegram' and ci.bot_key=j.target_bot_key and ci.external_id=j.target_chat_id and ci.external_chat_id=j.target_chat_id and ci.status='active')=1
  and expert_card_current_messaging_authority(j.user_id,${this.policy})
@@ -79,7 +79,7 @@ export class PostgresExpertApplicationMaterials {
         contentVersion: string | null;
         payloadDigest: string | null;
       }>(
-        sql`select j.id,j.user_id as "userId",j.application_id as "applicationId",j.status,j.attempt_id as "attemptId",j.target_bot_id as "botId",j.target_bot_key as "botKey",j.target_chat_id as "chatId",j.content_version as "contentVersion",j.payload_digest as "payloadDigest" from expert_application_material_jobs j join users u on u.id=j.user_id and u.active join expert_onboarding_applications a on a.id=j.application_id and a.user_id=j.user_id and a.archived_at is null and a.archive_until_date is null and a.verification_status='approved' where j.id=${id}::uuid and exists(select 1 from expert_onboarding_invoices i join expert_onboarding_payment_facts f on f.invoice_id=i.id and f.admission='interview' where i.application_id=a.id and i.user_id=j.user_id and i.status='settled') for update of j for share of u,a`,
+        sql`select j.id,j.user_id as "userId",j.application_id as "applicationId",j.status,j.attempt_id as "attemptId",j.target_bot_id as "botId",j.target_bot_key as "botKey",j.target_chat_id as "chatId",j.content_version as "contentVersion",j.payload_digest as "payloadDigest" from expert_application_material_jobs j join users u on u.id=j.user_id and u.active join expert_onboarding_applications a on a.id=j.application_id and a.user_id=j.user_id and a.archived_at is null and a.archive_until_date is null and a.verification_status='approved' where j.id=${id}::uuid and (j.attempt_id is not null or exists(select 1 from expert_card_drafts d where d.application_id=a.id and d.status='approved' and not d.rich_mode)) and exists(select 1 from expert_onboarding_invoices i join expert_onboarding_payment_facts f on f.invoice_id=i.id and f.admission='interview' where i.application_id=a.id and i.user_id=j.user_id and i.status='settled') for update of j for share of u,a`,
       )
     ).rows[0];
     if (!job?.botId || !job.botKey || !job.chatId) return null;

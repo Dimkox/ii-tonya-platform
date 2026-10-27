@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   bigint,
+  boolean,
   check,
   foreignKey,
   integer,
@@ -34,6 +35,23 @@ export const expertCardDrafts = pgTable(
       .references(() => users.id),
     revision: integer("revision").notNull().default(0),
     status: text("status").notNull().default("collecting"),
+    richMode: boolean("rich_mode").notNull().default(false),
+    richProfile:
+      jsonb("rich_profile").$type<import("@ii-tonya/contracts").RichProfile>(),
+    richGuided: jsonb("rich_guided")
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    richProposal:
+      jsonb("rich_proposal").$type<
+        Partial<import("@ii-tonya/contracts").RichProfile>
+      >(),
+    ownerConfirmedDigest: text("owner_confirmed_digest"),
+    previewPage: integer("preview_page"),
+    previewTokenDigest: text("preview_token_digest"),
+    previewContentDigest: text("preview_content_digest"),
+    assistanceRequestedAt: time("assistance_requested_at"),
+    assistanceRevision: integer("assistance_revision"),
+    assistanceResolvedAt: time("assistance_resolved_at"),
     inputMode: text("input_mode").notNull().default("INTERVIEW"),
     documentImportRevision: integer("document_import_revision"),
     documentProposal: jsonb("document_proposal").$type<{
@@ -50,6 +68,14 @@ export const expertCardDrafts = pgTable(
     updatedAt: time("updated_at").notNull().defaultNow(),
   },
   (t) => [
+    check(
+      "expert_card_drafts_rich_guided_check",
+      sql`jsonb_typeof(rich_guided)='object' AND octet_length(rich_guided::text)<=16000`,
+    ),
+    check(
+      "resident_rich_shape",
+      sql`coalesce((NOT rich_mode AND rich_profile IS NULL AND rich_proposal IS NULL) OR (rich_mode AND resident_rich_profile_valid(rich_profile)),false)`,
+    ),
     check(
       "expert_card_input_mode",
       sql`coalesce((document_import_revision IS NULL OR document_import_revision BETWEEN 1 AND revision) AND input_mode IN ('INTERVIEW','DOCUMENT_PROPOSAL') AND ((input_mode='INTERVIEW' AND document_proposal IS NULL) OR (input_mode='DOCUMENT_PROPOSAL' AND jsonb_typeof(document_proposal)='object' AND jsonb_typeof(document_proposal->'source')='string' AND jsonb_typeof(document_proposal->'content')='string' AND document_proposal ?& ARRAY['source','content'] AND (document_proposal-'source'-'content')='{}'::jsonb AND document_proposal->>'source' IN ('pdf','docx') AND length(btrim(document_proposal->>'content'))>=50 AND octet_length(document_proposal::text)<=100000)),false)`,
@@ -132,6 +158,7 @@ export const expertCardReviews = pgTable(
     publicDigest: text("public_digest"),
     safetyProof: jsonb("safety_proof"),
     warningAcknowledgment: text("warning_acknowledgment"),
+    returnReason: text("return_reason"),
     managerId: uuid("manager_id")
       .notNull()
       .references(() => users.id),

@@ -463,6 +463,13 @@
       "when": 1793056800000,
       "tag": "0065_resident_private_recovery_fences",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1793059200000,
+      "tag": "0066_resident_rich_onboarding",
+      "breakpoints": true
     }
   ]
 }

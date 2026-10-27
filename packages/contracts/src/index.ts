@@ -48,3 +48,5 @@ export * from "./expert-residency-lifecycle.js";
 export * from "./client-bot-account.js";
 
 export { canonicalPrivateProfile } from "./private-profile-key.js";
+
+export * from "./resident-rich-profile.js";

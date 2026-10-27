@@ -55,6 +55,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0063_resident_verification_review_corrections.sql",
       "packages/db/migrations/0064_resident_private_jobs.sql",
       "packages/db/migrations/0065_resident_private_recovery_fences.sql",
+      "packages/db/migrations/0066_resident_rich_onboarding.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
@@ -179,7 +180,9 @@ describe("expert residency referral scope boundary", () => {
       "planerka_legacy_booking_reviews",
       "planerka_service_mappings",
       "resident_card_corrections",
+      "resident_card_media",
       "resident_card_proposal_changes",
+      "resident_card_versions",
       "resident_check_generations",
       "resident_document_access_audit",
       "resident_evidence_jobs",
@@ -223,6 +226,7 @@ describe("expert residency referral scope boundary", () => {
     expect([...EXPERT_RESIDENCY_ALLOWED_ROUTES].sort()).toEqual([
       "/v1/admin/expert-cards",
       "/v1/admin/expert-cards/:applicationId",
+      "/v1/admin/expert-cards/:applicationId/media/:mediaId/link",
       "/v1/admin/expert-cards/:applicationId/promo-review",
       "/v1/admin/expert-cards/:applicationId/public-card",
       "/v1/admin/expert-cards/:applicationId/review",
@@ -280,6 +284,7 @@ describe("expert residency referral scope boundary", () => {
       "EXPERT_VERIFICATION_FORM_ENABLED",
       "PRIVATE_OCR_ENABLED",
       "PRIVATE_TELEGRAM_PREVIEW_ENABLED",
+      "RESIDENT_GEOCODE_ENABLED",
       "RESIDENT_PRIVATE_JOBS_ENABLED",
       "RESIDENT_WORKSPACE_NOTIFICATIONS_ENABLED",
     ]);

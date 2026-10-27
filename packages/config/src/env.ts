@@ -415,6 +415,7 @@ export type RuntimeConfig = {
   clientAccountQueries?: ClientAccountQueriesConfig;
   payerReceipt?: PayerReceiptConfig;
   expertApplicant?: ExpertApplicantConfig;
+  residentGeocode?: { key: string };
   privateVerification?: {
     bucket: string;
     region: string;
@@ -922,6 +923,13 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
       ? { privateVerification: privateVerificationConfig(source) }
       : {}),
+    ...(source.RESIDENT_GEOCODE_ENABLED === "true"
+      ? {
+          residentGeocode: {
+            key: requiredResidentGeocodeKey(source.RESIDENT_GEOCODE_API_KEY),
+          },
+        }
+      : {}),
     features: {
       ...(separatedSalesFlag === "true" ? { expertSeparatedSales: true } : {}),
       ...(heldFlag === "true" ? { expertHeldOnboarding: true } : {}),
@@ -1079,4 +1087,15 @@ function privateVerificationConfig(
       ? { vkToken: token, vkTokenKind: kind as "user" | "service" }
       : {}),
   };
+}
+
+function requiredResidentGeocodeKey(value: string | undefined): string {
+  if (
+    !value ||
+    value.length > 256 ||
+    /\s/u.test(value) ||
+    value.includes("__PLACEHOLDER_")
+  )
+    throw Error("resident_geocode_configuration");
+  return value;
 }

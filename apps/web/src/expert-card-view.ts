@@ -1,3 +1,4 @@
+import { richReadablePages } from "./expert-card-rich-view.js";
 import {
   validExpertPublicCard,
   type ExpertCardAdminClient,
@@ -11,12 +12,13 @@ type Pending = (
       kind: "review";
       action: "approve" | "return_changes";
       warningAcknowledgment?: string;
+      returnReason?: string;
     }
   | { kind: "promo" }
 ) &
   CardRevisionCommand;
 export function renderExpertCardReview(): string {
-  return `<section data-expert-card-root aria-labelledby="card-review-title"><h2 id="card-review-title">Карточки экспертов</h2><p>Защищённые материалы интервью доступны только в действующем сеансе сотрудника. Фото и документы показаны ссылочными идентификаторами без загрузки у провайдера.</p><button type="button" data-card-refresh disabled>Открыть / обновить очередь карточек</button><p data-card-status role="status" aria-live="polite">Для работы используйте административный сеанс выше.</p><section data-card-queue aria-label="Очередь карточек"></section><section data-card-detail aria-label="Защищённый черновик"></section><fieldset><legend>Публичная профессиональная карточка</legend><p>Заполните только согласованное публичное описание, без контактов и ссылок. Приватные ответы автоматически не переносятся.</p><label>Отображаемое имя <input data-card-displayName maxlength="80" disabled></label><label>Профессия <input data-card-profession maxlength="120" disabled></label><label>Город <input data-card-city maxlength="80" disabled></label><label>Краткое описание одним абзацем <textarea data-card-summary maxlength="2000" rows="5" placeholder="TODO: Wait for Content Spec" disabled></textarea></label><button type="button" data-card-save disabled>Сохранить публичные поля</button></fieldset><label><input type="checkbox" data-card-warning-ack disabled> Я лично прочитал(а) текущие предупреждения и соответствующие поля.</label><button type="button" data-card-approve disabled>Утвердить текущую ревизию</button><button type="button" data-card-return disabled>Вернуть на доработку</button><button type="button" data-card-promo disabled>Подтвердить промо по текущим доказательствам</button><p>Подтверждение промо доступно только после реальной доставки материалов для утверждённой ревизии. Сотрудник не может отметить оплату, доставку или активацию вручную.</p></section>`;
+  return `<section data-expert-card-root aria-labelledby="card-review-title"><h2 id="card-review-title">Карточки экспертов</h2><p>Защищённые материалы интервью доступны только в действующем сеансе сотрудника. Фото карточки открываются по защищённой временной ссылке после проверки сеанса.</p><button type="button" data-card-refresh disabled>Открыть / обновить очередь карточек</button><p data-card-status role="status" aria-live="polite">Для работы используйте административный сеанс выше.</p><section data-card-queue aria-label="Очередь карточек"></section><section data-card-detail aria-label="Защищённый черновик"></section><fieldset><legend>Публичная профессиональная карточка</legend><p>Заполните только согласованное публичное описание, без контактов и ссылок. Приватные ответы автоматически не переносятся.</p><label>Отображаемое имя <input data-card-displayName maxlength="80" disabled></label><label>Профессия <input data-card-profession maxlength="120" disabled></label><label>Город <input data-card-city maxlength="80" disabled></label><label>Краткое описание одним абзацем <textarea data-card-summary maxlength="2000" rows="5" placeholder="TODO: Wait for Content Spec" disabled></textarea></label><button type="button" data-card-save disabled>Сохранить публичные поля</button></fieldset><label><input type="checkbox" data-card-warning-ack disabled> Я лично прочитал(а) текущие предупреждения и соответствующие поля.</label><button type="button" data-card-approve disabled>Утвердить текущую ревизию</button><label>Причина возврата <textarea data-card-return-reason maxlength="2000" disabled></textarea></label><button type="button" data-card-return disabled>Вернуть на доработку</button><button type="button" data-card-promo disabled>Подтвердить промо по текущим доказательствам</button><p>Подтверждение промо доступно только после реальной доставки материалов для утверждённой ревизии. Сотрудник не может отметить оплату, доставку или активацию вручную.</p></section>`;
 }
 export function bindExpertCardReview(
   root: HTMLElement,
@@ -42,6 +44,9 @@ export function bindExpertCardReview(
     city: el<HTMLInputElement>("city"),
     summary: el<HTMLTextAreaElement>("summary"),
   };
+  const returnReason = root.querySelector<HTMLTextAreaElement>(
+    "[data-card-return-reason]",
+  );
   const warningAck = root.querySelector<HTMLInputElement>(
     "[data-card-warning-ack]",
   );
@@ -69,8 +74,9 @@ export function bindExpertCardReview(
       !selected.promoConfirmed &&
       selected.promoProofs.some(
         (p) =>
-          p.revision === selected!.revision &&
-          p.reviewId === selected!.approvedReviewId,
+          (p.revision === selected!.revision &&
+            p.reviewId === selected!.approvedReviewId) ||
+          (p.revision === 0 && p.reviewId === null),
       )
     );
   }
@@ -92,6 +98,7 @@ export function bindExpertCardReview(
       !selected?.publicCard ||
       (!!command &&
         (command.kind !== "review" || command.action !== "approve"));
+    if (returnReason) returnReason.disabled = !enabled || busy || !selected;
     back.disabled =
       !enabled ||
       busy ||
@@ -107,6 +114,7 @@ export function bindExpertCardReview(
   }
   function clear() {
     selected = undefined;
+    if (returnReason) returnReason.value = "";
     if (warningAck) warningAck.checked = false;
     detail.replaceChildren();
     for (const f of Object.values(fields)) f.value = "";
@@ -145,7 +153,86 @@ export function bindExpertCardReview(
     selected = item;
     if (warningAck) warningAck.checked = false;
     detail.replaceChildren();
-    if (item.effectiveFields) {
+    if (item.assistance?.requestedAt && !item.assistance.resolvedAt)
+      text(
+        detail,
+        `Владелец просит помощи. Ревизия ${item.assistance.revision}, ${item.assistance.requestedAt}. Требуется ответ менеджера.`,
+      );
+    if (item.rich?.enabled) {
+      text(
+        detail,
+        item.rich.confirmed
+          ? "Владелец подтвердил текущую версию."
+          : "Нужно полное подтверждение владельца после любых правок.",
+      );
+      const container = doc.createElement("section");
+      detail.append(container);
+      const pages = richReadablePages({
+        Профиль: item.rich.profile,
+        "Предложенные изменения": item.rich.proposal,
+        "Предыдущая утверждённая версия": item.previousVersion ?? null,
+      });
+      let page = 0;
+      const renderPage = () => {
+        container.replaceChildren();
+        text(
+          container,
+          `Профиль, услуги и предыдущая версия: страница ${page + 1}/${pages.length}`,
+        );
+        const pre = doc.createElement("pre");
+        pre.style.whiteSpace = "pre-wrap";
+        pre.textContent = pages[page]!;
+        container.append(pre);
+        for (const [label, delta] of [
+          ["Назад", -1],
+          ["Далее", 1],
+        ] as const) {
+          const b = doc.createElement("button");
+          b.textContent = label;
+          b.disabled = page + delta < 0 || page + delta >= pages.length;
+          b.onclick = () => {
+            page += delta;
+            renderPage();
+          };
+          container.append(b);
+        }
+      };
+      renderPage();
+      if (item.previousVersion) {
+        for (const [key, value] of Object.entries(item.rich.profile ?? {})) {
+          const prior = item.previousVersion.profile?.[key];
+          if (JSON.stringify(prior) !== JSON.stringify(value))
+            text(detail, `Изменено: ${key}`);
+        }
+      }
+      for (const m of item.media ?? []) {
+        const b = doc.createElement("button");
+        b.textContent = `Фото ${m.id}: ${m.state}`;
+        b.disabled = m.state !== "verified";
+        b.onclick = async () => {
+          const c = deps.getClient(),
+            epoch = generation,
+            id = item.applicationId;
+          if (!c?.mediaLink) return;
+          try {
+            const r = await c.mediaLink(id, m.id);
+            if (!current(c, epoch) || selected?.applicationId !== id) return;
+            const a = doc.createElement("a");
+            a.href = r.url;
+            a.textContent = "Открыть фото (ссылка действует 2 минуты)";
+            a.rel = "noreferrer noopener";
+            a.target = "_blank";
+            b.replaceWith(a);
+          } catch (e) {
+            if (current(c, epoch) && selected?.applicationId === id) failed(e);
+          }
+        };
+        detail.append(b);
+      }
+    }
+    if (item.returnReason)
+      text(detail, `Причина возврата: ${item.returnReason}`);
+    if (item.effectiveFields && !item.rich?.enabled) {
       text(detail, "Текущее содержимое для проверки:");
       for (const [field, value] of Object.entries(item.effectiveFields))
         text(detail, `${field}: ${value}`);
@@ -245,7 +332,7 @@ export function bindExpertCardReview(
       for (const item of items) {
         const b = doc.createElement("button");
         b.type = "button";
-        b.textContent = `${item.applicationId} · ревизия ${item.revision} · ${item.status} · материалов: ${item.entryCount}`;
+        b.textContent = `${item.assistanceRequested ? "Нужна помощь · " : ""}${item.applicationId} · ревизия ${item.revision} · ${item.status} · материалов: ${item.entryCount}`;
         b.onclick = () => void open(item.applicationId);
         queue.append(b);
       }
@@ -313,10 +400,21 @@ export function bindExpertCardReview(
             !warningAck?.checked
           )
             return;
+          if (
+            kind === "return_changes" &&
+            item.rich?.enabled &&
+            !returnReason?.value.trim()
+          ) {
+            status.textContent = "Укажите причину возврата.";
+            return;
+          }
           command = {
             ...base,
             kind: "review",
             action: kind,
+            ...(kind === "return_changes" && returnReason?.value.trim()
+              ? { returnReason: returnReason.value.trim() }
+              : {}),
             ...(kind === "approve" && item.safety?.issues.length
               ? { warningAcknowledgment: item.safety.digest }
               : {}),
@@ -337,6 +435,9 @@ export function bindExpertCardReview(
         await client.review(id, {
           ...base,
           action: command.action,
+          ...(command.returnReason
+            ? { returnReason: command.returnReason }
+            : {}),
           ...(command.warningAcknowledgment
             ? { warningAcknowledgment: command.warningAcknowledgment }
             : {}),

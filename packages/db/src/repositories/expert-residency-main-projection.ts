@@ -52,15 +52,21 @@ export async function restoreSettledMainCardProjection(
     )
   ).rows[0];
   if (!source || source.orderId !== coverage.sourceOrderId) return false;
+  const currentReview = (
+    await tx.execute<{ reviewId: string }>(
+      sql`select p.review_id as "reviewId" from experts_published p join resident_card_versions v on v.review_id=p.review_id where p.user_id=${input.userId}::uuid and p.expert_id=${input.expertId}::uuid`,
+    )
+  ).rows[0]?.reviewId;
   const gate = await lockCardActivationGate(tx, {
     applicationId: source.applicationId,
     userId: input.userId,
-    reviewId: source.reviewId,
+    reviewId: currentReview ?? source.reviewId,
   });
   if (
     !gate ||
-    gate.revision !== source.revision ||
-    gate.publicDigest !== source.publicDigest
+    (!currentReview &&
+      (gate.revision !== source.revision ||
+        gate.publicDigest !== source.publicDigest))
   )
     return false;
   const expert = (
@@ -81,9 +87,15 @@ export async function restoreSettledMainCardProjection(
   await tx.execute(
     sql`update experts set active=true,verified=true,public_display_name=${gate.publicPayload.displayName},updated_at=clock_timestamp() where id=${input.expertId}::uuid and user_id=${input.userId}::uuid`,
   );
-  await tx.execute(
-    sql`insert into experts_published(expert_id,user_id,application_audit_id,draft_id,review_id,revision,public_payload,public_digest,paid_order_id,next_billing_date,active) values(${input.expertId}::uuid,${input.userId}::uuid,${gate.applicationId}::uuid,${gate.draftId}::uuid,${gate.reviewId}::uuid,${gate.revision},${JSON.stringify(gate.publicPayload)}::jsonb,${gate.publicDigest},${source.orderId}::uuid,${source.endsAt}::timestamptz,true) on conflict(expert_id) do update set draft_id=excluded.draft_id,review_id=excluded.review_id,revision=excluded.revision,public_payload=excluded.public_payload,public_digest=excluded.public_digest,paid_order_id=excluded.paid_order_id,next_billing_date=excluded.next_billing_date,active=true,updated_at=clock_timestamp()`,
-  );
+  if (currentReview) {
+    await tx.execute(
+      sql`update experts_published set draft_id=${gate.draftId}::uuid,review_id=${gate.reviewId}::uuid,revision=${gate.revision},public_payload=${JSON.stringify(gate.publicPayload)}::jsonb,public_digest=${gate.publicDigest},paid_order_id=${source.orderId}::uuid,next_billing_date=${source.endsAt}::timestamptz,active=true,updated_at=clock_timestamp() where expert_id=${input.expertId}::uuid and user_id=${input.userId}::uuid`,
+    );
+  } else {
+    await tx.execute(
+      sql`insert into experts_published(expert_id,user_id,application_audit_id,draft_id,review_id,revision,public_payload,public_digest,paid_order_id,next_billing_date,active) values(${input.expertId}::uuid,${input.userId}::uuid,${gate.applicationId}::uuid,${gate.draftId}::uuid,${gate.reviewId}::uuid,${gate.revision},${JSON.stringify(gate.publicPayload)}::jsonb,${gate.publicDigest},${source.orderId}::uuid,${source.endsAt}::timestamptz,true) on conflict(expert_id) do update set draft_id=excluded.draft_id,review_id=excluded.review_id,revision=excluded.revision,public_payload=excluded.public_payload,public_digest=excluded.public_digest,paid_order_id=excluded.paid_order_id,next_billing_date=excluded.next_billing_date,active=true,updated_at=clock_timestamp()`,
+    );
+  }
   await tx.execute(
     sql`update expert_residency_lifecycle set status='active' where user_id=${input.userId}::uuid and expert_id=${input.expertId}::uuid and status<>'paused'`,
   );

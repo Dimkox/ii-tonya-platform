@@ -40,7 +40,8 @@ export const expertCardAdminRoutes: FastifyPluginAsync<{
   service?: Pick<
     ExpertCardAdminService,
     "list" | "detail" | "edit" | "review" | "confirmPromo"
-  >;
+  > &
+    Partial<Pick<ExpertCardAdminService, "mediaLink">>;
 }> = async (app, deps) => {
   if (!deps.enabled) return;
   const service = deps.service;
@@ -99,6 +100,21 @@ export const expertCardAdminRoutes: FastifyPluginAsync<{
         : reply.code(status(result.kind)).send({ error: result.kind });
     },
   );
+  app.post<{ Params: { applicationId: string; mediaId: string } }>(
+    "/v1/admin/expert-cards/:applicationId/media/:mediaId/link",
+    async (req, reply) => {
+      if (!service.mediaLink)
+        return reply.code(503).send({ error: "unavailable" });
+      const r = await service.mediaLink(
+        session(req.headers.authorization)!,
+        req.params.applicationId,
+        req.params.mediaId,
+      );
+      return r.kind === "ok"
+        ? r
+        : reply.code(status(r.kind)).send({ error: r.kind });
+    },
+  );
   app.post<{ Params: { applicationId: string }; Body: unknown }>(
     "/v1/admin/expert-cards/:applicationId/public-card",
     { bodyLimit: 32768 },
@@ -134,6 +150,9 @@ export const expertCardAdminRoutes: FastifyPluginAsync<{
         !uuid.test(req.params.applicationId) ||
         !mutation(req.body, [
           "action",
+          ...(object(req.body) && req.body.returnReason !== undefined
+            ? ["returnReason"]
+            : []),
           ...(object(req.body) && req.body.warningAcknowledgment !== undefined
             ? ["warningAcknowledgment"]
             : []),
@@ -147,6 +166,7 @@ export const expertCardAdminRoutes: FastifyPluginAsync<{
         idempotencyKey: string;
         action: "approve" | "return_changes";
         warningAcknowledgment?: string;
+        returnReason?: string;
       };
       const result = await service.review(session(req.headers.authorization)!, {
         applicationId: req.params.applicationId,

@@ -1,3 +1,9 @@
+import {
+  createPrivateObjectStore,
+  createTelegramDocumentReader,
+  createIsolatedDocumentParser,
+  createResidentGeocoder,
+} from "@ii-tonya/integrations";
 import { createBookingCallbackAck } from "./booking-callback-ack.js";
 import type { ExpertCardLegacyReplayRead } from "./expert-card-telegram-ingress.js";
 import {
@@ -40,6 +46,12 @@ export type ExpertCardCompositionOptions = {
     typeof createExpertCardService
   >[0]["documentImport"];
   mainCheckout?: ExpertCardMainCheckout;
+  geocode?: ConstructorParameters<
+    typeof PostgresExpertCardRepository
+  >[1]["geocode"];
+  photoCustody?: ConstructorParameters<
+    typeof PostgresExpertCardRepository
+  >[1]["photoCustody"];
   materialTransport?: ConstructorParameters<
     typeof PostgresExpertCardRepository
   >[1]["materialTransport"];
@@ -84,7 +96,43 @@ export function createExpertCardComposition(
   if (config.features.expertCard !== true) return undefined;
   const settings = config.expertCard!;
   assertExpertCardCheckout(config, options);
+  const store =
+    config.features.residentPrivateJobs && config.privateVerification
+      ? createPrivateObjectStore(config.privateVerification)
+      : undefined;
+  const reader =
+    store && settings.workBotToken
+      ? createTelegramDocumentReader({
+          botId: settings.workBotId,
+          token: settings.workBotToken,
+        })
+      : undefined;
+  const photoCustody =
+    options.photoCustody ??
+    (store && reader
+      ? {
+          read: async (input: Parameters<typeof reader.read>[0]) => {
+            const r = await reader.read(input);
+            return r.kind === "read" ? r.bytes : null;
+          },
+          put: async (input: Parameters<typeof store.put>[0]) =>
+            (await store.put(input)).kind === "verified",
+          presign: store.presign.bind(store),
+        }
+      : undefined);
   const repository = new PostgresExpertCardRepository(db, {
+    richOnboarding: true,
+    ...(photoCustody ? { photoCustody } : {}),
+    ...(options.geocode
+      ? { geocode: options.geocode }
+      : config.residentGeocode
+        ? {
+            geocode: createResidentGeocoder({
+              ...config.residentGeocode,
+              enabled: true,
+            }).locate,
+          }
+        : {}),
     messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
     workBotId: settings.workBotId,
     workBotKey: settings.workBotKey,
@@ -92,6 +140,45 @@ export function createExpertCardComposition(
       ? { materialTransport: options.materialTransport }
       : {}),
   });
+  const parser = config.privateVerification?.parserSocket
+    ? createIsolatedDocumentParser({
+        socketPath: config.privateVerification.parserSocket,
+        ocr: config.privateVerification.ocr,
+      })
+    : undefined;
+  const documentImport: ExpertCardCompositionOptions["documentImport"] =
+    options.documentImport ??
+    (reader && parser
+      ? {
+          read: async (input) =>
+            repository.readOwnedDocument(input, async () => {
+              if (!input.size || !input.mimeType) return null;
+              const type =
+                input.mimeType === "application/pdf"
+                  ? "pdf"
+                  : input.mimeType ===
+                      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    ? "docx"
+                    : null;
+              if (!type) return null;
+              const r = await reader.read({
+                ...input,
+                fileId: input.reference.slice(14),
+                size: input.size,
+                mimeType: input.mimeType,
+              });
+              return r.kind === "read" ? { bytes: r.bytes, type } : null;
+            }),
+          parser: {
+            parse: async (input) => {
+              const r = await parser.parse(input);
+              return r && r.coverage !== "partial"
+                ? { source: input.type, content: r.content }
+                : null;
+            },
+          },
+        }
+      : undefined);
   const financial = new PostgresExpertOnboardingMainPaymentRepository(db, {
     messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
     providerMode: settings.paymentMode,
@@ -145,9 +232,7 @@ export function createExpertCardComposition(
       draftTagsEnabled:
         config.features.expertDraftTags === true &&
         settings.draftTagsEnabled === true,
-      ...(options.documentImport
-        ? { documentImport: options.documentImport }
-        : {}),
+      ...(documentImport ? { documentImport } : {}),
       paymentMode: settings.paymentMode,
       ...(settings.mainCheckoutEnabled && options.mainCheckout
         ? { mainCheckout: options.mainCheckout }

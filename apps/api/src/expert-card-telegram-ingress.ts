@@ -59,7 +59,7 @@ export function parseExpertCardTelegramUpdate(
   if (
     typeof message.text === "string" &&
     message.text.startsWith("/") &&
-    !/^\/(?:card|card_answers|card_correct|card_document|card_submit|promo_proof|my_tariff|main_tariff|main_accept|main_invoice|tags)(?:\s|$)|^\/start card_/u.test(
+    !/^\/(?:card|card_mode|card_service_add|card_manager|card_checklist|card_geocode|card_answer|card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm|card_answers|card_correct|card_document|card_submit|promo_proof|my_tariff|main_tariff|main_accept|main_invoice|tags)(?:\s|$)|^\/start card_/u.test(
       message.text,
     ) &&
     !(options.lifecycleCommands && isExpertResidencyLifecycleUpdate(root))
@@ -130,6 +130,24 @@ export function parseExpertCardTelegramUpdate(
     content = {
       kind: hasPhoto ? "photo" : "document",
       reference,
+      ...(!hasPhoto &&
+      Number.isSafeInteger(record(message.document)?.file_size) &&
+      typeof record(message.document)?.mime_type === "string"
+        ? {
+            size: record(message.document)!.file_size as number,
+            mimeType: record(message.document)!.mime_type as string,
+          }
+        : {}),
+      ...(hasPhoto &&
+      Number.isSafeInteger(
+        record((message.photo as unknown[]).at(-1))?.file_size,
+      )
+        ? {
+            size: record((message.photo as unknown[]).at(-1))!
+              .file_size as number,
+            mimeType: "image/jpeg" as const,
+          }
+        : {}),
       ...(message.caption === undefined
         ? {}
         : { caption: message.caption as string }),

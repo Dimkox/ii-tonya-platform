@@ -5,6 +5,7 @@ export interface ExpertPublicCard {
   summary: string;
 }
 export interface ExpertCardWorkflow {
+  assistanceRequested?: boolean;
   applicationId: string;
   draftId: string;
   revision: number;
@@ -15,6 +16,24 @@ export interface ExpertCardWorkflow {
   promoConfirmed: boolean;
 }
 export interface ExpertCardDraft extends ExpertCardWorkflow {
+  assistance?: {
+    requestedAt: string | null;
+    revision: number | null;
+    resolvedAt: string | null;
+  };
+  rich?: {
+    enabled: boolean;
+    profile: Record<string, unknown> | null;
+    proposal: Record<string, unknown> | null;
+    confirmed: boolean | null;
+  };
+  previousVersion?: {
+    profile: Record<string, unknown> | null;
+    publicCard: ExpertPublicCard;
+    revision: number;
+  } | null;
+  media?: { id: string; state: string }[];
+  returnReason?: string | null;
   effectiveFields?: Record<string, string>;
   safety?: {
     policyId: string;
@@ -52,7 +71,7 @@ export interface ExpertCardDraft extends ExpertCardWorkflow {
     kind: "link" | "photo" | "document";
     reference: string;
     revision: number;
-    reviewId: string;
+    reviewId: string | null;
   }[];
 }
 export interface CardRevisionCommand {
@@ -60,6 +79,10 @@ export interface CardRevisionCommand {
   idempotencyKey: string;
 }
 export interface ExpertCardAdminClient {
+  mediaLink?(
+    id: string,
+    mediaId: string,
+  ): Promise<{ url: string; expiresIn: number }>;
   list(): Promise<ExpertCardWorkflow[]>;
   read(id: string): Promise<ExpertCardDraft>;
   edit(
@@ -71,6 +94,7 @@ export interface ExpertCardAdminClient {
     input: CardRevisionCommand & {
       action: "approve" | "return_changes";
       warningAcknowledgment?: string;
+      returnReason?: string;
     },
   ): Promise<ExpertCardWorkflow & { replay: boolean }>;
   confirmPromo(
@@ -168,7 +192,7 @@ function workflow(v: unknown): v is ExpertCardWorkflow {
     obj(v) &&
     uuid(v.applicationId) &&
     uuid(v.draftId) &&
-    integer(v.revision) &&
+    integer(v.revision, 0) &&
     typeof v.status === "string" &&
     ["collecting", "manager_review", "changes_requested", "approved"].includes(
       v.status,
@@ -210,9 +234,10 @@ function draft(v: unknown): v is ExpertCardDraft {
       (p) =>
         obj(p) &&
         uuid(p.id) &&
-        uuid(p.reviewId) &&
-        p.reviewId === v.approvedReviewId &&
-        p.revision === v.revision &&
+        ((p.reviewId === null && p.revision === 0) ||
+          (uuid(p.reviewId) &&
+            p.reviewId === v.approvedReviewId &&
+            p.revision === v.revision)) &&
         ((p.kind === "link" && httpsProof(p.reference)) ||
           ((p.kind === "photo" || p.kind === "document") &&
             media(p.reference))),
@@ -247,6 +272,34 @@ function draft(v: unknown): v is ExpertCardDraft {
       ))
   )
     return false;
+  if (
+    v.rich !== undefined &&
+    (!obj(v.rich) ||
+      typeof v.rich.enabled !== "boolean" ||
+      (v.rich.profile !== null &&
+        (!obj(v.rich.profile) ||
+          JSON.stringify(v.rich.profile).length > 100000)) ||
+      (v.rich.proposal !== null && !obj(v.rich.proposal)))
+  )
+    return false;
+  if (
+    v.media !== undefined &&
+    (!Array.isArray(v.media) ||
+      v.media.length > 10 ||
+      !v.media.every(
+        (m) =>
+          obj(m) &&
+          uuid(m.id) &&
+          [
+            "allocated",
+            "inflight",
+            "unknown",
+            "verified",
+            "unavailable",
+          ].includes(String(m.state)),
+      ))
+  )
+    return false;
   const m = v.materials;
   return (
     m === null ||
@@ -269,7 +322,7 @@ function command(id: string, input: CardRevisionCommand, keys: string) {
     !uuid(id) ||
     !obj(input) ||
     Object.keys(input).sort().join(",") !== keys ||
-    !integer(input.expectedRevision) ||
+    !integer(input.expectedRevision, 0) ||
     !text(input.idempotencyKey, 128) ||
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/u.test(input.idempotencyKey)
   )
@@ -308,6 +361,17 @@ export function createExpertCardClient(
     return { ...v, replay: v.replay };
   };
   return {
+    async mediaLink(id, mediaId) {
+      if (!uuid(id) || !uuid(mediaId)) return invalid();
+      const r = await request(`/${id}/media/${mediaId}/link`, {});
+      if (
+        typeof r.url !== "string" ||
+        !r.url.startsWith("https://") ||
+        r.expiresIn !== 120
+      )
+        return invalid();
+      return { url: r.url, expiresIn: 120 };
+    },
     async list() {
       const value = await request("?limit=50");
       if (
@@ -334,9 +398,17 @@ export function createExpertCardClient(
       command(
         id,
         input,
-        input.warningAcknowledgment === undefined
-          ? "action,expectedRevision,idempotencyKey"
-          : "action,expectedRevision,idempotencyKey,warningAcknowledgment",
+        [
+          "action",
+          "expectedRevision",
+          "idempotencyKey",
+          ...(input.warningAcknowledgment === undefined
+            ? []
+            : ["warningAcknowledgment"]),
+          ...(input.returnReason === undefined ? [] : ["returnReason"]),
+        ]
+          .sort()
+          .join(","),
       );
       if (
         input.warningAcknowledgment !== undefined &&

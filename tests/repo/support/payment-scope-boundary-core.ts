@@ -103,6 +103,7 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/0063_resident_verification_review_corrections.sql",
   "packages/db/migrations/0064_resident_private_jobs.sql",
   "packages/db/migrations/0065_resident_private_recovery_fences.sql",
+  "packages/db/migrations/0066_resident_rich_onboarding.sql",
   "packages/db/migrations/0059_residency_separated_sales.sql",
   "packages/db/migrations/0058_residency_core_stabilization.sql",
   "packages/db/migrations/0057_resident_verification_form.sql",
@@ -174,6 +175,8 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "resident_review_previews",
   "resident_object_deletions",
   "resident_private_objects",
+  "resident_card_media",
+  "resident_card_versions",
   "resident_review_events",
   "resident_document_access_audit",
   "resident_evidence_jobs",
@@ -325,6 +328,7 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
 
   "/v1/admin/expert-cards",
   "/v1/admin/expert-cards/:applicationId",
+  "/v1/admin/expert-cards/:applicationId/media/:mediaId/link",
   "/v1/admin/expert-cards/:applicationId/public-card",
   "/v1/admin/expert-cards/:applicationId/review",
   "/v1/admin/expert-cards/:applicationId/promo-review",
@@ -358,6 +362,7 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_FLAGS = new Set([
+  "RESIDENT_GEOCODE_ENABLED",
   "RESIDENT_PRIVATE_JOBS_ENABLED",
   "PRIVATE_OCR_ENABLED",
   "PRIVATE_TELEGRAM_PREVIEW_ENABLED",
@@ -436,7 +441,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "90f611ef2424a6e246cbb081db8d45b7e1caa7700bff38d7f954c758f9eec73b",
+    "b712a6983fcf80f53b174266478c5f410de7b272570e53a4c098ec7293cbe3ae",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -896,6 +901,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0066_resident_rich_onboarding.sql",
+    "7c81e8b71f77d256aef1a2fd8c8ee672a15ddb2680855f7c10bf182ec7d4b196",
+  ],
+  [
+    "packages/db/migrations/meta/0066_snapshot.json",
+    "ee67fcc27b22f6ee480a3285e4cefe6dea2c73cfeb34addbf431e7544a39fd78",
+  ],
+  [
+    "packages/db/migrations/state/0066_sql_objects.json",
+    "36d43b7aee8965bbc8080632485bc0df37a119b5d9ae37d22cb2c6afd9505b55",
+  ],
+  [
+    "packages/db/migrations/state/0066_manifest.json",
+    "ce4d4ab299ae4ad05817ee746c3108056c3b9aed8da3e2df6b03b35da7ef1585",
+  ],
+
   [
     "packages/db/migrations/0065_resident_private_recovery_fences.sql",
     "932d096ed16419f3a25814ccd881d116ff76847f1984fba61557164c0c4d6307",
@@ -1499,7 +1521,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "4978ba6b4325c5355f8a075d4446c94a9ac51b1b884041c321cb4c00e56de575",
+    "55505b31e634aea7350c306087568670cc4f8d0b1224f7045e6f9611b32f5e85",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1579,7 +1601,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "4978ba6b4325c5355f8a075d4446c94a9ac51b1b884041c321cb4c00e56de575",
+    "55505b31e634aea7350c306087568670cc4f8d0b1224f7045e6f9611b32f5e85",
   ],
 ]);
 const approvedDatabaseRelations = new Set([

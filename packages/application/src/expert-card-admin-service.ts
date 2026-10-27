@@ -11,6 +11,11 @@ type Command = {
   idempotencyKey: string;
 };
 export interface ExpertCardAdminRepository {
+  richMediaLink?(
+    sessionHash: string,
+    applicationId: string,
+    mediaId: string,
+  ): Promise<{ url: string; expiresIn: number; bearerUntilExpiry: boolean }>;
   listDrafts(sessionHash: string, limit?: number): Promise<readonly unknown[]>;
   readDraft(
     sessionHash: string,
@@ -23,6 +28,7 @@ export interface ExpertCardAdminRepository {
     input: Command & {
       action: "approve" | "return_changes";
       warningAcknowledgment?: string;
+      returnReason?: string;
     },
   ): Promise<unknown>;
   confirmPromo(input: Command): Promise<unknown>;
@@ -96,6 +102,30 @@ export function createExpertCardAdminService(deps: {
     };
   };
   return {
+    async mediaLink(
+      sessionHash: string,
+      applicationId: string,
+      mediaId: string,
+    ) {
+      const denied = authorize(sessionHash);
+      if (denied) return denied;
+      if (!uuid.test(applicationId) || !uuid.test(mediaId))
+        return { kind: "invalid" as const };
+      try {
+        if (!deps.repository.richMediaLink)
+          return { kind: "unavailable" as const };
+        return {
+          kind: "ok" as const,
+          ...(await deps.repository.richMediaLink(
+            sessionHash,
+            applicationId,
+            mediaId,
+          )),
+        };
+      } catch (e) {
+        return failure(e);
+      }
+    },
     async list(sessionHash: string, input: { limit?: number }) {
       const denied = authorize(sessionHash);
       if (denied) return denied;
@@ -174,12 +204,14 @@ export function createExpertCardAdminService(deps: {
       input: Omit<Command, "sessionHash"> & {
         action: "approve" | "return_changes";
         warningAcknowledgment?: string;
+        returnReason?: string;
       },
     ) {
       const denied = authorize(sessionHash);
       if (denied) return denied;
       const base = command(sessionHash, input, [
         "action",
+        ...(input.returnReason === undefined ? [] : ["returnReason"]),
         ...(input.warningAcknowledgment === undefined
           ? []
           : ["warningAcknowledgment"]),
@@ -190,6 +222,13 @@ export function createExpertCardAdminService(deps: {
           !/^[0-9a-f]{64}$/u.test(input.warningAcknowledgment))
       )
         return { kind: "invalid" as const };
+      if (
+        input.returnReason !== undefined &&
+        (typeof input.returnReason !== "string" ||
+          input.returnReason.trim().length < 1 ||
+          input.returnReason.length > 2000)
+      )
+        return { kind: "invalid" as const };
       if (!base || !["approve", "return_changes"].includes(input.action))
         return { kind: "invalid" as const };
       try {
@@ -198,6 +237,9 @@ export function createExpertCardAdminService(deps: {
           item: await deps.repository.reviewCard({
             ...base,
             action: input.action,
+            ...(input.returnReason === undefined
+              ? {}
+              : { returnReason: input.returnReason }),
             ...(input.warningAcknowledgment === undefined
               ? {}
               : { warningAcknowledgment: input.warningAcknowledgment }),

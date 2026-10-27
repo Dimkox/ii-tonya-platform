@@ -131,14 +131,22 @@ const HAND_SQL_FUNCTIONS = [
   "reject_test_expert_immutable_mutation",
   "resident_card_correction_guard",
   "resident_card_effective_fields",
+  "resident_card_media_erasure",
   "resident_card_proposal_change_guard",
   "resident_card_review_safety_guard",
+  "resident_card_version_source",
   "resident_financial_attempt_source",
   "resident_private_erasure_completion",
   "resident_reapply_deadline",
   "resident_reapply_eligible",
   "resident_review_event_source",
   "resident_review_recovery_source",
+  "resident_rich_digest",
+  "resident_rich_draft_guard",
+  "resident_rich_https",
+  "resident_rich_profile_valid",
+  "resident_rich_review_version",
+  "resident_rich_write_safety",
   "resident_safety_activation_guard",
   "resident_safety_assess",
   "resident_safety_compile",
@@ -296,9 +304,12 @@ const HAND_SQL_TRIGGERS = [
   "reconciliation_mismatches_append_only",
   "resident_card_correction_source",
   "resident_card_corrections_immutable",
+  "resident_card_media_erase",
   "resident_card_proposal_immutable",
   "resident_card_proposal_source",
   "resident_card_review_safety",
+  "resident_card_version_immutable",
+  "resident_card_version_source",
   "resident_financial_attempt_source",
   "resident_message_templates_immutable",
   "resident_object_key_immutable",
@@ -309,6 +320,9 @@ const HAND_SQL_TRIGGERS = [
   "resident_review_previews_immutable",
   "resident_review_recoveries_immutable",
   "resident_review_recovery_source",
+  "resident_rich_draft_source",
+  "resident_rich_review_version",
+  "resident_rich_write_safety",
   "resident_safety_active_valid",
   "resident_safety_log_subject",
   "resident_safety_outcome_subject",
@@ -401,7 +415,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(65);
+    expect(newest).toBe(66);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -516,7 +530,7 @@ describe("migration history integrity", () => {
       { tables: declared.size, onlyDeclared, onlyMigrated },
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
-    // 0064 adds five private custody, evidence, cache and key-recovery relations.
-    expect(declared.size).toBe(209);
+    // 0066 adds immutable reviewed card versions and private photo custody.
+    expect(declared.size).toBe(211);
   });
 });

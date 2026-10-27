@@ -1,3 +1,9 @@
+import {
+  richChecklist,
+  proposeRichFields,
+  richProfilePatchSchema,
+  richServiceSchema,
+} from "@ii-tonya/contracts";
 import { createHash } from "node:crypto";
 export type ExpertCardScope = {
   botId: string;
@@ -12,7 +18,11 @@ export type ExpertCardEvent = ExpertCardScope & {
 export type ExpertCardEntry =
   | { kind: "text"; text: string }
   | { kind: "photo" | "document"; reference: string };
-export type ExpertCardContent = ExpertCardEntry & { caption?: string };
+export type ExpertCardContent = ExpertCardEntry & {
+  caption?: string;
+  size?: number;
+  mimeType?: string;
+};
 export interface CardSafetyResult {
   safetyBlocked?: boolean;
   safetyIssues?: readonly {
@@ -23,6 +33,7 @@ export interface CardSafetyResult {
   }[];
 }
 export interface ExpertCardWorkflow extends CardSafetyResult {
+  returnReason?: string | null;
   applicationId: string;
   draftId: string | null;
   revision: number;
@@ -46,6 +57,37 @@ export interface DraftTagPage {
   tags_array: readonly string[];
 }
 export interface ExpertCardRepository {
+  ingestRichPhoto?(
+    input: ExpertCardEvent & {
+      expectedRevision: number;
+      reference: string;
+      size: number;
+      mimeType: "image/jpeg" | "image/png";
+    },
+  ): Promise<{ id: string; state: string }>;
+  richAction?(
+    input: ExpertCardEvent & {
+      expectedRevision: number;
+      action:
+        | "patch"
+        | "service"
+        | "remove_service"
+        | "propose"
+        | "accept_proposal"
+        | "preview"
+        | "proposal_preview"
+        | "confirm"
+        | "start"
+        | "geocode"
+        | "manager"
+        | "guided_answer"
+        | "service_add";
+      value?: unknown;
+      page?: number;
+      token?: string;
+    },
+  ): Promise<ExpertCardWorkflow & { replay: boolean; pageText?: string }>;
+
   changeDocumentProposal?(
     input: ExpertCardEvent & {
       expectedRevision: number;
@@ -247,7 +289,12 @@ export function createExpertCardService(deps: {
   draftTagsEnabled?: boolean;
   documentImport?: {
     read(
-      input: ExpertCardScope & { reference: string; signal: AbortSignal },
+      input: ExpertCardScope & {
+        reference: string;
+        signal: AbortSignal;
+        size?: number;
+        mimeType?: string;
+      },
     ): Promise<{ bytes: Uint8Array; type: "pdf" | "docx" } | null>;
     parser: {
       parse(input: {
@@ -481,12 +528,12 @@ export function createExpertCardService(deps: {
           });
           if (redeemed.kind === "duplicate") return { status: "duplicate" };
           return reply(
-            "Рабочий бот подключён. Мой актуальный тариф: /my_tariff. Интервью: отправляйте текст, фото или документ. /card — состояние; /card_answers — ответы и исправления; /card_submit НОМЕР_РЕВИЗИИ — отправить на проверку. TODO: Wait for Prompt Spec",
+            "Рабочий бот подключён. Мой актуальный тариф: /my_tariff. Интервью: /card_mode — начать; /card_checklist — мастер-чек-лист. Отправляйте текст, фото или документ. /card — состояние; /card_answers — ответы и исправления; /card_submit НОМЕР_РЕВИЗИИ — отправить на проверку.",
           );
         }
         if (
           text.startsWith("/") &&
-          !/^\/(?:card|card_answers|card_correct|card_document|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
+          !/^\/(?:card|card_mode|card_service_add|card_manager|card_checklist|card_geocode|card_answer|card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm|card_answers|card_correct|card_document|card_submit|promo_proof|main_tariff|main_accept|main_invoice|my_tariff|tags)(?:\s|$)/u.test(
             text,
           )
         )
@@ -497,6 +544,188 @@ export function createExpertCardService(deps: {
         }
         const current = await deps.repository.getWorkflow(s);
         if (!current) return { status: "unhandled" };
+        if (text === "/card_checklist") return reply(richChecklist());
+        if (text === "/card_mode" && deps.repository.richAction) {
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: current.revision,
+            action: "start",
+          });
+          return r.replay
+            ? { status: "duplicate" }
+            : reply(r.pageText ?? "Начнём с имени: /card_answer ваше имя");
+        }
+        if (text === "/card_manager" && deps.repository.richAction) {
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: current.revision,
+            action: "manager",
+          });
+          return r.replay
+            ? { status: "duplicate" }
+            : reply(r.pageText ?? "Запрос сохранён.");
+        }
+        if (text === "/card_geocode" && deps.repository.richAction) {
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: current.revision,
+            action: "geocode",
+          });
+          return r.replay
+            ? { status: "duplicate" }
+            : reply(r.pageText ?? "Карта пока недоступна.");
+        }
+        const answer =
+          /^\/card_answer (0|[1-9][0-9]{0,5}) ([A-Za-z]+) ([\s\S]+)$/u.exec(
+            text,
+          );
+        if (answer && deps.repository.richAction) {
+          let value: unknown = answer[3];
+          if (["socialLinks", "photos", "services"].includes(answer[2]!)) {
+            try {
+              value = JSON.parse(answer[3]!);
+            } catch {
+              return reply(
+                "Для списка нужен JSON-массив. /card_checklist — пример.",
+              );
+            }
+          }
+          if (value === "null") value = null;
+          const patch = richProfilePatchSchema.safeParse({
+            [answer[2]!]: value,
+          });
+          if (!patch.success)
+            return reply(
+              "Проверьте " +
+                answer[2] +
+                ": " +
+                patch.error.issues.map((i) => i.message).join("; "),
+            );
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: Number(answer[1]),
+            action: "patch",
+            value: patch.data,
+          });
+          return (
+            safetyReply(r) ??
+            (r.replay
+              ? { status: "duplicate" }
+              : reply(r.pageText ?? "Сохранено."))
+          );
+        }
+        if (text.startsWith("/card_answer ") && deps.repository.richAction) {
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: current.revision,
+            action: "guided_answer",
+            value: text.slice(13).trim(),
+          });
+          return (
+            safetyReply(r) ??
+            (r.replay
+              ? { status: "duplicate" }
+              : reply(r.pageText ?? "Сохранено."))
+          );
+        }
+        if (text === "/card_service_add" && deps.repository.richAction) {
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: current.revision,
+            action: "service_add",
+          });
+          return r.replay
+            ? { status: "duplicate" }
+            : reply(r.pageText ?? "Введите название услуги.");
+        }
+        if (text === "/card_preview" && deps.repository.richAction) {
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: current.revision,
+            action: "preview",
+          });
+          return r.replay
+            ? { status: "duplicate" }
+            : reply(r.pageText ?? "Откройте карточку.");
+        }
+        const rich =
+          /^\/(card_set|card_service|card_remove|card_import|card_accept|card_preview|card_proposal|card_confirm) (0|[1-9][0-9]{0,5})(?: ([\s\S]+))?$/u.exec(
+            text,
+          );
+        if (rich && deps.repository.richAction) {
+          const revision = Number(rich[2]);
+          const command = rich[1]!;
+          const tail = rich[3] ?? "";
+          let action:
+            | "patch"
+            | "service"
+            | "remove_service"
+            | "propose"
+            | "accept_proposal"
+            | "preview"
+            | "proposal_preview"
+            | "confirm";
+          let value: unknown;
+          let page: number | undefined;
+          let token: string | undefined;
+          if (command === "card_set" || command === "card_service") {
+            let parsed: unknown;
+            try {
+              parsed = JSON.parse(tail);
+            } catch {
+              return reply(
+                "Нужен JSON. Пример: /card_set " +
+                  revision +
+                  ' {"fullName":"Анна"}. Шаблон: /card_checklist',
+              );
+            }
+            const checked = (
+              command === "card_set"
+                ? richProfilePatchSchema
+                : richServiceSchema
+            ).safeParse(parsed);
+            if (!checked.success)
+              return reply(
+                "Исправьте поля: " +
+                  checked.error.issues
+                    .map((i) => i.path.join(".") + ": " + i.message)
+                    .join("; ")
+                    .slice(0, 3000),
+              );
+            value = checked.data;
+            action = command === "card_set" ? "patch" : "service";
+          } else if (command === "card_import") {
+            value = proposeRichFields(tail);
+            action = "propose";
+          } else if (command === "card_remove") {
+            value = tail;
+            action = "remove_service";
+          } else if (command === "card_accept" || command === "card_confirm") {
+            token = tail;
+            action = command === "card_accept" ? "accept_proposal" : "confirm";
+          } else {
+            const m = /^(?:(0|[1-9][0-9]?)(?: ([0-9a-f-]{36}))?)?$/u.exec(tail);
+            if (!m) return { status: "rejected" };
+            page = Number(m[1] ?? 0);
+            token = m[2];
+            action =
+              command === "card_proposal" ? "proposal_preview" : "preview";
+          }
+          const r = await deps.repository.richAction({
+            ...event,
+            expectedRevision: revision,
+            action,
+            ...(value === undefined ? {} : { value }),
+            ...(page === undefined ? {} : { page }),
+            ...(token === undefined ? {} : { token }),
+          });
+          return (
+            safetyReply(r) ??
+            (r.replay
+              ? { status: "duplicate" }
+              : reply(r.pageText ?? "Сохранено."))
+          );
+        }
         const answerPage = /^\/card_answers(?: (0|[1-9][0-9]?))?$/u.exec(text);
         if (answerPage && deps.repository.readOwnAnswers) {
           const answers = await deps.repository.readOwnAnswers(s);
@@ -556,7 +785,7 @@ export function createExpertCardService(deps: {
         }
         if (text === "/card")
           return reply(
-            `Карточка: ${current.status}; ревизия ${current.revision}; записей ${current.entryCount}. Материалы: ${current.materialStatus}. Мой актуальный тариф: /my_tariff. ${current.materialStatus === "waiting_content" ? "AWAITING_MATERIALS. Ваши материалы для рассылки будут доступны в ближайшее время" : ""}`.trim(),
+            `Карточка: ${{ collecting: "заполняется", manager_review: "на проверке у менеджера", changes_requested: "нужны уточнения", approved: "утверждена" }[current.status]}; ревизия ${current.revision}; записей ${current.entryCount}. Материалы: ${current.materialStatus}. Мой актуальный тариф: /my_tariff. ${current.status === "changes_requested" && current.returnReason ? "Причина возврата: " + current.returnReason + ". Продолжить: /card_mode. " : ""}${current.materialStatus === "waiting_content" ? "AWAITING_MATERIALS. Ваши материалы для рассылки будут доступны в ближайшее время" : ""}`.trim(),
           );
         const submit = submitCommand.exec(text);
         if (submit) {
@@ -696,10 +925,11 @@ export function createExpertCardService(deps: {
           }
         }
         if (text.startsWith("/")) return { status: "rejected" };
-        if (current.activeResident) return { status: "unhandled" };
+        if (current.activeResident && current.status === "approved")
+          return { status: "unhandled" };
         if (!["collecting", "changes_requested"].includes(current.status))
           return reply(
-            `Карточка: ${current.status}; ревизия ${current.revision}. Изменения доступны после возврата менеджером.`,
+            `Карточка: ${{ collecting: "заполняется", manager_review: "на проверке у менеджера", changes_requested: "нужны уточнения", approved: "утверждена" }[current.status]}; ревизия ${current.revision}. Изменения доступны после возврата менеджером.`,
           );
         const entry: ExpertCardEntry =
           content.kind === "text"
@@ -713,6 +943,25 @@ export function createExpertCardService(deps: {
         const blocked = safetyReply(result);
         if (blocked) return blocked;
         if (result.replay) return { status: "duplicate" };
+        if (content.kind === "photo" && deps.repository.ingestRichPhoto) {
+          if (content.size === undefined)
+            return reply(
+              "Фото сохранено как исходный ответ. Размер не подтверждён; пришлите оригинал фото ещё раз.",
+            );
+          const media = await deps.repository.ingestRichPhoto({
+            ...event,
+            expectedRevision: result.revision,
+            reference: content.reference,
+            size: content.size,
+            mimeType:
+              content.mimeType === "image/png" ? "image/png" : "image/jpeg",
+          });
+          return reply(
+            media.state === "verified"
+              ? `Фото сохранено в закрытом хранилище: ${media.id}. Оно не опубликовано. Откройте /card для актуальной ревизии.`
+              : "Исходное фото сохранено. Закрытое хранилище пока недоступно; фото ещё не принято в карточку.",
+          );
+        }
         if (content.kind === "document") {
           let proposal: { source: "pdf" | "docx"; content: string } | null =
             null;
@@ -726,6 +975,10 @@ export function createExpertCardService(deps: {
                 const document = await deps.documentImport!.read({
                   ...s,
                   reference: content.reference,
+                  ...(content.size === undefined ? {} : { size: content.size }),
+                  ...(content.mimeType === undefined
+                    ? {}
+                    : { mimeType: content.mimeType }),
                   signal,
                 });
                 if (
@@ -764,14 +1017,23 @@ export function createExpertCardService(deps: {
             );
           return reply(
             proposal && saved === true
-              ? "Файл сохранён. Текст извлечён как приватный неподтверждённый черновик. Проверьте его в интервью; публикация требует отдельной проверки."
-              : "Не удалось автоматически прочитать файл. Возможно, это картинка или сложный формат. Давайте заполним данные вручную.",
+              ? `Файл сохранён. Извлечённые поля — предложение. Полный просмотр и подтверждение: /card_proposal ${result.revision}`
+              : "Не удалось прочитать файл автоматически. Давайте пройдемся по вопросам вручную.",
           );
         }
         return reply(
-          `Ответ сохранён. Ревизия ${result.revision}. Отправить менеджеру: /card_submit ${result.revision}`,
+          `Ответ сохранён. Ревизия ${result.revision}. Извлечённые предложения: /card_proposal ${result.revision}. Пошагово: /card_mode; ответ: /card_answer ваш ответ. Шаблон: /card_checklist.`,
         );
       } catch (error) {
+        if (error instanceof Error && error.message.startsWith("card_fields:"))
+          return reply("Заполните поля: " + error.message.slice(12));
+        if (
+          error instanceof Error &&
+          error.message === "card_preview_incomplete"
+        )
+          return reply(
+            "Сначала откройте все страницы текущей версии через /card_preview РЕВИЗИЯ и подтвердите её.",
+          );
         if (input.callbackData !== undefined || text === "/tags") {
           let authorized = false;
           const code =

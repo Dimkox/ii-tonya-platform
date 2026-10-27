@@ -1,0 +1,893 @@
+{
+  "scope": "S3a rich onboarding implementation",
+  "baseCommit": "07782bcef41d565b6b39bbd335f5437150eaebd9",
+  "localArtifactsOnly": true,
+  "hostedCi": false,
+  "productionEvidence": false,
+  "sourceFiles": [
+    {
+      "path": ".env.example",
+      "sha256": "6bfc1eb5a23859da90da7566c281d6ce8544de1d246998a73c4eaafe36395ec3"
+    },
+    {
+      "path": "apps/api/src/expert-card-composition.ts",
+      "sha256": "c782eea1e9cfc4ca0ad0f120a5af1e11c8d5ab882908889fc6b8769b5497937e"
+    },
+    {
+      "path": "apps/api/src/expert-card-telegram-ingress.ts",
+      "sha256": "2972d46c3476e30e1f973e0b55b88042739176d4091d7e8ad65077fba78a3de0"
+    },
+    {
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "sha256": "6e18d4cd0cc656b82f0dfa39651358d9a7b1d6fb5da992262b7c44d9314d545e"
+    },
+    {
+      "path": "apps/web/src/expert-card-client.ts",
+      "sha256": "ec7666e81d08c9d0e5a82dd02ca9ca27069c24039cad0597c25c2765499780a8"
+    },
+    {
+      "path": "apps/web/src/expert-card-rich-view.ts",
+      "sha256": "23beaf2d9ae93f005cc5db3c1e37742459b25ac1960a59f33b9cc584fa2f5c69"
+    },
+    {
+      "path": "apps/web/src/expert-card-view.ts",
+      "sha256": "4f440d2f4900ed3ce58b9018e50657a78503f0242bbdc809ad761ae52a34508a"
+    },
+    {
+      "path": "docs/runbooks/resident-rich-onboarding.md",
+      "sha256": "5be710d1b7dfc88e67a7fb4c475e213a590456076aae8e190fc50b43c56003fe"
+    },
+    {
+      "path": "docs/test-evidence/residency-rich-onboarding-implementation-2026-10-27.md",
+      "sha256": "e920cb6fadb121904d2b8315cdc9ca2ff7352eadb790e4e35d691424468a6191"
+    },
+    {
+      "path": "packages/application/src/expert-card-admin-service.ts",
+      "sha256": "d29b2700ea55b3aea18438560a90af8008e37b0344dbacb9b26382dcb70538d5"
+    },
+    {
+      "path": "packages/application/src/expert-card-service.ts",
+      "sha256": "c76e2a36de41a0bc410f925d01c4f08f4ff5f6e7614d32f8572829e022935220"
+    },
+    {
+      "path": "packages/config/src/env.ts",
+      "sha256": "945a43c69a387861966ad7458d7464a323237793764ad9c1728053f5ff981406"
+    },
+    {
+      "path": "packages/config/src/expert-card-config.test.ts",
+      "sha256": "bb34d5a72e0e8baf835b15bc2df06835a04352de80cce28135c6d3da19ee7e8c"
+    },
+    {
+      "path": "packages/contracts/src/index.ts",
+      "sha256": "c7f19370e40286203206dbb80e0144aeb229aa46455961f7c780c9420e795290"
+    },
+    {
+      "path": "packages/contracts/src/resident-rich-profile.test.ts",
+      "sha256": "46d39e8896626e19badf7db63c2d3150d349799a1cfb0e64fd1a42726e9b8b72"
+    },
+    {
+      "path": "packages/contracts/src/resident-rich-profile.ts",
+      "sha256": "8c33eb4f9f20631e7032a9e18080ab17eb5c73569ec1c845c46b2d529df7d47b"
+    },
+    {
+      "path": "packages/db/migrations/0066_resident_rich_onboarding.sql",
+      "sha256": "7c81e8b71f77d256aef1a2fd8c8ee672a15ddb2680855f7c10bf182ec7d4b196"
+    },
+    {
+      "path": "packages/db/migrations/meta/0066_snapshot.json",
+      "sha256": "ee67fcc27b22f6ee480a3285e4cefe6dea2c73cfeb34addbf431e7544a39fd78"
+    },
+    {
+      "path": "packages/db/migrations/meta/_journal.json",
+      "sha256": "55505b31e634aea7350c306087568670cc4f8d0b1224f7045e6f9611b32f5e85"
+    },
+    {
+      "path": "packages/db/migrations/state/0066_manifest.json",
+      "sha256": "ce4d4ab299ae4ad05817ee746c3108056c3b9aed8da3e2df6b03b35da7ef1585"
+    },
+    {
+      "path": "packages/db/migrations/state/0066_sql_objects.json",
+      "sha256": "36d43b7aee8965bbc8080632485bc0df37a119b5d9ae37d22cb2c6afd9505b55"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-application-materials.ts",
+      "sha256": "30b59a044ca9d0b26e7f162fd5323509df1b5000f5757c11266a8544bea52a2b"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-card-repository.ts",
+      "sha256": "a143bfea820ca06b2f2ef089bc52394f24f0da5074e807d7640a76f9de40193d"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-residency-lifecycle-repository.ts",
+      "sha256": "b4324af3ade40a29d9e9c06da8471a1617d7eb2f949d4dc2dcf3d19d78a5294d"
+    },
+    {
+      "path": "packages/db/src/repositories/expert-residency-main-projection.ts",
+      "sha256": "d1a2d6e2bf7ca8746ba252521445f84157848f38dc02b98bddcb83f1f1aeb946"
+    },
+    {
+      "path": "packages/db/src/schema/expert-cards.ts",
+      "sha256": "75b4d5861ef2729511559de70632bc3603d330a302fce4ad337382805a6ae55a"
+    },
+    {
+      "path": "packages/db/src/schema/index.ts",
+      "sha256": "34202340a1189db6e995d62e3080c09a69df12c9314a6d42d5444880c0552008"
+    },
+    {
+      "path": "packages/db/src/schema/resident-rich-onboarding.ts",
+      "sha256": "ebc7ffcbd5daf20bb764c2b33216b862386e7df5ee972496723ee2558f2518e3"
+    },
+    {
+      "path": "packages/integrations/src/documents/resident-geocode.test.ts",
+      "sha256": "cdcc2124981faf49204ef7e77a52a0a5e8ad5a53b5c75156148ea290b728b069"
+    },
+    {
+      "path": "packages/integrations/src/documents/resident-geocode.ts",
+      "sha256": "67ef82d5e9f2ca10bbe6a2ca8df45784305f1996c7da819a2e1c1b490f0a64bd"
+    },
+    {
+      "path": "packages/integrations/src/index.ts",
+      "sha256": "b712a6983fcf80f53b174266478c5f410de7b272570e53a4c098ec7293cbe3ae"
+    },
+    {
+      "path": "tests/integration/resident-rich-onboarding.test.ts",
+      "sha256": "9aee1d690973723f232a98fa5b8a0816d86be4178a6704c5e80f60db689d63d6"
+    },
+    {
+      "path": "tests/repo/expert-referral-scope-guards.test.ts",
+      "sha256": "365b6814f699ded376051a3d30df09919275f1eece3219021650887da09b5090"
+    },
+    {
+      "path": "tests/repo/migration-history-integrity.test.ts",
+      "sha256": "f4557f0361721119a9ccccae285fb28164bba6facade23e113d20122f88f1617"
+    },
+    {
+      "path": "tests/repo/resident-rich-onboarding-state.test.ts",
+      "sha256": "9bb8c8bcba12967e54c4d3d6bd66deb15b27939b6e48a577accfa8d159a598bd"
+    },
+    {
+      "path": "tests/repo/support/payment-scope-boundary-core.ts",
+      "sha256": "31f30e6e7017e9243cddc3f47019443021fa4f7a2de094521cf7d36180030f2f"
+    },
+    {
+      "path": "tests/support/resident-rich-document-fixtures.ts",
+      "sha256": "fb3cdbe5042b8ea8af1f0b7fbd1ba2a16e38d9122b24f940f304c185c493d5b4"
+    }
+  ],
+  "commands": [
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/pg-complete1.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "Protected local PG config; parser socket explicitly set for parser cases."
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/pg-privacy-parser.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo|original-bot PDF|blocks nested"
+      ],
+      "exitCode": 0,
+      "environment": "Protected local PG config; parser socket explicitly set for parser cases."
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/browser2.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/rich-onboarding-20261027/browser-witness.mjs"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/contracts-green2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-rich-profile.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/guided-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/contracts/src/resident-rich-profile.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/geocode-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/integrations/src/documents/resident-geocode.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/scope3.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/scope-boundary.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/migration-guards2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/migration-history-integrity.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/env2.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/env-policy.test.ts"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "log": ".superpowers/sdd/rich-onboarding-20261027/deps-build2.log",
+      "command": [
+        "pnpm",
+        "--workspace-concurrency=1",
+        "--filter",
+        "@ii-tonya/contracts",
+        "--filter",
+        "@ii-tonya/config",
+        "--filter",
+        "@ii-tonya/integrations",
+        "--filter",
+        "@ii-tonya/db",
+        "--filter",
+        "@ii-tonya/application",
+        "-r",
+        "--sort",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "environment": "local"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/api-types-final.result.json",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/api",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/application-types-final.result.json",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/application",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/config-geocode-final.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/config/src/expert-card-config.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "c2aab763c355cb2848285816be38668143811119968ec7b9123cc162611a5001"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/db-types-final.result.json",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/db",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/guard-order-corrected.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "-t",
+        "registers exactly"
+      ],
+      "exitCode": 0,
+      "logSha256": "0923dd3196ee5e2a3393bfe3f016bd2310e32f152342cf4691cdcc499580064f"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/guards-final.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/expert-referral-scope-guards.test.ts"
+      ],
+      "exitCode": 1,
+      "logSha256": "55fe7eeda413615e304c0db023ab38798eac5a567976509d092557e42e1a7a9c"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/lint-last-diff.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "packages/db/src/repositories/expert-card-repository.ts",
+        "packages/application/src/expert-card-service.ts",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts",
+        "tests/repo/expert-referral-scope-guards.test.ts",
+        "tests/repo/resident-rich-onboarding-state.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-privacy-final.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-rich-onboarding.test.ts",
+        "-t",
+        "real private photo"
+      ],
+      "exitCode": 0,
+      "logSha256": "bd028f556cd815fa0133ce041f0fa0c95eb560b12e8214680add799b05468942"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/reconstruct-final.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        ".superpowers/sdd/rich-onboarding-20261027/reconstruct.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "7075ff72e410a6623941dccc96d83b46a4372440f4947114317426a5147750c5"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/state-final.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/resident-rich-onboarding-state.test.ts"
+      ],
+      "exitCode": 0,
+      "logSha256": "313a17f0c599bae24263f5b3e828efed97807afefbb97fac83771db7ca1ed655"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/tests-types-final.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/types-last-source.result.json",
+      "command": [
+        "pnpm",
+        "exec",
+        "tsc",
+        "--noEmit",
+        "-p",
+        "tsconfig.tests.json"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/web-types-final.result.json",
+      "command": [
+        "pnpm",
+        "--filter",
+        "@ii-tonya/web",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "logSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+    },
+    {
+      "result": ".superpowers/sdd/rich-onboarding-20261027/whitespace-final.result.json",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/api-types-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/api-types-final.result.json",
+      "sha256": "bee9f79bafd1cb4c16ead5ccb92962a28c808bd8c22f17a560f262393796dd6c",
+      "bytes": 160
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/api-types1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/application-types-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/application-types-final.result.json",
+      "sha256": "b07975486a84ef120367c62b7ee70197edc751ad0a90e96d026a4be4dbb75b28",
+      "bytes": 168
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/application-types1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/browser-witness.mjs",
+      "sha256": "664f03e9f37734d7f2ffb645c3b6c037f68b24e6a48ac94ecf26ae23dbbe28a7",
+      "bytes": 7471
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/browser1.log",
+      "sha256": "5ba35a501378cbe37ca213e5554d9409484ad96f80ac0f9a699c07b8388836d6",
+      "bytes": 771
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/browser2.log",
+      "sha256": "5c8454c66fff20ad7fe36242d4584c7cfe420e09cf1b36c3661ae10cd71b6ad2",
+      "bytes": 213
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/config-geocode-final.log",
+      "sha256": "c2aab763c355cb2848285816be38668143811119968ec7b9123cc162611a5001",
+      "bytes": 363
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/config-geocode-final.result.json",
+      "sha256": "51a8a21b053dd4dbedcf02f79de42bab6846f9ac81192545a9ff1dd1d0541c6d",
+      "bytes": 193
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/contracts-build.log",
+      "sha256": "90389c56950a67174b0d98d1e5fc6d7ab06f6512c9357456067e09b52dee6600",
+      "bytes": 379
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/contracts-build2.log",
+      "sha256": "4ad08ab648f8d0b772c753414df89218a1f61a2618e4065361009e5d3f6a9a76",
+      "bytes": 379
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/contracts-green.log",
+      "sha256": "cfaad32b682636e248853bd810b5e840450a7a483014bdd6a83ea092723a6067",
+      "bytes": 1313
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/contracts-green2.log",
+      "sha256": "f5d81916396dd551d57022e800a15914e98bc0d41eee350c0dae36bbd4241143",
+      "bytes": 368
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/contracts-red.log",
+      "sha256": "1c66faa941675652d004d2866364be278b661bc8b1ca0440edd3757a0f423b8f",
+      "bytes": 1254
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/db-types-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/db-types-final.result.json",
+      "sha256": "601353ee178af16cab05e0fbf951befc1c32a257bbece5cb375c22c1b22e8f69",
+      "bytes": 159
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/db-types1.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/dependencies-build1.log",
+      "sha256": "2b6e311045c0f9714a509fd3d9d9ea9cef1f81163167926d366a48fd81ac82f3",
+      "bytes": 1551
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/deps-build2.log",
+      "sha256": "f83f133754ad5a0e1fb5f59d03c596128624e9f864d74d31874bc6b3d658ae91",
+      "bytes": 1931
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/docs-format.log",
+      "sha256": "710f3476d16f8145457460fbc5aebbe53578dda5f453a95de0e4ba2ed11498ff",
+      "bytes": 138
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/env2.log",
+      "sha256": "2b66aefae4c5913ca367cfe733513ec9be715ef904b313252ee3a8a6c4d1dd37",
+      "bytes": 341
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/focused-regressions1.log",
+      "sha256": "121d1b2aebfce83771182ea4d22fbb853f46bddf11bd1e67e2c78a40a643f4be",
+      "bytes": 20957
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/format-final.log",
+      "sha256": "4248a131aab9c2014ac834620b75a09207189a7b35650ee4e23adbeeb560e9a5",
+      "bytes": 1820
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/format-last-test.log",
+      "sha256": "d273e69b3468811384b8fd2d170016c825f9e2d53748459a4d6e5a26565dd367",
+      "bytes": 57
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/format1.log",
+      "sha256": "a3b6e883a21508982e4b4d02aa656431a189864dc49d9dbe75334970199653f4",
+      "bytes": 1440
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/format2.log",
+      "sha256": "1cdc0c084144b29a28ee90909e0a9627c9082a7dd409d070b26bd6f3ff692989",
+      "bytes": 1664
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/geocode-green.log",
+      "sha256": "db89d9176e25f2742b2dbaa21e38082fb832b3ba8bd2ca1fbb1c1f2d6dcf2071",
+      "bytes": 372
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/geocode-red.log",
+      "sha256": "eec18be04503da120872a5373afac891ccc042f9b0f81a1070b6ad6a41a4f8da",
+      "bytes": 1279
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/guard-order-corrected.log",
+      "sha256": "0923dd3196ee5e2a3393bfe3f016bd2310e32f152342cf4691cdcc499580064f",
+      "bytes": 386
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/guard-order-corrected.result.json",
+      "sha256": "d59a9c86a2c3886f89ae22146372a68d714023a22b6636fc183f2104c62b6660",
+      "bytes": 221
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/guards-final.log",
+      "sha256": "55fe7eeda413615e304c0db023ab38798eac5a567976509d092557e42e1a7a9c",
+      "bytes": 2930
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/guards-final.result.json",
+      "sha256": "f7b6ab014013be2e726b8f78a1ce9d193ef20461919518bc858e92ce240e14c3",
+      "bytes": 194
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/guided-green.log",
+      "sha256": "c678c933101a67cb9ab2ef194e17b2a4349e599a94bc5db8d66cbc5210f01e8a",
+      "bytes": 368
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/guided-red.log",
+      "sha256": "24df499c9e4f2dc937cf74af8ebf948904572a6a9b11644cb84b544fed85237a",
+      "bytes": 2364
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/integrations-build.log",
+      "sha256": "f2510225614575d7db81f95b592766a6b47bf51b043e1941aa533925627e1d93",
+      "bytes": 380
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/introspected-schema.ts",
+      "sha256": "0efa8e7d48a20951e98b0084629f4126d547252af5e573e9cdd80d28f717c677",
+      "bytes": 375400
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/introspection.log",
+      "sha256": "e1397e63426d6ec40a5ec5b8cbe53e467081c6f1828cbc8374bf11141f637506",
+      "bytes": 256475
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/labelled.docx",
+      "sha256": "a9fe25bdf9b321db1414f90b83a4b2cbd6b84a69603e9e8b3f503d77c6287f01",
+      "bytes": 1305
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/labelled.pdf",
+      "sha256": "578d9ac47ef885df39d43180f2f277b3213fdd0113249e3e63d72839b048607c",
+      "bytes": 733
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/lint-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/lint-last-diff.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/lint-last-diff.result.json",
+      "sha256": "4c39521fcadbe3f5d64c4badea01645a809799741cfd5d9aff4500f4ecb2b199",
+      "bytes": 456
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/lint1.log",
+      "sha256": "e323bc613fc4226bcad57d7f6b7958f795e66d25f5d538c5acad5520fa3786b2",
+      "bytes": 968
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/manager-browser.png",
+      "sha256": "b6264da39ccdbeeb3acef5a545712723a6f044b928809d48f9de3a7ed1009f79",
+      "bytes": 142073
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/migration-guards2.log",
+      "sha256": "d9abef979a4641a03e92932480e1dff2d531425e8c05d5901d5884fd34fa34de",
+      "bytes": 358
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-complete1.log",
+      "sha256": "91b169c3e07254505fec5fdd2865a2dce341dc88e36f0eb200b540c355581b84",
+      "bytes": 1233
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-guided1.log",
+      "sha256": "40477bfc4faa14dcbed37fb51b568f47adb15656988765dd642f08fdcc4d4ce4",
+      "bytes": 491
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-ingress-media2.log",
+      "sha256": "66535d8b0ec2e4e070de8c21868f8257477a5068a419a4e4def3fe5be742bdeb",
+      "bytes": 1556
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-ingress3.log",
+      "sha256": "341207b9719287b51418127b69ea5c5466b16e53ffc27d66e9414e07564d50b4",
+      "bytes": 517
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-media1.log",
+      "sha256": "ebbc83b2a0f92b6aac7d3b7c6585a7d7554b723aaefc498cf096d272416e84e6",
+      "bytes": 3231
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-owner-photos.log",
+      "sha256": "432dd4f4212f07ea2d3198f25bf2f2fe2a850e9e3c13b2a0380f0faf43017a8f",
+      "bytes": 503
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-privacy-final.log",
+      "sha256": "bd028f556cd815fa0133ce041f0fa0c95eb560b12e8214680add799b05468942",
+      "bytes": 503
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-privacy-final.result.json",
+      "sha256": "0ab20ce5b555dd94fe56d3630df01677f5de5d1bc82698fc364652118f3fd930",
+      "bytes": 225
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-update1.log",
+      "sha256": "a55f9e9de1b9f6b3dc8359a8cc52fe2f4589ef4eb1ce1998756e57401c3dbbf5",
+      "bytes": 2492
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-update2.log",
+      "sha256": "9beecb91c12e7d6d8339abc20d63ae8460de70940da0fc6c37f4ff9bba4f6dcf",
+      "bytes": 5497
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-paid-update3.log",
+      "sha256": "ef8ff531f7e4773db63ff5b18cc2be3560ec37ea085f85e7deee1b92d7d0a245",
+      "bytes": 503
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-parser1.log",
+      "sha256": "cf1b75819bd963f23ef7c83b29ec72c9e4e181f98d57626d5db9f573c2dcc521",
+      "bytes": 512
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-privacy-parser.log",
+      "sha256": "35b55984e2ca90b4b638589c549b6c98ec2fd77506abcf141f088b7b01628199",
+      "bytes": 738
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-red.log",
+      "sha256": "99f82613738f01d694f692889426b1e2afdb2f3e6d6ee8f8c3757384be86cc98",
+      "bytes": 9415
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/pg-red2.log",
+      "sha256": "22db1d033e4ce1d58fad9ee78c6e2730f10b17da4d4831e09349a67f8fed7448",
+      "bytes": 771
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/reconstruct-final.log",
+      "sha256": "7075ff72e410a6623941dccc96d83b46a4372440f4947114317426a5147750c5",
+      "bytes": 272
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/reconstruct-final.result.json",
+      "sha256": "9e440f42c98640fb908421a24c2b4852f6429c14c746b913623c0f141d192e3b",
+      "bytes": 193
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/reconstruct.ts",
+      "sha256": "7b6e4bae4b7281cb14c628286f02358458c68da54e39782767915d8090fe84e5",
+      "bytes": 5595
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/reconstruct1.log",
+      "sha256": "397862ad4be1157bcf93ad040884518f8d9b6dcb8cd0153b85d0ebb4cfda0a71",
+      "bytes": 272
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/reconstruct2.log",
+      "sha256": "7075ff72e410a6623941dccc96d83b46a4372440f4947114317426a5147750c5",
+      "bytes": 272
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/rich-state2.log",
+      "sha256": "8a61487ce64264cc426d8679e4ace24ded1ae4e732d65e8591551f24e03f70bc",
+      "bytes": 469
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/rotate-local.ts",
+      "sha256": "f76b94f8860cc9c4c7b14af4f59035595e15f1b1cefddf6ce37f079be13f7b75",
+      "bytes": 1624
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/rotation.log",
+      "sha256": "5d431489043b69ce73b15298d43bea6162f0e9f019e8f5876a83cdae3914808a",
+      "bytes": 159
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/run.py",
+      "sha256": "5841c9a7be2bb7afe62c2bd0a8d951d14ed4e253590ad9c4f35526e0f4bb566f",
+      "bytes": 867
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/scope2.log",
+      "sha256": "ce3fdbb2300e19b49b874446e813fdd586826284221c1e5e854fb056f40b3ed4",
+      "bytes": 16357
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/scope3.log",
+      "sha256": "3645c993bdf3e2739cea4ad1746e409485a7970e440e302baaff814ec6caea94",
+      "bytes": 535
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/state-final.log",
+      "sha256": "313a17f0c599bae24263f5b3e828efed97807afefbb97fac83771db7ca1ed655",
+      "bytes": 469
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/state-final.result.json",
+      "sha256": "b495f6a34143d35f8b57e5cb27aef118d3dc2b81141889b0ca17b0d9ae324dd7",
+      "bytes": 196
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/tests-types-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/tests-types-final.result.json",
+      "sha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "bytes": 174
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/types-last-source.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/types-last-source.result.json",
+      "sha256": "994103dd4356ac001011dec3cc5ceea5294b65118badd6a3fe7002b42444c0bd",
+      "bytes": 174
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/types-tests1.log",
+      "sha256": "4c67e3b59436ba3d1c1499a15296846f996a14c16af4b524aa04c618973bf92a",
+      "bytes": 10740
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/types-tests2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/web-types-final.log",
+      "sha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+      "bytes": 15
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/web-types-final.result.json",
+      "sha256": "59624d29ca605a874484f2e4790a88bb0b2bea9f87c77018a6734d6d6f67669f",
+      "bytes": 160
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/web-types1.log",
+      "sha256": "1075016abe4ee44ce3c006bf7619df015ea0f829a35c475558a72f86c21b3bf8",
+      "bytes": 2493
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/whitespace-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".superpowers/sdd/rich-onboarding-20261027/whitespace-final.result.json",
+      "sha256": "e3b9db95b0bd75d85eed2989d2b622082fdb471c5a0b78a7037b9a03038a167f",
+      "bytes": 136
+    }
+  ],
+  "knownOpenSeam": "Unsolicited owner review-status delivery is explicitly assigned to S4; /card shows current state and exact return reason."
+}
