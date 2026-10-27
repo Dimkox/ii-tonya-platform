@@ -1,4 +1,25 @@
+# Semantic tags independent review — 2026-10-27
+
+Source4a8bd1ac1a11aadd140cd5a287b7f89135083e9b adds ordinary ForceReply custom tags
+over36bedff8. Root found generic Telegram replies were hijacked by this route;
+same semantic_tags_implementer is correcting only that compatibility regression.
+Three fresh read-only reviewers inspect stable exact committed source while the
+producer applies bounded correction. Read exact commit, not mutable source. Root
+owns spec/status/coordinator/review/gates; producer owns source/evidence. No
+concurrent PG/build jobs; no S3b final gate/push/PR yet. Preserve initial101/39 and
+ordinary-input31/11 evidence. Whole approved S4a then S4b still required.
+S4a temp draft additionally clarifies immediate owner-confirmed availability-only
+updates without manager reapproval, distinct from initial card/service review.
+
 # Rich onboarding delivered; semantic tags active — 2026-10-27
+
+S3b initial producer commit36bedff81c47156f443163bce1d522cdd2d8bddd; root independently
+verified101 portable archive/raw pairs. Final helper10/10 and SQL cache-null RED/GREEN,
+state reconstruction/typechecks/lint reported. Before review, root found ordinary
+custom-tag entry required a UUID-bearing command; same implementer is adding a
+readable button/plain-text route with original hidden scope/preview binding. Source
+ownership unchanged, no competing heavy jobs. Await correction commit, then launch
+all three fresh read-only reviewers before triage. No S3b full gate/push/PR yet.
 
 DraftPR115 OPEN/Draft at254c8c169cbb8432654a46de206bd20500cecc3f:
 https://github.com/Dimkox/ii-tonya-platform/pull/115
@@ -22,6 +43,30 @@ connection URL/processargs. Same onePG17.5 and private parser remain. Model rese
 assets/pins outsideGit at /tmp/residency-semantic-model-preparation-20261027; real
 semantic runtime must still be implemented/proven. Continue S4 schedule/lifecycle
 and whole journey after S3b. Pending refund-policy question remains manual; do not reask.
+
+Current S3b implementer: /root/semantic_tags_implementer. Helper9-test GREEN;
+actual local network-none/read-only320MiB helper, PG10/10 GREEN after3 harness
+setup corrections. Normal composed owner pipeline133ms first/72ms warm, cache
+startup1757ms; these are bounded local fixtures, NOT production guarantees. Runtime
+is NOT accepted. Populated 0068→0069 and browser races now pass; supplemental
+safety, callbacks, disabled-tag removal, revocation/erasure and cache restoration
+pass. Longer 741-character service pipeline 248 ms; startup/rebuild about 1.75/1.96 s.
+Final metadata, types/lint/guards/evidence and independent review remain. Root
+must not run competing PG/builds. Root-owned dirty docs: semantic spec/coordinator/
+AGENT-STATUS; producer excludes them. Inherited>20 tags need reachable subset-only
+reduction or explicit full replacement, no addition/final approval above20.
+
+S4 is prepared as sequential bounded drafts (no source yet):
+/tmp/spec-residency-native-scheduling-draft-20261027.md (S4a) and
+/tmp/spec-residency-lifecycle-completion-draft-20261027.md (S4b), with combined original
+/tmp/spec-residency-scheduling-lifecycle-draft-20261027.md and read-only evidence
+/tmp/residency-scheduling-lifecycle-preparation-20261027.md. New concrete seams:
+Planerka-only SQL confirmation, notification capture/eligibility and client booked
+read must gain real native authority; automatic private logistics delivery also
+missing. Read paths need immediate native paid coverage, not only stale activeflag.
+Existing workspace/review notifiers are promo-bot fee/form flows, not work-bot main
+activation/card review. Preserve them and add real S4b sources. No native Temporal
+in Node24.22.1; primary TC39/polyfill research retained. No dependency added by root.
 
 # Rich onboarding ready for gated push — 2026-10-27
 

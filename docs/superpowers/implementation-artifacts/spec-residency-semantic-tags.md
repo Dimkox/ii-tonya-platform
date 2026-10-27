@@ -2,7 +2,7 @@
 title: Local semantic hashtag recommendations and moderated selection
 created: 2026-10-27
 type: feature
-status: in-progress
+status: in-review
 baseline_commit: 254c8c169cbb8432654a46de206bd20500cecc3f
 review_loop_iteration: 0
 context:
@@ -272,3 +272,31 @@ acceptance. RequireDocker preflight passes Node24.22.1/pnpm11.9.0/PG17.5 environ
 Do not rerender BMad; the original rendered build workflow continues. No story_key.
 Root may organize subsequent S4 into sequential schedule/booking and notice/lifecycle
 contracts; all approved work and final end-to-end journey remain required.
+
+## Implementation clarifications
+
+Owner-provided method→problem associations must be distinguishable from actual
+semantic matches. Do not invent cosine or semantic50 for an association lacking
+a measured>.85 match; explicit relation provenance ranks beneath direct exact/
+real-semantic evidence. Formats/associations still share the15 recommendation
+limit and20 confirmed canonical aggregate. No competence claim or silent selection.
+
+Advance exact current-journal-tail guard in
+tests/repo/hybrid-message-gateway-schema-parity.test.ts with the actual additive
+migration metadata, retaining historical0041/B1 assertions and strict equality.
+
+Legacy aggregate-limit reachability: a historical approved version may exceed20
+across multiple services. Ensure a real owner path can reduce that set; rejecting
+every individual removal while the remainder still exceeds20 creates a deadlock.
+Provide an explicit whole-profile replacement within20, or permit strictly
+decreasing removals in a grandfathered mutable draft while forbidding additions
+and final confirmation/review above20. Preserve immutable prior approval and all
+unrelated answers; no hidden truncation/reset. Cover through populated upgrade
+and owner commands, not only a directSQL assertion.
+
+Ordinary custom-tag input must be reachable through a readable button and plain
+text label, without asking the owner to copy an internal preview UUID. Bind the
+reply to its original server-issued scope/preview/revision and consent; a delayed
+reply must not silently attach to a newer scope. An advanced token command may
+coexist, but cannot be the only normal path. Verify actual ingress for the simple
+label and stale/wrong-scope reply, preserving original-input replay.
