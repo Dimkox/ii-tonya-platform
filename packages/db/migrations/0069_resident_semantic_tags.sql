@@ -68,6 +68,7 @@ END $$;
 CREATE TRIGGER resident_tag_before_write BEFORE INSERT OR UPDATE ON expert_card_drafts FOR EACH ROW EXECUTE FUNCTION resident_tag_before_write();
 --> statement-breakpoint
 -- Repair comparisons retain every non-selection answer and count scoped occurrences.
+-- Any strict subset is progress, including active-tag removal before obsolete tags.
 CREATE FUNCTION resident_tag_nonselection_content(d expert_card_drafts) RETURNS jsonb LANGUAGE sql STABLE AS $$
  SELECT (to_jsonb(d)-ARRAY['semantic_tags','tag_preview','revision','status','owner_confirmed_digest','preview_page','preview_token_digest','preview_content_digest','approved_review_id','updated_at']) || jsonb_build_object(
  'rich_profile',CASE WHEN d.rich_profile IS NULL THEN NULL ELSE jsonb_set(d.rich_profile,'{services}',coalesce((SELECT jsonb_agg(s-'tags' ORDER BY n) FROM jsonb_array_elements(d.rich_profile->'services') WITH ORDINALITY a(s,n)),'[]')) END,
@@ -92,7 +93,7 @@ CREATE FUNCTION resident_tag_repair_allowed(previous expert_card_drafts,current_
  SELECT current_draft.status IN('collecting','changes_requested') AND current_draft.owner_confirmed_digest IS NULL
  AND resident_tag_nonselection_content(previous)=resident_tag_nonselection_content(current_draft)
  AND NOT EXISTS(SELECT * FROM resident_tag_selection_items(current_draft) EXCEPT ALL SELECT * FROM resident_tag_selection_items(previous))
- AND EXISTS(SELECT 1 FROM (SELECT * FROM resident_tag_selection_items(previous) EXCEPT ALL SELECT * FROM resident_tag_selection_items(current_draft)) removed WHERE resident_tag_obsolete(label))
+ AND EXISTS(SELECT * FROM resident_tag_selection_items(previous) EXCEPT ALL SELECT * FROM resident_tag_selection_items(current_draft))
 $$;
 --> statement-breakpoint
 CREATE FUNCTION resident_tag_unselected_safe(d expert_card_drafts) RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
@@ -106,7 +107,7 @@ BEGIN
 END $$;
 --> statement-breakpoint
 CREATE FUNCTION resident_tag_aggregate_guard() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE d expert_card_drafts; total integer; old_total integer; assessment jsonb; selected jsonb; decreasing boolean:=false; invalid_selection boolean; repair boolean:=false;
+DECLARE d expert_card_drafts; total integer; old_total integer; assessment jsonb; selected jsonb; decreasing boolean:=false; invalid_selection boolean; invalid_syntax boolean; repair boolean:=false;
 BEGIN
  IF TG_TABLE_NAME='expert_card_drafts' THEN
   -- A read-only proposal may expose obsolete/over-limit selections for removal,
@@ -124,7 +125,7 @@ BEGIN
  END IF;
  IF NOT FOUND THEN RETURN NULL; END IF;
  SELECT count(DISTINCT identity),jsonb_build_object('selected:tags',coalesce(jsonb_agg(jsonb_build_object('identity',identity,'label',label) ORDER BY identity,label),'[]')::text) INTO total,selected FROM resident_selected_tags(d);
- IF EXISTS(SELECT 1 FROM resident_selected_tags(d) t WHERE NOT resident_tag_labels_valid(jsonb_build_array(t.label))) THEN RAISE EXCEPTION 'card_invalid_tags'; END IF;
+ invalid_syntax:=EXISTS(SELECT 1 FROM resident_selected_tags(d) t WHERE NOT resident_tag_labels_valid(jsonb_build_array(t.label)));
  IF total>20 THEN
   -- Grandfathered history can be reduced across several scopes without a deadlock.
   -- Only subset removals (or preview-only reads) are allowed; confirmation/review
@@ -140,14 +141,15 @@ BEGIN
  END IF;
  invalid_selection:=EXISTS(SELECT 1 FROM resident_selected_tags(d) t JOIN hashtags_db h ON t.identity='catalogue:'||h.id::text WHERE NOT h.is_active);
  assessment:=resident_safety_assess(selected,d.revision);
- IF invalid_selection OR (assessment->>'blocked')::boolean THEN
+ IF invalid_syntax OR invalid_selection OR (assessment->>'blocked')::boolean THEN
   IF TG_TABLE_NAME='expert_card_drafts' AND TG_OP='UPDATE' THEN
    repair:=resident_tag_repair_allowed(OLD,d);
   ELSIF TG_TABLE_NAME='expert_card_draft_tags' AND TG_OP='DELETE' THEN
-   repair:=d.status IN('collecting','changes_requested') AND d.owner_confirmed_digest IS NULL
-    AND resident_tag_obsolete((SELECT display_label FROM hashtags_db WHERE id=OLD.tag_id));
+   -- A real OLD tuple proves strict removal; its activity is immaterial.
+   repair:=d.status IN('collecting','changes_requested') AND d.owner_confirmed_digest IS NULL;
   END IF;
   IF repair AND resident_tag_unselected_safe(d) THEN RETURN NULL; END IF;
+  IF invalid_syntax THEN RAISE EXCEPTION 'card_invalid_tags'; END IF;
   IF invalid_selection THEN RAISE EXCEPTION 'card_inactive_tag'; END IF;
   RAISE EXCEPTION 'resident_safety_write_blocked';
  END IF;

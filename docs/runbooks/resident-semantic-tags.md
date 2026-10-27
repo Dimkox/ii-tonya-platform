@@ -32,9 +32,13 @@ admission, publication, provider flag, hosting limit or production configuration
   version may only remove a strict subset until it reaches20; all additions and
   whole-card confirmation/review remain blocked above20. The owner must deselect any
   additional format recommendation before confirming such a reduction.
-- Newly inactive or newly blocked selections can be removed one scope at a time.
+- Selections can be reduced one scope at a time while other selections are inactive
+  or newly blocked. Any strict subset removal is progress: the owner may remove an
+  active tag first or together with an obsolete tag. Labels accepted by the older
+  rich-card format (including comma/emoji text) also remain visible and removable
+  one scope at a time; new invalid labels and final confirmation remain blocked.
   Repair compares scoped occurrences, so removing the first occurrence of a repeated
-  obsolete tag is progress even if the unique count stays unchanged above 20.
+  tag is progress even if the unique count stays unchanged above 20.
   Repair cannot add or move selections, modify unrelated answers, or authorize
   another blocked field. Whole-card confirmation and approval still require valid
   selections. Catalogue deletion validates its original row separately from the

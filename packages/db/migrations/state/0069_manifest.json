@@ -352,9 +352,9 @@
     {
       "idx": 69,
       "tag": "0069_resident_semantic_tags",
-      "sha256": "33bf063f2e00fead4c1e0ae38f6fad453600522a4b4418e7db1f376f02830b22"
+      "sha256": "a5c787fb5e784b5cde3c8aa8f19d6f43e916b25c3587d5ed61b72490ff78d4d2"
     }
   ],
-  "snapshotSha256": "57a21e8a2415e18c7e1c815e5d3160968f815104dda6af5d57b8753c2504d551",
-  "sqlObjectsSha256": "d21ed843402474383ee56260df7ba97398aa70c1f74fd9b0b00b9b377d773801"
+  "snapshotSha256": "9887f6cdc11a4684993b375e0dc7cdf101fc1409c093d6f6c1f74a04e0e33247",
+  "sqlObjectsSha256": "e8ca1f50fe003a504d6cf335db6b58215a1f0dc92a0f005f17a4066fdd9a4517"
 }

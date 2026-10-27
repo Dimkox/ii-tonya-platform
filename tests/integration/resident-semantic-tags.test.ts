@@ -249,6 +249,12 @@ it("mutable SQL tags cannot exceed aggregate20 or bypass moderation", async () =
       sql`update expert_card_drafts set semantic_tags=${JSON.stringify(Array.from({ length: 21 }, (_, i) => "Авторская тема " + i))}::jsonb where id=${d!.draftId}::uuid`,
     ),
   ).rejects.toThrow();
+  for (const label of ["Стресс, тревога", "Спокойствие 🙂"])
+    await expect(
+      database.db.execute(
+        sql`update expert_card_drafts set rich_guided=${JSON.stringify({ tags: [label] })}::jsonb,revision=revision+1 where id=${d!.draftId}::uuid`,
+      ),
+    ).rejects.toMatchObject({ cause: { message: "card_invalid_tags" } });
 });
 
 const Fastify = createRequire(
@@ -1378,82 +1384,89 @@ it("R2 removes obsolete selections across catalogue and staged-service scopes wi
   }
 });
 
-it("R2 newly blocked repeated tags can be reduced but cannot authorize another blocked field", async () => {
-  const f = await linked(),
-    unsafe = await linked();
-  await patch(f, { bio: "Сохранить описание" });
-  await patch(unsafe, { bio: "опасное описание" });
-  const d = (await f.card.getWorkflow(f.work))!,
-    bad = (await unsafe.card.getWorkflow(unsafe.work))!;
-  for (const draft of [d, bad])
+it.each(["старая тема а", "ПА"])(
+  "R2 newly blocked repeated tags can be reduced but cannot authorize another blocked field (%s)",
+  async (profileTag) => {
+    const f = await linked(),
+      unsafe = await linked();
+    await patch(f, { bio: "Сохранить описание" });
+    await patch(unsafe, { bio: "опасное описание" });
+    const d = (await f.card.getWorkflow(f.work))!,
+      bad = (await unsafe.card.getWorkflow(unsafe.work))!;
+    for (const draft of [d, bad])
+      await database.db.execute(
+        sql`update expert_card_drafts set semantic_tags=${JSON.stringify([profileTag])}::jsonb,rich_guided='{"tags":["старая тема б"]}',rich_pending_services='[{"tags":["старая тема б"]}]',revision=revision+1 where id=${draft.draftId}::uuid`,
+      );
+    const previous = (
+      await database.db.execute<{ policy_id: string }>(
+        sql`select policy_id from resident_safety_active`,
+      )
+    ).rows[0]!.policy_id;
+    const managerId = (
+      await database.db.execute<{ admin_id: string }>(
+        sql`select admin_id from admin_sessions where session_id_hash=${manager.sessionHash}`,
+      )
+    ).rows[0]!.admin_id;
     await database.db.execute(
-      sql`update expert_card_drafts set semantic_tags='["старая тема а"]',rich_guided='{"tags":["старая тема б"]}',rich_pending_services='[{"tags":["старая тема б"]}]',revision=revision+1 where id=${draft.draftId}::uuid`,
+      sql`insert into admin_role_assignments(admin_id,role) values(${managerId}::uuid,'security_admin') on conflict do nothing`,
     );
-  const previous = (
-    await database.db.execute<{ policy_id: string }>(
-      sql`select policy_id from resident_safety_active`,
-    )
-  ).rows[0]!.policy_id;
-  const managerId = (
-    await database.db.execute<{ admin_id: string }>(
-      sql`select admin_id from admin_sessions where session_id_hash=${manager.sessionHash}`,
-    )
-  ).rows[0]!.admin_id;
-  await database.db.execute(
-    sql`insert into admin_role_assignments(admin_id,role) values(${managerId}::uuid,'security_admin') on conflict do nothing`,
-  );
-  const candidate = randomUUID();
-  await database.db.execute(
-    sql`insert into resident_safety_policies(id) values(${candidate}::uuid)`,
-  );
-  for (const pattern of ["старая тема а", "старая тема б", "опасное описание"])
+    const candidate = randomUUID();
     await database.db.execute(
-      sql`insert into forbidden_patterns(policy_id,pattern_regex,category,severity_level,error_message_template,provenance,positive_witness) values(${candidate}::uuid,${pattern},'MEDICAL_CLAIM','BLOCKER','Исправьте текст','synthetic R2 policy',${pattern})`,
+      sql`insert into resident_safety_policies(id) values(${candidate}::uuid)`,
     );
-  await database.db.execute(
-    sql`select resident_safety_publish(${candidate}::uuid,${managerId}::uuid,${manager.sessionHash})`,
-  );
-  const remove = async (owner: typeof f, scope: string) => {
-    let r = await owner.card.tagAction({
-      ...event(owner.work),
-      action: "recommend",
-      scope,
-    });
-    for (const label of [...r.preview!.selected])
-      r = await owner.card.tagAction({
+    for (const pattern of [
+      "старая тема а",
+      "старая тема б",
+      "опасное описание",
+    ])
+      await database.db.execute(
+        sql`insert into forbidden_patterns(policy_id,pattern_regex,category,severity_level,error_message_template,provenance,positive_witness) values(${candidate}::uuid,${pattern},'MEDICAL_CLAIM','BLOCKER','Исправьте текст','synthetic R2 policy',${pattern})`,
+      );
+    await database.db.execute(
+      sql`select resident_safety_publish(${candidate}::uuid,${managerId}::uuid,${manager.sessionHash})`,
+    );
+    const remove = async (owner: typeof f, scope: string) => {
+      let r = await owner.card.tagAction({
         ...event(owner.work),
-        action: "toggle",
-        token: r.preview!.token,
-        index: r.preview!.choices.indexOf(label),
+        action: "recommend",
+        scope,
       });
-    return owner.card.tagAction({
-      ...event(owner.work),
-      action: "confirm",
-      token: r.preview!.token,
-    });
-  };
-  try {
-    await expect(remove(unsafe, "profile")).rejects.toThrow();
-    await remove(f, "profile");
-    await expect(
-      database.db.execute(
-        sql`update expert_card_drafts set owner_confirmed_digest=resident_rich_digest(expert_card_drafts) where id=${d.draftId}::uuid`,
-      ),
-    ).rejects.toThrow();
-    await remove(f, "guided");
-    expect((await f.card.getDraftTags(f.work)).selectedCount).toBe(1);
-    await remove(f, "pending:1");
-    expect((await f.card.getDraftTags(f.work)).selectedCount).toBe(0);
-    expect(
-      (await f.card.readDraft(manager.sessionHash, f.applicationId))!.rich!
-        .profile!.bio,
-    ).toBe("Сохранить описание");
-  } finally {
-    await database.db.execute(
-      sql`select resident_safety_publish(${previous}::uuid,${managerId}::uuid,${manager.sessionHash})`,
-    );
-  }
-});
+      for (const label of [...r.preview!.selected])
+        r = await owner.card.tagAction({
+          ...event(owner.work),
+          action: "toggle",
+          token: r.preview!.token,
+          index: r.preview!.choices.indexOf(label),
+        });
+      return owner.card.tagAction({
+        ...event(owner.work),
+        action: "confirm",
+        token: r.preview!.token,
+      });
+    };
+    try {
+      await expect(remove(unsafe, "profile")).rejects.toThrow();
+      await remove(f, "profile");
+      await expect(
+        database.db.execute(
+          sql`update expert_card_drafts set owner_confirmed_digest=resident_rich_digest(expert_card_drafts) where id=${d.draftId}::uuid`,
+        ),
+      ).rejects.toThrow();
+      await remove(f, "guided");
+      expect((await f.card.getDraftTags(f.work)).selectedCount).toBe(1);
+      await remove(f, "pending:1");
+      expect((await f.card.getDraftTags(f.work)).selectedCount).toBe(0);
+      expect(
+        (await f.card.readDraft(manager.sessionHash, f.applicationId))!.rich!
+          .profile!.bio,
+      ).toBe("Сохранить описание");
+    } finally {
+      await database.db.execute(
+        sql`select resident_safety_publish(${previous}::uuid,${managerId}::uuid,${manager.sessionHash})`,
+      );
+    }
+  },
+);
 
 it("R2a profile confirmation preserves catalogue deletion authority and both retained storage scopes", async () => {
   const f = await linked();
@@ -1578,6 +1591,96 @@ it.each(["текущая", "ожидающая 1"])(
     } finally {
       await database.db.execute(
         sql`update hashtags_db set is_active=true where tag_value in ('тревожность','фобии')`,
+      );
+      await app.close();
+    }
+  },
+);
+
+it.each(["combined", "active-semantic", "active-catalogue"])(
+  "R2c strict %s removal remains possible while another scope is obsolete",
+  async (mode) => {
+    const f = await linked();
+    await patch(f, { bio: "Сохранить описание" });
+    const d = (await f.card.getWorkflow(f.work))!;
+    await database.db.execute(
+      sql`update expert_card_drafts set semantic_tags='["ПА"]',rich_guided='{"tags":["#тревожность"]}',revision=revision+1 where id=${d.draftId}::uuid`,
+    );
+    const { semanticTagOwnerFlow } =
+      await import("../support/semantic-tag-owner-flow.js");
+    const app = await workHttp(f.card);
+    const flow = semanticTagOwnerFlow(
+      (payload) =>
+        app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: {
+            "x-telegram-bot-api-secret-token":
+              "synthetic-core-webhook-secret-12345678",
+          },
+          payload,
+        }),
+      { chatId: f.work.chatId, botId: workScope.botId },
+      () => ++sequence,
+    );
+    try {
+      await flow.catalogue("#депрессия");
+      const unchanged = (
+        await database.db.execute(
+          sql`select resident_tag_nonselection_content(d) content from expert_card_drafts d where id=${d.draftId}::uuid`,
+        )
+      ).rows[0]!.content;
+      await database.db.execute(
+        sql`update hashtags_db set is_active=false where tag_value='тревожность' or (tag_value='депрессия' and ${mode !== "active-catalogue"})`,
+      );
+      let r = await flow.text("/tags_recommend профиль");
+      expect((await flow.confirm(r)).text).toContain(
+        "Не удалось изменить теги",
+      );
+      // Strict removal cannot hide a new identity, move an occurrence, or edit another answer.
+      for (const statement of [
+        sql`update expert_card_drafts set semantic_tags='["#КПТ"]',revision=revision+1 where id=${d.draftId}::uuid`,
+        sql`update expert_card_drafts set semantic_tags='[]',rich_guided='{"tags":["#тревожность","ПА"]}',revision=revision+1 where id=${d.draftId}::uuid`,
+        sql`update expert_card_drafts set semantic_tags='[]',rich_profile=jsonb_set(rich_profile,'{bio}','"Изменённый ответ"'),revision=revision+1 where id=${d.draftId}::uuid`,
+      ])
+        await expect(database.db.execute(statement)).rejects.toThrow();
+      if (mode !== "active-catalogue") r = await flow.remove(r, "ПА");
+      if (mode !== "active-semantic") r = await flow.remove(r, "#депрессия");
+      expect((await flow.confirm(r)).text).toContain("набор тегов сохранён");
+      expect((await flow.repeat()).duplicate).toBe(true);
+      const current = (
+        await database.db.execute<{
+          semantic_tags: string[];
+          rich_guided: { tags: string[] };
+          content: unknown;
+        }>(
+          sql`select semantic_tags,rich_guided,resident_tag_nonselection_content(d) content from expert_card_drafts d where id=${d.draftId}::uuid`,
+        )
+      ).rows[0]!;
+      expect(current.semantic_tags).toEqual(
+        mode === "active-catalogue" ? ["ПА"] : [],
+      );
+      expect(current.rich_guided.tags).toEqual(["#тревожность"]);
+      expect(current.content).toEqual(unchanged);
+      expect(
+        (
+          await database.db.execute(
+            sql`select count(*)::int n from expert_card_draft_tags where draft_id=${d.draftId}::uuid`,
+          )
+        ).rows[0]!.n,
+      ).toBe(mode === "active-semantic" ? 1 : 0);
+      await expect(
+        database.db.execute(
+          sql`update expert_card_drafts set owner_confirmed_digest=resident_rich_digest(expert_card_drafts) where id=${d.draftId}::uuid`,
+        ),
+      ).rejects.toThrow();
+      r = await flow.text("/tags_recommend профиль");
+      expect((await flow.confirm(r)).text).toContain(
+        "Не удалось изменить теги",
+      );
+    } finally {
+      await database.db.execute(
+        sql`update hashtags_db set is_active=true where tag_value in ('депрессия','тревожность')`,
       );
       await app.close();
     }
