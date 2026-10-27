@@ -1968,7 +1968,8 @@ export class PostgresExpertCardRepository {
           .slice(0, 15);
         const unique = new Map<string, string>();
         for (const label of [...selected, ...top.map((c) => c.label)])
-          unique.set(canonicalTag(label, catalogue), label);
+          if (!unique.has(canonicalTag(label, catalogue)))
+            unique.set(canonicalTag(label, catalogue), label);
         preview = {
           token: randomUUID(),
           revision: d.revision,
@@ -1976,7 +1977,10 @@ export class PostgresExpertCardRepository {
           scopeLabel,
           selected: [...unique.values()],
           choices: [...unique.values()],
-          candidates: top,
+          candidates: top.map((candidate) => ({
+            ...candidate,
+            label: unique.get(canonicalTag(candidate.label, catalogue))!,
+          })),
           mode: result.mode,
           generation: result.generation,
           registry,
@@ -2056,11 +2060,46 @@ export class PostgresExpertCardRepository {
             guided = row.guided,
             pending = row.pending,
             tags = row.tags;
+          let catalogueOnlyRemoval = false;
           if (preview.scope === "profile") {
-            tags = selected;
-            await tx.execute(
-              sql`delete from expert_card_draft_tags where draft_id=${d.id}::uuid`,
+            const legacy = (
+              await tx.execute<{ id: string; label: string }>(
+                sql`select h.id,h.display_label label from expert_card_draft_tags t join hashtags_db h on h.id=t.tag_id where t.draft_id=${d.id}::uuid`,
+              )
+            ).rows;
+            const identities = new Set(
+              selected.map((label) => canonicalTag(label, catalogue)),
             );
+            const retained = legacy.filter((tag) =>
+              identities.has(canonicalTag(tag.label, catalogue)),
+            );
+            const removed = legacy.filter(
+              (tag) => !identities.has(canonicalTag(tag.label, catalogue)),
+            );
+            // Preserve each existing storage scope and its readable spelling. The
+            // DELETE trigger retains authoritative OLD catalogue rows for repair.
+            tags = row.tags.filter((label) =>
+              identities.has(canonicalTag(label, catalogue)),
+            );
+            const represented = new Set(
+              [...tags, ...retained.map((tag) => tag.label)].map((label) =>
+                canonicalTag(label, catalogue),
+              ),
+            );
+            for (const label of selected) {
+              const identity = canonicalTag(label, catalogue);
+              if (!represented.has(identity)) {
+                tags.push(label);
+                represented.add(identity);
+              }
+            }
+            for (const tag of removed)
+              await tx.execute(
+                sql`delete from expert_card_draft_tags where draft_id=${d.id}::uuid and tag_id=${tag.id}::uuid`,
+              );
+            catalogueOnlyRemoval =
+              removed.length > 0 &&
+              JSON.stringify(tags) === JSON.stringify(row.tags);
           } else if (preview.scope === "guided")
             guided = { ...guided, tags: selected };
           else if (preview.scope.startsWith("service:")) {
@@ -2078,9 +2117,21 @@ export class PostgresExpertCardRepository {
               i === n ? { ...s, tags: selected } : s,
             );
           }
-          await tx.execute(
-            sql`update expert_card_drafts set semantic_tags=${JSON.stringify(tags)}::jsonb,rich_profile=${profile ? JSON.stringify(profile) : null}::jsonb,rich_guided=${JSON.stringify(guided)}::jsonb,rich_pending_services=${JSON.stringify(pending)}::jsonb,revision=revision+1,status='collecting',approved_review_id=null,owner_confirmed_digest=null,tag_preview=null where id=${d.id}::uuid`,
-          );
+          if (catalogueOnlyRemoval) {
+            // Revision advancement clears confirmation through the existing BEFORE
+            // trigger; only an approved card needs an explicit status transition.
+            if (d.status === "approved")
+              await tx.execute(
+                sql`update expert_card_drafts set revision=revision+1,status='collecting',approved_review_id=null,tag_preview=null where id=${d.id}::uuid`,
+              );
+            else
+              await tx.execute(
+                sql`update expert_card_drafts set revision=revision+1,approved_review_id=null,tag_preview=null where id=${d.id}::uuid`,
+              );
+          } else
+            await tx.execute(
+              sql`update expert_card_drafts set semantic_tags=${JSON.stringify(tags)}::jsonb,rich_profile=${profile ? JSON.stringify(profile) : null}::jsonb,rich_guided=${JSON.stringify(guided)}::jsonb,rich_pending_services=${JSON.stringify(pending)}::jsonb,revision=revision+1,status='collecting',approved_review_id=null,owner_confirmed_digest=null,tag_preview=null where id=${d.id}::uuid`,
+            );
           await this.invalidateJobs(tx, d.id);
           preview = null;
         }

@@ -38,7 +38,11 @@ admission, publication, provider flag, hosting limit or production configuration
   Repair cannot add or move selections, modify unrelated answers, or authorize
   another blocked field. Whole-card confirmation and approval still require valid
   selections. Catalogue deletion validates its original row separately from the
-  accompanying revision-only invalidation.
+  accompanying revision-only invalidation. Retained catalogue rows and semantic
+  selections stay in their existing storage scopes, including repeated identities.
+  Recommendations preserve the owner’s readable alias in both checkboxes and
+  candidate evidence. Catalogue-only removal from an approved card reopens the draft
+  and clears confirmation without changing its immutable prior approval.
 
 A stale preview, changed catalogue or safety publication, or changed semantic model
 cannot commit. Callback tokens rotate on each edit. Original Telegram update identity

@@ -114,6 +114,11 @@ BEGIN
   IF TG_OP='UPDATE' AND (to_jsonb(NEW)-ARRAY['tag_preview','updated_at'])=(to_jsonb(OLD)-ARRAY['tag_preview','updated_at']) THEN RETURN NULL; END IF;
   -- Immutable approved history may exceed the new aggregate20. It is not rewritten.
   IF TG_OP='UPDATE' AND NEW.status='approved' AND OLD.status='approved' AND NEW.revision=OLD.revision AND NEW.rich_profile IS NOT DISTINCT FROM OLD.rich_profile AND NEW.rich_guided IS NOT DISTINCT FROM OLD.rich_guided AND NEW.rich_pending_services IS NOT DISTINCT FROM OLD.rich_pending_services AND NEW.semantic_tags=OLD.semantic_tags THEN RETURN NULL; END IF;
+  -- Reopening changes no selected content. Any catalogue DELETE is independently
+  -- checked with its authoritative OLD row. Equal-value content assignments still
+  -- fire the separate strict trigger and cannot confirm an invalid selection.
+  IF TG_NAME='resident_tag_aggregate_status' AND TG_OP='UPDATE' AND OLD.status='approved' AND NEW.status='collecting' AND NEW.revision=OLD.revision+1 AND NEW.owner_confirmed_digest IS NULL AND NEW.approved_review_id IS NULL
+   AND (to_jsonb(NEW)-ARRAY['revision','status','owner_confirmed_digest','approved_review_id','tag_preview','preview_page','preview_token_digest','preview_content_digest','updated_at'])=(to_jsonb(OLD)-ARRAY['revision','status','owner_confirmed_digest','approved_review_id','tag_preview','preview_page','preview_token_digest','preview_content_digest','updated_at']) THEN RETURN NULL; END IF;
   SELECT * INTO d FROM expert_card_drafts WHERE id=NEW.id FOR UPDATE;
  ELSE SELECT * INTO d FROM expert_card_drafts WHERE id=coalesce(NEW.draft_id,OLD.draft_id) FOR UPDATE;
  END IF;
@@ -153,7 +158,8 @@ END $$;
 -- Selection/answer/confirmation writes are checked even when SET assigns an equal
 -- value. A catalogue deletion separately validates its OLD tag; its revision-only
 -- housekeeping cannot add content or confirm a card and does not need this trigger.
-CREATE CONSTRAINT TRIGGER resident_tag_aggregate_draft AFTER INSERT OR UPDATE OF semantic_tags,rich_mode,rich_profile,rich_guided,rich_pending_services,rich_proposal,status,owner_confirmed_digest,public_payload,input_mode,document_proposal,document_import_revision,user_id,application_id,messaging_policy_version,work_bot_id,work_bot_key,work_chat_id ON expert_card_drafts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION resident_tag_aggregate_guard();
+CREATE CONSTRAINT TRIGGER resident_tag_aggregate_draft AFTER INSERT OR UPDATE OF semantic_tags,rich_mode,rich_profile,rich_guided,rich_pending_services,rich_proposal,owner_confirmed_digest,public_payload,input_mode,document_proposal,document_import_revision,user_id,application_id,messaging_policy_version,work_bot_id,work_bot_key,work_chat_id ON expert_card_drafts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION resident_tag_aggregate_guard();
+CREATE CONSTRAINT TRIGGER resident_tag_aggregate_status AFTER UPDATE OF status ON expert_card_drafts DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION resident_tag_aggregate_guard();
 CREATE CONSTRAINT TRIGGER resident_tag_aggregate_selection AFTER INSERT OR UPDATE OR DELETE ON expert_card_draft_tags DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION resident_tag_aggregate_guard();
 --> statement-breakpoint
 ALTER FUNCTION resident_card_effective_fields(uuid) RENAME TO resident_card_pre_semantic_fields;

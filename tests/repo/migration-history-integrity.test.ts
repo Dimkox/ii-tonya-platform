@@ -347,6 +347,7 @@ const HAND_SQL_TRIGGERS = [
   "resident_safety_rules_immutable",
   "resident_tag_aggregate_draft",
   "resident_tag_aggregate_selection",
+  "resident_tag_aggregate_status",
   "resident_tag_before_write",
   "resident_tag_decision_source",
   "resident_terminal_decision_guard",

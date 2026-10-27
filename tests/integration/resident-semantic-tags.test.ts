@@ -1454,3 +1454,132 @@ it("R2 newly blocked repeated tags can be reduced but cannot authorize another b
     );
   }
 });
+
+it("R2a profile confirmation preserves catalogue deletion authority and both retained storage scopes", async () => {
+  const f = await linked();
+  await patch(f, { bio: "Сохранить описание" });
+  const d = (await f.card.getWorkflow(f.work))!;
+  await database.db.execute(
+    sql`update expert_card_drafts set semantic_tags='["ПА"]',rich_guided='{"tags":["#тревожность"]}',revision=revision+1 where id=${d.draftId}::uuid`,
+  );
+  const { semanticTagOwnerFlow } =
+    await import("../support/semantic-tag-owner-flow.js");
+  const app = await workHttp(f.card);
+  const flow = semanticTagOwnerFlow(
+    (payload) =>
+      app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers: {
+          "x-telegram-bot-api-secret-token":
+            "synthetic-core-webhook-secret-12345678",
+        },
+        payload,
+      }),
+    { chatId: f.work.chatId, botId: workScope.botId },
+    () => ++sequence,
+  );
+  try {
+    await flow.catalogue("#депрессия");
+    await database.db.execute(
+      sql`insert into expert_card_draft_tags(draft_id,user_id,tag_id) select d.id,d.user_id,h.id from hashtags_db h cross join expert_card_drafts d where d.id=${d.draftId}::uuid and h.tag_value='панические_атаки'`,
+    );
+    await database.db.execute(
+      sql`update hashtags_db set is_active=false where tag_value in ('депрессия','тревожность')`,
+    );
+    let r = await flow.text("/tags_recommend профиль");
+    r = await flow.remove(r, "#депрессия");
+    expect((await flow.confirm(r)).text).toContain("набор тегов сохранён");
+    expect((await flow.repeat()).duplicate).toBe(true);
+    expect(
+      (
+        await database.db.execute<{ semantic_tags: string[] }>(
+          sql`select semantic_tags from expert_card_drafts where id=${d.draftId}::uuid`,
+        )
+      ).rows[0]!.semantic_tags,
+    ).toEqual(["ПА"]);
+    expect(
+      (
+        await database.db.execute<{ tag_value: string }>(
+          sql`select h.tag_value from expert_card_draft_tags t join hashtags_db h on h.id=t.tag_id where t.draft_id=${d.draftId}::uuid`,
+        )
+      ).rows.map((x) => x.tag_value),
+    ).toEqual(["панические_атаки"]);
+    r = await flow.text("/tags_recommend текущая");
+    r = await flow.remove(r, "#тревожность");
+    await flow.confirm(r);
+  } finally {
+    await database.db.execute(
+      sql`update hashtags_db set is_active=true where tag_value in ('депрессия','тревожность')`,
+    );
+    await app.close();
+  }
+});
+
+it.each(["текущая", "ожидающая 1"])(
+  "R2b retained PA alias survives either obsolete-scope removal starting with %s",
+  async (first) => {
+    const f = await linked();
+    await patch(f, {});
+    const d = (await f.card.getWorkflow(f.work))!;
+    await database.db.execute(
+      sql`update expert_card_drafts set rich_guided='{"tags":["ПА","#тревожность"]}',rich_pending_services='[{"tags":["ПА","#фобии"]}]',revision=revision+1 where id=${d.draftId}::uuid`,
+    );
+    const { semanticTagOwnerFlow } =
+      await import("../support/semantic-tag-owner-flow.js");
+    const app = await workHttp(f.card);
+    const flow = semanticTagOwnerFlow(
+      (payload) =>
+        app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: {
+            "x-telegram-bot-api-secret-token":
+              "synthetic-core-webhook-secret-12345678",
+          },
+          payload,
+        }),
+      { chatId: f.work.chatId, botId: workScope.botId },
+      () => ++sequence,
+    );
+    await database.db.execute(
+      sql`update hashtags_db set is_active=false where tag_value in ('тревожность','фобии')`,
+    );
+    try {
+      for (const scope of [
+        first,
+        first === "текущая" ? "ожидающая 1" : "текущая",
+      ]) {
+        let r = await flow.text("/tags_recommend " + scope);
+        expect(r.text).toContain("Прямое совпадение / синоним: 1");
+        expect(r.text).not.toContain("Прямое совпадение / синоним: 0");
+        expect(
+          r
+            .reply_markup!.inline_keyboard.flat()
+            .filter((b) => b.callback_data.startsWith("ct2:t:"))
+            .map((b) => b.text),
+        ).toContain("1. ☑ ПА");
+        r = await flow.remove(
+          r,
+          scope === "текущая" ? "#тревожность" : "#фобии",
+        );
+        await flow.confirm(r);
+      }
+      const row = (
+        await database.db.execute<{
+          rich_guided: { tags: string[] };
+          rich_pending_services: { tags: string[] }[];
+        }>(
+          sql`select rich_guided,rich_pending_services from expert_card_drafts where id=${d.draftId}::uuid`,
+        )
+      ).rows[0]!;
+      expect(row.rich_guided.tags).toEqual(["ПА"]);
+      expect(row.rich_pending_services[0]!.tags).toEqual(["ПА"]);
+    } finally {
+      await database.db.execute(
+        sql`update hashtags_db set is_active=true where tag_value in ('тревожность','фобии')`,
+      );
+      await app.close();
+    }
+  },
+);

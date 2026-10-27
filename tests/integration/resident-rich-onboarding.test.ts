@@ -2569,3 +2569,66 @@ it("S3b R4 complete review rejects pending rejected stale custom decisions and p
     }),
   );
 }, 30000);
+
+it("R2a approved catalogue repair reopens mutable draft and preserves immutable prior approval", async () => {
+  const f = await secondRichFixture();
+  const d = (await f.repo.getWorkflow(f.work))!;
+  const { semanticTagOwnerFlow } =
+    await import("../support/semantic-tag-owner-flow.js");
+  const app = await workHttp(f.repo);
+  const flow = semanticTagOwnerFlow(
+    (payload) =>
+      app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers: {
+          "x-telegram-bot-api-secret-token":
+            "synthetic-core-webhook-secret-12345678",
+        },
+        payload,
+      }),
+    { chatId: f.work.chatId, botId: workScope.botId },
+    () => ++sequence,
+  );
+  try {
+    await flow.catalogue("#депрессия");
+    await f.approve();
+    const versions = async () =>
+      (
+        await database.db.execute(
+          sql`select to_jsonb(v) snapshot from resident_card_versions v where draft_id=${d.draftId}::uuid order by created_at`,
+        )
+      ).rows;
+    const before = await versions();
+    expect(before).toHaveLength(1);
+    await database.db.execute(
+      sql`update hashtags_db set is_active=false where tag_value in ('депрессия','тревожность')`,
+    );
+    let r = await flow.text("/tags_recommend профиль");
+    r = await flow.remove(r, "#онлайн");
+    expect((await flow.confirm(r)).text).toContain("Не удалось изменить теги");
+    expect((await f.repo.getWorkflow(f.work))!.status).toBe("approved");
+    r = await flow.remove(r, "#депрессия");
+    expect((await flow.confirm(r)).text).toContain("набор тегов сохранён");
+    expect((await flow.repeat()).duplicate).toBe(true);
+    const current = (
+      await database.db.execute(
+        sql`select status,owner_confirmed_digest,semantic_tags from expert_card_drafts where id=${d.draftId}::uuid`,
+      )
+    ).rows[0]!;
+    expect(current.status).toBe("collecting");
+    expect(current.owner_confirmed_digest).toBeNull();
+    expect(current.semantic_tags).toEqual([]);
+    await expect(
+      database.db.execute(
+        sql`update expert_card_drafts set owner_confirmed_digest=resident_rich_digest(expert_card_drafts) where id=${d.draftId}::uuid`,
+      ),
+    ).rejects.toThrow();
+    expect(await versions()).toEqual(before);
+  } finally {
+    await database.db.execute(
+      sql`update hashtags_db set is_active=true where tag_value in ('депрессия','тревожность')`,
+    );
+    await app.close();
+  }
+});
