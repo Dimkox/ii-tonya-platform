@@ -50,7 +50,9 @@ RED/failure records retained:
 - Initial stale dependency declarations / test inference errors, fixed by relevant builds and explicit types.
 - Initial scoped lint unused imports and exact migration/route/relation/hash/placeholder registrations; corrected without broadening guard patterns.
 
-The source/run artifacts and every retained log are SHA256-bound in `residency-rich-onboarding-implementation-2026-10-27.json`. Logs/drivers remain under ignored `.superpowers/sdd/rich-onboarding-20261027`; the manifest records local availability, not an uploaded artifact. Result sidecars retain command arguments, exit codes and log hashes for final checks. Earlier outcomes are separately described here and in the log ledger.
+The retained outputs and repeatability artifacts are now committed as85 separate deterministic gzip archives in [the durable evidence package](residency-rich-onboarding-2026-10-27/manifest.json). Each entry records compressed/raw byte counts and SHA256 digests; packaging verified decompression against the retained original. The implementation JSON binds the archive manifest and preserves the source hashes at implementation commit `5602413c7dca6809569d788b9d8254df80846cc8`.
+
+The package includes failure and success logs, final command/result sidecars, the browser and replay drivers, synthetic PDF/DOCX fixtures, generated introspection output, and the synthetic browser PNG. Credentials, database configuration, the credential-rotation script, dependency stores and runtimes are excluded. No retained artifact needed redaction during packaging. The final sidecars and existing command ledger preserve24 logs with recorded commands/exit codes. Earlier development logs without contemporaneous metadata explicitly retain null command/exitCode fields; their raw output is preserved without inventing execution records. [Package instructions](residency-rich-onboarding-2026-10-27/README.md) describe hash verification and restoration to the original ignored location. Packaging runs no new tests or builds.
 
 ## Migration evidence and operational limits
 
