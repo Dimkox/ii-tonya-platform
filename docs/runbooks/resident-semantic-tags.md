@@ -18,7 +18,9 @@ admission, publication, provider flag, hosting limit or production configuration
 - “Добавить свой тег / Другое” opens an ordinary Russian ForceReply field. The owner
   replies with one label, sees it in the full proposed set, then confirms the set.
   The private preview binds the original attempt to the returned bot message ID;
-  ingress requires that exact bot message in the same private chat. No token,
+  ingress first recognizes the fixed tag invitation text, then requires that exact
+  bot message in the same private chat. Unrelated replies retain ordinary text,
+  photo and document interview intake, including when tags are disabled. No token,
   identifier or command syntax is required in the normal flow. The advanced
   `/tags_custom <preview-token> <label>` command remains supported.
   BLOCKER refuses it. WARNING, including `#приворот`, remains visible to the

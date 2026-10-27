@@ -1,3 +1,6 @@
+export const EXPERT_CARD_TAG_PROMPT_TEXT =
+  "Напишите один свой тег в ответ на это сообщение.";
+
 /** One attempt only: an uncertain delivery must never be retried automatically. */
 export function createExpertCardTagPrompt(
   token: string,
@@ -26,7 +29,7 @@ export function createExpertCardTagPrompt(
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
               chat_id: input.chatId,
-              text: "Напишите один свой тег в ответ на это сообщение.",
+              text: EXPERT_CARD_TAG_PROMPT_TEXT,
               protect_content: true,
               reply_markup: {
                 force_reply: true,

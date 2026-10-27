@@ -1,3 +1,4 @@
+import { EXPERT_CARD_TAG_PROMPT_TEXT } from "./expert-card-tag-prompt.js";
 import { createHash } from "node:crypto";
 import type {
   ExpertCardService,
@@ -155,7 +156,9 @@ export function parseExpertCardTelegramUpdate(
   }
   const replyMessage = !callback ? record(message.reply_to_message) : null;
   let replyToBotMessageId: string | null = null;
-  if (!callback && message.reply_to_message !== undefined) {
+  // Ordinary interview replies keep their original text/media path. Only the
+  // fixed invitation from this bot is a tag reply, including stale/orphan prompts.
+  if (!callback && replyMessage?.text === EXPERT_CARD_TAG_PROMPT_TEXT) {
     replyToBotMessageId = id(replyMessage?.message_id);
     const replyFrom = record(replyMessage?.from),
       replyChat = record(replyMessage?.chat);

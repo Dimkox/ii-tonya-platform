@@ -1214,3 +1214,86 @@ it("ordinary own-tag ForceReply binds the original preview and never resends unc
     await app.close();
   }
 }, 30000);
+
+it("ordinary interview replies preserve text photo and document intake with tags enabled or disabled", async () => {
+  for (const enabled of [true, false]) {
+    const f = await linked();
+    const config = {
+      features: { expertCard: true, expertDraftTags: enabled },
+      expertCard: {
+        materialDeliveryEnabled: false,
+        mainCheckoutEnabled: false,
+        draftTagsEnabled: enabled,
+        workBotId: workScope.botId,
+        workBotKey: workScope.botKey,
+        workBotUsername: "synthetic_work_bot",
+        workBotToken: workScope.botId + ":" + "s".repeat(35),
+        webhookSecret: "synthetic-core-webhook-secret-12345678",
+        messagingConsentPolicyVersion: "client-messaging-v1",
+        paymentMode: "test",
+      },
+    } as unknown as RuntimeConfig;
+    const cap = createExpertCardComposition(database.db, config, {
+      tagPromptFetch: async () => {
+        throw new Error("ordinary reply must not send a tag prompt");
+      },
+    })!;
+    const app = await workHttp(f.card, undefined, undefined, cap);
+    try {
+      const original = await f.card.getWorkflow(f.work);
+      const before = original!.entryCount;
+      for (const [index, content] of [
+        { text: "Отвечаю на вопрос об опыте работы" },
+        { photo: [{ file_id: "ordinary_photo_reply" }] },
+        { document: { file_id: "ordinary_document_reply" } },
+        { text: "Уточняю свой предыдущий ответ" },
+      ].entries()) {
+        const response = await app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: {
+            "x-telegram-bot-api-secret-token":
+              "synthetic-core-webhook-secret-12345678",
+          },
+          payload: {
+            update_id: ++sequence,
+            message: {
+              message_id: sequence,
+              from: { id: Number(f.work.chatId) },
+              chat: { id: Number(f.work.chatId), type: "private" },
+              ...content,
+              reply_to_message: {
+                message_id: 7300 + index,
+                from:
+                  index === 3
+                    ? { id: Number(f.work.chatId) }
+                    : { id: Number(workScope.botId), is_bot: true },
+                chat: { id: Number(f.work.chatId), type: "private" },
+                text:
+                  index === 3
+                    ? "Мой предыдущий ответ"
+                    : "Расскажите о вашем опыте работы",
+              },
+            },
+          },
+        });
+        expect(response.statusCode).toBe(200);
+        expect(response.json().text ?? "").not.toContain(
+          "Подбор тегов пока недоступен",
+        );
+        expect((await f.card.getWorkflow(f.work))!.entryCount).toBe(
+          before + index + 1,
+        );
+      }
+      console.log(
+        JSON.stringify({
+          tagsEnabled: enabled,
+          ordinaryTextPhotoDocumentRepliesSaved: true,
+          replyToOwnMessageSaved: true,
+        }),
+      );
+    } finally {
+      await app.close();
+    }
+  }
+}, 30000);
