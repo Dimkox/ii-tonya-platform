@@ -46,14 +46,17 @@ jobs is delivered in [DraftPR114](https://github.com/Dimkox/ii-tonya-platform/pu
 at219f8e0c9d0938fccb4188cf0081f71b3f8b2db9. All8 independent findings closed;
 full/push605/605. Original and corrective evidence plus failed gates retained.
 
-Active S3a: codex/residency-rich-onboarding-20261026, contract
-spec-residency-rich-onboarding.md. Detailed profile/services/3 input modes and
-reviewed versions precede S3b semantic optimization, then S4 dynamic slots/lifecycle.
-The same isolated worktree and one task PostgreSQL cluster are reused. S3a exposes
-review outcomes/return reason through the owner card command and protected manager
-queue. A generic unsolicited review-status push producer does not exist in the
-baseline; S4 owns its real durable original-work-bot composition alongside lifecycle
-notices. This requirement remains open for the whole package, not silently dropped.
+S3a rich onboarding is delivered in [DraftPR115](https://github.com/Dimkox/ii-tonya-platform/pull/115)
+at254c8c169cbb8432654a46de206bd20500cecc3f. All13 findings closed; full/push611/611.
+Original85+corrective125+second48 archives and failed/successful gates retained.
+
+Active S3b: codex/residency-semantic-tags-20261027, contract
+spec-residency-semantic-tags.md. Real local semantic recommendations, aggregate20
+confirmed selections, moderated custom tags and protected catalogue export precede
+S4 native scheduling/lifecycle. Same isolated worktree and onePGcluster. S3a exposes
+review outcomes/return reason through /card and protected manager queue. Durable
+unsolicited owner review-status delivery is still explicitly required in S4 alongside
+lifecycle notices; no whole-package completion before that seam and final journey.
 
 ## Owner sources and precedence
 
@@ -163,17 +166,17 @@ contracts and evidence are authoritative; no earlier block is restarted.
 
 ### S3 — Onboarding and semantic catalogue
 
-- [ ] Typed profile/services/status schema and approved private knowledge projection;
+- [x] Typed profile/services/status schema and approved private knowledge projection;
       exact service amounts are informational, not platform client-service invoices.
-- [ ] Three input modes converge on one versioned private draft. Local extraction,
+- [x] Three input modes converge on one versioned private draft. Local extraction,
       owner-confirmed structured proposals, gap-only questions and manual fallback.
-- [ ] Required photos/online-room choice/offline logistics; bounded Yandex geocoding
+- [x] Required photos/online-room choice/offline logistics; bounded Yandex geocoding
       capability and human-correctable link, no unrestricted URL/file fetch.
 - [ ] In parallel where ownership is independent: semantic matching over the164-tag
       catalogue, synonyms, proposed method associations, format tags, top15 proposed
       suggestions under the latest correction, maximum20 confirmed tags, moderated custom tags and admin export.
       Associations are proposals, not verified clinical competence or diagnoses.
-- [ ] Human final review and versioned diffs. Retain current live version until a new
+- [x] Human final review and versioned diffs. Retain current live version until a new
       version passes safety and manager approval; no raw parser/LLM auto-publication.
 
 ### S4 — Scheduling and lifecycle integration

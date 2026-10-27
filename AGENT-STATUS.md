@@ -1,3 +1,28 @@
+# Rich onboarding delivered; semantic tags active — 2026-10-27
+
+DraftPR115 OPEN/Draft at254c8c169cbb8432654a46de206bd20500cecc3f:
+https://github.com/Dimkox/ii-tonya-platform/pull/115
+Parent codex/residency-private-verification-jobs-20261026 at219f8e0c (PR114).
+Runtime46e03bf0 acceptedR1–R13; exact tail guardfa1a669f accepted separately.
+Full/push611/611, remote/local exact and tree clean at delivery. Failed/successful
+logs and85+125+48 archives retained; push logs archived in this successor branch.
+No S3a source work remains; S4 owner review-status push seam remains explicitly open.
+
+Active branch codex/residency-semantic-tags-20261027 in the SAME isolated
+.worktrees/phase1-owner-plan-20261023. Contract spec-residency-semantic-tags.md:
+actual local semantic/exact matching over164 catalogue, top15 suggestions, aggregate20
+confirmed tags, explicit editable selection, custom moderation and real adminexport.
+Next migration0069. One fresh implementer owns source/evidence; root owns contract,
+master/status/coordinator/review/final gate/push. No descendants or competingheavyjobs.
+No BMad rerender, priorblock restart, permission/quota loop or provideractivation.
+
+RequireDocker preflight passes. Reuse protected rotated0600 config
+/tmp/verification-form-20261026.compose.json only in childmemory; never print env/
+connection URL/processargs. Same onePG17.5 and private parser remain. Model research
+assets/pins outsideGit at /tmp/residency-semantic-model-preparation-20261027; real
+semantic runtime must still be implemented/proven. Continue S4 schedule/lifecycle
+and whole journey after S3b. Pending refund-policy question remains manual; do not reask.
+
 # Rich onboarding ready for gated push — 2026-10-27
 
 Same isolated worktree and codex/residency-rich-onboarding-20261026. Runtime46e03bf0
