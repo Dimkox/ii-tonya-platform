@@ -136,3 +136,19 @@ approved/moderation2/2 and state/history/scope24/24 passed. Final0069 replay rep
 213 tables/156 functions/194 triggers/1449 constraints/533 indexes/2 extensions.
 Source producer is idle; all assigned reviewers will reassess exact source. No
 final branch gate, push or provider activation yet. Preserve all earlier archives.
+
+## General-removal and legacy-syntax correction ready
+
+Atc3244a58 edge/gap accepted their scoped delta; blind found combined removal of
+inactive catalogue A and active semantic C still wrongly rejected while staged B
+remains. Root additionally traced legacy comma/emoji labels accepted before0069
+but blocked globally before incremental repair (R7). Non-frozen contract iteration3
+clarifies strict per-scope subset deletion, without new selections/moves or unrelated
+content changes; all final validity gates remain.
+
+Source7b4f79f564aef0d14b5070496a54c682ae616229 supplies actual owner10/10, approved
+and R4 controls2/2, authentic0068 syntax upgrade1/1 with RED/GREEN, final state/scope
+15/15 and earlier history/scope24/24. Root verified48 raw/archive pairs and7 source
+pins; prior238 artifacts unchanged.0069 final counts remain213/156/194/1449/533/2.
+All assigned reviewers will inspect this exact bounded delta. Source producer idle;
+no competing PG/build, final gate or provider activation.

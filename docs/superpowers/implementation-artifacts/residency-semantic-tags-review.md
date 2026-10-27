@@ -59,3 +59,27 @@ R1 remains accepted. R2 has two distinct remaining normal-path failures:
 One bounded second correction is assigned to the same producer, with actual ordinary
 flow regressions, preservation of all prior guard proofs, refreshed state if SQL
 changes, and no destructive restart/broad rerun. No new owner decision is needed.
+
+## Final R2 reassessment at c3244a58
+
+Edge accepts R2b and adjacent original R2a behavior; gap accepts new proof/state.
+Blind confirms original R2a fixed but identifies R2c: profile removes inactive
+catalogue A and active semantic C while inactive staged B remains. General draft
+update only observes active C removed after A deletion and wrongly denies repair.
+All38 archives/12 source pins and preserved manifests match, independently checked.
+
+R2 remains open solely for this removal-boundary generalization. Contract iteration3
+clarifies that strict per-scope subset deletion need not remove an obsolete label
+itself. No additions/moves/non-tag edits or invalid finalization are allowed. Test
+combined and active-only removals via actual owner paths; keep earlier corrections
+and all evidence. No owner decision or destructive re-derivation is required.
+
+## Root compatibility finding R7
+
+High / bad_spec. resident-rich-profile.ts:64 historically accepts any text(80) tag;
+0069:128 unconditionally rejects a label outside the new whitelist before repair.
+A pre0069 approved profile with comma/emoji tags in separate services cannot remove
+one while another remains. Include in the current bounded batch: authentic populated
+upgrade and strict partial removal; preserve immutable history, new-label rejection
+and final validity. Independent assigned reviewers must assess this added boundary.
+This is a concrete changed-validation compatibility issue, not a speculative threat.

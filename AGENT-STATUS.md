@@ -1,3 +1,30 @@
+# Semantic tags general removal final review — 2026-10-27
+
+Source7b4f79f564aef0d14b5070496a54c682ae616229, producer idle/no heavyjobs. R2c
+strict per-scope deletion now permits active-only/combined removal without additions,
+moves, non-tag edits or invalid finalization. R7 authentic0068 comma/emoji legacy
+upgrade repairs one scope at a time, preserving immutable approval/financial facts;
+new invalid labels denied. Owner10/10,approved/R4 controls2/2,upgrade1/1; final
+state/scope15/15, prior history/scope24/24. Final0069 counts unchanged213/156/194/
+1449/533/2. Root verified48 artifacts/7 source hashes; all prior238 artifacts intact.
+Spec iteration3/in-review; all3 assigned reviewers inspect exact final delta.
+R1/R3–R6 closed; R2/R7 closure pending. Then fullgate/mandatory push/DraftPR on
+PR115 (still OPEN/Draft at254c8c), then S4a/S4b. No whole-package completion yet.
+
+# Semantic tags R2c strict-removal correction — 2026-10-27
+
+All3 assessedc3244a58. Original R2a/R2b now pass; blind found mixed removal
+(inactive catalogue A + active semantic C while inactive staged B remains) still
+blocked because repair insists removed JSON label itself be obsolete. Spec iteration3
+clarifies any strict per-scope subset deletion is safe privately; no additions/moves/
+unrelated edits/invalid confirmation or approval. Same producer makes bounded fix,
+normal-owner witnesses and fresh state if SQL changes. Root owns4 dirty docs.
+Root also found R7: pre0069 free-text tags with comma/emoji are rejected globally
+before subset repair, blocking cross-service cleanup. Same batch adds authentic
+pre0069 upgrade proof and strict repair without allowing new-invalid labels.
+R1/R3–R6 closed; all previous238 artifacts plus source pins preserved/verified.
+No final S3b gate/push/PR; continue S4a/S4b afterwards, no permission/restart loop.
+
 # Semantic tags final R2 reassessment — 2026-10-27
 
 Corrected sourcec3244a5891189c6666c87165672006632463d57c; producer idle, no heavy

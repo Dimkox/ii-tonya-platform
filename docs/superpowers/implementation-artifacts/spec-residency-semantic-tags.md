@@ -4,7 +4,7 @@ created: 2026-10-27
 type: feature
 status: in-review
 baseline_commit: 254c8c169cbb8432654a46de206bd20500cecc3f
-review_loop_iteration: 2
+review_loop_iteration: 3
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -371,3 +371,45 @@ repository proofs for these precise cases and relevant state/types/lint. Refresh
 The existing tagAction also admits an approved draft. Catalogue-only repair must
 handle its normal transition to collecting/confirmation invalidation while keeping
 the prior immutable approved version intact, not only an already-collecting fixture.
+
+## R2c general strict-removal boundary
+
+Second residual assessment accepts both original R2a/R2b cases but finds a mixed
+profile removal: inactive catalogue A, active semantic C, inactive staged B;
+deselect A+C in one profile preview. After A deletion the old-row helper only sees
+active C removed and wrongly rejects the remaining B. Do not add caller-supplied
+proof or another storage-migration workaround.
+
+Clarify the non-frozen repair rule: any genuine strict per-scope selection subset
+is a safe private repair when no selection is added/moved and every unrelated
+answer is byte-identical and passes the existing unrelated-content gate. The owner
+may choose to remove an active tag before an obsolete one; requiring the removed
+occurrence itself to be obsolete creates artificial deadlocks. The draft can remain
+incomplete/invalid privately, but owner finalization/manager approval, additions,
+unchanged invalid confirmation and unrelated unsafe edits remain prohibited.
+Actual catalogue DELETE OLD tuples prove removal; draft JSON proves its own strict
+subset. Neither needs to invent the now-deleted catalogue contents. Retain original
+owner/consent/revision, replay and immutable-public-version authority.
+
+Cover combined A+C deletion while B remains, active-only semantic and catalogue
+removal while obsolete selections remain, no-add/move, unchanged-invalid denial,
+unrelated blocked-field denial and final R4 moderation control. Preserve all
+previous passing paths/evidence and reconstruct0069 only when its SQL changes.
+This clarifies safe removal already required by editable owner selection, not new
+authority to introduce blocked content or approve an invalid card.
+
+## Legacy tag syntax repair (R7, same bounded batch)
+
+Root traced another concrete compatibility boundary: pre0069 richServiceSchema
+accepts any bounded text tag, including «Стресс, тревога» or emoji, whereas0069
+introduces a character whitelist and unconditionally rejects any remaining invalid
+label before subset repair. Two previously approved such labels in separate services
+therefore cannot be removed incrementally. Treat remaining legacy invalid label
+syntax as incomplete selected content under the same genuine strict-removal rule;
+never allow new invalid labels, additions/moves, invalid finalization or unrelated
+content changes. The confirmed scope may still be required to be syntactically valid.
+Use actual populated pre0069 source/schema evidence, preserve its immutable version
+and financial facts, then remove both scopes through normal owner operations. Do not
+manufacture historical state by disabling current guards. Retain negative new-invalid
+label and final approval controls. This preserves accepted legacy data and user repair
+reachability, without relaxing the new syntax rule for new content.
