@@ -139,3 +139,96 @@ returns to in-progress for incremental correction; approved intent remains uncha
 Owner notified of replay, legacy duplicate delivery, expired-coverage approval and
 partial-data/photo issues. Original source/evidence will remain immutable; no full
 gate or push occurs before assigned review closure.
+
+Portable evidence-only commit3d3ca163f34f4cf3fdd8ea772d62a2294987c236 retains85
+compressed artifacts. Root independently verified all85 archive/raw hash and byte
+pairs. A credential-URL pattern scan found only a source interpolation template in
+the replay driver, with no embedded literal password; no secret value was printed.
+Original local source/evidence integrity claims above refer to the runtime commit.
+
+Triage control commita41652c684f79263350cd2cc2d5573c8f98ec71f records all13 findings,
+updated non-frozen correction contract and remaining S4 notification seam. The same
+implementer was re-engaged once for all corrections. Preserve0066/original85 artifacts;
+append0067 and separate corrective evidence. Root performs no competing PG/build/test
+work. No final gate/push/acceptance yet; no repeated user approval was requested.
+
+Correction progress: producer captured actual contract failures for case-alias UUIDs
+and dropped partial services. Stable automatic-input/parsed-service identity,
+canonical IDs, SQL-null rejection, partial-service staging, legacy-photo safety and
+numbered revision-bound photo removal/cleanup are being verified. Two early
+integration attempts failed in their harness, explicitly not treated as substantive
+regression reproduction. They remain retained. New metadata replay will keep the
+credential out of argv using protected configuration/child environment and sanitize
+failure output. No corrective acceptance is implied by this progress entry.
+
+Read-only R4 correction follow-through found that the verified-prior-photo branch
+returned without reattaching a removed photo still retained in approved history.
+Producer was asked to include remove/re-upload of the same owned reference in R4,
+with current revision/cap/consent fences and no new PUT/historical mutation. This is
+part of useful replacement acceptance, not a new broad review cycle.
+
+Producer reports16/16 corrected integration cases passed. They include normal
+photo/PDF/DOCX composition, full/partial Russian imports, disabled fallback, actual
+renewal commands, approved-history photo re-selection with no extra PUT, catalogue
+name refresh and expired private approval followed by renewed latest-version restore.
+Synthetic financial calendar positioning preserves the30-day interval and live SQL
+constraints: its end was placed20seconds ahead, then actual time elapsed, preserving
+renewal-bill cycle identity. Earlier fixture positioning failures remain retained.
+
+Populated upgrade proof uses isolated accepted219f8e0c source to create collecting,
+reviewed and paid/published legacy actors on SQL through0065, then applies0066/0067
+without disabling triggers. Producer reports preservation and safe legacy operations.
+Producer added an empty-pending-queue digest compatibility refinement; its exact
+proof must be identified in final evidence. Root
+read final command sidecars: corrected integration, reconstruction, contracts/builds,
+API/tests types, populated upgrade and final affected proofs exit0. Earlier failed
+scope/lint/harness runs remain visible and are not relabelled. Corrective packaging
+and exactSHA review closure remain pending; no final gate or push.
+
+## First correction closure at be8a0c7d — second bounded batch
+
+All three assigned reviewers completed read-only closure. R1–R3 and R7–R13
+are closed (ten findings); R4–R6 remain open for the concrete cases below.
+Coordinator checked the cited implementation before accepting this batch.
+
+- R4: manager detail still selects ten historical media rows by UUID. After
+  replacements, current selected photos can disappear from preview. Select the
+  current profile photos in their order; handle prior-version photos separately
+  and bounded. Prove the real detail/API/view path with more than ten retained rows.
+- R5: service edit/removal compares old stored uppercase UUIDs with canonicalized
+  lowercase input. Compare canonical identities on both sides without rewriting
+  immutable historical versions; prove edit, removal and duplicate rejection.
+- R6: expired public A, privately approved B, then collecting/returned C before
+  renewal settlement: projection selects B but the publication trigger accepts
+  only current approved pointer or existing A. Align immutable latest-approved
+  authority across SQL, lifecycle and settlement, retaining all financial,
+  consent, safety, coverage and pause gates. Prove actual renewal through C.
+
+One implementer receives this bounded correction; append migration0068 if SQL
+changes, preserving0066/0067 and both85/125 evidence archives. No final gate or
+push yet. Review iteration2 is incremental, with no destructive restart or quota.
+
+## Parent and retained evidence recheck during second correction
+
+GitHub plugin confirms PR114 is OPEN/Draft, unmerged, head219f8e0c9d0938fccb4188cf0081f71b3f8b2db9
+and base codex/residency-verification-messages-20261026 atf11d5d90. Parent branch
+for the eventual S3a stackedPR remains codex/residency-private-verification-jobs-20261026.
+Root independently reverified all85 original plus125 first-correction compressed/raw
+archive pairs; no mismatch. This read-only check ran no suites or database jobs.
+
+## Second corrective source and assigned closure
+
+Owned commit46e03bf0db4a751977a494f9c645e165490a6c75 contains bounded R4/R5/R6
+fixes and additive0068. Producer stopped after4 focusedPG cases,55 affected checks,
+6 final state/hash negatives, actual managerAPI-response Chromium proof and relevant
+types/lint/format/diff.48 separate archives retain actual RED and harness failures.
+Root independently verified all48 archive/raw pairs and15 current owned source hashes.
+Three assigned reviewers were re-engaged together; no final triage until all reports.
+Full gate and push remain pending. Earlier85+125 evidence remains historical.
+
+## Runtime accepted — final branch gate next
+
+All three final assigned reports PASS46e03bf0db4a751977a494f9c645e165490a6c75.
+All13 findings closed; no further source correction or unchanged focused rerun.
+Root owns documentation checkpoint and canonical full gate, then mandatory push
+and stackedDraftPR on PR114. No hosted CI/release evidence is implied.

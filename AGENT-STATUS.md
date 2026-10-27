@@ -1,3 +1,56 @@
+# Rich onboarding accepted; final gate next — 2026-10-27
+
+Same isolated .worktrees/phase1-owner-plan-20261023, branch
+codex/residency-rich-onboarding-20261026. Runtime46e03bf0db4a751977a494f9c645e165490a6c75
+accepted by all three assigned reviewers; R1–R13 closed. Original85, corrective125,
+second48 archives preserved/verified.0066–0068 are append-only. Producer/reviewers
+stopped; root owns final branch gate, mandatory push and stacked DraftPR on PR114
+(codex/residency-private-verification-jobs-20261026 at219f8e0c, open/Draft verified).
+No gate/push yet for S3a. No competing PG/builds. No routine permission loop.
+Continue whole approved package: S3b semantic tags then S4 schedule/lifecycle;
+/tmp/spec-residency-semantic-tags-draft-20261027.md and corresponding S4 draft
+are prepared, reconcile accepted interfaces and freeze next. S4 review-status push
+remains open. Protected rotated PG config/existing parser retained; no live access.
+
+# Rich onboarding second correction batch — 2026-10-27
+
+Same isolated worktree/branch, HEAD be8a0c7d71cc5ed22b551cc2ce1cc6332adaed3e.
+All three closure reviews complete: ten findings closed; R4 current-photo manager
+preview, R5 historical uppercase service edit/removal and R6 private-approved B
+renewal after another draft C remain. One existing implementer owns bounded fixes,
+RED/GREEN, additive0068 and separately hashed evidence; preserve0066/0067 and85/125
+archives. Root owns dirty status/spec/coordinator/review documents and final gates.
+No gate/push/acceptance yet. Continue S3b and S4 afterwards; earlier instructions,
+protected existing PG/parser and pending manual refund policy remain unchanged.
+
+# Rich onboarding review corrections active — 2026-10-27
+
+Work only in isolated .worktrees/phase1-owner-plan-20261023, branch
+codex/residency-rich-onboarding-20261026. Initial source5602413c7dca6809569d788b9d8254df80846cc8;
+portable85-artifact evidence3d3ca163f34f4cf3fdd8ea772d62a2294987c236;
+root triage controla41652c684f79263350cd2cc2d5573c8f98ec71f. Runtime is NOT accepted.
+Three independent reviewers completed; thirteen concrete defects/proof gaps are
+recorded in docs/test-evidence/residency-rich-onboarding-review-2026-10-27.md.
+One existing implementer owns incremental R1–R13 correction, hand migration0067,
+focused RED/GREEN and separate archived corrective evidence. Preserve0066/original85
+artifacts/all earlier history. Root owns spec/master/status/coordinator/review/gates.
+No source rewrite, BMad rerender, routine permission/quota loop or unchanged broad
+suite repeat. No final branch gate or push yet; wait for assigned review closure.
+
+Reuse one task PG17.5 and existing isolated parser. The task-local DB credential
+was rotated after a diagnostic exposure; updated0600 protected config remains
+/tmp/verification-form-20261026.compose.json. Read it only in child memory; never
+print it or put credential URLs in argv/process diagnostics. Production untouched.
+Root does no competing PG/build work while the implementer verifies corrections.
+
+Continue the WHOLE approved package afterwards: S3b local semantic tags, then S4
+scheduling/lifecycle. Preparations: `/tmp/spec-residency-semantic-tags-draft-20261027.md` and
+`/tmp/spec-residency-scheduling-lifecycle-draft-20261027.md`;
+reconcile final S3a interfaces before freezing. Shared unsolicited owner review-status
+push is explicitly open for S4; /card state/reason and manager queue exist now.
+Refund-policy question remains pending/manual; do not reask or invent approval.
+S0/S0.5/S1/S2a/S2b are delivered; no prior block restart, merge/deploy/provider enablement.
+
 # Private verification delivered; rich onboarding active — 2026-10-26
 
 Draft PR114 OPEN at219f8e0c9d0938fccb4188cf0081f71b3f8b2db9:

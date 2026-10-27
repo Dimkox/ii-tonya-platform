@@ -2,9 +2,9 @@
 title: Rich resident onboarding and reviewed profile versions
 type: feature
 created: 2026-10-26
-status: in-progress
+status: in-review
 baseline_commit: 219f8e0c9d0938fccb4188cf0081f71b3f8b2db9
-review_loop_iteration: 1
+review_loop_iteration: 2
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -208,3 +208,33 @@ Archive exact commands/exit codes/matrix mapping and failures under separately h
 S3a evidence. Local green is not hosted CI or live release evidence. Commit locally
 when complete and report exactSHA/evidence/remaining risks to root. No criterion is
 complete merely because a placeholder/interface always returns unavailable.
+
+## Review closure and final gate
+
+All13 findings accepted closed at runtime46e03bf0db4a751977a494f9c645e165490a6c75.
+Second bounded correction preserved0066/0067, added0068 and retained85+125+48
+archives. Exact closure is recorded in residency-rich-onboarding-review-2026-10-27.md.
+Spec remains in-review until root canonical branch gate passes. S3b/S4 remain open.
+
+## Suggested Review Order
+
+- Entry and ordinary owner flow.
+  [expert-card-service.ts:281](../../../packages/application/src/expert-card-service.ts#L281)
+
+- Normal private media and parser composition.
+  [expert-card-composition.ts:91](../../../apps/api/src/expert-card-composition.ts#L91)
+
+- Typed partial services and readable preview.
+  [resident-rich-profile.ts:40](../../../packages/contracts/src/resident-rich-profile.ts#L40)
+
+- Owner mutations and manager version authority.
+  [expert-card-repository.ts:624](../../../packages/db/src/repositories/expert-card-repository.ts#L624)
+
+- Latest immutable approval survives later edits.
+  [0068_resident_latest_approved_publication.sql:3](../../../packages/db/migrations/0068_resident_latest_approved_publication.sql#L3)
+
+- Bounded current and approved media review.
+  [expert-card-view.ts:23](../../../apps/web/src/expert-card-view.ts#L23)
+
+- Integration regression and financial witnesses.
+  [resident-rich-onboarding.test.ts:1](../../../tests/integration/resident-rich-onboarding.test.ts#L1)
