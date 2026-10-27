@@ -36,7 +36,9 @@ admission, publication, provider flag, hosting limit or production configuration
   or newly blocked. Any strict subset removal is progress: the owner may remove an
   active tag first or together with an obsolete tag. Labels accepted by the older
   rich-card format (including comma/emoji text) also remain visible and removable
-  one scope at a time; new invalid labels and final confirmation remain blocked.
+  one label at a time, including within one service. Confirmation preserves their
+  exact text within the established string/count bounds; authoritative SQL permits
+  only strict subset repair. New invalid labels and final confirmation remain blocked.
   Repair compares scoped occurrences, so removing the first occurrence of a repeated
   tag is progress even if the unique count stays unchanged above 20.
   Repair cannot add or move selections, modify unrelated answers, or authorize

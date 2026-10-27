@@ -5,7 +5,6 @@ import {
   recommendTags,
 } from "./resident-semantic-tags.js";
 import {
-  tagSelectionSchema,
   tagLabelSchema,
   normalizeTag,
   canonicalTag,
@@ -2053,7 +2052,11 @@ export class PostgresExpertCardRepository {
           if (preview.selected.length > 35 || preview.choices.length > 35)
             return fail("card_invalid_tags");
         } else if (raw.action === "confirm") {
-          const parsed = tagSelectionSchema.safeParse(preview.selected);
+          // Preserve exact historical labels within the established bounds.
+          // SQL alone permits invalid syntax to survive a genuine strict removal.
+          const parsed = richServiceSchema.shape.tags.safeParse(
+            preview.selected,
+          );
           if (!parsed.success) return fail("card_tag_limit");
           const selected = parsed.data;
           let profile = row.profile,
