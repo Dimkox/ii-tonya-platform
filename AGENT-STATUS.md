@@ -1,3 +1,15 @@
+# Semantic tags consolidated corrections — 2026-10-27
+
+All3 initial reviewers finished exact79b5d233. Six unique findings in
+docs/superpowers/implementation-artifacts/residency-semantic-tags-review.md. R1
+ordinary replies fixed9182ab18 (13 artifacts/4 source hashes rootverified). R2
+inactive cross-scope removal, R3 punctuation negation, R4 complete-card moderation
+proof, R5 clean-checkout fixture path, R6 inherited richfixture moderation remain.
+Same producer owns one consolidated correction; preserve existing evidence/code,
+no destructive restart or permission loop. Spec iteration1/in-progress. Root alone
+owns docs/review/gates, no competing PG/build. Final gate/push/PR still pending.
+Continue S4a/S4b after accepted delivery; no whole-package completion here.
+
 # Semantic tags independent review — 2026-10-27
 
 Source4a8bd1ac1a11aadd140cd5a287b7f89135083e9b adds ordinary ForceReply custom tags

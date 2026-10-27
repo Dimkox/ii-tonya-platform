@@ -2,9 +2,9 @@
 title: Local semantic hashtag recommendations and moderated selection
 created: 2026-10-27
 type: feature
-status: in-review
+status: in-progress
 baseline_commit: 254c8c169cbb8432654a46de206bd20500cecc3f
-review_loop_iteration: 0
+review_loop_iteration: 1
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -300,3 +300,41 @@ reply to its original server-issued scope/preview/revision and consent; a delaye
 reply must not silently attach to a newer scope. An advanced token command may
 coexist, but cannot be the only normal path. Verify actual ingress for the simple
 label and stale/wrong-scope reply, preserving original-input replay.
+
+## Independent-review correction contract
+
+All three initial reviewers inspected79b5d233. Six unique findings remain after
+deduplicating identical claims/actions. Ordinary-reply routing is already corrected
+in9182ab18 and awaits assigned reviewer closure. See residency-semantic-tags-review.md.
+
+For newly inactive selected tags, a normal owner must be able to remove them across
+separate scopes one step at a time. Permit only strictly reducing obsolete selected
+content during mutable repair; no additions, unrelated unsafe edits, hidden removals
+or final confirmation/approval until all selections are valid. Keep historical
+immutable versions intact. Check the same selected-content removal boundary for
+newly blocked tag policies without weakening whole-card safety or allowing a tag
+removal to authorize another blocked field. Prove ordinary catalogue and service
+paths, not only direct SQL. This refines the existing editable/removable requirement.
+
+Exact fallback must apply negation to the same normalized Unicode token stream as
+matching, including punctuation/brackets/colon, so «тревожность (не паника)» and
+«Исключая: паника» cannot preselect the excluded panic topic at100. Preserve safe
+positive exact/synonym matching; no fabricated semantic fallback.
+
+Prove complete current-card review on realPG: pending/rejected/stale custom decisions
+block approval; a current approved decision permits a complete owner-confirmed card
+and is preserved with the selection in its immutable reviewed snapshot. Browser
+disabled-button fixtures alone do not prove this transactional boundary. Update
+existing rich-onboarding fixtures to obtain legitimate current custom approval or
+explicit valid canonical selection, preserving their original photo/renewal/
+immutable-version assertions. Never weaken the moderation guard to fit old fixtures.
+
+Integration tests must execute from a clean checkout without an untracked local
+evidence directory. Optional browser fixture export may be explicitly configured;
+otherwise use a created temporary directory with cleanup. Keep archived witnesses
+reproducible and clearly separate from mandatory integration execution.
+
+Preserve all passing model/callback/ordinary-reply/replay/upgrade/browser evidence.
+Make bounded additive corrections, not destructive re-derivation; owner authorized
+continuation and necessary focused reruns. If0069 changes, reconstruct current state
+and update exact hash guards. Root does not run competing PG/build jobs.
