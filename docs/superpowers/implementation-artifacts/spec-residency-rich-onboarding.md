@@ -2,7 +2,7 @@
 title: Rich resident onboarding and reviewed profile versions
 type: feature
 created: 2026-10-26
-status: in-review
+status: done
 baseline_commit: 219f8e0c9d0938fccb4188cf0081f71b3f8b2db9
 review_loop_iteration: 2
 context:
@@ -138,12 +138,12 @@ in this source set; keep exact typed service duration/IDs for the next block.
 
 ## Tasks & Acceptance
 
-- [ ] Add typed rich profile/services/version schema, hand migration/state and cross-layer validation without altering historical migration bytes.
-- [ ] Connect3 real bot input modes, reusable checklist, safe proposals/manual fallback, gap questions and complete revision-bound owner preview/confirmation.
-- [ ] Compose safe conditional logistics/geocode/manual-map capability; protect detailed private data and deletion.
-- [ ] Extend existing manager review/diff/return reason, current safety and publication version replacement while retaining old live state.
-- [ ] Move materials eligibility to card approval, preserve old receipts/unknowns, exact placeholder and existing promo/main-payment gates.
-- [ ] Execute matrix through real authenticated ingress, PostgreSQL/SQL guards, actual browser and local transport/parser witnesses; preserve RED/GREEN evidence.
+- [x] Add typed rich profile/services/version schema, hand migration/state and cross-layer validation without altering historical migration bytes.
+- [x] Connect3 real bot input modes, reusable checklist, safe proposals/manual fallback, gap questions and complete revision-bound owner preview/confirmation.
+- [x] Compose safe conditional logistics/geocode/manual-map capability; protect detailed private data and deletion.
+- [x] Extend existing manager review/diff/return reason, current safety and publication version replacement while retaining old live state.
+- [x] Move materials eligibility to card approval, preserve old receipts/unknowns, exact placeholder and existing promo/main-payment gates.
+- [x] Execute matrix through real authenticated ingress, PostgreSQL/SQL guards, actual browser and local transport/parser witnesses; preserve RED/GREEN evidence.
 
 ## Spec Change Log
 
@@ -214,7 +214,7 @@ complete merely because a placeholder/interface always returns unavailable.
 All13 findings accepted closed at runtime46e03bf0db4a751977a494f9c645e165490a6c75.
 Second bounded correction preserved0066/0067, added0068 and retained85+125+48
 archives. Exact closure is recorded in residency-rich-onboarding-review-2026-10-27.md.
-Spec remains in-review until root canonical branch gate passes. S3b/S4 remain open.
+Canonical full gate atfa1a669f passes611/611 plus all required checks. S3b/S4 remain open.
 
 ## Suggested Review Order
 
@@ -238,3 +238,12 @@ Spec remains in-review until root canonical branch gate passes. S3b/S4 remain op
 
 - Integration regression and financial witnesses.
   [resident-rich-onboarding.test.ts:1](../../../tests/integration/resident-rich-onboarding.test.ts#L1)
+
+## Delivery evidence
+
+Runtime46e03bf0 accepted by three independent reviewers; exact journal-tail guard
+correctionfa1a669f separately accepted. Canonical full gate611/611 and allchecks
+pass, retained at docs/test-evidence/residency-rich-onboarding-final-gate-2026-10-27.
+Failed gate remains under the gate-correction archive. No story_key is set, so
+sprint-status synchronization is not applicable. Mandatory gated push is next.
+No hostedCI, deployment or live provider certification is asserted.

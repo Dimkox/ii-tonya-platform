@@ -1,3 +1,13 @@
+# Rich onboarding ready for gated push — 2026-10-27
+
+Same isolated worktree and codex/residency-rich-onboarding-20261026. Runtime46e03bf0
+acceptedR1–R13; exact journal-tail guardfa1a669f separately accepted. Full gate at
+fa1a669f5b521ec8dbe75216fb35e993aa8d0902 passes611/611 and all checks. Spec done.
+Root owns final mandatory push and DraftPR on codex/residency-private-verification-jobs-20261026
+(PR114 open/Draft at219f8e0c). Preserve failed/successful logs and all priorarchives.
+Continue S3b semantic tags then S4 scheduling/lifecycle without permission loops.
+Next hand migration0069; protected PG/parser resources retained, no provider/live activation.
+
 # Rich onboarding accepted; final gate next — 2026-10-27
 
 Same isolated .worktrees/phase1-owner-plan-20261023, branch
