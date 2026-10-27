@@ -163,3 +163,17 @@ and reviewers verified final27 artifacts/2 source pins/5 unchanged-state pins.
 All seven sets313 artifacts retain previous failures and passing evidence.
 Hook check confirms the executable clone-wide pre-push gate. Root now owns
 canonical fullgate and mandatory push, then DraftPR and sequential S4a/S4b.
+
+## Canonical gate failure and exact registry correction
+
+Fullgate5bc816f7 ran613 repository checks:610 passed,3 scope-registration failures.
+All other gate checks, including complete tests typecheck, passed. Missing entries
+were two already-reviewed protected admin routes, five exact isolated-helper
+automation files and stale barrel/journal hashes. Root compared actual changes and
+added only exact paths/routes/normalized-content hashes. Both pre-existing journal
+map entries were advanced consistently. Classifiers, financial boundaries and
+negative checks remain unchanged; no broad exemption or feature activation.
+
+Focused scope-boundary130/130, lint and whitespace pass. Failed fullgate/repository
+logs and focused command logs/results are retained in the gate-correction manifest
+(8 artifacts). Independent exact-delta review precedes justified fullgate rerun.

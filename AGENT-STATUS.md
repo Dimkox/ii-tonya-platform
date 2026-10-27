@@ -1,3 +1,15 @@
+# Semantic tags exact gate registry correction — 2026-10-27
+
+Runtime790d308c accepted by all3 reviewers, R1–R7 closed. Fullgate5bc816f7
+failed only scope registry:610/613 tests, all other checks and full tests typecheck
+passed. Root fixed exact missing2 admin routes,5 helper automation paths/hashes,
+integrations barrel hash and both journal hash entries. No classifier/wildcard/
+feature/provider/runtime changes. Focused scope130/130 plus lint/whitespace green;
+8 failed+focused logs archived in residency-semantic-tags-gate-correction-2026-10-27.
+Root owns this narrow guard delta; independent approval pending, then rerun canonical
+fullgate because a real failure was corrected, mandatorypush/DraftPR. No active jobs.
+Continue full S4a/S4b after delivery; no routine approval/bypass/provider activation.
+
 # Semantic tags accepted; final gate next — 2026-10-27
 
 All3 assigned reviewers accept source790d308c957ca9be8ab83a18ff8f3de6642921b9.

@@ -337,6 +337,8 @@ export const EXPERT_RESIDENCY_ALLOWED_ROUTES = new Set([
   "/v1/admin/expert-cards/:applicationId/public-card",
   "/v1/admin/expert-cards/:applicationId/review",
   "/v1/admin/expert-cards/:applicationId/promo-review",
+  "/v1/admin/expert-cards/:applicationId/tags/review",
+  "/v1/admin/expert-cards/catalogue-export",
   "/v1/admin/expert-verification",
   "/v1/admin/expert-verification/:applicationId",
   "/v1/admin/expert-verification/invoices/:invoiceId/checkout",
@@ -446,7 +448,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "b712a6983fcf80f53b174266478c5f410de7b272570e53a4c098ec7293cbe3ae",
+    "e50af593b5dc130e0ac77412c481cd4c869e09aa0d11790ef774da7727724db7",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -573,6 +575,27 @@ const reviewedDomHarnessHashes = new Map([
 ]);
 
 const approvedAutomationArtifactHashes = new Map([
+  // Exact reviewed local semantic helper; docs/spec/resident-semantic-tags-guard-registration.md.
+  [
+    "compose.semantic-tags.yaml",
+    "55c4e129bc7a3c8920eec86bf2a0093c0a9b4ea3fdecf7e09bf4c96550b5b33c",
+  ],
+  [
+    "runtime/semantic-tags/dockerfile",
+    "0460bbac1393c1ad42044dc95772ca4eb97557cbef97e9a70963c07a4bcdd9b1",
+  ],
+  [
+    "runtime/semantic-tags/engine.py",
+    "fe768cb9c478e8a1731bdad22f71af1c1527edbcc8a01e7058ababffcaff30a3",
+  ],
+  [
+    "runtime/semantic-tags/server.py",
+    "809f74c442c71395d464de42bc3bb24d7a8aa8f7e864563ba9dea8697c49c48a",
+  ],
+  [
+    "runtime/semantic-tags/test_engine.py",
+    "2bf7ea90c53601214dd6547832710c25ace37b1b4bbeea451c70fab1a22fc9c6",
+  ],
   // Reviewed S2b isolated helper and synthetic witnesses; exact paths and bytes only.
   [
     "compose.private-parser.yaml",
@@ -1577,7 +1600,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "24037db01ed39c5132dad22b855cf88e6bc74f65e77512a2ee86aeec1f693e29",
+    "927e46e4f69f1cccc4c65e1600a228c0a1bd093a5a703997c674c1f174c62414",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1657,7 +1680,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "24037db01ed39c5132dad22b855cf88e6bc74f65e77512a2ee86aeec1f693e29",
+    "927e46e4f69f1cccc4c65e1600a228c0a1bd093a5a703997c674c1f174c62414",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
