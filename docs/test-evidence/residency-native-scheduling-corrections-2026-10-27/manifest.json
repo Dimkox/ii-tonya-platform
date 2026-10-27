@@ -1,0 +1,1337 @@
+{
+  "kind": "local-synthetic-native-scheduling-review-corrections-R1-R6",
+  "sourceCommit": "b1872e94030666bf97bb50fb366caa7d5a8906b2",
+  "baselineCommit": "336fe8e59b8fdd960af3f3ee5551f94c526d750b",
+  "reviewedOriginalSource": "9ce9eb23181be0a6ee54a0920fbc952d9e5aaf3e",
+  "capturedAtUtc": "2026-10-27T07:33:39.029456+00:00",
+  "productionEvidence": false,
+  "hostedCiEvidence": false,
+  "compression": "gzip level9 mtime0; PNG files unchanged",
+  "preservedManifests": [
+    {
+      "path": "docs/test-evidence/residency-native-scheduling-2026-10-27/manifest.json",
+      "sha256": "9d0d4720a431f1408fe39eef16ecd0bcb42d8a31f71cb9c11b32e7e25af181a9"
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "apps/api/src/expert-card-telegram-ingress.ts",
+      "sha256": "f065c1884d3194c5dc6508bd9631ad61190e938e102b8271421bcf28731aaf11",
+      "bytes": 7511
+    },
+    {
+      "path": "apps/api/src/routes/public-client-catalog.ts",
+      "sha256": "e3940fbc4a7d9fea289ae937cb22dfd5e3d92eb3658b92e2929e9b3428aa0f30",
+      "bytes": 5152
+    },
+    {
+      "path": "apps/web/src/booking-client.ts",
+      "sha256": "94155a3a5c597d9deece50045c0b1d6d9a6d0311001c735990f25c05856fe883",
+      "bytes": 6614
+    },
+    {
+      "path": "apps/web/src/booking-view.test.ts",
+      "sha256": "2355923df6caf10c32263a727f524a3a4274c4fedc3e12162c060f94d37d1387",
+      "bytes": 1706
+    },
+    {
+      "path": "apps/web/src/booking-view.ts",
+      "sha256": "5cf32afb1f96eb758e172be0fd3a7837f1a33212173e78b2fe399c6060ca136b",
+      "bytes": 12001
+    },
+    {
+      "path": "apps/web/src/catalog-client.ts",
+      "sha256": "78ac26a930a5e00f0e36a42ffee5e4080664c61b99973b2c744869122db5829f",
+      "bytes": 4065
+    },
+    {
+      "path": "apps/web/src/catalog-view.ts",
+      "sha256": "2ed65320551b1b3acee4d819fcb666e0aeceb62fb0e838f88893cb5a0b1c827b",
+      "bytes": 6812
+    },
+    {
+      "path": "apps/web/src/expert-card-client.ts",
+      "sha256": "0b428aa5aae7c67a13b52704400c37a1831fff69965368cfc4e8fd5fb711a55a",
+      "bytes": 13625
+    },
+    {
+      "path": "apps/web/src/expert-card-view.ts",
+      "sha256": "d5ef6cb84104095d978a12db61acde9de0e893b0d90c2e85162af583e11d2130",
+      "bytes": 24418
+    },
+    {
+      "path": "apps/worker/src/booking-notifications.ts",
+      "sha256": "a6ecb6451040104885a89b440b9a6f21953dd923813bb923c8698074fbd0378d",
+      "bytes": 6096
+    },
+    {
+      "path": "apps/worker/src/client-catalog-outbox.ts",
+      "sha256": "0b580995528205ef856826ee555b36e3cddd02a411a73427a4ecf3c33b723237",
+      "bytes": 16409
+    },
+    {
+      "path": "apps/worker/src/resident-native-discovery.test.ts",
+      "sha256": "cef5b3f18622b6e15a3a10fa5004b4afc95d4be72a6a3c59d04279a8dfbc8772",
+      "bytes": 1450
+    },
+    {
+      "path": "docs/operations/resident-native-scheduling.md",
+      "sha256": "e3f14be4dcd2b3afdc9fa079061a367e52fc0cf9e46803f0c1b0af469652f993",
+      "bytes": 6709
+    },
+    {
+      "path": "docs/spec/resident-native-scheduling-guard-registration.md",
+      "sha256": "70cf6226ae1138ff139e186d7648aec2ba96ff627a69fcf26bc3969e5e7992cc",
+      "bytes": 1319
+    },
+    {
+      "path": "packages/application/src/expert-card-service.ts",
+      "sha256": "a584cb07b0504a22273aacb45eb48c05abc7229928377464385aae85cf96caef",
+      "bytes": 53843
+    },
+    {
+      "path": "packages/contracts/package.json",
+      "sha256": "107c72668715f901d985b521260771b152b1efd78ca5f9ab9c719ca30db6d66a",
+      "bytes": 526
+    },
+    {
+      "path": "packages/contracts/src/booking-notifications.ts",
+      "sha256": "85884d51a38fe8e62b13dfd94290768a0a6b399ac899ac95bd210e3cfd008804",
+      "bytes": 6326
+    },
+    {
+      "path": "packages/contracts/src/index.ts",
+      "sha256": "66800d021c07f7c9f5e1b0fa61ecb3d378799cc1684a0c1ae45be6f78496092d",
+      "bytes": 1771
+    },
+    {
+      "path": "packages/contracts/src/resident-schedule.test.ts",
+      "sha256": "2f4ded9f579e5f981c970da5109b3a6f8e3901173656b46cccbdf1d5f180e0bb",
+      "bytes": 6008
+    },
+    {
+      "path": "packages/contracts/src/resident-schedule.ts",
+      "sha256": "891c9a52c5327cc10c0cb0136c52bbfe997f3e229dfdf2bb9071814408e7e3d0",
+      "bytes": 12095
+    },
+    {
+      "path": "packages/db/migrations/0070_resident_native_scheduling.sql",
+      "sha256": "57aa4832165fcaf88665ee6d3d9b358a05c94c8d27f1a6bc09167d0667129e75",
+      "bytes": 31491
+    },
+    {
+      "path": "packages/db/migrations/meta/0070_snapshot.json",
+      "sha256": "790760c28b969aecb1131ff8645c6a5708102318fc579b50a2e0bb778f07b220",
+      "bytes": 924975
+    },
+    {
+      "path": "packages/db/migrations/meta/_journal.json",
+      "sha256": "b9c66b8bb815b460dcf5fdbac623a9bb79c1c38239ca8dc618e59b5f0a86f0d7",
+      "bytes": 10936
+    },
+    {
+      "path": "packages/db/migrations/state/0070_manifest.json",
+      "sha256": "222b8f1e33823895774099ce115cb6475adfa2e279850e91c8a29a41b27b800e",
+      "bytes": 11821
+    },
+    {
+      "path": "packages/db/migrations/state/0070_sql_objects.json",
+      "sha256": "82fc8811b7e6c761a16a63c9fcb919d814000692c75abfdf345b9f7e5b4cfee0",
+      "bytes": 1008359
+    },
+    {
+      "path": "packages/db/src/index.ts",
+      "sha256": "dc65fa5ea4995a96c0e665b6f7d2c7ff078d62e9dc21de496d0830c902514674",
+      "bytes": 13684
+    },
+    {
+      "path": "packages/db/src/repositories/booking-notification-callback-repository.ts",
+      "sha256": "16c0f3ddb89958e618d4d4b3742b762de0fd5dfbddc50c10cf77c3a6a5d1dfcd",
+      "bytes": 14896
+    },
+    {
+      "path": "packages/db/src/repositories/booking-notification-repository.ts",
+      "sha256": "5232d8211f6b623d85dededa10537530947723d04a26c145e7509096932578c3",
+      "bytes": 50608
+    },
+    {
+      "path": "packages/db/src/repositories/booking-repository.ts",
+      "sha256": "5233a834fd0cccd6a0c27c351846a6daf62b19ec6c3acc58400859fb0f7b0ce4",
+      "bytes": 67250
+    },
+    {
+      "path": "packages/db/src/repositories/catalog-repository.ts",
+      "sha256": "81ba49f375581c4cbced37206805ca1482d1a5d3bb414601efd00f1c668629bb",
+      "bytes": 9758
+    },
+    {
+      "path": "packages/db/src/repositories/client-catalog-repository.ts",
+      "sha256": "54e0d6f6341997b06183421d7934117df55e4055265dfc8d2e466a077735b835",
+      "bytes": 26025
+    },
+    {
+      "path": "packages/db/src/repositories/expert-card-repository.ts",
+      "sha256": "980a5f3063d1e4623137db1020a849876cdb55b35776a50b9bfbbcb6cdba1918",
+      "bytes": 140708
+    },
+    {
+      "path": "packages/db/src/repositories/expert-telegram-query-repository.ts",
+      "sha256": "d0ef132a20414ad7c6bb69b091c1d1563fd6ebdd8033c08e26ab407ccc5709f7",
+      "bytes": 17540
+    },
+    {
+      "path": "packages/db/src/repositories/privacy-repository.ts",
+      "sha256": "546bdf8c492e8c9e22bbb1280a6e52b1735e6add524965c6c8cd75eecbca64a1",
+      "bytes": 59532
+    },
+    {
+      "path": "packages/db/src/repositories/resident-native-logistics.ts",
+      "sha256": "a2d47d7220bb508c061b9e55a453dd2cea75d279075e38a675d2dd20649b1ce8",
+      "bytes": 13336
+    },
+    {
+      "path": "packages/db/src/repositories/resident-schedule.ts",
+      "sha256": "09eaae1eb6d9f1d7f72a75a58a14d34aaf083756eec516373a54348455721394",
+      "bytes": 19456
+    },
+    {
+      "path": "packages/db/src/schema/expert-cards.ts",
+      "sha256": "ed633bf93561ae81cec6fe0c385672779cc26101fefd26ca92718c4a4b79515e",
+      "bytes": 17882
+    },
+    {
+      "path": "packages/db/src/schema/index.ts",
+      "sha256": "5aee7c39e247c880a929f286b94a4d42496f05e0b89bab868a1447d0c182b17f",
+      "bytes": 1334
+    },
+    {
+      "path": "packages/db/src/schema/resident-native-scheduling.ts",
+      "sha256": "e2fde075930bcd8f7e7ecdcb37aba57a6b3dc5cc43c1206f304454081310ad40",
+      "bytes": 14389
+    },
+    {
+      "path": "packages/db/src/schema/resident-rich-onboarding.ts",
+      "sha256": "75a6b3a765a7ebc2ae23c59117748dc9e15e7a86743202b9287e19b411a0e794",
+      "bytes": 2992
+    },
+    {
+      "path": "packages/worker/src/booking-notification-renderer.ts",
+      "sha256": "6bb102e220a9d0391cae43b01148edc85b6a97d557d859c63962a0840a293c2e",
+      "bytes": 4020
+    },
+    {
+      "path": "pnpm-lock.yaml",
+      "sha256": "128fc7e791a5f117b9be2d135c12d78a5a4dc2da025900e9604eafbeb1564c4b",
+      "bytes": 212113
+    },
+    {
+      "path": "tests/integration/resident-native-migration.test.ts",
+      "sha256": "72d483988b2852db1dbea7906b8c30c865d35bca20e39e57551a387a9bcb830f",
+      "bytes": 3629
+    },
+    {
+      "path": "tests/integration/resident-native-scheduling.test.ts",
+      "sha256": "6db70019086444a13b47a44e77e31ba9f09e4b86b20de77e4106b3397d8f1d6d",
+      "bytes": 76748
+    },
+    {
+      "path": "tests/repo/booking-repository-guards.test.ts",
+      "sha256": "466b32ea7189d5430f065f583671f7cc36bd651c5dc1ac6d063997d60ec45770",
+      "bytes": 4090
+    },
+    {
+      "path": "tests/repo/expert-referral-scope-guards.test.ts",
+      "sha256": "a7a6f43c3adb27118e9fc2d2f318727bb9855d7009d4641bb7daf8e72b93cdb5",
+      "bytes": 17044
+    },
+    {
+      "path": "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+      "sha256": "981fb0882e31cd5a4064916a40c8966b739e8042281d0e6e7cdff3d9becb3360",
+      "bytes": 3390
+    },
+    {
+      "path": "tests/repo/migration-history-integrity.test.ts",
+      "sha256": "1f09ca52a3ccdfa8923892b1ad75c677771cf475bb46a213933a1a87c771f547",
+      "bytes": 22771
+    },
+    {
+      "path": "tests/repo/resident-native-scheduling-state.test.ts",
+      "sha256": "7e016a1022e68d2898a234b08c2c8541ec9274766fc20a0adfa71aeadcde8904",
+      "bytes": 3270
+    },
+    {
+      "path": "tests/repo/support/payment-scope-boundary-core.ts",
+      "sha256": "45d3e463064d7e55ff03830339123918bf16fddb4b83e2399d1e8fc573f158e0",
+      "bytes": 98045
+    }
+  ],
+  "changedSourceFiles": [
+    "docs/operations/resident-native-scheduling.md",
+    "packages/db/migrations/meta/_journal.json",
+    "packages/db/src/repositories/booking-notification-repository.ts",
+    "packages/db/src/repositories/expert-telegram-query-repository.ts",
+    "packages/db/src/repositories/resident-native-logistics.ts",
+    "packages/worker/src/booking-notification-renderer.ts",
+    "tests/integration/resident-native-migration.test.ts",
+    "tests/integration/resident-native-scheduling.test.ts",
+    "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+    "tests/repo/migration-history-integrity.test.ts",
+    "tests/repo/support/payment-scope-boundary-core.ts"
+  ],
+  "preservation": {
+    "historicalJournalEntries0Through69Identical": true,
+    "newJournal70When": 1793152800001,
+    "originalProductionNativeInvocationRestoredByteForByte": true,
+    "historicalSqlAndReconstructedStateChanged": false,
+    "defaultProviderActivationChanged": false
+  },
+  "findings": {
+    "R1": {
+      "red": "r1-migration-red.log.gz",
+      "passing": [
+        "r1-migration-green.log.gz",
+        "history-guard.log.gz",
+        "journal-parity.log.gz",
+        "scope-guard.log.gz"
+      ],
+      "witness": "Normal migrateDb populated incremental upgrade, retained old rows and idempotent second invocation."
+    },
+    "R2": {
+      "red": "r234-regressions-red.log.gz",
+      "passing": [
+        "r2345-regressions-green.log.gz",
+        "corrections-pg-clean-green.log.gz"
+      ],
+      "witness": "Two due notices; throttle and pause defer the unsent row with attempt_count0, then explicit recovery delivers it; original unknown is not resent. The full file artifact has one unrelated R4 test-fixture failure, not an R2 failure."
+    },
+    "R3": {
+      "red": ["r234-regressions-red.log.gz", "r3-held-version-red.log.gz"],
+      "passing": [
+        "r3-held-version-green.log.gz",
+        "external-expert-query-preservation-green.log.gz"
+      ],
+      "witness": "Signed real client-choice callback detail keeps immutable booked and held service titles after approved replacement and paid expiry."
+    },
+    "R4": {
+      "red": "r234-regressions-red.log.gz",
+      "passing": [
+        "r4-clean-receipts-green.log.gz",
+        "external-provider-preservation-green.log.gz"
+      ],
+      "witness": "Three unconfirmed native outcomes through ordinary notification worker; no calendar language or invented provider rows. Synthetic receipt-ID reuse in the first full-file witness was corrected without changing runtime."
+    },
+    "R5": {
+      "negativeControl": "r5-missing-native-invocation-red.log.gz",
+      "mutation": "r5-invocation-mutation.diff.gz",
+      "passing": [
+        "r2345-regressions-green.log.gz",
+        "corrections-pg-clean-green.log.gz"
+      ],
+      "witness": "Actual production-composed runtime sends and persists both due private notices; recovery-only sends nothing; removing native invocation makes the witness fail. The full file artifact has one unrelated R4 test-fixture failure, not an R5 failure."
+    },
+    "R6": {
+      "red": "r6-clean-directory-red.log.gz",
+      "passing": [
+        "corrections-pg-clean-green.log.gz",
+        "r4-clean-receipts-green.log.gz",
+        "r6-opt-in-browser-export-green.log.gz",
+        "r6-browser-green.log.gz"
+      ],
+      "witness": "No original ignored fixture directory and no export variable for ordinary execution; both exporting tests pass without writing. Explicit export2/2 and actual Chrome replay pass. Full-file result is18/19 with unrelated R4 fixture failure retained."
+    }
+  },
+  "verification": {
+    "focusedStaticTests": 222,
+    "staticFiles": 7,
+    "incrementalMigrationTests": 1,
+    "legacyExternalNotificationTests": 37,
+    "legacyExpertQueryTests": 10,
+    "nativeUniqueCasesCovered": 19,
+    "nativeFullFileResult": "18 passed/1 failed; the failure was synthetic receipt reuse in new R4 expiry witness. All3 R4 cases passed after fixture correction; strengthened R3 held-version case passed separately. No broad rerun or relabelled failed command.",
+    "finalChecks": [
+      "types",
+      "build",
+      "lint",
+      "format",
+      "whitespace",
+      "environment"
+    ],
+    "browser": "Fresh actual synthetic HTTP/PG response exports replayed through production clients/views in actual Chrome; no live deployment."
+  },
+  "files": [
+    {
+      "file": "browser-fixtures--booking-api-fixture.json.gz",
+      "sha256": "52bfcd73c0f8db026afcbcc341549a76e369da63a70dd8d46bbb62a4a4c3fac6",
+      "bytes": 509,
+      "rawSha256": "ace237412666712be582c9480aca255fb7d57ffb4d32a902475b15308f9630fa",
+      "rawBytes": 899,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/browser-fixtures/booking-api-fixture.json"
+    },
+    {
+      "file": "browser-fixtures--manager-api-fixture.json.gz",
+      "sha256": "2a49a0dee5421a6519c4b811ad7dc8f18593e706a589b43b366a588dc868cd16",
+      "bytes": 1961,
+      "rawSha256": "f2d71c960141bf6a7d31be847cdfd5b5d34664ee9f2ed1d4483726c71b5b56ac",
+      "rawBytes": 5822,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/browser-fixtures/manager-api-fixture.json"
+    },
+    {
+      "file": "browser-witness.mjs.gz",
+      "sha256": "ce5af3d37e2157697be590b83214661160f497859adb169a06c31ebb4b2c6d65",
+      "bytes": 2787,
+      "rawSha256": "ce2122a37ee8659fa224561df6e0ae04e10a01585b05f261ef1ad793fefb621e",
+      "rawBytes": 6762,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/browser-witness.mjs"
+    },
+    {
+      "file": "build.log.gz",
+      "sha256": "45aa9c571d334cd12fe04346342f14e91260c09abf6ebdcb9144641c99c98271",
+      "bytes": 979,
+      "rawSha256": "de8330925e5f16ab77de74d611e4850f4a954c836ead56b2486822c6ba883994",
+      "rawBytes": 5477,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/build.log",
+      "command": ["pnpm", "build"],
+      "durationSeconds": 64.645,
+      "exitCode": 0,
+      "recordedResult": "build.result.json.gz",
+      "recordedSummary": []
+    },
+    {
+      "file": "build.result.json.gz",
+      "sha256": "737ce14e7278fcd7502b1076a7a6434cc94af2359c00cf4c2ec5c6adec4fd92b",
+      "bytes": 97,
+      "rawSha256": "43245ff039f21294356381ef14fad0b535fb8bb9556eccf1f97d3a30219efe69",
+      "rawBytes": 93,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/build.result.json"
+    },
+    {
+      "file": "checks.py.gz",
+      "sha256": "64188b10f0e82f7264a98357a6931f4cd499c1a3a3d67fd40d6c0d21ac16be50",
+      "bytes": 559,
+      "rawSha256": "37db2e80c515a50f28d7c331413033bf774ae21c4e69825920f38516013542fc",
+      "rawBytes": 1246,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/checks.py"
+    },
+    {
+      "file": "choices-browser.png",
+      "sha256": "321274bb36370e97dac011a3c30b5248508df61d932eafa2101ffe6777185595",
+      "bytes": 158464,
+      "rawSha256": "321274bb36370e97dac011a3c30b5248508df61d932eafa2101ffe6777185595",
+      "rawBytes": 158464,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/choices-browser.png"
+    },
+    {
+      "file": "corrections-pg-clean-green.isolation.json.gz",
+      "sha256": "68b2f8b88e5716037d16cf866629058afc30cb90fcede01b089acc783014a0dc",
+      "bytes": 118,
+      "rawSha256": "b0e414f6ea6f80c08947d2aa1f77ff67ff150ddfa80f62a9d3e18bea951b9a48",
+      "rawBytes": 121,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/corrections-pg-clean-green.isolation.json"
+    },
+    {
+      "file": "corrections-pg-clean-green.log.gz",
+      "sha256": "5ed1f507095a29b6e32f29fbfe5b010ecd0abdbc803b87d624f17ca405ac4535",
+      "bytes": 1395,
+      "rawSha256": "0b9905cae3d22b7d813f49be4bff67f63b435f3b653b1b199ac5956d52be2de8",
+      "rawBytes": 3451,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/corrections-pg-clean-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts"
+      ],
+      "startedAt": "2026-10-27T07:18:51.632Z",
+      "durationMs": 68450,
+      "exitCode": 1,
+      "signal": null,
+      "recordedResult": "corrections-pg-clean-green.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 18 passed (19)",
+        "Start at  07:18:52",
+        "Duration  67.09s (transform 2.96s, setup 0ms, collect 5.18s, tests 61.43s, environment 0ms, prepare 110ms)"
+      ]
+    },
+    {
+      "file": "corrections-pg-clean-green.result.json.gz",
+      "sha256": "3e6f747bfaaad033ed7b34ca26bb9ed771cbe6710090cd68f3cca62e0bf65562",
+      "bytes": 185,
+      "rawSha256": "0e5f1ec06bdfabec69f0ae09c0c6cfd51e335bc8b25aa2451e6595d68b45a936",
+      "rawBytes": 232,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/corrections-pg-clean-green.result.json"
+    },
+    {
+      "file": "environment.log.gz",
+      "sha256": "532f262c179b98362934344837e3bfc52112651b4084c2f28173712a127eecfd",
+      "bytes": 322,
+      "rawSha256": "79a06dcd1c13332ff0a5e5789716a5ba993b771222a799b3c5ddec9dbc2596cb",
+      "rawBytes": 484,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/environment.log",
+      "command": [
+        "pwsh",
+        "-File",
+        "scripts/check-development-environment.ps1",
+        "-RequireDocker"
+      ],
+      "durationSeconds": 1.325,
+      "exitCode": 0,
+      "recordedResult": "environment.result.json.gz",
+      "recordedSummary": []
+    },
+    {
+      "file": "environment.result.json.gz",
+      "sha256": "2bc3ed8e804cf17e1df94914b4f3c264ea5297c1d5137153df72a077ecc83bf9",
+      "bytes": 148,
+      "rawSha256": "0fe22d11fc56c714d2263f81fbee467020fb2adf798742de5bcbc14c4c37e662",
+      "rawBytes": 163,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/environment.result.json"
+    },
+    {
+      "file": "external-expert-query-preservation-green.log.gz",
+      "sha256": "142716f2d8be6065354330100c92912af35ce34f6af03f064d66b3c7468a8f71",
+      "bytes": 272,
+      "rawSha256": "f193c39150166e0eb0140e2d5f33f4a2af9361db407f644a03e33fca213719e7",
+      "rawBytes": 370,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/external-expert-query-preservation-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/expert-telegram-queries.test.ts"
+      ],
+      "startedAt": "2026-10-27T07:26:01.952Z",
+      "durationMs": 6602,
+      "browserFixtureExportDirectory": null,
+      "exitCode": 0,
+      "signal": null,
+      "recordedResult": "external-expert-query-preservation-green.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  10 passed (10)",
+        "Start at  07:26:03",
+        "Duration  5.26s (transform 763ms, setup 0ms, collect 2.08s, tests 2.72s, environment 0ms, prepare 109ms)"
+      ]
+    },
+    {
+      "file": "external-expert-query-preservation-green.result.json.gz",
+      "sha256": "e8c4705035572a13fc173e2e77b998ad06f9e8c5c06ab6d2dae91c6709a43e26",
+      "bytes": 204,
+      "rawSha256": "cfff5edf4d0c678a2f54a9fbdf32d4e3082f63ec5f90ecaaa7d55447d45e9dee",
+      "rawBytes": 269,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/external-expert-query-preservation-green.result.json"
+    },
+    {
+      "file": "external-provider-preservation-green.log.gz",
+      "sha256": "43c53ddaf7be75ac13d8cfe7e05d85e0a31c071265074a688d184884833d050c",
+      "bytes": 460,
+      "rawSha256": "5a64aab5b8af1551ffb42fe7db07d91a3e6dcac9145d61a87e7a5a687e014cf5",
+      "rawBytes": 749,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/external-provider-preservation-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/booking-notification-wire-admission.test.ts"
+      ],
+      "startedAt": "2026-10-27T07:25:00.550Z",
+      "durationMs": 12678,
+      "browserFixtureExportDirectory": null,
+      "exitCode": 0,
+      "signal": null,
+      "recordedResult": "external-provider-preservation-green.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  37 passed (37)",
+        "Start at  07:25:01",
+        "Duration  11.37s (transform 830ms, setup 0ms, collect 2.19s, tests 8.73s, environment 0ms, prepare 121ms)"
+      ]
+    },
+    {
+      "file": "external-provider-preservation-green.result.json.gz",
+      "sha256": "400e67e9bc77e1df1229306905aff8a3909c68cf14c1d047903a24043c6ba750",
+      "bytes": 217,
+      "rawSha256": "ee67fae9cc03f88a6343c556478e4672368247b9e1ceacc844f47a54168e18aa",
+      "rawBytes": 282,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/external-provider-preservation-green.result.json"
+    },
+    {
+      "file": "final-checks.py.gz",
+      "sha256": "5802410c78322f1a8ae8de0ae9a8fadee069b298b986733e690366821706005a",
+      "bytes": 591,
+      "rawSha256": "9cb0aa96814041d5446020a442f7a4fcbe2e49be333aeb79e6072047fa316a60",
+      "rawBytes": 1143,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/final-checks.py"
+    },
+    {
+      "file": "format.log.gz",
+      "sha256": "710c63d8d40d5688a62c3b08053dd1971c4e4ee87b2297f3f20c2540d22cd94e",
+      "bytes": 82,
+      "rawSha256": "17aa973d3f004560237d9a95171210b0671deff23d61628eecf7322ff5938f20",
+      "rawBytes": 66,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/format.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "prettier",
+        "--check",
+        "docs/operations/resident-native-scheduling.md",
+        "packages/db/migrations/meta/_journal.json",
+        "packages/db/src/repositories/booking-notification-repository.ts",
+        "packages/db/src/repositories/expert-telegram-query-repository.ts",
+        "packages/db/src/repositories/resident-native-logistics.ts",
+        "packages/worker/src/booking-notification-renderer.ts",
+        "tests/integration/resident-native-migration.test.ts",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts"
+      ],
+      "durationSeconds": 1.897,
+      "exitCode": 0,
+      "recordedResult": "format.result.json.gz",
+      "recordedSummary": []
+    },
+    {
+      "file": "format.result.json.gz",
+      "sha256": "8ae6b232e57b8cf4c722c840c6b1fca8d1adc29e42005970e8a4c6612ab4b418",
+      "bytes": 334,
+      "rawSha256": "88a3fe1a9e8e9a0418bb2b3512823c17355ac107f4ff2f33c335a35de9adfd0e",
+      "rawBytes": 785,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/format.result.json"
+    },
+    {
+      "file": "history-guard.log.gz",
+      "sha256": "a65e4b5ffa25e7bcd41a08dc979122617b41dbbc287f233c9394414d2cf36e53",
+      "bytes": 266,
+      "rawSha256": "943ab4cdb1b266e55d35c1998566260d40fe1f36cc9a389efb115edd9be1f295",
+      "rawBytes": 361,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/history-guard.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/migration-history-integrity.test.ts"
+      ],
+      "durationSeconds": 1.773,
+      "exitCode": 0,
+      "recordedResult": "history-guard.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  10 passed (10)",
+        "Start at  07:27:25",
+        "Duration  508ms (transform 66ms, setup 0ms, collect 63ms, tests 35ms, environment 0ms, prepare 100ms)"
+      ]
+    },
+    {
+      "file": "history-guard.result.json.gz",
+      "sha256": "11546f70d4b4e4358f080e334849e00e52149cb4246bf28d39b6c2efcc9031e1",
+      "bytes": 144,
+      "rawSha256": "ab10ddfe6a8b40467878951da5b2ab8c5450bae5d2b806b2275b3fd7e8d3ac64",
+      "rawBytes": 170,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/history-guard.result.json"
+    },
+    {
+      "file": "journal-parity.log.gz",
+      "sha256": "f85cffb7efcfe1a9dadbe30cace13cbb6bb42ecc81b006480a0a1c1a699f08fa",
+      "bytes": 274,
+      "rawSha256": "bb7d52c7d52a65332cad5ff4f70c99f9ce85f0b3ffa5df790677989cf10c071b",
+      "rawBytes": 365,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/journal-parity.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/hybrid-message-gateway-schema-parity.test.ts"
+      ],
+      "durationSeconds": 1.673,
+      "exitCode": 0,
+      "recordedResult": "journal-parity.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  3 passed (3)",
+        "Start at  07:27:27",
+        "Duration  495ms (transform 54ms, setup 0ms, collect 40ms, tests 7ms, environment 0ms, prepare 103ms)"
+      ]
+    },
+    {
+      "file": "journal-parity.result.json.gz",
+      "sha256": "4531a5af715f8c0ff543bd607fa3f71efdf61a6a7f42bfff96b2eea702514343",
+      "bytes": 153,
+      "rawSha256": "c2350b7a566a6d7023982c5bf4116668e3911b74de59aaef1fc828a32dd1fb47",
+      "rawBytes": 179,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/journal-parity.result.json"
+    },
+    {
+      "file": "lint.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/lint.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "packages/db/src/repositories/booking-notification-repository.ts",
+        "packages/db/src/repositories/expert-telegram-query-repository.ts",
+        "packages/db/src/repositories/resident-native-logistics.ts",
+        "packages/worker/src/booking-notification-renderer.ts",
+        "tests/integration/resident-native-migration.test.ts",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "tests/repo/hybrid-message-gateway-schema-parity.test.ts",
+        "tests/repo/migration-history-integrity.test.ts",
+        "tests/repo/support/payment-scope-boundary-core.ts"
+      ],
+      "durationSeconds": 2.253,
+      "exitCode": 0,
+      "recordedResult": "lint.result.json.gz",
+      "recordedSummary": []
+    },
+    {
+      "file": "lint.result.json.gz",
+      "sha256": "e240a10e60c932840d2ee3d9d1dbeca0f8c63ff1e95a9ece1932d6aa2be13745",
+      "bytes": 294,
+      "rawSha256": "727cbcfab62770c2198a4866af850731165b9846e72ae78b6bf1c52295b6c356",
+      "rawBytes": 666,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/lint.result.json"
+    },
+    {
+      "file": "manager-browser.png",
+      "sha256": "d5bd7c642774112f5243869b3a024d22619655c765d264dc29ee257e0d679e9a",
+      "bytes": 166771,
+      "rawSha256": "d5bd7c642774112f5243869b3a024d22619655c765d264dc29ee257e0d679e9a",
+      "rawBytes": 166771,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/manager-browser.png"
+    },
+    {
+      "file": "package-evidence.py.gz",
+      "sha256": "f9cf7b804db770011b85b21933f2c83485834aa76e779321e2cc69732cc95916",
+      "bytes": 3416,
+      "rawSha256": "cb3533e476ae98e15ac1bf05fe9b9ac1122175107820502ec7bd126bff424d64",
+      "rawBytes": 7992,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/package-evidence.py"
+    },
+    {
+      "file": "query-service.log.gz",
+      "sha256": "ac5874eb32ec56858f900653a9df40046dcd6bc007463540cba7cd109db30e81",
+      "bytes": 282,
+      "rawSha256": "d6351ce79e80d8f35593e1a5c4d6e9ec32c6eecee020ff9c03becab0ed59c8be",
+      "rawBytes": 374,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/query-service.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/application/src/expert-telegram-query-service.test.ts"
+      ],
+      "durationSeconds": 1.741,
+      "exitCode": 0,
+      "recordedResult": "query-service.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  8 passed (8)",
+        "Start at  07:27:40",
+        "Duration  467ms (transform 65ms, setup 0ms, collect 59ms, tests 15ms, environment 0ms, prepare 105ms)"
+      ]
+    },
+    {
+      "file": "query-service.result.json.gz",
+      "sha256": "19071290c68530569ed9dcbf299716780bf074c51897320780f3017bbad7cd4b",
+      "bytes": 157,
+      "rawSha256": "c447b08332fe3edf2ddf1671a0a981140983d9e11699e1127f0c2583a14af060",
+      "rawBytes": 186,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/query-service.result.json"
+    },
+    {
+      "file": "r1-migration-green.log.gz",
+      "sha256": "070f6116af37b8697ca3c7814d59d7a0bfe35acc9c87023b4af5c60493812bc0",
+      "bytes": 318,
+      "rawSha256": "7bb06ccde767f60d7a9f3592e5cae071ad48f44155a7240c350ae8e50b77046f",
+      "rawBytes": 458,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r1-migration-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-migration.test.ts"
+      ],
+      "startedAt": "2026-10-27T07:09:54.906Z",
+      "durationMs": 6045,
+      "exitCode": 0,
+      "signal": null,
+      "recordedResult": "r1-migration-green.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  1 passed (1)",
+        "Start at  07:09:56",
+        "Duration  4.69s (transform 742ms, setup 0ms, collect 2.11s, tests 2.11s, environment 0ms, prepare 120ms)"
+      ]
+    },
+    {
+      "file": "r1-migration-green.result.json.gz",
+      "sha256": "51baf47b6c89c4a482a341f3835e6632df22aa470b315d5022431833041e6715",
+      "bytes": 180,
+      "rawSha256": "3938cb022395eaf759de3e8540e658deb171c91ca0b4cf8d0ca7d25e68b9d56f",
+      "rawBytes": 230,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r1-migration-green.result.json"
+    },
+    {
+      "file": "r1-migration-red.log.gz",
+      "sha256": "18b4ec1ceac84f79ee2d9da0f5589c824ca627bc954db2469362efb1c000fdf7",
+      "bytes": 478,
+      "rawSha256": "c56b8473e1f6cafeab91186e80291c1842400dd5186bfca22f59d87bb29390a8",
+      "rawBytes": 1050,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r1-migration-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-migration.test.ts"
+      ],
+      "startedAt": "2026-10-27T07:09:28.398Z",
+      "durationMs": 5984,
+      "exitCode": 1,
+      "signal": null,
+      "recordedResult": "r1-migration-red.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed (1)",
+        "Start at  07:09:29",
+        "Duration  4.68s (transform 764ms, setup 0ms, collect 2.12s, tests 2.09s, environment 0ms, prepare 96ms)"
+      ]
+    },
+    {
+      "file": "r1-migration-red.result.json.gz",
+      "sha256": "4e75acabb76a3e9784445209b7a0ab4fb2f0bae1094e67b315c0bbc4d9948cc5",
+      "bytes": 181,
+      "rawSha256": "fab258e0306f927ec8468f0b592843e2b17885b8ea8348ef07e80cde86fb8aee",
+      "rawBytes": 230,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r1-migration-red.result.json"
+    },
+    {
+      "file": "r234-regressions-red.log.gz",
+      "sha256": "5e9df259248c9633318aa953f20f830fcacd4d2857d577c0f24400fb79259943",
+      "bytes": 2075,
+      "rawSha256": "dfce78fc009a95c5006cfae07c94a7e3bb3f2228e5af5f260c17ac625631898e",
+      "rawBytes": 8387,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r234-regressions-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "R2 |R3 |R4 "
+      ],
+      "startedAt": "2026-10-27T07:11:31.737Z",
+      "durationMs": 32282,
+      "exitCode": 1,
+      "signal": null,
+      "recordedResult": "r234-regressions-red.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  6 failed | 12 skipped (18)",
+        "Start at  07:11:32",
+        "Duration  30.95s (transform 2.82s, setup 0ms, collect 5.19s, tests 25.26s, environment 0ms, prepare 99ms)"
+      ]
+    },
+    {
+      "file": "r234-regressions-red.result.json.gz",
+      "sha256": "1285d3f019acd9f7282939e8e6c1fa305651d6b8899db1ab398c2e9f3fc0eb72",
+      "bytes": 197,
+      "rawSha256": "822c1280d4af59866c21b0f889827618d735e950fc5d77e1a292bb9b6b118463",
+      "rawBytes": 261,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r234-regressions-red.result.json"
+    },
+    {
+      "file": "r2345-regressions-green.log.gz",
+      "sha256": "9888e555191c784695a62d1fce1bb18934031465317d6ff9994b40a9fce53981",
+      "bytes": 557,
+      "rawSha256": "26ad3ac1b52de9e2442d05811c0338db2d812fc11569f4b98d16ff6d79722132",
+      "rawBytes": 1108,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r2345-regressions-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "R2 |R3 |R4 |R5 "
+      ],
+      "startedAt": "2026-10-27T07:15:00.716Z",
+      "durationMs": 37795,
+      "exitCode": 0,
+      "signal": null,
+      "recordedResult": "r2345-regressions-green.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  7 passed | 12 skipped (19)",
+        "Start at  07:15:01",
+        "Duration  36.41s (transform 2.97s, setup 0ms, collect 5.24s, tests 30.71s, environment 0ms, prepare 108ms)"
+      ]
+    },
+    {
+      "file": "r2345-regressions-green.result.json.gz",
+      "sha256": "bdd687d10113ae61b282eccf8b1cb9dd02ea5fdd5613c71ce89b2f6b79d518f1",
+      "bytes": 200,
+      "rawSha256": "5a1e98d63cf4dc9818533510a1f48177a7b66bfd79df95b3d0d9ca6e9693cb69",
+      "rawBytes": 265,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r2345-regressions-green.result.json"
+    },
+    {
+      "file": "r3-held-version-green.log.gz",
+      "sha256": "242ce0a51e8979641e2ef469266e301fcea270b6f807008670b07fa6ca9f28a6",
+      "bytes": 368,
+      "rawSha256": "6f48a76896d952c22d0f0513fead4c412617df948ad78b6eeb2abf117ff18061",
+      "rawBytes": 526,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r3-held-version-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "R3 owner-scoped"
+      ],
+      "startedAt": "2026-10-27T07:24:17.979Z",
+      "durationMs": 18197,
+      "browserFixtureExportDirectory": null,
+      "exitCode": 0,
+      "signal": null,
+      "recordedResult": "r3-held-version-green.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  1 passed | 18 skipped (19)",
+        "Start at  07:24:19",
+        "Duration  16.82s (transform 2.74s, setup 0ms, collect 5.13s, tests 11.20s, environment 0ms, prepare 116ms)"
+      ]
+    },
+    {
+      "file": "r3-held-version-green.result.json.gz",
+      "sha256": "992127f854b8dc4b28fd61047de515bba288ac2333c9af752d875647bbe7edcf",
+      "bytes": 227,
+      "rawSha256": "0d93e9b190ebaa0724b786459dc78058598022e4e4a9f826d259d21e7b27411e",
+      "rawBytes": 306,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r3-held-version-green.result.json"
+    },
+    {
+      "file": "r3-held-version-red.log.gz",
+      "sha256": "8c97703cbe5e6b288fd0db478650ea9bcbd2208eefb90b6449d2f468732e0264",
+      "bytes": 1350,
+      "rawSha256": "fec1ecb8e4fedc0228f6d86431cdc07360d98cb0e2a9b0af5d7389ca3b7faadb",
+      "rawBytes": 3371,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r3-held-version-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "R3 owner-scoped"
+      ],
+      "startedAt": "2026-10-27T07:23:28.847Z",
+      "durationMs": 18345,
+      "browserFixtureExportDirectory": null,
+      "exitCode": 1,
+      "signal": null,
+      "recordedResult": "r3-held-version-red.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 18 skipped (19)",
+        "Start at  07:23:29",
+        "Duration  16.99s (transform 2.76s, setup 0ms, collect 5.14s, tests 11.36s, environment 0ms, prepare 128ms)"
+      ]
+    },
+    {
+      "file": "r3-held-version-red.result.json.gz",
+      "sha256": "c85b8603a879d1f4f3994a327ad77c669c5cb542d793ebbdf7059f9ec9ccb6d2",
+      "bytes": 227,
+      "rawSha256": "cba08ef2c2fbd580acb0a8d47c36103bd14898ddae4f05513edbeddef7e61dbc",
+      "rawBytes": 306,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r3-held-version-red.result.json"
+    },
+    {
+      "file": "r4-clean-receipts-green.isolation.json.gz",
+      "sha256": "68b2f8b88e5716037d16cf866629058afc30cb90fcede01b089acc783014a0dc",
+      "bytes": 118,
+      "rawSha256": "b0e414f6ea6f80c08947d2aa1f77ff67ff150ddfa80f62a9d3e18bea951b9a48",
+      "rawBytes": 121,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r4-clean-receipts-green.isolation.json"
+    },
+    {
+      "file": "r4-clean-receipts-green.log.gz",
+      "sha256": "067a5339e0e404ddbef2e53cf76400cf3ecbb2df05a20a75a60183fa4eccbc44",
+      "bytes": 374,
+      "rawSha256": "3b38f0d72eaf9ea170c42a82f815fad2830cbb616b7bade827240fb487747b97",
+      "rawBytes": 670,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r4-clean-receipts-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "R4 unconfirmed"
+      ],
+      "startedAt": "2026-10-27T07:20:57.252Z",
+      "durationMs": 19981,
+      "exitCode": 0,
+      "signal": null,
+      "recordedResult": "r4-clean-receipts-green.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  3 passed | 16 skipped (19)",
+        "Start at  07:20:58",
+        "Duration  18.62s (transform 2.81s, setup 0ms, collect 5.19s, tests 12.98s, environment 0ms, prepare 123ms)"
+      ]
+    },
+    {
+      "file": "r4-clean-receipts-green.result.json.gz",
+      "sha256": "76db0f9acf8e4f4da6bb34dfa7894b08f9a0cc8f45dbf22c0152d35eb6cd6e66",
+      "bytes": 199,
+      "rawSha256": "0da7ef305338d66eeab5105fba6914d98008af60b3301a9884b94c1d59ab6a85",
+      "rawBytes": 264,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r4-clean-receipts-green.result.json"
+    },
+    {
+      "file": "r5-invocation-mutation.diff.gz",
+      "sha256": "02449aea52c0427e2e15b7eff885555c9fa24a8e4e2273247f87d213dc72edc4",
+      "bytes": 180,
+      "rawSha256": "e68b04817c5f61eb0021074a291f3912b92c1be3d7fa3057d67752833fb6b434",
+      "rawBytes": 258,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r5-invocation-mutation.diff"
+    },
+    {
+      "file": "r5-missing-native-invocation-red.log.gz",
+      "sha256": "1db37d5676d5c014739c3af465aa6d6bbe390edd7092c434e395bcc4447381c7",
+      "bytes": 1195,
+      "rawSha256": "ba6628bc3bb6f0c6758d0065946c4f8af3913176e4ec29b758b44049d3666ac4",
+      "rawBytes": 2994,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r5-missing-native-invocation-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "R5 production-composed"
+      ],
+      "startedAt": "2026-10-27T07:17:35.670Z",
+      "durationMs": 13320,
+      "exitCode": 1,
+      "signal": null,
+      "recordedResult": "r5-missing-native-invocation-red.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 18 skipped (19)",
+        "Start at  07:17:36",
+        "Duration  11.97s (transform 2.88s, setup 0ms, collect 5.19s, tests 6.32s, environment 0ms, prepare 89ms)"
+      ]
+    },
+    {
+      "file": "r5-missing-native-invocation-red.result.json.gz",
+      "sha256": "d6a13bdb5354244a40091e7ccd9e4030d47c8ebf7135834a7d7213c9bb21fa20",
+      "bytes": 202,
+      "rawSha256": "615d9a88482168f231d941bd43b9de3467abfe23faace8b223a77947564dc807",
+      "rawBytes": 272,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r5-missing-native-invocation-red.result.json"
+    },
+    {
+      "file": "r6-browser-green.log.gz",
+      "sha256": "67bf1052b28e1cd5428c3587533bcd6dea57e0b7649d229b365ab97563632b18",
+      "bytes": 260,
+      "rawSha256": "7f27ac16ba34dcd6091e2a13d90324539cc2e825127b96937dc315dd15253e7a",
+      "rawBytes": 368,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r6-browser-green.log",
+      "command": [
+        "node",
+        ".superpowers/sdd/native-scheduling-corrections-20261027/browser-witness.mjs"
+      ],
+      "browserFixtureExportDirectory": "/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/.superpowers/sdd/native-scheduling-corrections-20261027/browser-fixtures",
+      "exitCode": 0,
+      "durationSeconds": null,
+      "timingNote": "Exit success observed; separate wall timer was not recorded for this browser invocation.",
+      "recordedSummary": []
+    },
+    {
+      "file": "r6-clean-directory-red.log.gz",
+      "sha256": "cc771fc16424426d142cd32ccccf88c253515993d28da1664069f4cc6ba24ea5",
+      "bytes": 1296,
+      "rawSha256": "57ac3da73b074a3fdbe53933b738eee6cdada0f5abe22969add838246d408b39",
+      "rawBytes": 3255,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r6-clean-directory-red.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "actual authenticated work ingress"
+      ],
+      "startedAt": "2026-10-27T07:16:31.667Z",
+      "durationMs": 12178,
+      "exitCode": 1,
+      "signal": null,
+      "recordedResult": "r6-clean-directory-red.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 failed (1)",
+        "Tests  1 failed | 18 skipped (19)",
+        "Start at  07:16:32",
+        "Duration  10.86s (transform 2.64s, setup 0ms, collect 5.09s, tests 5.30s, environment 0ms, prepare 110ms)"
+      ]
+    },
+    {
+      "file": "r6-clean-directory-red.result.json.gz",
+      "sha256": "8a2d67f3b2404d39ff36457761acf52a8f7db03b2c09b38b15574e0a5fcc93c1",
+      "bytes": 208,
+      "rawSha256": "25c79dc5fe6bccd81991971a4938dcfaca37dfdcc64cf8cab038374eacb17f4d",
+      "rawBytes": 283,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r6-clean-directory-red.result.json"
+    },
+    {
+      "file": "r6-opt-in-browser-export-green.log.gz",
+      "sha256": "320afb1f838aaded25cb7009cd05064effb5ea8e0a8c9a37652f143e63d3f58c",
+      "bytes": 427,
+      "rawSha256": "99c0e18e59285532cfc5e51fbf5feded8062619d3458213d0f42a66ab4f11b82",
+      "rawBytes": 647,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r6-opt-in-browser-export-green.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/integration/resident-native-scheduling.test.ts",
+        "-t",
+        "real native catalog request|actual authenticated work ingress"
+      ],
+      "startedAt": "2026-10-27T07:21:50.345Z",
+      "durationMs": 17596,
+      "browserFixtureExportDirectory": "/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.worktrees/phase1-owner-plan-20261023/.superpowers/sdd/native-scheduling-corrections-20261027/browser-fixtures",
+      "exitCode": 0,
+      "signal": null,
+      "recordedResult": "r6-opt-in-browser-export-green.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  2 passed | 17 skipped (19)",
+        "Start at  07:21:51",
+        "Duration  16.28s (transform 2.88s, setup 0ms, collect 5.21s, tests 10.58s, environment 0ms, prepare 123ms)"
+      ]
+    },
+    {
+      "file": "r6-opt-in-browser-export-green.result.json.gz",
+      "sha256": "99c5d9bdccd8bc03b07516686466b533e24f3a86c51ed9380c6c0d902c11de2b",
+      "bytes": 339,
+      "rawSha256": "02937d207246aff9fa9be846622fa4c240e33377e8b2f9fc1d8aa13e13c3e759",
+      "rawBytes": 517,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/r6-opt-in-browser-export-green.result.json"
+    },
+    {
+      "file": "renderer.log.gz",
+      "sha256": "82c6380af157cb1a0f077db829da5e3293cebfeeb79cc688f141a453f48578ff",
+      "bytes": 277,
+      "rawSha256": "9537048c1685d87b288b7a50a8cdbdb024bd9d9f9f4fb8e5d6de4e7d5196264c",
+      "rawBytes": 374,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/renderer.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "packages/worker/src/booking-notification-renderer.test.ts"
+      ],
+      "durationSeconds": 2.026,
+      "exitCode": 0,
+      "recordedResult": "renderer.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  61 passed (61)",
+        "Start at  07:27:38",
+        "Duration  812ms (transform 131ms, setup 0ms, collect 305ms, tests 71ms, environment 0ms, prepare 100ms)"
+      ]
+    },
+    {
+      "file": "renderer.result.json.gz",
+      "sha256": "4ce16636eea4787375a3a5becc5fb8fa9a6b3e77aed208379ba74eb79c5d8c3d",
+      "bytes": 153,
+      "rawSha256": "95ca189f0d4ab6330d14748cf9c677ccfc5a1c9622909a1e9f904cb5108da333",
+      "rawBytes": 181,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/renderer.result.json"
+    },
+    {
+      "file": "run.mjs.gz",
+      "sha256": "62f25d43159764027ae92b7d86061e524b59d6bb0248782e67826b8b710b8f9d",
+      "bytes": 704,
+      "rawSha256": "3b7769bd64b1ce578afd64e66318d28bf3352cdd61bad81b254df88dcda740b3",
+      "rawBytes": 1302,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/run.mjs"
+    },
+    {
+      "file": "runtime-controls.log.gz",
+      "sha256": "704e5bbbd222e6084abff0e333674ad4bc617ea529583cefd85e5c43f17c5c11",
+      "bytes": 272,
+      "rawSha256": "eecc6e63fff699a75b0f7326ceb2fcec59dea6205eb64b2f27d7c4bb74ba27d2",
+      "rawBytes": 359,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/runtime-controls.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "apps/worker/src/booking-notifications.test.ts"
+      ],
+      "durationSeconds": 4.94,
+      "exitCode": 0,
+      "recordedResult": "runtime-controls.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  8 passed (8)",
+        "Start at  07:27:42",
+        "Duration  3.69s (transform 1.53s, setup 0ms, collect 3.17s, tests 38ms, environment 0ms, prepare 127ms)"
+      ]
+    },
+    {
+      "file": "runtime-controls.result.json.gz",
+      "sha256": "b23ae3d1a2c401e5f94b44f734bc019b920db70c9c7b063cb53e4c1e2f974aed",
+      "bytes": 144,
+      "rawSha256": "48747e8f6144be2c602eddbf6ea5640943d4e26438eb490853e681b7e3c1b00f",
+      "rawBytes": 168,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/runtime-controls.result.json"
+    },
+    {
+      "file": "scope-guard.log.gz",
+      "sha256": "591a5694ee97365a3ad93cc98bcce893a39365e075c7abac527fca41ae566269",
+      "bytes": 358,
+      "rawSha256": "2b72a768248178e4d56603010e9bbdea390a1f46c8bb74abec6552f9fd9badfb",
+      "rawBytes": 534,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/scope-guard.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/scope-boundary.test.ts"
+      ],
+      "durationSeconds": 7.229,
+      "exitCode": 0,
+      "recordedResult": "scope-guard.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  130 passed (130)",
+        "Start at  07:27:28",
+        "Duration  5.90s (transform 157ms, setup 0ms, collect 573ms, tests 4.91s, environment 0ms, prepare 99ms)"
+      ]
+    },
+    {
+      "file": "scope-guard.result.json.gz",
+      "sha256": "7b7369f24f32b707b04fd308e6a77097d0262535c3f027f45a73d8d96f920b89",
+      "bytes": 135,
+      "rawSha256": "4dcb0e68786a96d2d6342e4ce1262f102b178ebe2fd30a616f7e152d46db37b5",
+      "rawBytes": 157,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/scope-guard.result.json"
+    },
+    {
+      "file": "state-guard.log.gz",
+      "sha256": "cbf532f0b5a946348d670fdfdb29a2c1cb7d7fb4852a353422b2c5cef0c411db",
+      "bytes": 329,
+      "rawSha256": "48e6410cec9037ef532b8a5625259531578ac4537c22c25d8ad5829922627795",
+      "rawBytes": 470,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/state-guard.log",
+      "command": [
+        "pnpm",
+        "exec",
+        "vitest",
+        "run",
+        "tests/repo/resident-native-scheduling-state.test.ts"
+      ],
+      "durationSeconds": 2.324,
+      "exitCode": 0,
+      "recordedResult": "state-guard.result.json.gz",
+      "recordedSummary": [
+        "Test Files  1 passed (1)",
+        "Tests  2 passed (2)",
+        "Start at  07:27:36",
+        "Duration  1.07s (transform 138ms, setup 0ms, collect 39ms, tests 605ms, environment 0ms, prepare 128ms)"
+      ]
+    },
+    {
+      "file": "state-guard.result.json.gz",
+      "sha256": "f78572e4335659c8f99afd5d26635dcfdd3dc84e570bc3ce2df226887baec347",
+      "bytes": 147,
+      "rawSha256": "df237b56fee2382ccf246492e2f5fd710440a42f1b2aa877b3833c193d29f5db",
+      "rawBytes": 175,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/state-guard.result.json"
+    },
+    {
+      "file": "types.log.gz",
+      "sha256": "0a40056adb0bb5991b81885218f94a4efdf5cd790cb55109b9fa350c7e187a54",
+      "bytes": 135,
+      "rawSha256": "0c2b79cfd19322976c040aa7c08be23b8df5fd5344a62f9524c74abe61e28fc1",
+      "rawBytes": 326,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/types.log",
+      "command": ["pnpm", "typecheck"],
+      "durationSeconds": 70.488,
+      "exitCode": 0,
+      "recordedResult": "types.result.json.gz",
+      "recordedSummary": []
+    },
+    {
+      "file": "types.result.json.gz",
+      "sha256": "c4bddc8ba4815bda9e2bafc15460e79eefc6b18027ac660c6d284b9af8b75124",
+      "bytes": 101,
+      "rawSha256": "f3b2d58392cbe23b3a506a34a285cdeeb7c636904017bfb1dc557ce6860fbe23",
+      "rawBytes": 97,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/types.result.json"
+    },
+    {
+      "file": "whitespace.log.gz",
+      "sha256": "f61f27bd17de546264aa58f40f3aafaac7021e0ef69c17f6b1b4cd7664a037ec",
+      "bytes": 20,
+      "rawSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawBytes": 0,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/whitespace.log",
+      "command": ["git", "diff", "--check"],
+      "durationSeconds": 0.021,
+      "exitCode": 0,
+      "recordedResult": "whitespace.result.json.gz",
+      "recordedSummary": []
+    },
+    {
+      "file": "whitespace.result.json.gz",
+      "sha256": "fa3d478ce56f01e6cca4278b01afaf6d095abf8248c3bd34ecd74a6dc9d9d672",
+      "bytes": 102,
+      "rawSha256": "68f1379f8dbe33640e155b2fa7418c4f9087a01f927288ae16b1be9a072569f1",
+      "rawBytes": 105,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/whitespace.result.json"
+    },
+    {
+      "file": "without-task-directory.py.gz",
+      "sha256": "fb80977de9fea3ac155825dfe9992abc5fbb7880ba16d219815b878bf78e2da4",
+      "bytes": 471,
+      "rawSha256": "de86842a146e156a4220aede472648559be0b5ae6e2a63ed9ac7b183d7cb3858",
+      "rawBytes": 768,
+      "originalPath": ".superpowers/sdd/native-scheduling-corrections-20261027/without-task-directory.py"
+    }
+  ],
+  "limitations": [
+    "Local synthetic PostgreSQL and transport evidence only; no live Telegram/provider/payment or deployment activity.",
+    "Final source is covered by focused corrective runs; the original full-file failed run is retained honestly and is not claimed all-green.",
+    "The original populated rich approval fixture qualification remains as previously documented; R1 adds a separate genuine normal migrateDb populated upgrade.",
+    "Independent corrective review, root exact-head gate and delivery remain separate. S4b remains outstanding."
+  ]
+}
