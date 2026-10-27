@@ -944,11 +944,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/state/0070_manifest.json",
-    "7a5997de63376f2e499cd840252746af351b5b102eeab2c6ea0d21cc18520990",
+    "aff9330d9c1bbd94ef511e298ebd6d8c40849a4abcc0d869a41208d9179ee925",
   ],
   [
     "packages/db/migrations/state/0070_sql_objects.json",
-    "d1f21e15ee056bafedd8c7306866f9e6245f74312935d6619c6a0a31dbd9221d",
+    "96a9dd70096a148a598a23c5a0719f50f3545659015234e5a9a6913da8a04aff",
   ],
   [
     "packages/db/migrations/meta/0071_snapshot.json",
@@ -956,11 +956,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/state/0071_manifest.json",
-    "f0fc638e5ccb1e04bf1c6d57a355af3c185ac3e659281f7ae76653546efe4af5",
+    "44564b00bcde15055269fd0a0e4dfb5fb94044e18d6dfda8867b4ff993209ef4",
   ],
   [
     "packages/db/migrations/state/0071_sql_objects.json",
-    "3a753ba25340bc18dd79e85b0565b910181422772fd293bb378b72dc4f342369",
+    "57a3764156e186e7e6ca025059d489141e57add709de267691f54881052b97cf",
   ],
   [
     "packages/db/migrations/meta/0072_snapshot.json",
@@ -968,11 +968,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/state/0072_manifest.json",
-    "22e305d99b2c92f7b2ae1188c2c494fae8106f9550e60c239a33d061b0627ebd",
+    "0933260beb39a30155da3a96dec70875e1d9a5a4341e3469e38c3bd3df53b90f",
   ],
   [
     "packages/db/migrations/state/0072_sql_objects.json",
-    "6fcabe6e262d9745d460e769ea0bf9828ab8d064566ca76cf78c2e3f9f46bd95",
+    "d011f500ac43301819458357621847f25ccbd1a5eb0c3050f243840f53e6eebd",
   ],
   [
     "packages/db/migrations/meta/0073_snapshot.json",
@@ -980,11 +980,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/state/0073_manifest.json",
-    "beafb6ae0bc8726518738c18b7e8e4c96740ec29ce731e6e330e7cfd25a59a11",
+    "db078855e5d7bffe45b65e40c0d295734fc50f3d804062044e13d364ee78edca",
   ],
   [
     "packages/db/migrations/state/0073_sql_objects.json",
-    "fdc4db59f610e1feed17104c41ddd6811b2cff407e7573a29503666e6882e2f9",
+    "43732405c71a10780f3549adef95bb41a092f1bf640ef608d53ded1419e75339",
   ],
   [
     "packages/db/migrations/history/main-before-unification/0039_lifecycle_scheduler_c1.sql",
