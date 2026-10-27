@@ -6,6 +6,7 @@ import os
 import posixpath
 import re
 import shlex
+import subprocess
 import sys
 import traceback
 from dataclasses import dataclass
@@ -816,11 +817,65 @@ def root_context(payload: dict[str, Any], input_data: dict[str, Any], tool: str)
         return RootContext(session_cwd, None, {}, None, 'root-resolution-error')
 
 
+_FILE_TOOLS = frozenset({'Write', 'Edit', 'MultiEdit', 'NotebookEdit'})
+_FILE_PATH_KEYS = ('file_path', 'notebook_path', 'filePath', 'path')
+
+
+def _file_tool_root(input_data: dict[str, Any], tool: str) -> tuple[str, Path] | None:
+    """(path, root) when a file tool names one absolute path inside a Getzilla project (#205).
+
+    The edited file decides its repository, not the shell's last cwd: in a session that works on
+    two repositories, an edit in the second one is checked against that repository's policy and grants.
+    """
+    if tool not in _FILE_TOOLS:
+        return None
+    paths = {str(input_data[key]) for key in _FILE_PATH_KEYS if isinstance(input_data.get(key), str) and input_data[key]}
+    if len(paths) != 1:
+        return None
+    raw = next(iter(paths))
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        return None
+    recognized = _recognized_root(path)
+    return (raw, recognized) if recognized is not None and _installed_root(recognized) else None
+
+
+def _installed_root(root: Path) -> bool:
+    """A real Getzilla install, not a `.getzilla` folder an agent made to borrow a root.
+
+    The root is a Git top level that commits its own `.getzilla/config/policy.json`, and it does not
+    sit inside another project's `.getzilla` tree (a scratch copy, or a fake folder in config/).
+    """
+    if '.getzilla' in root.parts or not (root / '.getzilla/config/policy.json').is_file():
+        return False
+    try:
+        top = subprocess.run(['git', '-C', str(root), 'rev-parse', '--show-toplevel'], capture_output=True,
+                             text=True, encoding='utf-8', errors='replace', timeout=5, check=False)
+        tracked = subprocess.run(['git', '-C', str(root), 'ls-files', '--error-unmatch', '--',
+                                  '.getzilla/config/policy.json'], capture_output=True, timeout=5, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return (top.returncode == 0 and tracked.returncode == 0
+            and Path(top.stdout.strip()).resolve() == root.resolve())
+
+
 def _root_context(payload: dict[str, Any], input_data: dict[str, Any], tool: str) -> RootContext:
     session_values = {
         key: str(payload[key]) for key in _SESSION_ROOT_ALIASES if payload.get(key) not in (None, '')
     }
     session_cwd = next(iter(session_values.values()), None)
+    file_root = _file_tool_root(input_data, tool)
+    if file_root is not None:
+        session_root = None
+        if session_cwd is not None:
+            session_path = Path(session_cwd).expanduser()
+            session_root = _recognized_root(session_path if session_path.is_absolute() else Path.cwd() / session_path)
+        # A file inside the session's repository stays under its rules, including a project copy
+        # in that repository's scratch area; only a file outside it takes its own repository.
+        outside = session_root is None or not Path(file_root[0]).expanduser().resolve().is_relative_to(session_root)
+        # A root that holds the session's own repository is never a second repository.
+        if outside and not (session_root is not None and session_root.is_relative_to(file_root[1])):
+            return RootContext(session_cwd, session_root, {}, file_root[1], 'effective-root')
     session_paths: list[Path] = []
     session_roots: set[Path] = set()
     recognized_session_values = 0
