@@ -1,3 +1,24 @@
+# Private verification delivered; rich onboarding active — 2026-10-26
+
+Draft PR114 OPEN at219f8e0c9d0938fccb4188cf0081f71b3f8b2db9:
+https://github.com/Dimkox/ii-tonya-platform/pull/114
+Base codex/residency-verification-messages-20261026 atf11d5d90 (PR113).
+Runtime b360ac46 acceptedR1–R8; exact guard/example2d943517 separately accepted.
+Full gate and final mandatory push605/605; local/remote HEAD matched, tree clean.
+Original72+corrective46 artifacts and failed/successful gates retained. No source
+work remains for S2b; no merge, deployment or live capability activation.
+
+Active branch codex/residency-rich-onboarding-20261026 uses the same isolated
+.worktrees/phase1-owner-plan-20261023. Contract spec-residency-rich-onboarding.md
+starts S3a detailed profile/services,3 input modes, owner confirmation and versioned
+manager review. Latest materials order is after card approval; earlier parallel
+fee-time jobs must not bypass it. S3b local semantic tags then S4 slots/lifecycle
+remain required. No BMad rerender or previous-block restart. Root owns contract/
+review/gate/push; one implementer owns source and evidence, no descendants.
+One protected PG17.5 and isolated parser remain. Next hand migration0066; preserve
+all historical bytes. Refund policy still pending/manual. Owner autonomy and
+necessary focused-run/splitting override persist; no routine permission loops.
+
 # Private verification jobs ready for gated push — 2026-10-26
 
 Same isolated worktree and codex/residency-private-verification-jobs-20261026.

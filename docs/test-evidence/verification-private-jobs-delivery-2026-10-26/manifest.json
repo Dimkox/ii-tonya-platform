@@ -1,0 +1,23 @@
+{
+  "head": "219f8e0c9d0938fccb4188cf0081f71b3f8b2db9",
+  "pr": "https://github.com/Dimkox/ii-tonya-platform/pull/114",
+  "remoteHeadVerified": true,
+  "files": [
+    {
+      "file": "verification-private-jobs-push-gate-1793059052017977035.log.gz",
+      "bytes": 443,
+      "sha256": "a0cfd24910d4bb7c410afd02ae08c04177a69ba9599c98e2fbf5f5c73498d4a0",
+      "rawBytes": 987,
+      "rawSha256": "ef03098ff3530d8f7b0073054c281dcf43dafb338e699ec5ac3fc3804353fea4",
+      "exitCode": 0
+    },
+    {
+      "file": "verification-private-jobs-push-repo-1793059052017977035.log.gz",
+      "bytes": 2329,
+      "sha256": "2b82dd8a0310a4fa55ac8c35ca1ed862ed7a7e54621989c3d5880ab7c619f8ff",
+      "rawBytes": 8183,
+      "rawSha256": "9b91c098f35518d181f27bbea20fda10e0de0ba73677f108e5fbde48cf699f65",
+      "exitCode": 0
+    }
+  ]
+}

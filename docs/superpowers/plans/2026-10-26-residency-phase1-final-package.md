@@ -41,11 +41,15 @@ bounded new sales/other contracts against the accepted stabilization source.
 
 ## Current sequential continuation
 
-S2a final verification/messages is delivered in [Draft PR113](https://github.com/Dimkox/ii-tonya-platform/pull/113)
-atf11d5d906acf6e1983fe36739981e31a847207ce. All six independent findings closed;
-full/push592/592. S2b private custody/extraction/OCR/social evidence jobs follows
-on codex/residency-private-verification-jobs-20261026, contract spec-verification-private-jobs.md.
-S3 rich onboarding/local tags and S4 dynamic slots/lifecycle remain afterwards.
+S2a is delivered in DraftPR113 atf11d5d90. S2b private custody/extraction/OCR/social
+jobs is delivered in [DraftPR114](https://github.com/Dimkox/ii-tonya-platform/pull/114)
+at219f8e0c9d0938fccb4188cf0081f71b3f8b2db9. All8 independent findings closed;
+full/push605/605. Original and corrective evidence plus failed gates retained.
+
+Active S3a: codex/residency-rich-onboarding-20261026, contract
+spec-residency-rich-onboarding.md. Detailed profile/services/3 input modes and
+reviewed versions precede S3b semantic optimization, then S4 dynamic slots/lifecycle.
+The same isolated worktree and one task PostgreSQL cluster are reused.
 
 ## Owner sources and precedence
 
@@ -123,7 +127,7 @@ Delivered [Draft PR112](https://github.com/Dimkox/ii-tonya-platform/pull/112) at
 - [x] Bounded safe regex execution; malformed/unsafe policy cannot crash workers or
       silently authorize publication. No legal-compliance guarantee from regex alone.
 
-### S2 — Final verification and communications (current)
+### S2 — Final verification and communications (delivered)
 
 Active branch: `codex/residency-verification-messages-20261026` in the same isolated tree.
 S2a contract: `docs/superpowers/implementation-artifacts/spec-final-verification-messages.md`.
@@ -136,20 +140,21 @@ Earlier no-auto-invoice/tariff-after-verification wording below is historical on
 Reuse the existing manager interface; Kanban stays Phase2. Prepare the bounded
 implementation contract after read-only form, decision/delivery and private-job audits.
 
-- [ ] Versioned form expansion for final role fields, no-status tax help and optional
+- [x] Versioned form expansion for final role fields, no-status tax help and optional
       evidence. Preserve earlier submitted versions and pending private references.
-- [ ] Private ingestion/OCR/document and social-health jobs with current-owner,
+- [x] Private ingestion/OCR/document and social-health jobs with current-owner,
       revision, consent, timeout and24h-cache boundaries; unavailable stays unknown.
-- [ ] Real manager queue/card, fresh-role/MFA approval/rejection/info-request,
+- [x] Real manager queue/card, fresh-role/MFA approval/rejection/info-request,
       immutable decision/event and48h follow-up lifecycle. Genuine approved-intake
       proof enables the separate interview-exception producer; no forged old decision.
-- [ ] Five approved message templates with typed variables, preview/edit, exact final
+- [x] Five approved message templates with typed variables, preview/edit, exact final
       hash audit, same original bot/chat delivery and consent/attempt fences.
-- [ ] Soft reapplication after one calendar month; hard rejection remains explicit.
+- [x] Soft reapplication after one calendar month; hard rejection remains explicit.
       Insufficient evidence first requests information. Refund and waitlist language
       must reflect actual stored facts/accepted terms, not invented retention/refunds.
-- [ ] Separate approved welcome notification and owner-initiated existing tariff flow.
-      Do not recreate the old approve-immediately-invoices behavior for new intakes.
+- [x] Latest approved sales flow: tariff selection precedes form; manager approval
+      creates fixed3000 onboarding checkout, and genuine payment alone locks price.
+      Earlier separate-post-verification-calculation wording is superseded.
 
 ### S3 — Onboarding and semantic catalogue
 
