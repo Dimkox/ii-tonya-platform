@@ -47,8 +47,8 @@ describe("B1 schema/migration parity", () => {
       },
     ]);
     expect(journal.entries.at(-1)).toMatchObject({
-      idx: 74,
-      tag: "0074_resident_native_scheduling",
+      idx: 75,
+      tag: "0075_resident_lifecycle_completion",
       breakpoints: true,
     });
   });
