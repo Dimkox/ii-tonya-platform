@@ -8,7 +8,7 @@ mutating resources. All were launched before triage; all finals received.
 | ID | Reviewers | Severity / classification | Finding and required action | Status |
 | --- | --- | --- | --- | --- |
 | R1 | blind, edge | high / patch | Any Telegram reply entered custom-tag handling; media replies rejected. Recognize only original tag invitations; preserve ordinary interview/command replies and disabled-tag mode. service:482, ingress:168. | Closed: blind + edge PASS9182ab18 |
-| R2 | blind, edge | high / bad_spec | SQL0069:96 rejects removing one inactive tag if another remains, deadlocking cross-scope cleanup. Allow bounded strictly reducing obsolete selections with final validity gates intact. | Open |
+| R2 | blind, edge | high / bad_spec | SQL0069:96 rejects removing one inactive tag if another remains, deadlocking cross-scope cleanup. Allow bounded strictly reducing obsolete selections with final validity gates intact. | Closed: all assigned SQL paths accepted7b4f79f5 |
 | R3 | blind, edge | high / patch | contracts/resident-semantic-tags.ts:70 uses whitespace for negation and Unicode words for matching. Brackets/colon hide negation and preselect an excluded topic at100. Use consistent tokens and meaningful regression. | Closed: both PASS eb110d74 |
 | R4 | gap | medium / bad_spec | Tests show pending decisions/UI but never exercise whole-card SQL approval. Prove pending/rejected/stale rejection and current-approved immutable snapshot through actualPG review. | Closed: gap PASS eb110d74 |
 | R5 | gap | medium / patch | tests/integration/resident-semantic-tags.test.ts:455 writes to an untracked directory, failing clean checkout withENOENT. Make optional export or created temporary destination. | Closed: gap PASS eb110d74 |
@@ -83,3 +83,16 @@ one while another remains. Include in the current bounded batch: authentic popul
 upgrade and strict partial removal; preserve immutable history, new-label rejection
 and final validity. Independent assigned reviewers must assess this added boundary.
 This is a concrete changed-validation compatibility issue, not a speculative threat.
+
+## Assessment at7b4f79f5
+
+Blind and gap accept R2/R7 SQL and retained evidence; edge accepts R2c but finds
+application-level R7 within-scope restriction: repo2055 tagSelectionSchema rejects
+a remaining historical emoji tag before reaching the accepted SQL subset guard.
+Two bad labels in one service can only be removed together. The non-frozen contract
+previously permitted scope-level strictness; root now chooses consistent bounded
+private repair at both layers, preserving all final validity and new-label guards.
+One focused application/legacy-owner proof correction remains. SQL/state need not
+change if existing authority suffices. R2 is closed at7b4f79f5; R7 remains pending
+this narrow usability/compatibility completion. All48 artifacts/7 pins independently
+verified by the assigned reviewers. No new business decision or approval is needed.

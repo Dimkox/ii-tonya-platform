@@ -4,7 +4,7 @@ created: 2026-10-27
 type: feature
 status: in-review
 baseline_commit: 254c8c169cbb8432654a46de206bd20500cecc3f
-review_loop_iteration: 3
+review_loop_iteration: 4
 context:
   - AGENTS.md
   - docs/agents/expert-residency-team.md
@@ -413,3 +413,21 @@ and financial facts, then remove both scopes through normal owner operations. Do
 manufacture historical state by disabling current guards. Retain negative new-invalid
 label and final approval controls. This preserves accepted legacy data and user repair
 reachability, without relaxing the new syntax rule for new content.
+
+## R7 within-scope repair consistency
+
+Final SQL review accepts the strict-removal authority, but edge identifies the
+application's tagSelectionSchema precheck still rejects an unchanged legacy-invalid
+label retained in the same scope. The previous non-frozen allowance for a completely
+valid confirmed scope is superseded here: apply the same bounded private-removal
+rule consistently across scopes and within one scope. Do not require the owner to
+remove all obsolete labels from one service in a single confirmation.
+
+Keep type/size/count bounds. Permit unchanged historical labels only when authoritative
+SQL proves a genuine strict subset with no additions/moves/non-tag changes. Newly
+introduced invalid labels, unchanged-invalid confirmation and whole-card finalization
+stay denied. A pre0069 service [Стресс, тревога; Спокойствие 🙂; #КПТ] must allow
+removing just the comma label, retaining emoji unchanged, then removing emoji, with
+old approval and financial/non-tag facts intact. Verify actual owner callbacks and
+invalid-new-label/unchanged/finalization controls. Preserve accepted SQL/state if
+its existing guard is sufficient; no unnecessary reconstruction or broad rerun.

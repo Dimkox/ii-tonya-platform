@@ -1,3 +1,27 @@
+# Semantic tags final application review — 2026-10-27
+
+Source790d308c957ca9be8ab83a18ff8f3de6642921b9; producer idle/no jobs. R7 confirm
+precheck now uses established bounded old tag shape (type/control/80chars/20count/
+unique), preserving labels while unchanged SQL enforces genuine strict removal and
+new-invalid/unchanged-invalid/finalization denial. Authentic0068 SAME-service real
+callbacks RED/GREEN1/1, owner10/10, DBbuild/types/tests types/lint/format pass.
+Root verified27 artifacts/2 source pins;5 state pins and prior286 artifacts
+preserved. Entire migration tree unchanged from7b4f79f5; no reconstruction.
+Spec iteration4/in-review; assigned reviewers assess final delta. R1–R6 closed;
+R7 closure pending, then fullgate/push/DraftPR on PR115 and continue S4a/S4b.
+No source jobs, no deployment/provider activation or whole-package completion.
+
+# Semantic tags R7 application-layer completion — 2026-10-27
+
+All3 assessed7b4f79f5. R2 SQL/removal now closed; R7 has one application precheck
+restriction: two invalid legacy labels in SAME service require removal together.
+Spec iteration4 clarifies consistent private strict-subset repair within/across
+scopes, retaining all new-invalid/unchanged-invalid/finalization denials. Same
+producer makes bounded TS+authentic old-schema owner-callback proof correction;
+SQL/state already accepted and need no reconstruction unless actually changed.
+Root owns dirty spec/review/status; all prior286 artifacts/source pins preserved.
+Then assigned closure, fullgate/push/DraftPR, continue S4a/S4b. No permission loop.
+
 # Semantic tags general removal final review — 2026-10-27
 
 Source7b4f79f564aef0d14b5070496a54c682ae616229, producer idle/no heavyjobs. R2c
