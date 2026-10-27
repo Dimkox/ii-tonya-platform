@@ -235,6 +235,8 @@ describe("expert residency referral scope boundary", () => {
       "/v1/admin/expert-cards/:applicationId/promo-review",
       "/v1/admin/expert-cards/:applicationId/public-card",
       "/v1/admin/expert-cards/:applicationId/review",
+      "/v1/admin/expert-cards/:applicationId/tags/review",
+      "/v1/admin/expert-cards/catalogue-export",
       "/v1/admin/expert-referrals/inventory",
       "/v1/admin/expert-verification",
       "/v1/admin/expert-verification/:applicationId",

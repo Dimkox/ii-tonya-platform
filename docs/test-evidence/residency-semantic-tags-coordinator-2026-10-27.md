@@ -177,3 +177,12 @@ negative checks remain unchanged; no broad exemption or feature activation.
 Focused scope-boundary130/130, lint and whitespace pass. Failed fullgate/repository
 logs and focused command logs/results are retained in the gate-correction manifest
 (8 artifacts). Independent exact-delta review precedes justified fullgate rerun.
+
+The independent reviewer accepted exact registry correctionef94cd03. Its fullgate
+then passed612/613; the one remaining test was the mirrored exact route set in
+expert-referral-scope-guards.test.ts, still expecting the old38 entries. Root adds
+only the same two reviewed literal routes, retaining strict sorted equality.
+Focused13/13, lint and whitespace pass; all other second fullgate checks/types
+passed. Both failed full runs and focused outputs remain in separate immutable
+archives. No runtime/classifier or test limit changes. Exact mirror review precedes
+the final justified gate rerun.

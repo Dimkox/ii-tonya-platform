@@ -1,3 +1,13 @@
+# Semantic tags mirrored route guard correction — 2026-10-27
+
+Runtime790d308c accepted, exact registryef94cd03 independently accepted. Second
+fullgate612/613: only mirrored route-set equality in expert-referral-scope-guards
+remained stale. Root adds same2 exact routes; no assertion/classifier/runtime change.
+Focused13/13, lint/whitespace green;8 second failed/focused artifacts retained.
+Await narrow independent review, then rerun fullgate; no activejobs. First failed
+gate610/613 and first focused130/130 also retained. All runtime findings closed.
+No push yet; continue S4a/S4b after gated delivery.
+
 # Semantic tags exact gate registry correction — 2026-10-27
 
 Runtime790d308c accepted by all3 reviewers, R1–R7 closed. Fullgate5bc816f7
