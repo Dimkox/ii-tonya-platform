@@ -45,3 +45,10 @@ Actual expiry denial witness caught and corrected that. Protected booking-choice
 view initially still rendered serviceCode while catalogue carried approved title;
 actual two-service/browser witness now validates human-readable titles. No root
 source edits or concurrent heavy verification. Review must use final source SHA.
+
+
+Corrective source b1872e94030666bf97bb50fb366caa7d5a8906b2 is accepted by all three
+assigned reviewers. R1–R6 closed; evidence23d722b638c462ab7b75ca6ec3aa2600f53305b6.
+Root independently verified original86/corrective66 raw/archive pairs and49/50
+source pins, original manifest unchanged and protected credential absent. Full
+branch gate is next; no producer/reviewer/heavy verification jobs remain running.

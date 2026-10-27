@@ -1,3 +1,25 @@
+# Native scheduling accepted; canonical gate next — 2026-10-27
+
+Current branch codex/residency-native-scheduling-20261027, same isolated worktree.
+All3 reviewers PASS sourceb1872e94030666bf97bb50fb366caa7d5a8906b2; R1–R6 closed.
+Evidence23d722b638c462ab7b75ca6ec3aa2600f53305b6; root verified86+66 artifact pairs,
+49/50 source pins, preserved original manifest and protected credential absence.
+No active producer/reviewer/PG/build jobs. Root owns canonical full gate, acceptance
+completion docs, mandatory gated push and stacked DraftPR on semantic-tags branch
+(PR116/c2077357). Then continue S4b; do not finish the whole owner task here.
+Gate/push capture helpers ready at /tmp/residency-native-scheduling-observed-{gate,push}.py.
+Baselinec207735727210660ac949b78b84cf7463519fb99. State222tables/175functions/
+210triggers/1509constraints/549indexes/2extensions; migration0070 timestamp now
+1793152800001, strict monotonic guard and actual migrateDb upgrade1/1 verified.
+Full19-case correction run retained as18/19 (test receipt-counter defect), affected
+R4 cases corrected3/3; all assigned reviewers accepted that qualification. External
+PG37/37, expert queries10/10, focusedstatic222/222, actual browser/fullbuild/types/
+lint/format/whitespace pass. No hostedCI/deployment/provider activation claim.
+Keep taskPG17.5/parser/semantic helper and protected rotated config for whole journey.
+S4b draft /tmp/spec-residency-lifecycle-completion-draft-20261027.md and finalcoverage
+/tmp/residency-owner-final-coverage-20261027.md are prepared; final draft includes
+actual reservation audit provenance and S4a migration/fixture/composition lessons.
+
 # Native scheduling review corrections — 2026-10-27
 
 Current branch codex/residency-native-scheduling-20261027, same isolated worktree.

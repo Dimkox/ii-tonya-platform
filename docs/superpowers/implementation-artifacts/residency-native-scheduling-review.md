@@ -5,7 +5,7 @@ Reviewed source: 9ce9eb23181be0a6ee54a0920fbc952d9e5aaf3e.
 Evidence commit: c80ca4a82a7b2838a624f75aa57f87ce46664ce1.
 Three fresh context-free read-only reviewers completed before triage. Duplicate
 claims were consolidated only where the required correction is the same. Root
-confirmed each source site. Six findings remain; no branch acceptance/push yet.
+confirmed each source site. All six findings below are closed at corrective source b1872e94; branch gate/push remain pending.
 Root verified 86 archive/raw pairs and 49 source hashes at the recorded commit;
 protected local database credential is absent from all87 scanned manifest/artifacts.
 No heavy root test/build/database jobs ran alongside the implementer.
@@ -46,3 +46,30 @@ A clean ordinary integration run must not depend on .superpowers/sdd directories
 Native logistics requires a real normal composition witness; a direct repository
 transport mock alone does not prove worker activation. Source is not accepted until
 all six assigned review findings are closed and root branch gates pass.
+
+
+## Corrective source accepted
+
+All three original reviewers independently PASS source
+b1872e94030666bf97bb50fb366caa7d5a8906b2. Blind closes R1–R4; edge closes R1/R2/R4;
+verification gap closes R5/R6 and checks the actual incremental migrateDb upgrade.
+No new concrete regression remains. The actual composed-runtime mutation proves
+that removing native.runOnce fails delivery; source is restored byte-for-byte.
+Clean-directory proof reproduced ENOENT before the opt-in fixture correction.
+The full corrected native run was18/19 because a synthetic receipt counter reused
+an ID; the test-only correction passes all3 affected R4 cases without the ignored
+directory. Do not rewrite that failed full run as a19/19 full invocation.
+
+Corrective evidence commit23d722b638c462ab7b75ca6ec3aa2600f53305b6 preserves66 artifacts
+and50 source hashes. Root independently verifies every raw/gzip pair and committed
+source pin, original manifest preservation and absence of the protected local
+credential from67 scanned manifest/artifacts. ManifestSHA256:
+b20f6b8bc0a18f046d5c5d9e80fbe52209a9f2db483bc669ae4ad8e16372591f.
+Original86 artifacts/49 pins are retained unchanged. Other final correction proofs:
+actual populated upgrade1/1 and replay; external37/37; expert queries10/10;
+focused static222/222; actual browser, full workspace build/types, tests types,
+changed lint/format/whitespace. Native data state remains222tables/175functions/
+210triggers/1509constraints/549indexes/2extensions; only0070 journal time changed.
+
+Root now owns canonical full branch gate, gated push and stacked DraftPR; no
+hostedCI or release activation is claimed. S4b remains the next sequential block.
