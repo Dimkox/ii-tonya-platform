@@ -18,6 +18,16 @@ except Exception:
     raise SystemExit(0)
 
 
+def _named_paths(root, prompt: str) -> str:
+    """Real paths of the files a task names, so the agent reads them instead of guessing."""
+    try:
+        from getzilla.path_hints import prompt_paths
+        return '\n\n' + prompt_paths(root, prompt)
+    except Exception:
+        # Path context is advisory; the route context still goes out.
+        return ''
+
+
 def main() -> None:
     payload = read_payload()
     root = root_from(payload)
@@ -38,6 +48,8 @@ def main() -> None:
             # Keep the open change package's route; a new prompt must not orphan it.
             context = (route_context(existing) + '\n\n') if existing else ''
             context += f'Getzilla kept the active route: {conflict}'
+    if context:
+        context += _named_paths(root, prompt)
     emit({
         'hookSpecificOutput': {
             'hookEventName': 'UserPromptSubmit',

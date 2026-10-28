@@ -849,10 +849,12 @@ def _installed_root(root: Path) -> bool:
     if '.getzilla' in root.parts or not (root / '.getzilla/config/policy.json').is_file():
         return False
     try:
-        top = subprocess.run(['git', '-C', str(root), 'rev-parse', '--show-toplevel'], capture_output=True,
+        # The folder may be a repository the agent made: its own config must not run a program here (#215).
+        git = ['git', '-c', 'core.fsmonitor=false', '-C', str(root)]
+        top = subprocess.run([*git, 'rev-parse', '--show-toplevel'], capture_output=True,
                              text=True, encoding='utf-8', errors='replace', timeout=5, check=False)
-        tracked = subprocess.run(['git', '-C', str(root), 'ls-files', '--error-unmatch', '--',
-                                  '.getzilla/config/policy.json'], capture_output=True, timeout=5, check=False)
+        tracked = subprocess.run([*git, 'ls-files', '--error-unmatch', '--', '.getzilla/config/policy.json'],
+                                 capture_output=True, timeout=5, check=False)
     except (OSError, subprocess.TimeoutExpired):
         return False
     return (top.returncode == 0 and tracked.returncode == 0
