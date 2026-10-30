@@ -16,7 +16,10 @@ import {
   startTestPostgres,
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
-import { runOutboxBatch } from "../../packages/worker/src/outbox-runner.js";
+import {
+  runOutboxBatch,
+  type OutboxRunnerDeps,
+} from "../../packages/worker/src/outbox-runner.js";
 import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS } from "../../packages/worker/src/local-operator-case-outbox.js";
 import { randomUUID } from "node:crypto";
 import { CLIENT_ASYNC_OUTBOX_TOPICS } from "../../packages/contracts/src/client-consent-authority.js";
@@ -286,7 +289,7 @@ describe("review regressions for client outbox operational boundaries", () => {
         ...runnerDeps(
           repository,
           vi.fn(),
-          vi.fn(async () => "still_unknown"),
+          vi.fn(async () => "still_unknown" as const),
         ),
         metrics: { record: () => undefined },
         dispatcher: {
@@ -396,7 +399,7 @@ describe("review regressions for client outbox operational boundaries", () => {
           ...runnerDeps(
             repository,
             vi.fn(),
-            vi.fn(async () => "still_unknown"),
+            vi.fn(async () => "still_unknown" as const),
           ),
           maxAttempts: 1,
           ...(metrics
@@ -588,7 +591,7 @@ describe("review regressions for client outbox operational boundaries", () => {
           ...runnerDeps(
             repository,
             vi.fn(),
-            vi.fn(async () => "still_unknown"),
+            vi.fn(async () => "still_unknown" as const),
           ),
           batchSize: 1,
           maxAttempts: 1,
@@ -1170,8 +1173,8 @@ afterAll(async () => testDb?.stop(), 120_000);
 
 const runnerDeps = (
   repository: PostgresOutboxRepository,
-  dispatch: ReturnType<typeof vi.fn>,
-  reconcile: ReturnType<typeof vi.fn>,
+  dispatch: OutboxRunnerDeps["dispatcher"]["dispatch"],
+  reconcile: OutboxRunnerDeps["reconciler"]["reconcile"],
   now = new Date(),
 ) => ({
   repository,
