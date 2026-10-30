@@ -992,6 +992,59 @@ CREATE FUNCTION early_bird_private.public_wave_application(target_user uuid) RET
 $$;
 REVOKE ALL ON FUNCTION early_bird_private.public_wave_application(uuid) FROM PUBLIC;
 --> statement-breakpoint
+-- Restore only the existing Wave identity after an old lifecycle hid both flags.
+-- Reuse the reviewed refresh capability, admission and immutable financial source.
+CREATE OR REPLACE FUNCTION early_bird_refresh_projection(target_user uuid,target_review uuid) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE c record; previous public.experts_published%ROWTYPE; expert public.experts%ROWTYPE;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtextextended(target_user::text,0));
+ PERFORM public.early_bird_touch_coverage_epoch(target_user);
+ SELECT * INTO expert FROM public.experts WHERE user_id=target_user FOR UPDATE;
+ IF NOT FOUND OR NOT expert.verified THEN RETURN; END IF;
+ SELECT * INTO previous FROM public.experts_published
+  WHERE user_id=target_user AND expert_id=expert.id AND wave_intent_id IS NOT NULL AND paid_order_id IS NULL FOR UPDATE;
+ IF NOT FOUND THEN RETURN; END IF;
+ -- Read eligibility after exact expert/projection locks. The current candidate
+ -- rechecks paid coverage, consent, latest approved card, safety, holds and pause.
+ SELECT candidate.* INTO c FROM public.early_bird_admission_candidates candidate
+ JOIN public.expert_card_drafts d ON d.id=candidate.draft_id AND d.user_id=candidate.user_id
+  AND d.status='approved' AND d.approved_review_id=candidate.review_id AND d.revision=candidate.revision
+ WHERE candidate.intent_id=previous.wave_intent_id AND candidate.user_id=previous.user_id AND candidate.user_id=target_user
+  AND candidate.expert_id=previous.expert_id AND candidate.expert_id=expert.id
+  AND candidate.draft_id=previous.draft_id AND d.application_id=previous.application_audit_id AND candidate.review_id=target_review;
+ IF NOT FOUND THEN
+  UPDATE public.experts_published SET active=false,updated_at=clock_timestamp() WHERE expert_id=previous.expert_id AND user_id=target_user;
+  RETURN;
+ END IF;
+ INSERT INTO public.early_bird_admissions(intent_id,user_id,expert_id,draft_id,review_id,revision,public_digest)
+ VALUES(c.intent_id,c.user_id,c.expert_id,c.draft_id,c.review_id,c.revision,c.public_digest) ON CONFLICT(intent_id,review_id) DO NOTHING;
+ -- Never manufacture verification or replace financial/intent ownership.
+ UPDATE public.experts SET active=true,updated_at=clock_timestamp() WHERE id=expert.id AND user_id=target_user AND verified;
+ UPDATE public.experts_published SET review_id=c.review_id,revision=c.revision,public_payload=c.public_payload,public_digest=c.public_digest,next_billing_date=c.ends_at,active=true,updated_at=clock_timestamp()
+ WHERE expert_id=previous.expert_id AND user_id=target_user AND wave_intent_id=previous.wave_intent_id AND paid_order_id IS NULL;
+ -- Require the read-time authority to agree after writes and row-lock waits.
+ IF NOT public.early_bird_current_publication_valid(expert.id) THEN
+  UPDATE public.experts_published SET active=false,updated_at=clock_timestamp() WHERE expert_id=expert.id AND user_id=target_user;
+  UPDATE public.experts SET active=false,updated_at=clock_timestamp() WHERE id=expert.id AND user_id=target_user;
+ END IF;
+END $$;
+--> statement-breakpoint
+-- Primary financial LOGINs receive this exact private capability, not EXECUTE
+-- on the public Wave internals or any new direct table permissions.
+CREATE FUNCTION early_bird_private.public_restore_wave_projection(target_user uuid,target_expert uuid) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+DECLARE target_review uuid;
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtextextended(target_user::text,0));
+ SELECT p.review_id INTO target_review FROM public.experts_published p JOIN public.experts e ON e.id=p.expert_id AND e.user_id=p.user_id
+ WHERE p.user_id=target_user AND p.expert_id=target_expert AND e.verified AND p.wave_intent_id IS NOT NULL AND p.paid_order_id IS NULL;
+ IF NOT FOUND THEN RETURN false; END IF;
+ PERFORM public.early_bird_refresh_projection(target_user,target_review);
+ RETURN public.early_bird_current_publication_valid(target_expert);
+END $$;
+REVOKE ALL ON FUNCTION early_bird_private.public_restore_wave_projection(uuid,uuid) FROM PUBLIC;
+--> statement-breakpoint
 ALTER FUNCTION expert_card_activation_gate_valid(uuid,uuid) RENAME TO expert_card_activation_before_public_continuation;
 CREATE FUNCTION expert_card_activation_gate_valid(target_user uuid,target_review uuid) RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
 DECLARE d expert_card_drafts%ROWTYPE; r expert_card_reviews%ROWTYPE; v resident_card_versions%ROWTYPE; assessment jsonb; helper oid; wave_application uuid;

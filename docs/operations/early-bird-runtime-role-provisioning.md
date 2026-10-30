@@ -61,7 +61,7 @@ Pass that actual existing primary financial LOGIN explicitly with
 `--financial-login`; replace the placeholder above with the independently verified
 primary database principal used by API/worker canonical posting. The command does
 not create a financial LOGIN, infer its name, or change its pre-existing table
-privileges. It grants schema USAGE and exactly these six private EXECUTEs:
+privileges. It grants schema USAGE and exactly these seven private EXECUTEs:
 
 - `early_bird_private.public_payment_apply_guard(uuid,uuid,uuid)`
 - `early_bird_private.public_payment_complete(uuid,uuid)`
@@ -69,9 +69,15 @@ privileges. It grants schema USAGE and exactly these six private EXECUTEs:
 - `early_bird_private.public_order_expiry_allowed(uuid)`
 - `early_bird_private.public_wave_application(uuid)`
 - `early_bird_private.public_current_wave_end(uuid)`
+- `early_bird_private.public_restore_wave_projection(uuid,uuid)`
 
-The first five are called directly by canonical repositories; the last is called
-through invoker-mode `expert_residency_current_coverage`. These grants are required
+The first five are called directly by canonical repositories. The current Wave
+end is read through invoker-mode `expert_residency_current_coverage` and the
+lifecycle repository independently of publication visibility or pause. The final
+capability restores only an existing, currently eligible Wave projection for the
+same user/expert/intent and retains current verification, consent, safety, pause
+and refund checks. It creates no financial entitlement and grants no EXECUTE on
+the public Wave refresh or publication internals. These grants are required
 even when public checkout is disabled because expiry and coverage reads share
 those canonical paths. Definer-only identity, never-sent and credit-reversal
 helpers receive no grants. The primary retains its legacy financial trust model;

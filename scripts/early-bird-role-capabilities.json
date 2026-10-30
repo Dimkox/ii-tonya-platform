@@ -277,6 +277,7 @@
     "early_bird_private.public_time(timestamp with time zone)",
     "early_bird_private.public_order_expiry_allowed(uuid)",
     "early_bird_private.public_wave_application(uuid)",
-    "early_bird_private.public_current_wave_end(uuid)"
+    "early_bird_private.public_current_wave_end(uuid)",
+    "early_bird_private.public_restore_wave_projection(uuid,uuid)"
   ]
 }
