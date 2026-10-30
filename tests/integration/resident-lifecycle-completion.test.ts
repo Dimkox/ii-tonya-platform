@@ -14,10 +14,8 @@ import { verifyExpertOfferProfile } from "../../packages/db/src/repositories/exp
 import { PostgresExpertPromoRepository } from "../../packages/db/src/repositories/expert-promo-repository.js";
 import { PostgresExpertVerificationRepository } from "../../packages/db/src/repositories/expert-verification-repository.js";
 import { PostgresExpertCardRepository } from "../../packages/db/src/repositories/expert-card-repository.js";
-import {
-  startExpertReferralTestDatabase,
-  type ExpertReferralTestDatabase,
-} from "../../packages/db/src/testkit/expert-referral.js";
+import { type ExpertReferralTestDatabase } from "../../packages/db/src/testkit/expert-referral.js";
+import { startPublicHeldOnboardingFixture } from "../support/public-held-onboarding-fixture.js";
 import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 import { createExpertCardService } from "../../packages/application/src/expert-card-service.js";
 
@@ -25,6 +23,9 @@ const promoScope = { botId: "717171", botKey: "core-promo" };
 const workScope = { botId: "818181", botKey: "core-work" };
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
 let database: ExpertReferralTestDatabase;
+let publicPayments: Awaited<
+  ReturnType<typeof startPublicHeldOnboardingFixture>
+>;
 let verification: PostgresExpertVerificationRepository;
 let promo: PostgresExpertPromoRepository;
 let manager: { sessionHash: string; token: string };
@@ -607,7 +608,8 @@ const receipt = async (input: {
   receipt: { botKey: input.botKey, chatId: input.chatId, messageId: 101 },
 });
 beforeAll(async () => {
-  database = await startExpertReferralTestDatabase();
+  publicPayments = await startPublicHeldOnboardingFixture();
+  database = publicPayments.database;
   expect(
     (await database.db.execute(sql`show server_version_num`)).rows[0]
       ?.server_version_num,
@@ -629,7 +631,7 @@ beforeAll(async () => {
   });
 }, 120000);
 afterAll(async () => {
-  await database?.stop();
+  await publicPayments?.close();
 }, 120000);
 
 it("missing template remains truthful and does not invent material delivery", async () => {
@@ -1155,17 +1157,8 @@ async function normalFormOnboarding(): Promise<
     const invoice = await verification.invoiceForOwner(scope, invoiceId);
     if (!invoice) throw Error("normal_form_invoice_missing");
     expect(invoice.amountMinor).toBe("300000");
-    const { createPayerReceiptVault } = await import("@ii-tonya/integrations");
     const { PostgresPayerReceiptContactRepository } =
       await import("../../packages/db/src/repositories/payer-receipt-contact-repository.js");
-    const { PostgresHeldOnboardingCheckout } =
-      await import("../../packages/db/src/repositories/expert-held-onboarding-repository.js");
-    const { startHeldOnboardingLocal } =
-      await import("../support/held-onboarding-local.js");
-    const vault = createPayerReceiptVault({
-      activeKeyId: "fixture",
-      keys: new Map([["fixture", new Uint8Array(32).fill(11)]]),
-    });
     const bridge = (
       await database.db.execute<{ quoteId: string }>(
         sql`select quote_id as "quoteId" from expert_sales_form_bridges where application_id=${applicationId}::uuid`,
@@ -1173,7 +1166,7 @@ async function normalFormOnboarding(): Promise<
     ).rows[0]!;
     await new PostgresPayerReceiptContactRepository(
       database.db,
-      vault,
+      publicPayments.vault,
       30,
     ).capture({
       userId,
@@ -1181,38 +1174,30 @@ async function normalFormOnboarding(): Promise<
       email: "synthetic@example.com",
       idempotencyKey: randomUUID(),
     });
-    const local = await startHeldOnboardingLocal("synthetic_" + randomUUID());
-    try {
-      const checkout = new PostgresHeldOnboardingCheckout(database.db, {
-        enabled: true,
-        client: local.client,
-        vault,
-        protector: local.protector,
-        decryptor: local.decryptor,
-        repository: verification,
-        returnUrl: "https://example.com/return",
-        vatCode: 1,
-        mode: "test",
-      });
-      expect(
-        await checkout.createCheckout({ invoiceId: invoice.id }),
-      ).toMatchObject({ url: "https://yookassa.ru/synthetic-sales-checkout" });
-      local.waiting();
-      await checkout.reconcile(invoice.id);
-      await checkout.reconcile(invoice.id);
-      expect(
-        local.requests.filter((r) => r.method === "POST").map((r) => r.path),
-      ).toEqual(["/v3/payments", expect.stringMatching(/\/capture$/)]);
-      expect(
-        (
-          await database.db.execute(
-            sql`select admission,amount_minor::text amount from expert_onboarding_payment_facts where invoice_id=${invoice.id}::uuid`,
-          )
-        ).rows[0],
-      ).toEqual({ admission: "interview", amount: "300000" });
-    } finally {
-      await local.stop();
-    }
+    const checkout = publicPayments.runtime.held;
+    const payment = await checkout.createCheckout({ invoiceId: invoice.id });
+    expect(payment).toMatchObject({
+      url: "https://yoomoney.ru/checkout/local",
+    });
+    await publicPayments.waiting(payment.paymentId);
+    await checkout.reconcile(invoice.id);
+    await checkout.reconcile(invoice.id);
+    expect(
+      (await publicPayments.stats()).posts
+        .filter(
+          (r) =>
+            r.metadata?.order_id === invoice.id ||
+            r.path.startsWith(`/v3/payments/${payment.paymentId}/`),
+        )
+        .map((r) => r.path),
+    ).toEqual(["/v3/payments", expect.stringMatching(/\/capture$/)]);
+    expect(
+      (
+        await database.db.execute(
+          sql`select admission,amount_minor::text amount from expert_onboarding_payment_facts where invoice_id=${invoice.id}::uuid`,
+        )
+      ).rows[0],
+    ).toEqual({ admission: "interview", amount: "300000" });
     const binding = await verification.findOnboardingPaymentBinding(invoice.id);
     if (!binding) throw Error("normal_form_binding_missing");
     return { userId, scope, applicationId, invoice, binding };
