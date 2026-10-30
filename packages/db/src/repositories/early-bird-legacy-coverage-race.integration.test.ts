@@ -1,24 +1,25 @@
+import { createEarlyBirdCanonicalCoverageFixture } from "../testkit/early-bird-canonical-coverage-fixture.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { expertResidencyPaymentEventSchema } from "@ii-tonya/contracts";
 import { verifiedEventFixture } from "../../../integrations/src/expert-residency/verified-event.js";
-import {
-  startExpertReferralTestDatabase,
-  type ExpertReferralTestDatabase,
-} from "../testkit/expert-referral.js";
+import type { ExpertReferralTestDatabase } from "../testkit/expert-referral.js";
 import { PostgresExpertResidencyRepository } from "./expert-residency-repository.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "./expert-residency-provider-inbox-repository.js";
 let fixture: ExpertReferralTestDatabase;
+let coverage: Awaited<
+  ReturnType<typeof createEarlyBirdCanonicalCoverageFixture>
+>;
 beforeAll(async () => {
-  fixture = await startExpertReferralTestDatabase();
-  await fixture.enableExpertReferralCommands();
+  coverage = await createEarlyBirdCanonicalCoverageFixture();
+  fixture = coverage.db;
 }, 120_000);
 afterAll(async () => {
-  await fixture?.stop();
+  await coverage?.stop();
 }, 120_000);
 it("retries legacy settlement after an overlapping wave payment commits", async () => {
-  const expert = await fixture.createExpertIdentity();
+  const expert = coverage.expert;
   const repository = new PostgresExpertResidencyRepository(fixture.db);
   const audit = await fixture.createAdminAudit({
     action: "expert_residency.tariff_create",
@@ -58,18 +59,6 @@ it("retries legacy settlement after an overlapping wave payment commits", async 
       verifiedAt: new Date().toISOString(),
     },
   );
-  await fixture.db.execute(
-    sql`create table early_bird_coverage_epochs (user_id uuid primary key, revision bigint not null)`,
-  );
-  await fixture.db.execute(
-    sql`create function early_bird_touch_coverage_epoch(target_user uuid) returns void language sql as $$ insert into early_bird_coverage_epochs(user_id,revision) values(target_user,1) on conflict(user_id) do update set revision=early_bird_coverage_epochs.revision+1 $$`,
-  );
-  await fixture.db.execute(
-    sql`create table early_bird_payment_successes (user_id uuid not null, disposition text not null, ends_at timestamptz)`,
-  );
-  await fixture.db.execute(
-    sql`create function early_bird_active_coverage_end(target_user uuid) returns timestamptz language sql as $$ select max(ends_at) from early_bird_payment_successes where user_id=target_user and disposition='eligible' $$`,
-  );
   // Legacy establishes its SERIALIZABLE snapshot before awaiting the subject
   // lock. The wave writer commits an epoch and paid interval while it waits.
   let release!: () => void, held!: () => void;
@@ -80,16 +69,14 @@ it("retries legacy settlement after an overlapping wave payment commits", async 
     release = resolve;
   });
   const wave = fixture.db.transaction(async (tx) => {
+    await tx.execute(sql`set transaction isolation level serializable`);
     await tx.execute(
       sql`select pg_advisory_xact_lock(hashtextextended(${expert.userId}::uuid::text,0))`,
     );
     held();
     await gate;
     await tx.execute(
-      sql`insert into early_bird_payment_successes values(${expert.userId}::uuid,'eligible','2027-02-09T21:00:00Z')`,
-    );
-    await tx.execute(
-      sql`select early_bird_touch_coverage_epoch(${expert.userId}::uuid)`,
+      sql`select early_bird_commit_verified_payment(${JSON.stringify(coverage.paymentSnapshot)}::jsonb,${coverage.paymentProof.evidenceDigest},${coverage.paymentProof.capturedAt}::timestamptz)`,
     );
   });
   await ready;
@@ -123,4 +110,14 @@ it("retries legacy settlement after an overlapping wave payment commits", async 
     "value.residencyStartsAt",
     "2027-02-09T21:00:00.000Z",
   );
+  const committed = await fixture.db.execute<{
+    ends: Date | string;
+    provider: string;
+  }>(
+    sql`select c.ends_at as ends,s.provider_object_id as provider from early_bird_effective_coverages c join early_bird_payment_successes s on s.intent_id=c.intent_id where c.intent_id=${coverage.intentId}::uuid`,
+  );
+  expect(new Date(committed.rows[0]!.ends).toISOString()).toBe(
+    "2027-02-09T21:00:00.000Z",
+  );
+  expect(committed.rows[0]!.provider).toBe(coverage.payment.id);
 }, 120_000);
