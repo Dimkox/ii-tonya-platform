@@ -94,6 +94,10 @@ BEGIN
   IF NEW.provider<>'yookassa' THEN RETURN NEW; END IF;
   object_kind:=CASE WHEN NEW.operation_kind='create_refund' THEN 'refund' ELSE 'payment' END;
  ELSIF TG_TABLE_NAME='early_bird_refund_binding_registry' THEN source_kind:=NEW.product;
+ ELSIF TG_TABLE_NAME='early_bird_refund_registry' THEN
+  -- The shared registry's XOR constraint selects the genuine financial source.
+  source_kind:=CASE WHEN NEW.intent_id IS NOT NULL THEN 'composite' ELSE 'deferred' END;
+  source_id:=coalesce(NEW.intent_id,NEW.deferred_invoice_id);
  END IF;
  PERFORM early_bird_private.public_identity_claim(object_kind,object_id,source_kind,source_id);
  RETURN NEW;
@@ -130,7 +134,7 @@ DO $$ DECLARE binding record; BEGIN
  UNION ALL
  SELECT 'refund' object_kind,provider_refund_id provider_object_id,'composite' source_kind,intent_id source_id FROM public.early_bird_payment_full_refunds WHERE provider_refund_id IS NOT NULL
  UNION ALL
- SELECT 'refund' object_kind,provider_refund_id provider_object_id,'composite' source_kind,intent_id source_id FROM public.early_bird_refund_registry WHERE provider_refund_id IS NOT NULL
+ SELECT 'refund' object_kind,provider_refund_id provider_object_id,CASE WHEN intent_id IS NOT NULL THEN 'composite' ELSE 'deferred' END source_kind,coalesce(intent_id,deferred_invoice_id) source_id FROM public.early_bird_refund_registry WHERE provider_refund_id IS NOT NULL
  UNION ALL
  SELECT 'refund' object_kind,provider_refund_id provider_object_id,'deferred' source_kind,invoice_id source_id FROM public.early_bird_deferred_verified_refund_bindings WHERE provider_refund_id IS NOT NULL
  UNION ALL
