@@ -461,8 +461,10 @@ it.each(["admitted", "uncertain", "bound"] as const)(
     await admit(f);
     if (phase !== "admitted") await claim(f);
     if (phase === "bound") await bind(f, "pending");
+    const beforeExpiry = await state(f);
     await clock(true);
-    await expect(canonicalExpire(f)).rejects.toThrow();
+    expect(await canonicalExpire(f)).toBe(false);
+    expect(await state(f)).toEqual(beforeExpiry);
     expect(await state(f)).toMatchObject({
       state: phase,
       status: "payment_pending",
