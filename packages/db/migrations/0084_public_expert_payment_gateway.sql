@@ -473,8 +473,11 @@ CREATE FUNCTION early_bird_private.public_onboarding_committed_matches(r public.
    JOIN public.public_expert_payment_resolutions admission ON admission.request_id=original.id AND admission.kind='apply_attempt' AND admission.apply_attempt_id=original.apply_attempt_id AND admission.observation_id=origin.id AND admission.action='onboarding_settle'
    WHERE f.invoice_id=r.invoice_id AND f.operation_id=r.legacy_operation_id AND f.user_id=r.user_id AND f.purpose='onboarding'
     AND f.provider_object_id=r.provider_object_id AND f.provider_mode=r.mode AND f.amount_minor=r.amount_minor AND f.currency=r.currency AND f.captured_at=o.provider_captured_at
-    AND f.xmin::text::numeric<>mod(pg_current_xact_id()::text::numeric,4294967296)
+    -- Guard stores a TOP-LEVEL xid8 even below SAVEPOINT. A visible immutable
+    -- fact from that different completed transaction is committed; a distinct
+    -- tuple xmin/subxid alone says nothing about its outer commit boundary.
     AND original.apply_action='onboarding_settle' AND original.apply_xid IS NOT NULL
+    AND original.apply_xid<>pg_current_xact_id() AND pg_visible_in_snapshot(original.apply_xid,pg_current_snapshot())
     AND origin.provider_object_id=f.provider_object_id AND origin.mode=f.provider_mode AND origin.amount_minor=f.amount_minor AND origin.currency=f.currency AND origin.provider_captured_at=f.captured_at
     AND f.event_id='public:'||original.id::text||':'||origin.id::text AND f.evidence_digest=origin.evidence_digest),false)
 $$;
@@ -754,8 +757,14 @@ BEGIN
  IF NOT early_bird_private.public_source_valid(r,false) THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
  -- A sibling request may already have posted this same held parent. Inspect its
  -- immutable committed fact before requesting another financial transaction.
- committed_onboarding:=a.action='onboarding_settle' AND EXISTS(SELECT 1 FROM public.expert_onboarding_payment_facts f WHERE f.invoice_id=r.invoice_id AND f.xmin::text::numeric<>mod(pg_current_xact_id()::text::numeric,4294967296));
- IF (r.apply_attempt_id IS DISTINCT FROM target_attempt OR r.apply_xid IS NULL OR r.apply_xid=pg_current_xact_id()) AND NOT committed_onboarding THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
+ -- Preserve the original current-top-level-transaction refusal unconditionally.
+ IF r.apply_xid=pg_current_xact_id() THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
+ -- Reuse the full origin proof, including its top-level XID and immutable
+ -- event/digest provenance; do not infer commitment from a tuple's subxid.
+ committed_onboarding:=a.action='onboarding_settle' AND EXISTS(SELECT 1 FROM public.public_expert_payment_requests original
+  JOIN public.public_expert_payment_observations origin ON origin.id=original.apply_observation_id AND origin.request_id=original.id
+  WHERE original.invoice_id=r.invoice_id AND early_bird_private.public_onboarding_committed_matches(original,origin));
+ IF (r.apply_attempt_id IS DISTINCT FROM target_attempt OR r.apply_xid IS NULL) AND NOT committed_onboarding THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
  IF a.action='onboarding_settle' THEN
   SELECT f.invoice_id::text INTO legacy_id FROM public.expert_onboarding_payment_facts f JOIN public.expert_onboarding_invoices i ON i.id=f.invoice_id AND i.status='settled'
   JOIN public.expert_onboarding_payment_operations op ON op.id=f.operation_id AND op.status='succeeded'
