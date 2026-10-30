@@ -24,7 +24,7 @@ it("times out saturated discovery checkout and releases it without affecting a h
   const connect = () => db.$client.connect();
   let held: Awaited<ReturnType<typeof connect>> | undefined;
   try {
-    held = await db.$client.connect();
+    held = await connect();
     const before = Date.now();
     await expect(db.$client.connect()).rejects.toThrow(/timeout/iu);
     expect(Date.now() - before).toBeLessThan(6500);
