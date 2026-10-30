@@ -35,7 +35,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
   with lock:
    path=self.path; key=self.headers.get('Idempotence-Key')
    if any(p['key']==key for p in posts):self.send_error(409);return
-   posts.append({'path':path,'key':key,'metadata':body.get('metadata'), 'hasReceipt':bool(body.get('receipt'))})
+   posts.append({'path':path,'key':key,'metadata':body.get('metadata'),'hasReceipt':bool(body.get('receipt')),'capture':body.get('capture'),'paymentMethodType':body.get('payment_method_data',{}).get('type')})
    now=(__import__('datetime').datetime.now(__import__('datetime').timezone.utc)+__import__('datetime').timedelta(seconds=offset)).isoformat(timespec='milliseconds').replace('+00:00','Z')
    if path=='/v3/payments':
     item={'id':str(__import__('uuid').uuid4()),'status':'pending','paid':False,'test':True,'refundable':False,'amount':body['amount'],'metadata':body['metadata'],'created_at':now,'confirmation':{'type':'redirect','confirmation_url':'https://yoomoney.ru/checkout/local'},'payment_method':{'type':'bank_card'}}

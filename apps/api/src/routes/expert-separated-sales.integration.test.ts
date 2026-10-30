@@ -1,7 +1,20 @@
 import Fastify from "fastify";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { sql } from "drizzle-orm";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import {
+  createPayerReceiptVault,
+  ExperimentalGatewayIpc,
+} from "@ii-tonya/integrations";
+import { createPublicExpertPaymentRuntime } from "../../../../packages/db/src/public-expert-payment-runtime.js";
+import { PostgresPublicExpertPaymentObservations } from "../../../../packages/db/src/repositories/public-expert-payment-gateway.js";
+import { createPublicExpertRuntimePrincipals } from "../../../../packages/db/src/testkit/public-expert-runtime-principals.js";
+import { PostgresPayerReceiptContactRepository } from "../../../../packages/db/src/repositories/payer-receipt-contact-repository.js";
+import { buildEarlyBirdRoleProvisioningSql } from "../../../../scripts/provision-early-bird-runtime-roles.mjs";
+import {
+  startPublicExpertFuturePostgres,
+  startPublicExpertGatewayProvider,
+} from "../../../../tests/support/public-expert-gateway-provider.mjs";
 import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
@@ -12,16 +25,127 @@ import { createExpertApplicantComposition } from "../expert-applicant-compositio
 import { expertApplicantTelegramRoutes } from "./expert-applicant-telegram.js";
 import { loadEnv } from "@ii-tonya/config";
 let database: ExpertReferralTestDatabase;
+let clock: Awaited<ReturnType<typeof startPublicExpertFuturePostgres>>;
+let provider: Awaited<ReturnType<typeof startPublicExpertGatewayProvider>>;
+let principals: Awaited<ReturnType<typeof createPublicExpertRuntimePrincipals>>;
+let runtime: ReturnType<typeof createPublicExpertPaymentRuntime>;
+const vault = createPayerReceiptVault({
+  activeKeyId: "fixture",
+  keys: new Map([["fixture", new Uint8Array(32).fill(7)]]),
+});
+type ProviderPayment = {
+  id: string;
+  status: string;
+  amount: { value: string; currency: string };
+  metadata: Record<string, string>;
+  captured_at?: string;
+};
+async function providerStats() {
+  return provider.command({ op: "stats" }) as Promise<{
+    posts: {
+      path: string;
+      key: string;
+      metadata: Record<string, string> | null;
+      hasReceipt: boolean;
+      capture: boolean | null;
+      paymentMethodType: string | null;
+    }[];
+    reads: string[];
+    payments: ProviderPayment[];
+  }>;
+}
 beforeAll(async () => {
-  database = await startExpertReferralTestDatabase();
+  clock = await startPublicExpertFuturePostgres();
+  const NativeDate = Date;
+  vi.stubGlobal(
+    "Date",
+    new Proxy(NativeDate, {
+      construct(target, args) {
+        return Reflect.construct(
+          target,
+          args.length ? args : [NativeDate.now() + clock.offsetSeconds * 1000],
+        );
+      },
+      get(target, property) {
+        return property === "now"
+          ? () => NativeDate.now() + clock.offsetSeconds * 1000
+          : Reflect.get(target, property);
+      },
+    }),
+  );
+  const previous = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
+  process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL = clock.connectionString;
+  try {
+    database = await startExpertReferralTestDatabase();
+  } finally {
+    if (previous === undefined)
+      delete process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
+    else process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL = previous;
+  }
+  expect(
+    (await database.db.$client.query("show server_version_num")).rows[0]!
+      .server_version_num,
+  ).toBe("170005");
+  principals = await createPublicExpertRuntimePrincipals(database.db);
+  const gatewayLogin = "sales_gateway_" + randomUUID().replaceAll("-", "");
+  const password = randomBytes(24).toString("hex");
+  await database.db.$client.query(
+    `create role ${gatewayLogin} login inherit password '${password}'`,
+  );
+  await database.db.$client.query(
+    await buildEarlyBirdRoleProvisioningSql({
+      ii_tonya_wave_gateway: gatewayLogin,
+    }),
+  );
+  provider = await startPublicExpertGatewayProvider(
+    database.db.$client.options.connectionString!,
+    gatewayLogin,
+    password,
+    clock.offsetSeconds,
+  );
+  const requestKey = randomBytes(32);
+  runtime = createPublicExpertPaymentRuntime(database.db, {
+    connections: principals.connections,
+    gateway: new ExperimentalGatewayIpc({
+      address: provider.address,
+      key: Buffer.alloc(32, "k"),
+      authKey: Buffer.alloc(32, "a"),
+      timeoutMs: 10000,
+    }),
+    mode: "test",
+    messagingConsentPolicyVersion: "client-messaging-v1",
+    vault,
+    requestKey,
+    requestKeyReference: "sales:v1",
+    retainedRequestKeys: new Map([["sales:v1", requestKey]]),
+    returnUrl: "https://example.com/return",
+    vatCode: 1,
+  });
+  await runtime.assertReady();
   await seedClientConsent(
     database.db,
     await database.createUser(),
     "client_messaging",
   );
-}, 120000);
+}, 180000);
 afterAll(async () => {
-  await database?.stop();
+  const failures: unknown[] = [];
+  for (const cleanup of [
+    () => runtime?.stop(),
+    () => provider?.close(),
+    () => principals?.close(),
+    () => database?.stop(),
+    () => clock?.stop(),
+  ]) {
+    try {
+      await cleanup();
+    } catch (error) {
+      failures.push(error);
+    }
+  }
+  vi.unstubAllGlobals();
+  if (failures.length)
+    throw new AggregateError(failures, "sales public fixture cleanup failed");
 }, 120000);
 it("normal private ingress shows base, separate positive/promo/period, real form and manager-approved fixed fee", async () => {
   const tariff = await database.createResidencyTariff({
@@ -41,13 +165,7 @@ it("normal private ingress shows base, separate positive/promo/period, real form
     EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: "synthetic_sales_secret_1234567890",
     EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
   });
-  const { createPayerReceiptVault } = await import("@ii-tonya/integrations");
-  const vault = createPayerReceiptVault({
-    activeKeyId: "fixture",
-    keys: new Map([["fixture", new Uint8Array(32).fill(7)]]),
-  });
-  let activeCheckout:
-    import("@ii-tonya/db").PostgresHeldOnboardingCheckout | undefined;
+  let activeCheckout: Pick<typeof runtime.held, "recoverCheckout"> | undefined;
   const app = Fastify({ logger: false });
   await app.register(expertApplicantTelegramRoutes, {
     enabled: true,
@@ -161,7 +279,10 @@ it("normal private ingress shows base, separate positive/promo/period, real form
     expect(submitted.text).not.toContain("цены ещё не доступны");
     const beforeApproval = await send("", "st:current");
     expect(beforeApproval.text).toContain("осталось");
-    expect(beforeApproval.text).not.toContain("https://yookassa");
+    expect(beforeApproval.text).not.toMatch(
+      /https:\/\/(?:yookassa|yoomoney)\.ru\//u,
+    );
+    expect((await providerStats()).posts).toHaveLength(0);
     const captured = await send("/receipt synthetic@example.com");
     expect(captured.text).toContain("Адрес для чека сохранён");
     expect(JSON.stringify(captured)).not.toContain("synthetic@example.com");
@@ -287,12 +408,7 @@ it("normal private ingress shows base, separate positive/promo/period, real form
         )
       ).rows[0]?.n,
     ).toBe(0);
-    const { PostgresHeldOnboardingCheckout } =
-      await import("../../../../packages/db/src/repositories/expert-held-onboarding-repository.js");
-    const { startHeldOnboardingLocal } =
-      await import("../../../../tests/support/held-onboarding-local.js");
-    const local = await startHeldOnboardingLocal();
-    try {
+    {
       const source = (
         await database.db.execute<{
           userId: string;
@@ -302,23 +418,15 @@ it("normal private ingress shows base, separate positive/promo/period, real form
           sql`select i.user_id as "userId",b.quote_id as "quoteId",o.id as "operationId" from expert_onboarding_invoices i join expert_sales_form_bridges b on b.application_id=i.application_id join expert_onboarding_payment_operations o on o.invoice_id=i.id where i.id=${decision.invoiceId}::uuid`,
         )
       ).rows[0]!;
-      const checkout = new PostgresHeldOnboardingCheckout(database.db, {
-        enabled: true,
-        client: local.client,
-        vault,
-        protector: local.protector,
-        decryptor: local.decryptor,
-        repository: repo,
-        returnUrl: "https://example.com/return",
-        vatCode: 1,
-        mode: "test",
-      });
+      // The authenticated ingress continues its own approved invoice. Public
+      // delivery obtains the receipt and operation from that canonical source.
+      const checkout = runtime.held;
       activeCheckout = checkout;
       const currentTariff = await send("", "st:current");
       expect(currentTariff.text).toContain("15284,70 ₽");
       expect(currentTariff.text).toContain("Срок:");
       expect(currentTariff.text).toContain("осталось");
-      expect(currentTariff.text).toContain("3000 ₽: https://yookassa.ru/");
+      expect(currentTariff.text).toContain("3000 ₽: https://yoomoney.ru/");
       const ready = await checkout.recoverCheckout({
         invoiceId: decision.invoiceId!,
         operationId: source.operationId,
@@ -329,13 +437,18 @@ it("normal private ingress shows base, separate positive/promo/period, real form
         operationId: source.operationId,
       });
       expect(
-        local.requests.filter(
-          (r) => r.method === "POST" && r.path === "/v3/payments",
-        ),
+        (await providerStats()).posts.filter((r) => r.path === "/v3/payments"),
       ).toHaveLength(1);
-      expect(local.requests[0]?.body).toMatchObject({
+      expect((await providerStats()).posts[0]).toMatchObject({
         capture: false,
-        payment_method_data: { type: "bank_card" },
+        paymentMethodType: "bank_card",
+        hasReceipt: true,
+        metadata: {
+          purpose: "onboarding",
+          order_id: decision.invoiceId,
+          operation_id: source.operationId,
+          user_id: source.userId,
+        },
       });
       const persisted = (
         await database.db.execute<{ encrypted: string; body: string | null }>(
@@ -344,22 +457,14 @@ it("normal private ingress shows base, separate positive/promo/period, real form
       ).rows[0]!;
       expect(persisted.body).toBeNull();
       expect(persisted.encrypted).not.toContain("synthetic@example.com");
-      local.waiting();
-      await checkout.reconcile(decision.invoiceId!);
-      expect(
-        local.requests.filter(
-          (r) => r.method === "POST" && r.path.endsWith("/capture"),
-        ),
-      ).toHaveLength(1);
-      expect(
-        (
-          await database.db.execute(
-            sql`select count(*)::int n from expert_sales_provider_observations where status='waiting_for_capture'`,
-          )
-        ).rows[0]?.n,
-      ).toBe(1);
-    } finally {
-      await local.stop();
+      const pending = (await providerStats()).payments.find(
+        (payment) => payment.metadata.order_id === decision.invoiceId,
+      )!;
+      expect(pending).toMatchObject({
+        id: ready.kind === "ready" ? ready.paymentId : "missing",
+        status: "pending",
+        amount: { value: "3000.00", currency: "RUB" },
+      });
     }
   } finally {
     await app.close();
@@ -367,8 +472,6 @@ it("normal private ingress shows base, separate positive/promo/period, real form
 }, 120000);
 
 it("authoritative fee success locks only selected quarter; later quote sources preserve terms and wrong periods are denied", async () => {
-  const { createYooKassaClient, YooKassaOnboardingPaymentVerifier } =
-    await import("@ii-tonya/integrations");
   const { PostgresExpertCampaignQuoteRepository } =
     await import("../../../../packages/db/src/repositories/expert-campaign-quote-repository.js");
   const repo = new PostgresExpertVerificationRepository(database.db, {
@@ -385,78 +488,133 @@ it("authoritative fee success locks only selected quarter; later quote sources p
       sql`select i.id invoice,o.id operation,i.user_id as "userId",b.tariff_version_id tariff from expert_onboarding_invoices i join expert_onboarding_payment_operations o on o.invoice_id=i.id join expert_sales_bases b on b.user_id=i.user_id order by i.created_at limit 1`,
     )
   ).rows[0]!;
-  await repo.bindPayment(row.invoice, {
-    id: row.operation,
-    providerObjectId: "sales_payment_1",
-    userId: row.userId,
-    purpose: "onboarding",
-    amountMinor: "300000",
-    currency: "RUB",
-    mode: "test",
-  });
   const binding = await repo.findOnboardingPaymentBinding(row.invoice);
   expect(binding).not.toBeNull();
-  const capturedAt = new Date().toISOString();
-  const createdAt = new Date(Date.now() - 100).toISOString();
-  const client = createYooKassaClient(
-    { mode: "test", shopId: "test-shop", secretKey: "synthetic-only" },
-    async () =>
-      new Response(
-        JSON.stringify({
-          id: "sales_payment_1",
-          status: "succeeded",
-          paid: true,
-          amount: { value: "3000.00", currency: "RUB" },
-          test: true,
-          created_at: createdAt,
-          captured_at: capturedAt,
-          metadata: {
-            order_id: row.invoice,
-            user_id: row.userId,
-            operation_id: row.operation,
-            purpose: "onboarding",
-          },
-          refundable: true,
-        }),
-        { status: 200 },
-      ),
-  );
-  const proof = await new YooKassaOnboardingPaymentVerifier(
-    client,
-    repo,
-  ).verify(row.invoice);
-  expect(proof).not.toBeNull();
-  const settlements = await Promise.all([
-    repo.settleVerified(proof!),
-    repo.settleVerified(proof!),
+  const pending = (await providerStats()).payments.find(
+    (item) => item.metadata.order_id === row.invoice,
+  )!;
+  expect(pending.status).toBe("pending");
+  expect(
+    (
+      await database.db.execute(
+        sql`select i.status,(select count(*)::int from expert_onboarding_payment_facts f where f.invoice_id=i.id) facts,(select count(*)::int from public_expert_payment_resolutions resolution join public_expert_payment_requests request on request.id=resolution.request_id where request.invoice_id=i.id and resolution.kind='applied') applied from expert_onboarding_invoices i where i.id=${row.invoice}::uuid`,
+      )
+    ).rows[0],
+  ).toEqual({ status: "pending", facts: 0, applied: 0 });
+  // Confirm only at the local bank boundary. Both real reconciliation paths
+  // start before the first financial application, racing capture and settlement.
+  await provider.command({
+    op: "payment",
+    id: pending.id,
+    status: "waiting_for_capture",
+  });
+  const firstReconciliations = await Promise.all([
+    runtime.held.reconcile(row.invoice),
+    runtime.held.reconcile(row.invoice),
   ]);
-  expect(settlements.map((s) => s.replay).sort()).toEqual([false, true]);
-  const { createExpertVerificationComposition } =
-    await import("../expert-verification-composition.js");
+  // An admitted CAPTURE can legitimately make its contender pending. The held
+  // port returns the pre-capture observation, not a financial replay boolean.
+  expect(firstReconciliations.map((result) => result.kind)).not.toContain(
+    "unavailable",
+  );
+  expect(
+    firstReconciliations.some((result) => result.kind === "observed"),
+  ).toBe(true);
+  const stats = await providerStats();
+  expect(
+    stats.posts.filter((post) => post.path.endsWith("/capture")),
+  ).toHaveLength(1);
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from public_expert_payment_observations observation join public_expert_payment_requests request on request.id=observation.request_id where request.invoice_id=${row.invoice}::uuid and observation.status='waiting_for_capture'`,
+      )
+    ).rows[0]?.n,
+  ).toBeGreaterThanOrEqual(1);
+  expect(
+    (
+      await database.db.execute(
+        sql`select exists(select 1 from public_expert_payment_requests capture join public_expert_payment_requests original on original.invoice_id=capture.invoice_id and original.kind='onboarding_create' join public_expert_payment_observations held on held.request_id=original.id and held.provider_object_id=capture.parent_payment_id where capture.invoice_id=${row.invoice}::uuid and capture.kind='onboarding_capture' and held.status='waiting_for_capture' and held.payment_method_type='bank_card' and held.observed_at<=capture.dispatched_at) proven`,
+      )
+    ).rows[0]?.proven,
+  ).toBe(true);
+  const payment = stats.payments.find((item) => item.id === pending.id)!;
+  expect(payment.status).toBe("succeeded");
+  expect(payment.captured_at).toEqual(expect.any(String));
+  expect(
+    (
+      await database.db.execute(
+        sql`select i.status,f.provider_object_id payment,early_bird_private.public_time(f.captured_at) captured from expert_onboarding_invoices i join expert_onboarding_payment_facts f on f.invoice_id=i.id where i.id=${row.invoice}::uuid`,
+      )
+    ).rows[0],
+  ).toEqual({
+    status: "settled",
+    payment: pending.id,
+    captured: payment.captured_at,
+  });
+  const request = (
+    await database.db.execute<{ id: string }>(
+      sql`select id from public_expert_payment_requests where invoice_id=${row.invoice}::uuid and kind='onboarding_capture'`,
+    )
+  ).rows[0]!;
+  const postsBeforeReplay = stats.posts.length;
+  const recovered = await Promise.all([
+    runtime.recovery.recover(request.id),
+    runtime.recovery.recover(request.id),
+  ]);
+  const observations = new PostgresPublicExpertPaymentObservations(
+    principals.connections.observations.db,
+  );
+  const replayed = await Promise.all(
+    recovered.map(async (result) => {
+      if (result.kind !== "observed") throw Error("fee_replay_not_observed");
+      expect(result.observation.status).toBe("succeeded");
+      return observations.resolve(request.id, result.observationId);
+    }),
+  );
+  expect(replayed.map((result) => result?.kind)).toEqual([
+    "already_applied",
+    "already_applied",
+  ]);
+  expect((await providerStats()).posts).toHaveLength(postsBeforeReplay);
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from expert_onboarding_payment_facts where invoice_id=${row.invoice}::uuid`,
+      )
+    ).rows[0]?.n,
+  ).toBe(1);
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from expert_onboarding_payment_facts fact join public_expert_payment_requests request on request.invoice_id=fact.invoice_id and request.legacy_operation_id=fact.operation_id join public_expert_payment_observations observation on observation.request_id=request.id and observation.id=request.apply_observation_id where fact.invoice_id=${row.invoice}::uuid and fact.event_id='public:'||request.id::text||':'||observation.id::text and fact.evidence_digest=observation.evidence_digest and fact.provider_object_id=observation.provider_object_id and fact.captured_at=observation.provider_captured_at`,
+      )
+    ).rows[0]?.n,
+  ).toBe(1);
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from public_expert_payment_resolutions where request_id=${request.id}::uuid and kind='applied'`,
+      )
+    ).rows[0]?.n,
+  ).toBe(1);
   const { yookassaWebhookRoutes } = await import("./yookassa-webhook.js");
   const { PostgresWebhookInboxRepository } =
     await import("../../../../packages/db/src/repositories/webhook-inbox-repository.js");
-  const config = loadEnv({
-    DATABASE_URL: "postgresql://synthetic:synthetic@localhost/fixture",
-    ALLOW_INSECURE_LOCAL_DATABASE: "true",
-    EXPERT_VERIFICATION_ENABLED: "true",
-    EXPERT_VERIFICATION_PAYMENT_VERIFICATION_ENABLED: "true",
-    EXPERT_VERIFICATION_PAYMENT_MODE: "test",
-    EXPERT_VERIFICATION_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
-  });
-  const composition = createExpertVerificationComposition(database.db, config, {
-    providerMode: "test",
-    paymentVerification: { authoritativeGet: true, client },
-  })!;
   const app = Fastify({ logger: false });
   await app.register(yookassaWebhookRoutes, {
     effectivePeerAddress: () => "185.71.76.1",
     inbox: new PostgresWebhookInboxRepository(database.db),
+    publicPayment: runtime,
     resolvePurpose: async (id) =>
       (await repo.findOnboardingInvoiceByProviderObjectId(id))
         ? "ONBOARDING_FEE"
         : null,
-    onboarding: composition.onboardingWebhook!,
+    onboarding: {
+      async handle() {
+        throw Error("must_not_fall_back_to_legacy_onboarding");
+      },
+    },
     verify: async () => {
       throw Error("must_not_route_to_main");
     },
@@ -475,7 +633,7 @@ it("authoritative fee success locks only selected quarter; later quote sources p
             payload: {
               type: "notification",
               event: "payment.succeeded",
-              object: { id: "sales_payment_1" },
+              object: { id: payment.id },
             },
           })
         ).statusCode,
@@ -489,6 +647,13 @@ it("authoritative fee success locks only selected quarter; later quote sources p
     )
   ).rows[0];
   expect(lock).toEqual({ price: "1528470", term: 3 });
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from expert_sales_paid_locks where user_id=${row.userId}::uuid`,
+      )
+    ).rows[0]?.n,
+  ).toBe(1);
   expect(
     (
       await database.db.execute(
@@ -672,6 +837,18 @@ it("paid selected terms feed the real gated main invoice and never bypass card/p
     quoteId: quote.id,
     revision: state.revision,
   });
+  // Main requires its own genuinely captured receipt for this accepted quote;
+  // the onboarding contact cannot authorize another invoice's disclosure.
+  const contact = await new PostgresPayerReceiptContactRepository(
+    database.db,
+    vault,
+    30,
+  ).capture({
+    userId: row.userId,
+    quoteId: quote.id,
+    email: "synthetic@example.com",
+    idempotencyKey: randomUUID(),
+  });
   const invoice = await financial.createMainInvoice({
     ...event(work),
     revision: state.revision,
@@ -683,19 +860,48 @@ it("paid selected terms feed the real gated main invoice and never bypass card/p
       )
     ).rows[0],
   ).toEqual({ price: "1528470", term: 3, seconds: 7776000 });
+  await database.db.execute(
+    sql`insert into payer_receipt_order_bindings(order_id,contact_id,quote_id,user_id) values(${invoice.orderId}::uuid,${contact.receiptContactId}::uuid,${quote.id}::uuid,${row.userId}::uuid)`,
+  );
+  const binding = await financial.checkoutBindingForOwner(
+    { ...event(work), revision: state.revision },
+    invoice.orderId,
+  );
+  const ready = await runtime.main.createOrRecover(binding);
+  expect(ready).toMatchObject({ kind: "ready", orderId: invoice.orderId });
+  await runtime.main.createOrRecover(binding);
+  const stats = await providerStats();
+  const mainPosts = stats.posts.filter(
+    (post) => post.metadata?.order_id === invoice.orderId,
+  );
+  expect(mainPosts).toHaveLength(1);
+  expect(mainPosts[0]).toMatchObject({
+    path: "/v3/payments",
+    capture: true,
+    hasReceipt: true,
+    metadata: { purpose: "main_residency", user_id: row.userId },
+  });
+  expect(
+    stats.payments.find((item) => item.metadata.order_id === invoice.orderId),
+  ).toMatchObject({
+    id: ready.kind === "ready" ? ready.paymentId : "missing",
+    status: "pending",
+    amount: { value: "15284.70", currency: "RUB" },
+  });
+  expect(
+    (
+      await database.db.execute(
+        sql`select count(*)::int n from experts_published where user_id=${row.userId}::uuid and active`,
+      )
+    ).rows[0]?.n,
+  ).toBe(0);
 }, 120000);
 
 it("automatic bill and explicit renewal preserve the locked quarter after the original tariff closes", async () => {
-  const { PostgresYooKassaOperationRepository } =
-    await import("../../../../packages/db/src/repositories/yookassa-operation-repository.js");
-  const { PostgresExpertResidencyProviderInboxRepository } =
-    await import("../../../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js");
   const { PostgresExpertResidencyLifecycleRepository } =
     await import("../../../../packages/db/src/repositories/expert-residency-lifecycle-repository.js");
   const { PostgresExpertOnboardingMainPaymentRepository } =
     await import("../../../../packages/db/src/repositories/expert-onboarding-main-payment-repository.js");
-  const { createYooKassaClient, YooKassaPaymentVerifier } =
-    await import("@ii-tonya/integrations");
   const row = (
     await database.db.execute<{
       id: string;
@@ -706,53 +912,53 @@ it("automatic bill and explicit renewal preserve the locked quarter after the or
       sql`select o.id,o.cash_minor::text cash,o.tariff_version_id tariff,l.user_id as "userId" from expert_residency_orders o join experts e on e.id=o.expert_id join expert_sales_paid_locks l on l.user_id=e.user_id where o.status='payment_pending'`,
     )
   ).rows[0]!;
-  const operations = new PostgresYooKassaOperationRepository(database.db);
-  const claim = await operations.claim({
-    commandId: randomUUID(),
-    orderId: row.id,
-    kind: "create_payment",
-    mode: "test",
-    amountMinor: row.cash,
-    currency: "RUB",
-    requestDigest: `sha256:${createHash("sha256").update(row.id).digest("hex")}`,
+  const pending = (await providerStats()).payments.find(
+    (item) => item.metadata.order_id === row.id,
+  )!;
+  const request = (
+    await database.db.execute<{ id: string }>(
+      sql`select id from public_expert_payment_requests where order_id=${row.id}::uuid and kind='main_create'`,
+    )
+  ).rows[0]!;
+  // The local provider completes the capture:true bank payment. Financial
+  // evidence still arrives only through the real gateway's fresh GET.
+  await provider.command({
+    op: "payment",
+    id: pending.id,
+    status: "succeeded",
   });
-  const paymentId = `main_${randomUUID()}`;
-  const operation = await operations.bindProviderObject(claim.id, paymentId);
-  const amount = BigInt(row.cash);
-  const client = createYooKassaClient(
-    { mode: "test", shopId: "test-shop", secretKey: "synthetic-fixture-only" },
-    async () =>
-      new Response(
-        JSON.stringify({
-          id: paymentId,
-          status: "succeeded",
-          paid: true,
-          test: true,
-          amount: {
-            value: `${amount / 100n}.${String(amount % 100n).padStart(2, "0")}`,
-            currency: "RUB",
-          },
-          created_at: new Date(Date.now() - 1000).toISOString(),
-          captured_at: new Date().toISOString(),
-          metadata: { order_id: row.id },
-          refundable: true,
-        }),
-        { status: 200 },
-      ),
-  );
-  const proof = await new YooKassaPaymentVerifier(
-    client,
-    operations,
-  ).verifyPayment(operation);
-  expect(proof).not.toBeNull();
-  await new PostgresExpertResidencyProviderInboxRepository(database.db).settle(
-    proof!,
-  );
-  // Calendar fixture advances this paid cycle to its final six days. The full
-  // 90-day duration and all production source/settlement triggers stay enabled.
-  await database.db.execute(
-    sql`update expert_residency_orders set settled_at=settled_at-interval '84 days',residency_starts_at=residency_starts_at-interval '84 days',residency_ends_at=residency_ends_at-interval '84 days' where id=${row.id}::uuid`,
-  );
+  await runtime.recovery.recover(request.id);
+  const payment = (await providerStats()).payments.find(
+    (item) => item.id === pending.id,
+  )!;
+  expect(payment.captured_at).toEqual(expect.any(String));
+  expect(
+    (
+      await database.db.execute(
+        sql`select status,provider_payment_id payment,early_bird_private.public_time(settled_at) settled,early_bird_private.public_time(residency_starts_at) starts,extract(epoch from residency_ends_at-residency_starts_at)::int seconds from expert_residency_orders where id=${row.id}::uuid`,
+      )
+    ).rows[0],
+  ).toEqual({
+    status: "settled",
+    payment: payment.id,
+    settled: payment.captured_at,
+    starts: payment.captured_at,
+    seconds: 7776000,
+  });
+  expect(
+    (
+      await database.db.execute(
+        sql`select paid_order_id,active,wave_intent_id from experts_published where user_id=${row.userId}::uuid`,
+      )
+    ).rows[0],
+  ).toEqual({ paid_order_id: row.id, active: true, wave_intent_id: null });
+  const postsBeforeReplay = (await providerStats()).posts.length;
+  await runtime.recovery.recover(request.id);
+  expect((await providerStats()).posts).toHaveLength(postsBeforeReplay);
+  // Advance the actual disposable PG/Node/provider clock to the final six days.
+  // Captured settlement and the full 90-day coverage remain immutable.
+  await clock.advance(84 * 86400);
+  await provider.command({ op: "offset", seconds: clock.offsetSeconds });
   await database.db.execute(
     sql`update expert_residency_tariff_versions set active_to=clock_timestamp() where id=${row.tariff}::uuid`,
   );
