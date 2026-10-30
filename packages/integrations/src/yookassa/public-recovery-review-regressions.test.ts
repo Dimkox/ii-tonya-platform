@@ -23,17 +23,26 @@ const claim = {
 
 it("rechecks the database lease after decryption and sends zero POSTs when admission expired", async () => {
   const events: string[] = [];
+  let releaseDecrypt!: (value: { body: string; bodyVersion: number }) => void;
+  let notifyDecryptStarted!: () => void;
+  const decryptStarted = new Promise<void>((resolve) => {
+    notifyDecryptStarted = resolve;
+  });
+  let leaseCurrent = true;
   const postExact = vi.fn(async () => {
     events.push("post");
     return { providerObjectId: "payment_1" };
   });
-  const result = await recoverExactYooKassaOperation({
+  const recoveryPromise = recoverExactYooKassaOperation({
     enabled: true,
     claim,
     decryptor: {
       decrypt: async () => {
         events.push("decrypt");
-        return { body: "{}", bodyVersion: 1 };
+        notifyDecryptStarted();
+        return new Promise((resolve) => {
+          releaseDecrypt = resolve;
+        });
       },
     },
     admission: {
@@ -41,7 +50,7 @@ it("rechecks the database lease after decryption and sends zero POSTs when admis
         events.push("admit");
         expect(operationId).toBe(claim.operationId);
         expect(leaseToken).toBe(claim.leaseToken);
-        return false; // The lease expired or the operation entered the public cohort.
+        return leaseCurrent;
       },
     },
     transport: { postExact },
@@ -51,6 +60,10 @@ it("rechecks the database lease after decryption and sends zero POSTs when admis
       reschedule: vi.fn(),
     },
   });
+  await decryptStarted;
+  leaseCurrent = false; // The lease expires while asynchronous decryption is pending.
+  releaseDecrypt({ body: "{}", bodyVersion: 1 });
+  const result = await recoveryPromise;
 
   expect(result).toEqual({ kind: "ineligible" });
   expect(events).toEqual(["decrypt", "admit"]);
