@@ -2,6 +2,16 @@ import { expect, it, vi } from "vitest";
 import { loadEnv } from "@ii-tonya/config";
 import { buildApp } from "./app.js";
 import { createDefaultLifecycle } from "./server.js";
+import { ExperimentalGatewayIpc } from "@ii-tonya/integrations";
+const receiptCancellation = () => ({
+  receiptDisclosureGateway: new ExperimentalGatewayIpc({
+    address: "\0unused-lifecycle-wiring",
+    key: Buffer.alloc(32, 1),
+    authKey: Buffer.alloc(32, 2),
+    timeoutMs: 10,
+  }),
+  receiptDisclosureKeyVersion: "fixture-v1",
+});
 function enabledConfig() {
   return loadEnv({
     DATABASE_URL: "postgresql://local:local@localhost/test",
@@ -39,8 +49,15 @@ it("normal app requires the enabled lifecycle command capability", async () => {
 it("normal lifecycle rejects missing strict renewal checkout before migration", () => {
   const config = enabledConfig();
   config.expertResidencyLifecycle!.renewalCheckoutEnabled = true;
+  expect(() =>
+    createDefaultLifecycle(receiptCancellation()).preflight(config),
+  ).toThrow("expert_residency_lifecycle_checkout_capability_required");
+});
+it("enabled renewal checkout requires its receipt cancellation gateway before migration", () => {
+  const config = enabledConfig();
+  config.expertResidencyLifecycle!.renewalCheckoutEnabled = true;
   expect(() => createDefaultLifecycle().preflight(config)).toThrow(
-    "expert_residency_lifecycle_checkout_capability_required",
+    "receipt disclosure cancellation gateway required",
   );
 });
 
@@ -106,6 +123,7 @@ it("configured renewal checkout requires the actual merchant callback", () => {
   const config = enabledConfig();
   config.expertResidencyLifecycle!.renewalCheckoutEnabled = true;
   const lifecycle = createDefaultLifecycle({
+    ...receiptCancellation(),
     expertResidencyLifecycle: {
       mainCheckout: {
         strictFirstSendCancellation: true,

@@ -2,6 +2,16 @@ import { expect, it, vi } from "vitest";
 import { buildTestApp, buildApp } from "./app.js";
 import { createDefaultLifecycle } from "./server.js";
 import { loadEnv } from "@ii-tonya/config";
+import { ExperimentalGatewayIpc } from "@ii-tonya/integrations";
+const receiptCancellation = () => ({
+  receiptDisclosureGateway: new ExperimentalGatewayIpc({
+    address: "\0unused-card-wiring",
+    key: Buffer.alloc(32, 1),
+    authKey: Buffer.alloc(32, 2),
+    timeoutMs: 10,
+  }),
+  receiptDisclosureKeyVersion: "fixture-v1",
+});
 const base = () =>
   loadEnv({
     DATABASE_URL: "postgresql://local:local@localhost/test",
@@ -76,8 +86,15 @@ it("normal app rejects a card capability bound to a different webhook secret", a
 it("enabled main checkout requires explicit custody capability before migration", () => {
   const config = enabledConfig();
   config.expertCard!.mainCheckoutEnabled = true;
+  expect(() =>
+    createDefaultLifecycle(receiptCancellation()).preflight(config),
+  ).toThrow("expert_card_checkout_capability_required");
+});
+it("enabled main checkout requires its receipt cancellation gateway before migration", () => {
+  const config = enabledConfig();
+  config.expertCard!.mainCheckoutEnabled = true;
   expect(() => createDefaultLifecycle().preflight(config)).toThrow(
-    "expert_card_checkout_capability_required",
+    "receipt disclosure cancellation gateway required",
   );
 });
 
@@ -85,6 +102,7 @@ it("configured main checkout still requires canonical merchant callback before m
   const config = enabledConfig();
   config.expertCard!.mainCheckoutEnabled = true;
   const lifecycle = createDefaultLifecycle({
+    ...receiptCancellation(),
     expertCard: {
       mainCheckout: {
         strictFirstSendCancellation: true,
