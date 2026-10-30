@@ -589,6 +589,13 @@
       "when": 1793152800014,
       "tag": "0083_early_bird_launch_publication",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793152800015,
+      "tag": "0084_public_expert_payment_gateway",
+      "breakpoints": true
     }
   ]
 }

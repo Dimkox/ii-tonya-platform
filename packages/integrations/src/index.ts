@@ -412,3 +412,5 @@ export {
   EarlyBirdStandardCheckoutSender,
   type EarlyBirdStandardSenderDiagnostic,
 } from "./yookassa/early-bird-standard-checkout-sender.js";
+
+export * from "./yookassa/public-expert-gateway-contracts.js";

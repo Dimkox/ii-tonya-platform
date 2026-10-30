@@ -63,3 +63,5 @@ export * from "./early-bird-form.js";
 export * from "./early-bird-runtime.js";
 
 export * from "./early-bird-launch-kit.js";
+
+export * from "./public-expert-payments.js";
