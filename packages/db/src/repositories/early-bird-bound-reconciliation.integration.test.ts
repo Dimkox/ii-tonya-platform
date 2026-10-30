@@ -138,25 +138,39 @@ it("accounts missed-callback composite and deferred captures with real isolated 
       );
     }
     const timing = (
-      await db.execute<{ quoted: Date; expires: Date; created: Date }>(
+      await db.execute<{
+        quoted: Date | string;
+        expires: Date | string;
+        created: Date | string;
+      }>(
         sql`select quoted_at as quoted,expires_at as expires,clock_timestamp() as created from early_bird_composite_intents where id=${f.identity.operationId}::uuid`,
       )
     ).rows[0]!;
-    const createdAt = timing.created.toISOString();
-    const capturedAt = (
-      await db.execute<{ at: Date }>(sql`select clock_timestamp() as at`)
-    ).rows[0]!.at.toISOString();
-    const databaseNow = (
-      await db.execute<{ at: Date }>(sql`select clock_timestamp() as at`)
-    ).rows[0]!.at.getTime();
+    const createdAt = new NativeDate(timing.created).toISOString();
+    const capturedAt = new NativeDate(
+      (
+        await db.execute<{ at: Date | string }>(
+          sql`select clock_timestamp() as at`,
+        )
+      ).rows[0]!.at,
+    ).toISOString();
+    const databaseNow = new NativeDate(
+      (
+        await db.execute<{ at: Date | string }>(
+          sql`select clock_timestamp() as at`,
+        )
+      ).rows[0]!.at,
+    ).getTime();
     expect(Date.parse(createdAt)).toBeGreaterThanOrEqual(
-      timing.quoted.getTime(),
+      new NativeDate(timing.quoted).getTime(),
     );
     expect(Date.parse(capturedAt)).toBeGreaterThanOrEqual(
       Date.parse(createdAt),
     );
     expect(Date.parse(capturedAt)).toBeLessThanOrEqual(databaseNow);
-    expect(Date.parse(capturedAt)).toBeLessThan(timing.expires.getTime());
+    expect(Date.parse(capturedAt)).toBeLessThan(
+      new NativeDate(timing.expires).getTime(),
+    );
     expect(Math.abs(databaseNow - Date.now())).toBeLessThan(1500);
     let succeeded = false;
     const getPayment = vi.fn(async (id: string) => {
