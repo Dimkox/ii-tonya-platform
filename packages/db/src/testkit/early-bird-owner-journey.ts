@@ -13,12 +13,19 @@ import { PostgresResidentReviewRepository } from "../repositories/resident-revie
 import { expect } from "vitest";
 import { sql } from "drizzle-orm";
 import { startExpertReferralTestDatabase } from "./expert-referral.js";
+import type { ExpertReferralTestDatabase } from "./expert-referral.js";
 
 /** Disposable, real-schema approved expert and encrypted owner invoice fixture. */
-export async function createEarlyBirdOwnerJourney() {
-  const db = await startExpertReferralTestDatabase(undefined, {
-    forceDisposableCluster: true,
-  });
+export async function createEarlyBirdOwnerJourney(
+  options: {
+    database?: ExpertReferralTestDatabase;
+  } = {},
+) {
+  const db =
+    options.database ??
+    (await startExpertReferralTestDatabase(undefined, {
+      forceDisposableCluster: true,
+    }));
   try {
     await db.db.transaction(async (tx) => {
       await tx.execute(
@@ -28,10 +35,11 @@ export async function createEarlyBirdOwnerJourney() {
         sql`insert into early_bird_launch_configs(phase,enrollment_start_at,client_start_at,promo_deadline_days,final_call_trigger_at) values ('WAVE_1_EARLY_BIRD','2026-11-01T00:00:00+03:00','2027-01-11T00:00:00+03:00',10,'2026-12-28T10:00:00+03:00')`,
       );
     });
-    // A disposable DB runs the real phase logic against a deterministic launch-period clock.
-    await db.db.execute(
-      sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
-    );
+    // Injected fixtures own their actual isolated clock and lifecycle.
+    if (!options.database)
+      await db.db.execute(
+        sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
+      );
     await applyEarlyBirdDraftIfNeeded(
       db.db,
       "docs/superpowers/implementation-artifacts/drafts/0081_early_bird_composite.sql",
@@ -280,7 +288,7 @@ export async function createEarlyBirdOwnerJourney() {
       authority,
     };
   } catch (error) {
-    await db.stop();
+    if (!options.database) await db.stop();
     throw error;
   }
 }
