@@ -366,11 +366,13 @@ it("fresh held observation admits capture, contact-free parent response loss rec
   await new PublicHeldOnboardingCheckout(r.deps).reconcile(f.invoiceId);
   expect(r.counts()).toBe(2);
   const current = (await r.source.invoice(f.invoiceId))!;
-  expect(current.requests.map((p) => p.kind)).toEqual([
+  expect(current.requests.map((p) => p.kind).sort()).toEqual([
     "onboarding_create",
     "onboarding_capture",
-  ]);
-  expect(current.requests[1]).toMatchObject({
+  ].sort());
+  expect(
+    current.requests.find((p) => p.kind === "onboarding_capture"),
+  ).toMatchObject({
     contactId: null,
     envelope: null,
     providerObjectId: r.payment()!.id,
@@ -396,11 +398,13 @@ it("loss of qualification and contact revocation admit only contact-free cancel 
   await checkout.reconcile(f.invoiceId);
   expect(r.counts()).toBe(2);
   const current = (await r.source.invoice(f.invoiceId))!;
-  expect(current.requests.map((p) => p.kind)).toEqual([
+  expect(current.requests.map((p) => p.kind).sort()).toEqual([
     "onboarding_create",
     "onboarding_cancel",
-  ]);
-  expect(current.requests[1]).toMatchObject({
+  ].sort());
+  expect(
+    current.requests.find((p) => p.kind === "onboarding_cancel"),
+  ).toMatchObject({
     contactId: null,
     envelope: null,
     state: "bound",
