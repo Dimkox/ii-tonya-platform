@@ -624,6 +624,13 @@ export async function startTestPostgres(
     },
     async reset() {
       await resetWithImmutableExpertReferralAdminResults(db, async (tx) => {
+        // Disposable reset only: production erasure must retain nonfinancial identity reservations.
+        // Older migration-prefix fixtures legitimately have no registry yet.
+        await tx.execute(sql`do $$ begin
+          if to_regclass('public.public_expert_provider_identities') is not null then
+            truncate table public.public_expert_provider_identities;
+          end if;
+        end $$`);
         await tx.execute(sql`
           truncate table admin_case_actions, integration_errors,
             client_identity_proof_receipts, client_sessions,

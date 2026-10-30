@@ -19,6 +19,17 @@ import { payerReceiptContacts } from "./payer-receipt-contacts.js";
 const instant = (name: string) => timestamp(name, { withTimezone: true });
 const xid8 = customType<{ data: string }>({ dataType: () => "xid8" });
 const pgName = customType<{ data: string }>({ dataType: () => "name" });
+/** Typed nonfinancial identity claims survive ordinary source erasure. */
+export const publicExpertProviderIdentities = pgTable(
+  "public_expert_provider_identities",
+  {
+    objectKind: text("object_kind").notNull(),
+    providerObjectId: text("provider_object_id").notNull(),
+    sourceKind: text("source_kind").notNull(),
+    sourceId: uuid("source_id").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.objectKind, t.providerObjectId] })],
+);
 /** SQL owns polymorphic source guards, state transitions, exact checks and capability ACLs. */
 export const publicExpertPaymentRequests = pgTable(
   "public_expert_payment_requests",

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const uuid = z.uuid();
 const amount = z.string().regex(/^[1-9][0-9]{0,11}$/u);
+// Preserve PostgreSQL microseconds as strings; financial callers must not round through Date.
 const instant = z.iso.datetime({ offset: true });
 const providerId = z.string().regex(/^[A-Za-z0-9_-]{1,64}$/u);
 const digest = z.string().regex(/^sha256:[a-f0-9]{64}$/u);

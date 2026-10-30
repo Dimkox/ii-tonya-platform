@@ -55,8 +55,95 @@ CREATE TRIGGER public_expert_observations_immutable BEFORE UPDATE OR DELETE ON p
 CREATE TRIGGER public_expert_resolutions_immutable BEFORE UPDATE OR DELETE ON public_expert_payment_resolutions FOR EACH ROW EXECUTE FUNCTION reject_append_only_change();
 REVOKE ALL ON public_expert_payment_requests,public_expert_payment_observations,public_expert_payment_resolutions FROM PUBLIC;
 --> statement-breakpoint
+-- Plan amendment: nonfinancial, typed provider identity ownership across expert products.
+-- Claims survive ordinary source/user erasure; only isolated testkit reset truncates them.
+CREATE TABLE public_expert_provider_identities (
+ object_kind text NOT NULL CHECK(object_kind IN('payment','refund')),
+ provider_object_id text NOT NULL CHECK(provider_object_id ~ '^[A-Za-z0-9_-]{1,64}$'),
+ source_kind text NOT NULL CHECK(source_kind IN('onboarding','residency','composite','deferred')),
+ source_id uuid NOT NULL,
+ PRIMARY KEY(object_kind,provider_object_id)
+);
+REVOKE ALL ON public_expert_provider_identities FROM PUBLIC;
+CREATE FUNCTION early_bird_private.public_identity_immutable() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+BEGIN
+ IF TG_OP='DELETE' OR NEW IS DISTINCT FROM OLD THEN RAISE EXCEPTION 'public_provider_identity_immutable'; END IF;
+ RETURN NEW;
+END $$;
+CREATE TRIGGER public_provider_identity_immutable BEFORE UPDATE OR DELETE ON public_expert_provider_identities FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_immutable();
+CREATE FUNCTION early_bird_private.public_identity_claim(target_kind text,target_object text,target_source_kind text,target_source uuid) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+BEGIN
+ -- Unique-key arbitration, not snapshot-based absence checks. At stronger isolation
+ -- concurrent conflicts may raise serialization_failure; they never admit two owners.
+ INSERT INTO public.public_expert_provider_identities(object_kind,provider_object_id,source_kind,source_id)
+ VALUES(target_kind,target_object,target_source_kind,target_source)
+ ON CONFLICT(object_kind,provider_object_id) DO UPDATE SET source_id=EXCLUDED.source_id
+ WHERE public_expert_provider_identities.source_kind=EXCLUDED.source_kind AND public_expert_provider_identities.source_id=EXCLUDED.source_id;
+ IF NOT FOUND THEN RAISE EXCEPTION 'public_provider_identity_conflict' USING ERRCODE='23505'; END IF;
+END $$;
+CREATE FUNCTION early_bird_private.public_identity_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+DECLARE data jsonb:=to_jsonb(NEW); object_kind text:=TG_ARGV[0]; object_id text:=data->>TG_ARGV[1]; source_kind text:=TG_ARGV[2]; source_id uuid:=(data->>TG_ARGV[3])::uuid;
+BEGIN
+ IF object_id IS NULL THEN RETURN NEW; END IF;
+ IF TG_TABLE_NAME='public_expert_payment_requests' THEN
+  object_kind:=CASE WHEN NEW.product='refund' THEN 'refund' ELSE 'payment' END;
+  source_kind:=CASE WHEN NEW.product='onboarding' THEN 'onboarding' ELSE 'residency' END;
+ ELSIF TG_TABLE_NAME='expert_residency_provider_operations' THEN
+  IF NEW.provider<>'yookassa' THEN RETURN NEW; END IF;
+  object_kind:=CASE WHEN NEW.operation_kind='create_refund' THEN 'refund' ELSE 'payment' END;
+ ELSIF TG_TABLE_NAME='early_bird_refund_binding_registry' THEN source_kind:=NEW.product;
+ END IF;
+ PERFORM early_bird_private.public_identity_claim(object_kind,object_id,source_kind,source_id);
+ RETURN NEW;
+END $$;
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON expert_onboarding_payment_operations FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('payment','provider_object_id','onboarding','id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON expert_residency_provider_operations FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('dynamic','provider_object_id','residency','id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_verified_bindings FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('payment','provider_object_id','composite','intent_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_payment_successes FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('payment','provider_object_id','composite','intent_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_deferred_verified_bindings FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('payment','provider_id','deferred','invoice_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_deferred_invoices FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('payment','provider_id','deferred','id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_verified_refund_bindings FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('refund','provider_refund_id','composite','intent_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_payment_full_refunds FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('refund','provider_refund_id','composite','intent_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_refund_registry FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('refund','provider_refund_id','composite','intent_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_deferred_verified_refund_bindings FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('refund','provider_refund_id','deferred','invoice_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_deferred_refund_facts FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('refund','provider_refund_id','deferred','invoice_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON early_bird_refund_binding_registry FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('refund','provider_refund_id','dynamic','subject_id');
+CREATE TRIGGER public_provider_identity_guard BEFORE INSERT OR UPDATE ON public_expert_payment_requests FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_identity_guard('dynamic','provider_object_id','dynamic','legacy_operation_id');
+-- Reject contradictory historical ownership; never silently choose a winner.
+DO $$ DECLARE binding record; BEGIN
+ FOR binding IN SELECT * FROM (
+ SELECT 'payment' object_kind,provider_object_id provider_object_id,'onboarding' source_kind,id source_id FROM public.expert_onboarding_payment_operations WHERE provider_object_id IS NOT NULL
+ UNION ALL
+ SELECT CASE WHEN operation_kind='create_refund' THEN 'refund' ELSE 'payment' END object_kind,provider_object_id provider_object_id,'residency' source_kind,id source_id FROM public.expert_residency_provider_operations WHERE provider_object_id IS NOT NULL AND provider='yookassa'
+ UNION ALL
+ SELECT 'payment' object_kind,provider_object_id provider_object_id,'composite' source_kind,intent_id source_id FROM public.early_bird_verified_bindings WHERE provider_object_id IS NOT NULL
+ UNION ALL
+ SELECT 'payment' object_kind,provider_object_id provider_object_id,'composite' source_kind,intent_id source_id FROM public.early_bird_payment_successes WHERE provider_object_id IS NOT NULL
+ UNION ALL
+ SELECT 'payment' object_kind,provider_id provider_object_id,'deferred' source_kind,invoice_id source_id FROM public.early_bird_deferred_verified_bindings WHERE provider_id IS NOT NULL
+ UNION ALL
+ SELECT 'payment' object_kind,provider_id provider_object_id,'deferred' source_kind,id source_id FROM public.early_bird_deferred_invoices WHERE provider_id IS NOT NULL
+ UNION ALL
+ SELECT 'refund' object_kind,provider_refund_id provider_object_id,'composite' source_kind,intent_id source_id FROM public.early_bird_verified_refund_bindings WHERE provider_refund_id IS NOT NULL
+ UNION ALL
+ SELECT 'refund' object_kind,provider_refund_id provider_object_id,'composite' source_kind,intent_id source_id FROM public.early_bird_payment_full_refunds WHERE provider_refund_id IS NOT NULL
+ UNION ALL
+ SELECT 'refund' object_kind,provider_refund_id provider_object_id,'composite' source_kind,intent_id source_id FROM public.early_bird_refund_registry WHERE provider_refund_id IS NOT NULL
+ UNION ALL
+ SELECT 'refund' object_kind,provider_refund_id provider_object_id,'deferred' source_kind,invoice_id source_id FROM public.early_bird_deferred_verified_refund_bindings WHERE provider_refund_id IS NOT NULL
+ UNION ALL
+ SELECT 'refund' object_kind,provider_refund_id provider_object_id,'deferred' source_kind,invoice_id source_id FROM public.early_bird_deferred_refund_facts WHERE provider_refund_id IS NOT NULL
+ UNION ALL
+ SELECT 'refund' object_kind,provider_refund_id provider_object_id,product source_kind,subject_id source_id FROM public.early_bird_refund_binding_registry WHERE provider_refund_id IS NOT NULL
+ UNION ALL
+ SELECT CASE WHEN product='refund' THEN 'refund' ELSE 'payment' END object_kind,provider_object_id provider_object_id,CASE WHEN product='onboarding' THEN 'onboarding' ELSE 'residency' END source_kind,legacy_operation_id source_id FROM public.public_expert_payment_requests WHERE provider_object_id IS NOT NULL
+ ) all_bindings ORDER BY object_kind,provider_object_id,source_kind,source_id LOOP
+  PERFORM early_bird_private.public_identity_claim(binding.object_kind,binding.provider_object_id,binding.source_kind,binding.source_id);
+ END LOOP;
+END $$;
+--> statement-breakpoint
 CREATE FUNCTION early_bird_private.public_time(value timestamptz) RETURNS text LANGUAGE sql IMMUTABLE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
- SELECT to_char(value AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
+ SELECT regexp_replace(to_char(value AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),'([0-9]{3})000Z$','\1Z')
 $$;
 CREATE FUNCTION early_bird_private.public_snapshot(r public.public_expert_payment_requests) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
  SELECT r.snapshot || jsonb_build_object('state',r.state,'providerObjectId',r.provider_object_id,'envelope',CASE WHEN r.encrypted_body IS NULL THEN NULL ELSE jsonb_build_object('ciphertext',r.encrypted_body,'keyReference',r.key_reference) END)
@@ -326,13 +413,12 @@ BEGIN
  IF r.state NOT IN('uncertain','bound','resolved') OR (r.provider_object_id IS NOT NULL AND r.provider_object_id<>object_id)
   OR NOT public.expert_jsonb_has_exact_keys(proof,ARRAY['version','complete','exactCandidates','observation']) OR proof->'version' IS DISTINCT FROM '1'::jsonb OR proof->'complete'<>'true'::jsonb OR proof->'exactCandidates'<>'1'::jsonb
   OR NOT early_bird_private.public_fact_valid(r,object_id,proof->'observation') OR NOT early_bird_private.public_source_valid(r,false) THEN RETURN NULL; END IF;
- IF EXISTS(SELECT 1 FROM public.public_expert_payment_requests other WHERE other.provider_object_id=object_id AND other.id<>r.id AND NOT(other.product='onboarding' AND r.product='onboarding' AND other.legacy_operation_id=r.legacy_operation_id))
- OR EXISTS(SELECT 1 FROM public.expert_residency_provider_operations op WHERE op.provider_object_id=object_id AND op.id<>r.legacy_operation_id)
- OR EXISTS(SELECT 1 FROM public.expert_onboarding_payment_operations op WHERE op.provider_object_id=object_id AND op.id<>r.legacy_operation_id)
- OR EXISTS(SELECT 1 FROM public.early_bird_payment_successes WHERE provider_object_id=object_id)
- OR EXISTS(SELECT 1 FROM public.early_bird_verified_bindings WHERE provider_object_id=object_id)
- OR EXISTS(SELECT 1 FROM public.early_bird_deferred_invoices WHERE provider_id=object_id)
- THEN RETURN NULL; END IF;
+ -- Common typed identity ownership includes deferred verified bindings before settlement.
+ IF EXISTS(SELECT 1 FROM public.public_expert_provider_identities identity_claim
+  WHERE identity_claim.object_kind=CASE WHEN r.product='refund' THEN 'refund' ELSE 'payment' END
+   AND identity_claim.provider_object_id=object_id
+   AND ROW(identity_claim.source_kind,identity_claim.source_id) IS DISTINCT FROM
+       ROW(CASE WHEN r.product='onboarding' THEN 'onboarding' ELSE 'residency' END,r.legacy_operation_id)) THEN RETURN NULL; END IF;
  IF r.product='onboarding' THEN
   UPDATE public.expert_onboarding_payment_operations SET provider_object_id=object_id,status=CASE WHEN status='succeeded' THEN status ELSE 'pending' END WHERE id=r.legacy_operation_id AND(provider_object_id IS NULL OR provider_object_id=object_id);
   UPDATE public.expert_sales_provider_requests SET provider_object_id=object_id WHERE id=r.id AND(provider_object_id IS NULL OR provider_object_id=object_id);
@@ -341,6 +427,7 @@ BEGIN
  IF r.product='main' THEN UPDATE public.expert_residency_payment_attempts pa SET provider_request_id=object_id,status='pending',updated_at=clock_timestamp() FROM public.expert_residency_provider_operations op WHERE op.id=r.legacy_operation_id AND pa.id=op.payment_attempt_id AND pa.order_id=r.order_id AND pa.status IN('created','pending','unknown_outcome'); END IF;
  UPDATE public.public_expert_payment_requests SET provider_object_id=object_id,state=CASE WHEN state='uncertain' THEN 'bound' ELSE state END WHERE id=r.id RETURNING * INTO r;
  RETURN early_bird_private.public_snapshot(r);
+EXCEPTION WHEN unique_violation THEN RETURN NULL;
 END $$;
 CREATE FUNCTION early_bird_private.public_payment_observe(target_request uuid,object_id text,target_fact jsonb) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 DECLARE r public.public_expert_payment_requests%ROWTYPE; previous public.public_expert_payment_observations%ROWTYPE; observation_id uuid;
@@ -619,7 +706,14 @@ $$;
 CREATE FUNCTION early_bird_private.public_contact_cleanup() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 BEGIN
  IF NEW.redacted_at IS NOT NULL AND OLD.redacted_at IS NULL THEN
+  IF EXISTS(SELECT 1 FROM public.public_expert_payment_requests WHERE contact_id=NEW.id)
+   AND NOT EXISTS(SELECT 1 FROM public.early_bird_gateway_contact_state WHERE contact_id=NEW.id AND revoked_at IS NOT NULL) THEN RAISE EXCEPTION 'public_contact_ack_required'; END IF;
   UPDATE public.public_expert_payment_requests SET encrypted_body=NULL,key_reference=NULL WHERE contact_id=NEW.id AND encrypted_body IS NOT NULL;
+  -- Onboarding keeps genuine legacy request evidence, but no retained receipt copy after ACK.
+  UPDATE public.expert_sales_provider_requests SET encrypted_body=NULL,key_reference=NULL WHERE contact_id=NEW.id AND encrypted_body IS NOT NULL;
+  -- Public main creates no replay copy. Existing authorized refund/main operations may already have one.
+  UPDATE public.expert_residency_provider_operations op SET replay_ciphertext=NULL,replay_key_reference=NULL,replay_body_version=NULL,recovery_expires_at=NULL
+   WHERE replay_ciphertext IS NOT NULL AND EXISTS(SELECT 1 FROM public.public_expert_payment_requests req WHERE req.contact_id=NEW.id AND req.legacy_operation_id=op.id AND req.product IN('main','refund'));
  END IF;
  RETURN NEW;
 END $$;
