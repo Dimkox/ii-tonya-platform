@@ -219,6 +219,7 @@ export type {
   YooKassaExactRecoveryTransport,
   YooKassaReplayDecryptor,
   YooKassaReplayProtector,
+  YooKassaReplayAssociatedData,
 } from "./yookassa/exact-body-recovery.js";
 export {
   createExpertCommandProcessor,
@@ -415,3 +416,16 @@ export {
 
 export * from "./yookassa/public-expert-gateway-contracts.js";
 export * from "./yookassa/public-expert-gateway.js";
+export {
+  PublicExpertRecovery,
+  assertPublicExpertFreshObservation,
+} from "./yookassa/public-expert-recovery.js";
+export type {
+  PublicExpertFreshObservation,
+  PublicExpertRecoveryBinder,
+  PublicExpertObservationWriter,
+  PublicExpertRecoveryTransport,
+  PublicExpertRecoveryResult,
+} from "./yookassa/public-expert-recovery.js";
+export { publicExpertPaymentSourceSchema } from "./yookassa/public-expert-gateway-contracts.js";
+export type { PublicExpertPaymentSourceData } from "./yookassa/public-expert-gateway-contracts.js";

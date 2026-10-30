@@ -293,3 +293,41 @@ export const publicExpertApplyActionSchema = z
 export type PublicExpertApplyAction = z.infer<
   typeof publicExpertApplyActionSchema
 >;
+
+/** Read-only canonical source; encrypted contact is never a caller-supplied price or send grant. */
+export const publicExpertPaymentSourceSchema = z.strictObject({
+  version: z.literal(1),
+  product: z.enum(["onboarding", "main", "refund"]),
+  userId: uuid,
+  sourceId: uuid,
+  operationId: uuid.nullable(),
+  expertId: uuid.nullable(),
+  mode: z.enum(["test", "live"]),
+  amountMinor: amount,
+  currency: z.literal("RUB"),
+  parentPaymentId: providerId.nullable(),
+  idempotencyKey: uuid.nullable(),
+  requestDigest: digest.nullable(),
+  paymentDeadline: instant,
+  providerDeadline: instant,
+  current: z.boolean(),
+  contact: z
+    .strictObject({
+      binding: z.strictObject({
+        id: uuid,
+        quoteId: uuid,
+        userId: uuid,
+        kind: z.literal("email"),
+        basis: z.literal("fiscal_payment_dec_plt_004_v1"),
+        capturedAt: instant,
+        expiresAt: instant,
+      }),
+      keyId: z.string().min(1),
+      ciphertext: z.string().min(1),
+    })
+    .nullable(),
+  requests: z.array(publicExpertPaymentSnapshotSchema).max(3),
+});
+export type PublicExpertPaymentSourceData = z.infer<
+  typeof publicExpertPaymentSourceSchema
+>;

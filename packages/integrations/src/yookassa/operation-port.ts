@@ -25,6 +25,8 @@ export interface YooKassaOperation {
 }
 
 export interface ClaimYooKassaOperationCommand {
+  /** Preallocated delivery identity only; canonical financial claim validation remains authoritative. */
+  readonly deliveryOperationId?: string;
   readonly commandId: string;
   readonly orderId: string;
   readonly paymentAttemptId?: string;

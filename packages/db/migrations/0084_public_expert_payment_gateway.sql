@@ -718,6 +718,80 @@ BEGIN
  RETURN NEW;
 END $$;
 CREATE TRIGGER public_contact_cleanup AFTER UPDATE ON payer_receipt_contacts FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_contact_cleanup();
+-- Read-only source projection. It confers no prepare/admit/bind/financial authority.
+-- Encrypting a receipt needs its exact vault AAD; plaintext never enters this projection.
+CREATE FUNCTION early_bird_private.public_source_data(product_name text,target_user uuid,target_source uuid) RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+DECLARE v_source_id uuid; v_operation_id uuid; v_quote_id uuid; v_expert_id uuid; v_mode_name text; v_amount_value bigint; v_parent_id text;
+ v_idempotency uuid; v_digest text; v_deadline timestamptz; v_provider_until timestamptz; v_current_frame boolean; v_contact public.payer_receipt_contacts%ROWTYPE; v_requests jsonb;
+BEGIN
+ IF target_user IS NULL OR target_source IS NULL THEN RETURN NULL; END IF;
+ IF product_name='onboarding' THEN
+  SELECT i.id,op.id,b.quote_id,i.provider_mode,i.amount_minor,op.provider_object_id,a.expires_at,a.expires_at
+   INTO v_source_id,v_operation_id,v_quote_id,v_mode_name,v_amount_value,v_parent_id,v_deadline,v_provider_until
+   FROM public.expert_onboarding_invoices i
+   JOIN public.expert_onboarding_payment_operations op ON op.invoice_id=i.id AND op.user_id=i.user_id
+   JOIN public.expert_sales_fee_attempts a ON a.invoice_id=i.id AND a.user_id=i.user_id
+   JOIN public.expert_sales_form_bridges b ON b.application_id=i.application_id AND b.user_id=i.user_id
+   WHERE i.id=target_source AND i.user_id=target_user AND i.amount_minor=op.amount_minor AND i.provider_mode=op.provider_mode AND i.currency='RUB' AND op.currency='RUB';
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  v_current_frame:=early_bird_private.public_onboarding_current(v_source_id,target_user);
+ ELSE
+  IF product_name='refund' THEN
+   SELECT o.id,op.id,m.quote_id,o.expert_id,m.provider_mode,op.amount_minor,op.parent_payment_id,op.idempotency_key,op.request_digest,o.payment_deadline,o.provider_deadline
+    INTO v_source_id,v_operation_id,v_quote_id,v_expert_id,v_mode_name,v_amount_value,v_parent_id,v_idempotency,v_digest,v_deadline,v_provider_until
+    FROM public.expert_residency_provider_operations op
+    JOIN public.expert_residency_orders o ON o.id=op.order_id
+    JOIN public.experts e ON e.id=o.expert_id AND e.user_id=target_user
+    JOIN public.expert_card_main_orders m ON m.order_id=o.id AND m.user_id=e.user_id
+    WHERE op.id=target_source AND op.operation_kind='create_refund' AND op.provider='yookassa' AND op.environment_mode=m.provider_mode;
+  ELSIF product_name='main' THEN
+   SELECT o.id,m.quote_id,o.expert_id,m.provider_mode,o.cash_minor,o.payment_deadline,o.provider_deadline
+    INTO v_source_id,v_quote_id,v_expert_id,v_mode_name,v_amount_value,v_deadline,v_provider_until
+    FROM public.expert_residency_orders o JOIN public.experts e ON e.id=o.expert_id AND e.user_id=target_user
+    JOIN public.expert_card_main_orders m ON m.order_id=o.id AND m.user_id=e.user_id
+    JOIN public.expert_card_main_acceptances a ON a.id=m.acceptance_id AND a.user_id=m.user_id AND a.quote_id=m.quote_id
+    WHERE o.id=target_source AND o.currency='RUB';
+  ELSE RETURN NULL;
+  END IF;
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  v_current_frame:=EXISTS(SELECT 1 FROM public.users WHERE id=target_user AND active);
+ END IF;
+ IF v_amount_value<=0 OR v_mode_name NOT IN('test','live') THEN RETURN NULL; END IF;
+ SELECT c.* INTO v_contact FROM public.payer_receipt_contacts c
+  WHERE c.user_id=target_user AND c.quote_id=v_quote_id AND c.redacted_at IS NULL AND c.ciphertext IS NOT NULL
+   AND c.expires_at>public.early_bird_current_time()
+   AND NOT EXISTS(SELECT 1 FROM public.receipt_revocation_outbox WHERE contact_id=c.id)
+   AND NOT EXISTS(SELECT 1 FROM public.early_bird_gateway_contact_state WHERE contact_id=c.id AND revoked_at IS NOT NULL)
+   AND (product_name='onboarding' OR EXISTS(SELECT 1 FROM public.payer_receipt_order_bindings b WHERE b.order_id=v_source_id AND b.contact_id=c.id AND b.quote_id=c.quote_id AND b.user_id=c.user_id))
+  ORDER BY c.captured_at DESC,c.id DESC LIMIT 1;
+ SELECT coalesce(jsonb_agg(early_bird_private.public_snapshot(r) ORDER BY r.created_at,r.id),'[]'::jsonb) INTO v_requests
+  FROM public.public_expert_payment_requests r WHERE r.product=product_name AND r.user_id=target_user AND
+  CASE WHEN product_name='refund' THEN r.legacy_operation_id=target_source ELSE r.legacy_source_id=v_source_id END;
+ RETURN jsonb_build_object('version',1,'product',product_name,'userId',target_user,'sourceId',v_source_id,'operationId',v_operation_id,'expertId',v_expert_id,'mode',v_mode_name,'amountMinor',v_amount_value::text,'currency','RUB','parentPaymentId',v_parent_id,'idempotencyKey',v_idempotency,'requestDigest',v_digest,'paymentDeadline',early_bird_private.public_time(v_deadline),'providerDeadline',early_bird_private.public_time(v_provider_until),'current',v_current_frame,'contact',
+  CASE WHEN v_contact.id IS NULL THEN NULL ELSE jsonb_build_object('binding',jsonb_build_object('id',v_contact.id,'quoteId',v_contact.quote_id,'userId',v_contact.user_id,'kind',v_contact.kind,'basis',v_contact.basis,'capturedAt',early_bird_private.public_time(v_contact.captured_at),'expiresAt',early_bird_private.public_time(v_contact.expires_at)),'keyId',v_contact.key_id,'ciphertext',v_contact.ciphertext) END,'requests',v_requests);
+END $$;
+CREATE FUNCTION early_bird_private.public_onboarding_source(target_user uuid,target_source uuid) RETURNS jsonb LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT early_bird_private.public_source_data('onboarding',target_user,target_source)
+$$;
+CREATE FUNCTION early_bird_private.public_main_source(target_user uuid,target_source uuid) RETURNS jsonb LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT early_bird_private.public_source_data('main',target_user,target_source)
+$$;
+CREATE FUNCTION early_bird_private.public_refund_source(target_user uuid,target_source uuid) RETURNS jsonb LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT early_bird_private.public_source_data('refund',target_user,target_source)
+$$;
+-- Internal held-checkout API accepts an invoice created by the manager command, not a UI user/amount.
+CREATE FUNCTION early_bird_private.public_onboarding_invoice(target_invoice uuid) RETURNS jsonb LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT early_bird_private.public_source_data('onboarding',i.user_id,i.id) FROM public.expert_onboarding_invoices i
+ WHERE i.id=target_invoice AND EXISTS(SELECT 1 FROM public.expert_sales_fee_attempts a WHERE a.invoice_id=i.id AND a.user_id=i.user_id)
+$$;
+CREATE FUNCTION early_bird_private.public_onboarding_pending(batch_limit integer,after_invoice uuid) RETURNS jsonb LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT coalesce(jsonb_agg(id ORDER BY id),'[]'::jsonb) FROM (
+  SELECT DISTINCT invoice_id id FROM public.public_expert_payment_requests r WHERE r.product='onboarding'
+   AND r.state IN('admitted','uncertain','bound') AND (after_invoice IS NULL OR r.invoice_id>after_invoice)
+  ORDER BY invoice_id LIMIT least(50,greatest(1,batch_limit))
+ ) candidates
+$$;
+
 -- Revoke every new capability and helper, including the trusted-processor guard.
 -- Task6 provisions exact external LOGIN mappings; this migration guesses no role.
 DO $$ DECLARE fn record; BEGIN

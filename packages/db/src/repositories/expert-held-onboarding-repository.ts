@@ -53,7 +53,7 @@ export class PostgresHeldOnboardingCheckout {
   private async frame(tx: Tx, invoiceId: string) {
     const initial = (
       await tx.execute<{ userId: string }>(
-        sql`select user_id as "userId" from expert_onboarding_invoices where id=${invoiceId}::uuid`,
+        sql`select user_id as "userId" from expert_onboarding_invoices where id=${invoiceId}::uuid and not exists(select 1 from public_expert_payment_requests public_request where public_request.invoice_id=expert_onboarding_invoices.id)`,
       )
     ).rows[0];
     if (!initial) throw new Error("held_invoice_unavailable");
@@ -367,7 +367,7 @@ export class PostgresHeldOnboardingCheckout {
     if (!this.deps.enabled) return { examined: 0 };
     const rows = (
       await this.db.execute<{ id: string }>(
-        sql`select i.id from expert_onboarding_invoices i join expert_sales_fee_attempts a on a.invoice_id=i.id join expert_onboarding_payment_operations o on o.invoice_id=i.id where o.provider_object_id is not null and not exists(select 1 from expert_onboarding_payment_facts f where f.invoice_id=i.id) and not exists(select 1 from expert_sales_provider_observations observed where observed.invoice_id=i.id and observed.status='canceled') and (${this.reconciliationCursor}::uuid is null or i.id>${this.reconciliationCursor}::uuid) order by i.id limit ${Math.min(50, Math.max(1, limit))}`,
+        sql`select i.id from expert_onboarding_invoices i join expert_sales_fee_attempts a on a.invoice_id=i.id join expert_onboarding_payment_operations o on o.invoice_id=i.id where not exists(select 1 from public_expert_payment_requests public_request where public_request.invoice_id=i.id) and o.provider_object_id is not null and not exists(select 1 from expert_onboarding_payment_facts f where f.invoice_id=i.id) and not exists(select 1 from expert_sales_provider_observations observed where observed.invoice_id=i.id and observed.status='canceled') and (${this.reconciliationCursor}::uuid is null or i.id>${this.reconciliationCursor}::uuid) order by i.id limit ${Math.min(50, Math.max(1, limit))}`,
       )
     ).rows;
     this.reconciliationCursor = rows.length ? rows[rows.length - 1]!.id : null;

@@ -465,3 +465,15 @@ export {
   PostgresEarlyBirdLaunchKit,
   type LaunchKitClaim,
 } from "./repositories/early-bird-launch-kit.js";
+export {
+  PostgresPublicExpertPaymentSource,
+  PostgresPublicExpertPaymentBinder,
+  PostgresPublicExpertPaymentObservations,
+  PublicHeldOnboardingCheckout,
+  PublicMainResidencyCheckout,
+  buildPublicExpertPaymentRequest,
+} from "./repositories/public-expert-payment-gateway.js";
+export type {
+  PublicExpertCheckoutDependencies,
+  PublicMainCheckoutBinding,
+} from "./repositories/public-expert-payment-gateway.js";
