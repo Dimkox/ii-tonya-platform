@@ -30,6 +30,7 @@ const required = {
       "@ii-tonya/db",
       "@ii-tonya/integrations",
       "@ii-tonya/observability",
+      "drizzle-orm",
       "fastify",
     ],
     devDependencies: [],

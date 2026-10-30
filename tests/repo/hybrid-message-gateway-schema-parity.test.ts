@@ -56,10 +56,10 @@ describe("B1 schema/migration parity", () => {
       },
     ]);
     expect(journal.entries.at(-1)).toEqual({
-      idx: 83,
+      idx: 84,
       version: "7",
-      when: 1793152800014,
-      tag: "0083_early_bird_launch_publication",
+      when: 1793152800015,
+      tag: "0084_public_expert_payment_gateway",
       breakpoints: true,
     });
   });
