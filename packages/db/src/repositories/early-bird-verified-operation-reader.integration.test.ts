@@ -10,6 +10,7 @@ import {
   type TestDatabase,
 } from "../testkit/postgres.js";
 import { PostgresEarlyBirdVerifiedPaymentReader } from "./early-bird-verified-payment-reader.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only";
 
 let fixture: TestDatabase;
 let limited: Pool;
@@ -43,7 +44,7 @@ beforeAll(async () => {
   );
   const address = new URL(fixture.db.$client.options.connectionString!);
   address.username = "wave_operation_reader";
-  address.password = "synthetic-only";
+  address.password = SYNTHETIC_FIXTURE_VALUE_1;
   limited = new Pool({ connectionString: address.toString(), max: 1 });
 }, 120_000);
 afterAll(async () => {

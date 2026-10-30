@@ -16,6 +16,8 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-reader";
+const SYNTHETIC_FIXTURE_VALUE_2 = "synthetic-writer";
 
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
@@ -189,10 +191,10 @@ it("removes bound provider data when the expert is erased", async () => {
   );
   const url = new URL(db.db.$client.options.connectionString!);
   url.username = "wave_reader_10_20";
-  url.password = "synthetic-reader";
+  url.password = SYNTHETIC_FIXTURE_VALUE_1;
   const readerPool = new Pool({ connectionString: url.toString() });
   url.username = "wave_writer_10_20";
-  url.password = "synthetic-writer";
+  url.password = SYNTHETIC_FIXTURE_VALUE_2;
   const writerPool = new Pool({ connectionString: url.toString() });
   try {
     const reader = new PostgresEarlyBirdCandidateIntentReader(

@@ -17,6 +17,10 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-reader";
+const SYNTHETIC_FIXTURE_VALUE_2 = "synthetic-writer";
+const SYNTHETIC_FIXTURE_VALUE_3 = "synthetic-only";
+
 
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
@@ -194,10 +198,10 @@ it("runs wave card handoff using a non-owner application LOGIN", async () => {
   );
   const url = new URL(db.db.$client.options.connectionString!);
   url.username = "wave_reader_10_20";
-  url.password = "synthetic-reader";
+  url.password = SYNTHETIC_FIXTURE_VALUE_1;
   const readerPool = new Pool({ connectionString: url.toString() });
   url.username = "wave_writer_10_20";
-  url.password = "synthetic-writer";
+  url.password = SYNTHETIC_FIXTURE_VALUE_2;
   const writerPool = new Pool({ connectionString: url.toString() });
   try {
     const reader = new PostgresEarlyBirdCandidateIntentReader(
@@ -279,7 +283,7 @@ it("runs wave card handoff using a non-owner application LOGIN", async () => {
     await db.db.execute(sql`grant update on users,expert_onboarding_applications to wave_card_app_test`);
     await db.db.execute(sql`grant insert,update on expert_card_requests,expert_card_handoffs to wave_card_app_test`);
     await db.db.execute(sql`grant execute on function public.early_bird_paid_workspace(uuid),public.early_bird_refresh_projection(uuid,uuid),public.early_bird_current_publication_valid(uuid) to wave_card_app_test`);
-    const appAddress=new URL(db.db.$client.options.connectionString!); appAddress.username="wave_card_app_test"; appAddress.password="synthetic-only";
+    const appAddress=new URL(db.db.$client.options.connectionString!); appAddress.username="wave_card_app_test"; appAddress.password=SYNTHETIC_FIXTURE_VALUE_3;
     const appPool=new Pool({connectionString:appAddress.toString()}); appPool.on("error",()=>{});
     const cards = new PostgresExpertCardRepository(drizzle(appPool,{logger:true}) as never, { waveWorkspace:true,messagingConsentPolicyVersion:"client-messaging-v1",workBotId:"2",workBotKey:"fixture-work" });
     const key = "1:100";

@@ -20,6 +20,7 @@ import {
   buildEarlyBirdRoleProvisioningSql,
   loadEarlyBirdRoleCapabilities,
 } from "../../../../scripts/provision-early-bird-runtime-roles.mjs";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only";
 
 let fixture: TestDatabase;
 let directory: string;
@@ -84,7 +85,7 @@ it("installs all current segments and provisions every isolated capability witho
     const login = mapping[capability.role]!;
     const url = new URL(fixture.db.$client.options.connectionString!);
     url.username = login;
-    url.password = "synthetic-only";
+    url.password = SYNTHETIC_FIXTURE_VALUE_1;
     const pool = new Pool({ connectionString: url.toString(), max: 1 });
     pools.push(pool);
     const identity = (

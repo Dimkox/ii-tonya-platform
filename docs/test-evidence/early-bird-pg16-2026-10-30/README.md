@@ -39,3 +39,11 @@ Independent read-only review checked source assertions and source/result hashes;
 it confirmed the stated synthetic scope and limitations. These observations do
 not replace exact-SHA CI, signed artifact assembly, target role audits, deployment
 health or a resident-initiated real payment.
+
+The executed probe source remains immutable in commit
+`1164de8c0b52111b906560f8176918b4b4dc6a9c` and the original protected task file;
+its digest is the `probeSha256` in the JSON result. The current text copy only
+extracts two identical synthetic literals into local constants so the generic
+secret scanner does not mistake fixture assignments for credentials. Independent
+AST substitution review confirmed equivalent statements and values. That
+refactored copy was not executed again; it is not a new test result.

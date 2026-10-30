@@ -1,4 +1,9 @@
 import {
+  EarlyBirdBoundReconciliation,
+  createEarlyBirdBoundPaymentReconciler,
+  PostgresEarlyBirdBoundReconciliationSource,
+} from "./early-bird-bound-reconciliation.js";
+import {
   PostgresYooKassaPaymentPurposeRepository,
   PostgresYooKassaRefundParentBinding,
   PostgresEarlyBirdPaymentSettlementStore,
@@ -54,6 +59,8 @@ type Connections = Record<
 /** Explicit trusted assembly. Isolated database credentials and authenticated gateway are required. */
 export function createExpertEarlyBirdWebhookRuntime(options: {
   db: DrizzleDb;
+  /** Dedicated bounded checkout pool; never the main HTTP pool. */
+  discoveryDb: DrizzleDb;
   gateway: ExperimentalGatewayIpc;
   connections: Connections;
 }) {
@@ -75,6 +82,7 @@ export function createExpertEarlyBirdWebhookRuntime(options: {
   if (
     !options ||
     !options.db ||
+    !options.discoveryDb ||
     !(options.gateway instanceof ExperimentalGatewayIpc) ||
     roles.some(
       (key) =>
@@ -203,5 +211,18 @@ export function createExpertEarlyBirdWebhookRuntime(options: {
       else await settlements.reverse(event);
     },
   };
-  return { yookassaWebhook: webhook, earlyBirdWebhookRouting: routing };
+  const boundReconciliation = new EarlyBirdBoundReconciliation(
+    new PostgresEarlyBirdBoundReconciliationSource(options.discoveryDb),
+    createEarlyBirdBoundPaymentReconciler({
+      compositeVerifier: verifier,
+      compositeStore: paymentStore,
+      deferredVerifier,
+      deferredStore,
+    }),
+  );
+  return {
+    yookassaWebhook: webhook,
+    earlyBirdWebhookRouting: routing,
+    boundReconciliation,
+  };
 }

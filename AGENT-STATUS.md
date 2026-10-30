@@ -8,8 +8,12 @@ this does not waive tests, independent review, isolated provider roles or exact-
 gates. Production was observed read-only at release
 `19ecb3456a647743f00584b14d097c2759f0d718`; API and worker active, payments disabled.
 No deployment or real provider payment has been performed by this increment.
-The candidate is being committed for its first owner-authorized exact-SHA CI run;
-up to two such full hosted runs were authorized. The local pre-push aggregate
+Full hosted run ONE is consumed: GitHub Actions 40987914970 at source
+1164de8c0b52111b906560f8176918b4b4dc6a9c failed secret scanning before tests.
+Its evidence is retained. Full run TWO has not started; no third full run is
+authorized. The corrected candidate includes committed frozen dependency graph
+49efe200 and Vitest typing fix fe556d10; read Git for its final exact SHA.
+The local pre-push aggregate
 failed on six stale fixture/guard files; all six then passed focused corrections.
 The native fault/rollback files have consumed their three local invocations, so
 the gated feature push deliberately uses --no-verify with this bounded-run reason
@@ -21,6 +25,31 @@ and deletion is shown completed only after ACK and database mutation. See
 `docs/superpowers/implementation-artifacts/early-bird-gateway-ack-owner-decision-2026-10-30.md`.
 This supersedes the older physical-request-before-first-byte condition below.
 Use contact/generation tokens, not permanent user revocation for TTL expiry.
+
+The owner also explicitly approved the three-day reminder rule: send again only
+when the tariff is unpaid AND the Pay button has not been clicked. Telegram does
+not provide message-open facts. Do not replace clicks with fabricated read state.
+
+New bound-payment reconciliation reuses fresh provider GET verifiers and isolated
+settlement stores without repeating checkout POST. Independent re-review accepted
+the separate read-only discovery pool (four-second acquisition deadline) and
+reliable shutdown cleanup. The new discovery regression passed 2/2 on its second
+local invocation; the earlier reconciler unit file is exhausted at four runs.
+Gateway preparation now installs a
+root-owned helper and publishes only eleven hash-verified public files outside
+the private application release. A root selector binds gateway startup/rollback
+to the selected application SHA. Source review and local systemd sandbox evidence
+are distinct from actual production acceptance. Do not share the application
+group with the gateway or fabricate admin/MFA sessions. Root preparation needs
+AmbientCapabilities=CAP_SETUID CAP_SETGID under the preserved systemd sandbox;
+the gateway itself has no capabilities. Local sandbox script is exhausted at
+three invocations; final post-drop assertions await authorized hosted CI.
+
+Read-only production audit found zero administrator assignments/sessions. Owner
+questions about genuine manager access, the future single test-expert price
+identity, and merchant-cabinet webhook configuration remain unanswered. The
+existing 10/20-ruble authorization must not silently affect all experts. No real
+charge, provider mutation, production environment edit or deployment is claimed.
 
 Current implementation and limitations are tracked in
 `docs/superpowers/implementation-artifacts/early-bird-continuation-2026-10-29.md`.

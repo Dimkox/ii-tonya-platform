@@ -18,6 +18,9 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-reader";
+const SYNTHETIC_FIXTURE_VALUE_2 = "synthetic-writer";
+const SYNTHETIC_FIXTURE_VALUE_3 = "synthetic-only";
 
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
@@ -191,10 +194,10 @@ it("keeps native admission fail closed for ordinary DB logins without wave grant
   );
   const url = new URL(db.db.$client.options.connectionString!);
   url.username = "wave_reader_10_20";
-  url.password = "synthetic-reader";
+  url.password = SYNTHETIC_FIXTURE_VALUE_1;
   const readerPool = new Pool({ connectionString: url.toString() });
   url.username = "wave_writer_10_20";
-  url.password = "synthetic-writer";
+  url.password = SYNTHETIC_FIXTURE_VALUE_2;
   const writerPool = new Pool({ connectionString: url.toString() });
   try {
     const reader = new PostgresEarlyBirdCandidateIntentReader(
@@ -399,7 +402,7 @@ it("keeps native admission fail closed for ordinary DB logins without wave grant
     ).rows[0]!.id;
     const address = new URL(db.db.$client.options.connectionString!);
     address.username = "wave_native_reader";
-    address.password = "synthetic-only";
+    address.password = SYNTHETIC_FIXTURE_VALUE_3;
     const nativePool = new Pool({ connectionString: address.toString() });
     try {
       const unpaid = await db.createExpertIdentity();

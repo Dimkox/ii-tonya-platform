@@ -666,15 +666,15 @@ const approvedPackageManifestHashes = new Map([
   // advisories. Dependency names and payment integration boundaries are unchanged.
   [
     "apps/sandbox-api/package.json",
-    "449a71ee2e260137f66e409824c7b940503a5227ddb2838b793ae2959eca555d",
+    "e274bb47edb371e673dc86fb806aa1e9c90973b73a87a02e82add2c72d161fe5",
   ],
   [
     "apps/api/package.json",
-    "612edab1de19229840f06fe1cead61134e8ba5bba085bfb5a41a43540c68a51b",
+    "4db1262b33e3a14268dca723019c129b4a1c253b53956f47b6bc84baa42e3318",
   ],
   [
     "apps/web/package.json",
-    "12a1b7ae68a27c1c79c816357e92a00b772385f1cc6e4877c33f7f271694def1",
+    "40d3cb3dc44b5f0a3406fdd091eb017fa05e8379841f6fc13a34a854407f2909",
   ],
   [
     "apps/worker/package.json",
@@ -684,7 +684,7 @@ const approvedPackageManifestHashes = new Map([
     "package.json",
     // Reviewed navigation increment: add the native Nginx proof entrypoint and
     // invoke it from verify:deploy. Existing scripts and dependency graph remain.
-    "db3bc1f5f1d61883a1dfde9374f1411694c4746c5a0ed7f6dc28a153f80fcc02",
+    "2f3f91a8d2999bf30874c9ee1fee6730d0e5761bd5aca82d81e0473b0f2a0d1e",
   ],
   [
     "packages/application/package.json",
@@ -692,11 +692,11 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/config/package.json",
-    "8d60e8bda20c29b9ff7d28ce0bd24265694ee09970ec020cc9e90cb4c1b72ffa",
+    "4f09a3f673b7c618d8005bdc84673a79390d59520920ce83947618d45168cd5d",
   ],
   [
     "packages/contracts/package.json",
-    "107c72668715f901d985b521260771b152b1efd78ca5f9ab9c719ca30db6d66a",
+    "176fc9aa618da35e1aa1c03576e1f34088dda9c131835fc0022f6ff0324dd3d2",
   ],
   [
     "packages/db/package.json",
@@ -708,7 +708,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/integrations/package.json",
-    "37a9cc6e97ad7e6e56b7476741e97ec209d37535a3f88c43b2eb8703f05a4e57",
+    "a8cd1428b34414037b048d8b12344f5bb1f7b2f9f78918b791db6ef6f34a030e",
   ],
   [
     "packages/observability/package.json",
@@ -716,7 +716,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "packages/sandbox-payments/package.json",
-    "b8426f19f7d6aeb30e5ffdb2d0e50af134d7445db11e4022eb2f00a378fbc495",
+    "f3f02f3424d14be05309bea4135fafab8ec50fdb3f645bd1a7a47d3c86113da0",
   ],
   [
     "packages/worker/package.json",
@@ -746,8 +746,160 @@ const reviewedDomHarnessHashes = new Map([
 
 const approvedAutomationArtifactHashes = new Map([
   [
+    "apps/api/src/early-bird-bound-reconciliation.ts",
+    "1dae2c33985c037dd360597502e1876e5732a3a67dbc7ebd531df4c5f4f4276b",
+  ],
+  [
+    "apps/api/src/early-bird-bound-reconciliation.test.ts",
+    "f7e793bb0d7c4072d073ba38bc1e212109449efb859fa83d3b75af518fb47688",
+  ],
+  [
+    "apps/api/src/early-bird-discovery-pool.ts",
+    "ea99baf7b019f372db0e9ddce4fbbfde6edabaef7bf69d0876545eb0dc2c96ac",
+  ],
+  [
+    "apps/api/src/early-bird-discovery-pool.test.ts",
+    "4075405f934d0384527a9a600da1aad1ab19f9322a17cabbd4c571f27486f532",
+  ],
+  [
+    "packages/db/src/repositories/early-bird-bound-reconciliation.integration.test.ts",
+    "21f98a1cb0378b0d9dc14da0a0e982f1556e575d7383d23b15115b1160e8de88",
+  ],
+  [
+    "apps/api/src/early-bird-gateway-bootstrap.ts",
+    "f49a1a1c5dc7657bfbc8299804174812233eb503d57d0e070a6e8775bfea8ee1",
+  ],
+  [
+    "apps/api/src/expert-early-bird-webhook-runtime.ts",
+    "2ca2c4a224525543a4f4ac2b2af3088c52fc3bf7cecd0213fd9dd779c5c25a98",
+  ],
+  [
+    "apps/api/src/server.ts",
+    "af51974f8ccfa042eeac468a4f5e05f66e85662ab839767542ee24d5d3132065",
+  ],
+
+  [
+    "deploy/gateway-provision/test_prepare_systemd_sandbox.sh",
+    "f56f79bbe1d7ff85cc3a48600622635fb781aeab0fd4fe1ba59e6674fd323338",
+  ],
+  [
+    "deploy/gateway-provision/readme.md",
+    "69f3d2630d2429a3a23372a4e38d2d48c175b37eeac48353c995966c4097b32c",
+  ],
+  [
+    "deploy/gateway-provision/prepare-bounded-handoff.test.mjs",
+    "2c21a8281f26996f8d5b43c4a1aa2a12ed2742b3d1728128316e51f3626bb998",
+  ],
+  [
+    "deploy/gateway-provision/prepare-code-publication.test.mjs",
+    "ca1ba4a21d24277349e6b6303b09649954b38fca68f2918d21bef9139f7ba8af",
+  ],
+  [
+    "deploy/gateway-provision/prepare-code-selector.test.mjs",
+    "66ca1b68708f15418a0308abcadd9daa3a64835b9bbf710366a4b7b28127912a",
+  ],
+  [
+    "deploy/gateway-provision/prepare-native.mjs",
+    "4e426fb8c5f8811d65b8a6f7119981deeddcbb28424495945d9dc330e215da53",
+  ],
+  [
+    "deploy/gateway-provision/prepare-native.test.mjs",
+    "e6c8e0f70026beb6fd3203ea4e4ca76d5f5f460bc4ee9c18ccc23a8b58ad1b05",
+  ],
+  [
+    "deploy/gateway-provision/prepare-timeout.test.mjs",
+    "645a0bdf843e765057a48242c5d79924be2c7b9ac24d30bfeb876f78ac36bc46",
+  ],
+  [
+    "deploy/gateway-provision/prepare-units.test.mjs",
+    "ee33e40f7796c761e349ef8f020619fd53ea5bcd4bf7c62ba9fdee1fee0304c4",
+  ],
+  [
+    "deploy/gateway-provision/prepare_gateway.py",
+    "b102daa05bf956af20252e73b009014f817df42e98ec93edc2fc6da2feaf46da",
+  ],
+  [
+    "deploy/gateway-provision/sysusers.conf",
+    "809595afed785bcae104a5fde8427c7a6bbca77dc84028506c17714915dafd1f",
+  ],
+  [
+    "deploy/gateway-provision/test_prepare_gateway.py",
+    "5660041061bf0b894da7f34b663212397c31d2d17ec145ccc6d59a58879c215c",
+  ],
+  [
+    "deploy/gateway-provision/test_prepare_gateway_bad_marker.py",
+    "a8372dbc153be0c43aaf7e09b45d87df1cce3fefc2d076ccf8538d50546f81b9",
+  ],
+  [
+    "deploy/gateway-provision/test_prepare_gateway_cross_uid.sh",
+    "26bfd539fdccea5b84b6f6565add11972ac58cbe9111fae81dcb0555cb35b96a",
+  ],
+  [
+    "deploy/gateway-provision/tmpfiles.conf",
+    "e290c1f9a3431d11dd4e4a75d4a673dbe46443cc5a4bd1195ca7c779aaf08469",
+  ],
+  [
+    "deploy/systemd/ii-tonya-yookassa-gateway.service",
+    "851d74e2c1c1cc74547fc3f1112de46f54b6616e72e4fb18613ea955a671905f",
+  ],
+  [
+    "deploy/systemd/ii-tonya-early-bird-prepare.service",
+    "990226f0e73b383a955ff594e2682def578faa25dd8169240deebddd6ff39c3a",
+  ],
+  [
+    "deploy/systemd/ii-tonya-migrate.service.d/30-early-bird-prepare.conf",
+    "ebe7d7bcf12c9258bfe2a092528bc53ed57ca1cb94579dcc57abd5a14e5517a5",
+  ],
+  [
+    "pyproject.toml",
+    "b464d7bec6b0509dfbea85aba8e3ed7e21570136caadc1ea94f5ed44d953a7df",
+  ],
+  [
+    "tests/repo/python-ci-discovery.test.ts",
+    "18200f2c018e03d3033eb786ca395642db7fffcf8bdbf806a967c03056123806",
+  ],
+
+  [
+    "trivy.yaml",
+    "005ad605cb97d59d352f50d130328cd7d4c833e053c2e3c910600e7d6eb9ea6a",
+  ],
+  [
+    ".getzilla/templates/ci/github-actions-verify.yml",
+    "0b8fbb564f0ca94edd10c90106f8a5e27efe5b5abd4725077a06b11d5aac9996",
+  ],
+  [
+    "tests/runtime/test_claw_healthcheck.py",
+    "35fa8c45c657123a5f4abc2c5eb6c1c1484d263f81b25fd874922d96e40a827e",
+  ],
+  [
+    "tests/runtime/test_helper_healthchecks.py",
+    "10674de815f3d53c6a32786de5b5dee7e8ed8e81d8defb37b2b7153454f39896",
+  ],
+
+  [
+    "scripts/getzilla_reviewed_opengrep.py",
+    "4128701bd9042a62b7a49dbbe8d98a7ffab18f1b21a1d65060bc9776c4bc141a",
+  ],
+  [
+    "scripts/test_getzilla_reviewed_opengrep.py",
+    "2a479f1cd4e054a2dbc8e9552c3ed8488250a3c2cf7566fa14e7b1aecbc4cf0d",
+  ],
+  [
+    "engineering/opengrep-reviewed-observations.json",
+    "314bb68190223c01418fe456cb3abf444afac60c1a6d676d99e8e5091d1a1e00",
+  ],
+
+  [
+    "scripts/early-bird-bridge/archive-hash.test.mjs",
+    "6d9355de355dbb00f0fbc7805ce7eaaa499a86d1e939115b7e7930f5c1a6e408",
+  ],
+  [
+    "scripts/early-bird-bridge/archive-hash.mjs",
+    "a0cc12570da4939ac7e5b83bd2530b1fb785b5918ce60a3b4c28ef7c22bcaa97",
+  ],
+  [
     "scripts/build-early-bird-bridge-release.mjs",
-    "369639fb8b2e51011317e1bfd2fbb7f9338352c3d0c0dd27c7c9a58d36ddf58f",
+    "10dbdea609d658ed13b5d3a275805d3de2a16ae9e037d85fa92475f5804bd5e4",
   ],
   [
     "scripts/early-bird-bridge/bridge.test.mjs",
@@ -765,105 +917,105 @@ const approvedAutomationArtifactHashes = new Map([
   // Early Bird transport and isolation experiment inventory.
   [
     "scripts/experimental/yookassa_gateway/bound_gateway.py",
-    "d1f35a296200e9d783ac7ee9a9d095fffd001171ff3f21b1b3aea4d8ce8f5c60",
+    "fd2de8d25d3f9cad04a04b31f0022ee85ae61fcfa5713f7c2710a5ac197aa963",
   ],
   [
     "scripts/experimental/yookassa_gateway/docker_isolation_probe.py",
-    "78e6f52a58ae4452b8748b044c7bc2ee4825a8f2d8452296b51bc92539eaddcf",
+    "17ce69d3585331de596ea09f9f94b560372463b82e3c373075d63fd30e2a2f69",
   ],
   [
     "scripts/experimental/yookassa_gateway/durable_state.py",
-    "6c0270fa903641329b3acdbdc9c2b0cfd807231e3362b1c6298777e40c926ccb",
+    "94cf39987b6bc1cb912681b809ed15dddcb1d691c54a9f5a29b52a21d46e34d4",
   ],
   [
     "scripts/experimental/yookassa_gateway/egress_fence.py",
-    "049dbef4ff8c9042ce0339d69ecd1a61ba58d4c1e96ad91793efe1dccc0de740",
+    "4e8b7c6aa14c4eff4ea52fc061b4c8db3c18c65a908d1821b4fd2decc46388f2",
   ],
   [
     "scripts/experimental/yookassa_gateway/gateway.py",
-    "681b5f87c26dd1fe743d770e16e4aca7ad81ec8b9ddac213610e8c917e75444e",
+    "1964d8b53cb76e7a1da0759297bcebf42fa25d13baad3393fff8e043d6299d90",
   ],
   [
     "scripts/experimental/yookassa_gateway/ipc.py",
-    "c5134524b705c30b553f1dc00740ba10f72b543a4aa70a8bd691de2cce4a956a",
+    "6b608d16c8dced513d98b9e6d4bf7a194d8b3fb8eab83d2e5d32d8772b53987f",
   ],
   [
     "scripts/experimental/yookassa_gateway/launcher.py",
-    "a4e8babb9ae3410b7902ec1139e8c27db26bdb69a77522c2dba45dea6478c8ba",
+    "4df8910a99feed921e0294b985edc7c44d4a0847aff2a8437901c8c9d0709850",
   ],
   [
     "scripts/experimental/yookassa_gateway/nonce_registry.py",
-    "39b72fff3c29a1f335514ff97e5859888007c97a4d7bb2a475398d9257ca6677",
+    "72084ff2c5f1060ec9f064b65a16b5b348c74421036b3955a4dea43e8442ad67",
   ],
   [
     "scripts/experimental/yookassa_gateway/pg_authority.py",
-    "13c59096046810b5c6ec791551080653676fb9da27d22df2f40fa18f30b2c80e",
+    "7dde5bb588e215c9a22909a23e96fdef748020ba0d185f4775c35336c1917813",
   ],
   [
     "scripts/experimental/yookassa_gateway/provider_reader.py",
-    "32bbaecc903b2567a95f60696cbc7b01f9b174ed83f2aba121d7e7bae5451a1e",
+    "47933326dd5ca5cdf3901a9247b0d34a3f9ed2d9072b69687e4d5a6c38e72175",
   ],
   [
     "scripts/experimental/yookassa_gateway/revocation.py",
-    "8bd55b9104042f225ae03e9ceaa41913f1ebe68a9757b4a09bca21fe27309b2f",
+    "062709620d084360e33e7ec1e1eaa78928a7fdb56939d92e93a40abd7269c3ac",
   ],
   [
     "scripts/experimental/yookassa_gateway/subject_tokens.py",
-    "419d3f63c17207a452f40518e56128d239a026b6ecb37c6817534c4a1656e1f9",
+    "078aaa8b6958fd06e3cb30fa781e9a39f197db0c5426dc981b28f4c5268203fa",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_bound_gateway.py",
-    "d3bc654da706e2a7b99d31f8f23d8962879bbf399b5ec6a019ae11bd7bc10fe2",
+    "3a868a7e7a8aaa1b94ceb23166a12316ce96da6e7a83da5b2c2d130bde1aa7b1",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_durable_state.py",
-    "b1226370f024fdfb7db6f0a459684a873c67bbf27caa1451239971f0c55c9349",
+    "48e90a949725b2c4de09611b5f448fd05d587426522f8e7e099d858652caf318",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_egress_fence.py",
-    "2fe9fe5b908c106d3373074326b77f7e1837e6aa69151916e42ee6d24e77d687",
+    "b5099099a65590382600f40b838986cf1c6b9f66549d543b298cfc93a1411ffc",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_gateway.py",
-    "50f8e6887d71b59c5ee0e592b18c98991e8aaa3fd42d1a401c200f8cff0dfa36",
+    "0eae248ae887fd0fef367bd2e754b378168c9ad4666d04e1a233959c4e98e839",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_ipc.py",
-    "746d768b4c231ea45a5900919abab36bbc35ddf53686939c3a71ee2a8716dc55",
+    "a1a29c13fa4c8f29c5cdc8b2e71f64149838cdb061031f07581ac7c7f57b3acf",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_launcher.py",
-    "c900ebc347aedbf89ea4c3a68f6b0504e668e395eca6bf30dd1f5a6655c3f8fe",
+    "48a8748e709ccfd75698329a903f6e6176db3b1108abf146fa2345855ca1e5ce",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_nonce_registry.py",
-    "f4dd922150857f950fad1aaa38e67a31ace75cb0e13c7948cc83f5766c8ffafe",
+    "ad03694851cfca9996903528bed5c25a28610283c3f737d4e20515e84b2d6459",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_pg_authority_integration.py",
-    "a020af0837d3823ae560e056d8e21f9fe3ce316a5911de355119d7259d75cac1",
+    "e61f0973d47371da914b46b12f98721905bcf0e99c514a6f6969b5186541e2cf",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_provider_reader.py",
-    "ae86950cf7fab40717f3e869916d0fb38085bee8d3495569dad5f33ae94c7a5f",
+    "1e0f5d03080578d0078dbf52da4bc8f5c4edbaabda2757d1d9dc84fd03bc824e",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_provision_assets.py",
-    "8204574d36cff5b0752945e3bb830d8bae8345fc52f72fdcb47f1fd540ddc5ca",
+    "0b5b9b0717ad5d3401f269c8a1e54d54d485288675b876109942fbfdc754a97e",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_revocation.py",
-    "9f675559efca4d8f751d6b80c26732a9beee0a2f410457f5d82900a3e48ca092",
+    "e1fe21c451ffc7a71e55167ae55102304efffea2c3a0256e4cf40292bfe9eb9e",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_subject_tokens.py",
-    "53c6a89c237f77ccdedac4fa950740838f0b88b9acd99decf5c3265c9c973b98",
+    "2a4ab15ec1d2e8acbea1582cfb9ca7adc653d7749ab944ea47e6908e3566a275",
   ],
 
   // Read-only GitHub Actions gates explicitly authorized for this public repository.
   [
     ".github/workflows/getzilla-verify.yml",
-    "5fce1cae157cb77b27ed9529a0fa35fe2dbe6ba9c6f70b60a31f481c2c77cd5d",
+    "b5f0322f177b0e8fb829999225348c82e25a5d2574da4bb35b236e72a4895f32",
   ],
   [
     "scripts/assert-ci-db-results.mjs",
@@ -875,7 +1027,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/getzilla_verify_ci.py",
-    "848bc326741e29fac53fc9e47b54d777d03329be72e76326b1f9d963e31b5786",
+    "0f149c73c6322383479533c659d7114664fd3c50033d4aa867b86e39b8e464ff",
   ],
   [
     "scripts/getzilla_ci.py",
@@ -892,19 +1044,19 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "runtime/semantic-tags/dockerfile",
-    "0460bbac1393c1ad42044dc95772ca4eb97557cbef97e9a70963c07a4bcdd9b1",
+    "fa84dfb61d49b317ec27a1a86d5e5abafaaf31f1623a7ab39a7b7cc842aab673",
   ],
   [
     "runtime/semantic-tags/engine.py",
-    "fe768cb9c478e8a1731bdad22f71af1c1527edbcc8a01e7058ababffcaff30a3",
+    "7b11b0e524b600c754b365d1cc15dec27ade6a8d08980a387cd49303d8957b6c",
   ],
   [
     "runtime/semantic-tags/server.py",
-    "809f74c442c71395d464de42bc3bb24d7a8aa8f7e864563ba9dea8697c49c48a",
+    "aeb03825a3f42faf70d9be2dcbe12805cd036cd32a34f8ada2adf071d1819130",
   ],
   [
     "runtime/semantic-tags/test_engine.py",
-    "2bf7ea90c53601214dd6547832710c25ace37b1b4bbeea451c70fab1a22fc9c6",
+    "8f08ec40a43d39dfced965e199824091b9dfeaf43f3e2cab9cccb7f31d957635",
   ],
   // Reviewed S2b isolated helper and synthetic witnesses; exact paths and bytes only.
   [
@@ -913,7 +1065,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "packages/integrations/parser/dockerfile",
-    "05bc975e61f4be435f1e83a647952ad52c3a3129da5bf16f35b627652e0bd41f",
+    "939497f4a5b0061f8002c78dbf0d467a06fc3fd7efb5793b0fb3922a4fead39d",
   ],
   [
     "packages/integrations/parser/build-image.sh",
@@ -952,7 +1104,7 @@ const approvedAutomationArtifactHashes = new Map([
   // Read-only owner backlog validator: inspect source coverage, task links and dependency DAG.
   [
     "_bmad-output/specs/spec-owner-update-2026-09-16/validate_backlog.py",
-    "c9fe761993a035ff74b6ce6c8469eab888bb4469e509e9e0c54423cc56977395",
+    "358e738320f3a8998f8d4a0e82d4e582a757afde9b696b6ba5e64825c244c95b",
   ],
   // Host bootstrap for the native production runtime (PR #70). These mutate the server
   // out of band, so their content is pinned here as well as in deploy/bootstrap/SHA256SUMS.
@@ -1004,19 +1156,19 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "deploy/systemd/ii-tonya-api.service",
-    "ab01263f0edf37cb9eaf4502c5365b3b81002f4c761631359f41012bd98e76fc",
+    "df0632758cc00034f2f2392d93974c652fc0834c0dd33ffd1e75a127f629061b",
   ],
   [
     "deploy/systemd/ii-tonya-worker.service",
-    "f507dedeaa04d0c39aad9fba03d9c90f3a2d280fcd31221d19caae87b6a3dc26",
+    "947443343b6d7c102fa1f62d40eb2e3c914060c6fff4736dfb307eee7f75fcdf",
   ],
   [
     "deploy/systemd/ii-tonya-migrate.service",
-    "d2914b6ef210d94d42fa8f08c89c300c3f8dbe8a0637669ed3cc5e94ae785704",
+    "8e6f70fe21d37b7e9eab4c30ef26424c411fa0ecbffb118371d0f1de221b72f7",
   ],
   [
     "deploy/claw/dockerfile.test",
-    "d69356b4769493c64c69d8f2e7d5dd178d7a408b0fa6b15cdeb856925b874ebe",
+    "85a98d0bc817ee49d823c9b3b0d9b11446c675cebb89497bc348e29035fb9c94",
   ],
   [
     "deploy/claw/dockerfile.test.dockerignore",
@@ -1220,12 +1372,12 @@ const approvedDependencySpecifiers = new Map([
   ["@testcontainers/postgresql", "^10.28.0"],
   ["@types/node", "^24.0.0"],
   ["@types/pg", "^8.15.5"],
-  ["@vitest/coverage-v8", "^3.2.4"],
+  ["@vitest/coverage-v8", "^4.1.11"],
   ["drizzle-kit", "^0.31.4"],
   ["drizzle-orm", "^0.45.2"],
   ["eslint", "^9.31.0"],
   ["fast-check", "^4.2.0"],
-  ["fastify", "^5.12.5"],
+  ["fastify", "^5.12.6"],
   ["globals", "^14.0.0"],
   ["pg", "^8.16.3"],
   ["pino", "^9.7.0"],
@@ -1234,10 +1386,10 @@ const approvedDependencySpecifiers = new Map([
   ["tsx", "^4.20.3"],
   ["typescript", "^5.8.3"],
   ["typescript-eslint", "^8.30.1"],
-  ["vite", "^7.3.6"],
-  ["vitest", "^3.2.4"],
+  ["vite", "^7.3.7"],
+  ["vitest", "^4.1.11"],
   ["yaml", "^2.8.0"],
-  ["zod", "^4.3.6"],
+  ["zod", "^4.6.6"],
 ]);
 const approvedMigrationHashes = new Map([
   [
@@ -2469,8 +2621,48 @@ const isVersionedGetzillaToolingPath = (path: string): boolean =>
   /^scripts\/getzilla_[a-z_]+\.py$/u.test(path) ||
   GETZILLA_ROOT_HOOK_SHIMS.has(path);
 
+// Exact reviewed deployment and CI discovery inventory.
+const reviewedGatewayProvisionArtifacts = new Set([
+  "apps/api/src/early-bird-bound-reconciliation.ts",
+  "apps/api/src/early-bird-bound-reconciliation.test.ts",
+  "apps/api/src/early-bird-discovery-pool.ts",
+  "apps/api/src/early-bird-discovery-pool.test.ts",
+  "packages/db/src/repositories/early-bird-bound-reconciliation.integration.test.ts",
+  "apps/api/src/early-bird-gateway-bootstrap.ts",
+  "apps/api/src/expert-early-bird-webhook-runtime.ts",
+  "apps/api/src/server.ts",
+
+  "deploy/gateway-provision/test_prepare_systemd_sandbox.sh",
+  "deploy/gateway-provision/readme.md",
+  "deploy/gateway-provision/prepare-bounded-handoff.test.mjs",
+  "deploy/gateway-provision/prepare-code-publication.test.mjs",
+  "deploy/gateway-provision/prepare-code-selector.test.mjs",
+  "deploy/gateway-provision/prepare-native.mjs",
+  "deploy/gateway-provision/prepare-native.test.mjs",
+  "deploy/gateway-provision/prepare-timeout.test.mjs",
+  "deploy/gateway-provision/prepare-units.test.mjs",
+  "deploy/gateway-provision/prepare_gateway.py",
+  "deploy/gateway-provision/sysusers.conf",
+  "deploy/gateway-provision/test_prepare_gateway.py",
+  "deploy/gateway-provision/test_prepare_gateway_bad_marker.py",
+  "deploy/gateway-provision/test_prepare_gateway_cross_uid.sh",
+  "deploy/gateway-provision/tmpfiles.conf",
+  "deploy/systemd/ii-tonya-yookassa-gateway.service",
+  "deploy/systemd/ii-tonya-early-bird-prepare.service",
+  "deploy/systemd/ii-tonya-migrate.service.d/30-early-bird-prepare.conf",
+  "pyproject.toml",
+  "tests/repo/python-ci-discovery.test.ts",
+]);
+
 export const isPaymentScopeInspectionPath = (rawPath: string): boolean => {
   const path = normalizePath(rawPath);
+  if (reviewedGatewayProvisionArtifacts.has(path)) return true;
+  if (
+    path === "engineering/opengrep-reviewed-observations.json" ||
+    path === "trivy.yaml" ||
+    path === ".getzilla/templates/ci/github-actions-verify.yml"
+  )
+    return true;
   if (isVersionedBmadToolingPath(path)) return false;
   if (isVersionedGetzillaToolingPath(path)) return false;
   if (path.endsWith("/package.json") || path === "package.json") return true;

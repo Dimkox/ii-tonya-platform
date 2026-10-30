@@ -1,6 +1,8 @@
 import { expect, it, vi } from "vitest";
 import { loadEnv } from "@ii-tonya/config";
 import { createDefaultLifecycle } from "./server.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic_work_secret_123456789012";
+
 it("refuses API startup before exposing wave card routes if database capabilities are unavailable", async () => {
   const config = loadEnv({
     DATABASE_URL: "postgresql://local:local@localhost/test",
@@ -12,7 +14,7 @@ it("refuses API startup before exposing wave card routes if database capabilitie
     EXPERT_CARD_WORK_BOT_KEY: "expert-work",
     EXPERT_CARD_WORK_BOT_USERNAME: "synthetic_work_bot",
     EXPERT_CARD_MESSAGING_CONSENT_POLICY_VERSION: "policy-v1",
-    TELEGRAM_WEBHOOK_SECRET: "synthetic_work_secret_123456789012",
+    TELEGRAM_WEBHOOK_SECRET: SYNTHETIC_FIXTURE_VALUE_1,
   });
   const execute = vi.fn(async () => ({ rows: [{ available: false }] }));
   const db = {
@@ -37,7 +39,7 @@ it("passes the shared wave capability into the public catalog factory", async ()
     EXPERT_CARD_WORK_BOT_KEY: "expert-work",
     EXPERT_CARD_WORK_BOT_USERNAME: "synthetic_work_bot",
     EXPERT_CARD_MESSAGING_CONSENT_POLICY_VERSION: "policy-v1",
-    TELEGRAM_WEBHOOK_SECRET: "synthetic_work_secret_123456789012",
+    TELEGRAM_WEBHOOK_SECRET: SYNTHETIC_FIXTURE_VALUE_1,
   });
   const statements: string[] = [];
   const execute = vi.fn(async (query: unknown) => {

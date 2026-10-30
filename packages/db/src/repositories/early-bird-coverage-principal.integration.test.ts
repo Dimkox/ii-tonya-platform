@@ -6,6 +6,8 @@ import {
 } from "@testcontainers/postgresql";
 import { Pool } from "pg";
 import { afterAll, beforeAll, expect, it } from "vitest";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only-test-password";
+
 let container: StartedPostgreSqlContainer;
 let admin: Pool;
 beforeAll(async () => {
@@ -32,7 +34,7 @@ afterAll(async () => {
 }, 120_000);
 it("permits only provisioned coverage functions to a genuine non-owner login", async () => {
   const role = `coverage_${randomUUID().replaceAll("-", "")}`;
-  const password = "synthetic-only-test-password";
+  const password = SYNTHETIC_FIXTURE_VALUE_1;
   const user = randomUUID();
   await admin.query(
     `create role "${role}" login password '${password}' nosuperuser noinherit nocreatedb nocreaterole nobypassrls`,

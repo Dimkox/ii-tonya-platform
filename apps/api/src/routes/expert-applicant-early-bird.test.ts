@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { expect, it, vi } from "vitest";
 import { expertApplicantTelegramRoutes } from "./expert-applicant-telegram.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-secret";
 
 it("admits wave buttons only when a wave capability is installed", async () => {
   for (const enabled of [false, true]) {
@@ -13,7 +14,7 @@ it("admits wave buttons only when a wave capability is installed", async () => {
       capability: {
         botId: "123",
         botKey: "promo-key",
-        webhookSecret: "synthetic-secret",
+        webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
         verificationFormEnabled: true,
         separatedSalesEnabled: true,
         earlyBirdEnabled: enabled,
@@ -56,7 +57,7 @@ it.each([
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       verificationFormEnabled: false,
       separatedSalesEnabled: true,
       earlyBirdEnabled: true,
@@ -93,7 +94,7 @@ it("passes a bounded safe Telegram first name only after scoped identity validat
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       separatedSalesEnabled: true,
       earlyBirdEnabled: true,
       verificationFormEnabled: true,

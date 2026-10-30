@@ -1,3 +1,5 @@
+import { createEarlyBirdDiscoveryPool } from "./early-bird-discovery-pool.js";
+import type { EarlyBirdBoundReconciliation } from "./early-bird-bound-reconciliation.js";
 import { createExpertEarlyBirdWebhookRuntime } from "./expert-early-bird-webhook-runtime.js";
 import { createEarlyBirdDeferredRuntime } from "./expert-early-bird-deferred-runtime.js";
 import { PostgresFinalCallEngagement } from "@ii-tonya/db";
@@ -245,13 +247,22 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
   });
   const pools: DrizzleDb[] = [];
   let closing: Promise<void> | undefined;
+  let reconciliation: EarlyBirdBoundReconciliation | undefined;
   const close = () =>
-    (closing ??= Promise.allSettled(pools.map((db) => closeDb(db))).then(
-      (results) => {
-        if (results.some((result) => result.status === "rejected"))
-          throw new Error("early_bird_gateway_database_close_failed");
-      },
-    ));
+    (closing ??= (async () => {
+      let stopFailed = false;
+      try {
+        await reconciliation?.stop();
+      } catch {
+        stopFailed = true;
+      }
+      // Pool.end waits for checked-out clients; it does not terminate an
+      // in-flight financial transaction. Every dedicated pool has finite
+      // acquisition, statement and lock timeouts.
+      const results = await Promise.allSettled(pools.map((db) => closeDb(db)));
+      if (stopFailed || results.some((result) => result.status === "rejected"))
+        throw new Error("early_bird_gateway_database_close_failed");
+    })());
   const connections = new Map<string, { db: DrizzleDb; login: string }>();
   const connection = (name: string) => {
     const prior = connections.get(name);
@@ -302,6 +313,12 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
       gateway,
       subjectKeyVersion,
       close,
+      startReconciliation() {
+        reconciliation?.start();
+      },
+      stopReconciliation() {
+        return reconciliation?.stop();
+      },
       serverOptions(db: DrizzleDb) {
         if (!standardRuntime || !webhook || !deferred || !config.launchPhase)
           return fail();
@@ -313,11 +330,18 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
         } as Parameters<
           typeof createExpertEarlyBirdWebhookRuntime
         >[0]["connections"];
-        const webhookRuntime = createExpertEarlyBirdWebhookRuntime({
-          db,
-          gateway,
-          connections: webhookConnections,
-        });
+        // The ordinary API credential is reused solely for SELECT discovery.
+        // Its own max-one pool bounds checkout independently of HTTP traffic.
+        const discoveryDb = createEarlyBirdDiscoveryPool(config.databaseUrl);
+        pools.push(discoveryDb);
+        const { boundReconciliation, ...webhookRuntime } =
+          createExpertEarlyBirdWebhookRuntime({
+            db,
+            discoveryDb,
+            gateway,
+            connections: webhookConnections,
+          });
+        reconciliation = boundReconciliation;
         const prepare = connection("deferred/prepare"),
           invoice = connection("deferred/invoice"),
           send = connection("deferred/send"),

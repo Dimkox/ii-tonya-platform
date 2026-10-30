@@ -13,6 +13,8 @@ import { createExpertApplicantComposition } from "./expert-applicant-composition
 import { expertApplicantTelegramRoutes } from "./routes/expert-applicant-telegram.js";
 import { createPostgresEarlyBirdAuthority } from "./expert-early-bird-authority.js";
 import { createExpertEarlyBirdService } from "./expert-early-bird-service.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic_sales_secret_1234567890";
+
 let database: ExpertReferralTestDatabase;
 beforeAll(async () => {
   database = await startExpertReferralTestDatabase();
@@ -53,7 +55,7 @@ it("rejects continuation and retry after messaging consent is withdrawn", async 
     EXPERT_SEPARATED_SALES_ENABLED: "true",
     EXPERT_PROMO_TELEGRAM_BOT_ID: "717171",
     EXPERT_PROMO_TELEGRAM_BOT_KEY: "sales-fixture",
-    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: "synthetic_sales_secret_1234567890",
+    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: SYNTHETIC_FIXTURE_VALUE_1,
     EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
   });
   const startMs = Date.parse("2027-01-11T00:00:00+03:00");

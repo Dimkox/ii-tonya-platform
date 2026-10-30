@@ -14,6 +14,7 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only-password";
 
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
@@ -226,7 +227,7 @@ it("rejects a connection switched away from the expected LOGIN", async () => {
   );
   const testConnection = new URL(db.db.$client.options.connectionString!);
   testConnection.username = "wave_binding_test_login";
-  testConnection.password = "synthetic-only-password";
+  testConnection.password = SYNTHETIC_FIXTURE_VALUE_1;
   const pool = new Pool({ connectionString: testConnection.toString() });
   try {
     await pool.query("set role ii_tonya_wave_verifier");

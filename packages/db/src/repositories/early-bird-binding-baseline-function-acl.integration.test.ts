@@ -14,6 +14,7 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only-password";
 
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
@@ -223,7 +224,7 @@ it("permits baseline PUBLIC invoker functions without table reads", async () => 
   );
   const testConnection = new URL(db.db.$client.options.connectionString!);
   testConnection.username = "wave_binding_test_login";
-  testConnection.password = "synthetic-only-password";
+  testConnection.password = SYNTHETIC_FIXTURE_VALUE_1;
   const pool = new Pool({ connectionString: testConnection.toString() });
   try {
     const restricted = drizzle(pool) as never;

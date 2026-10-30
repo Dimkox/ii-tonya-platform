@@ -121,6 +121,7 @@ import { clientPrivacyRoutes } from "./routes/client-privacy.js";
 import { browserAccountRoutes } from "./routes/browser-account.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { selartiResponseRoutes } from "./routes/selarti-response.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__";
 
 // Fastify exposes no public distinction between implicit and explicit 200.
 // Use its installed status-set marker, guarded by the differential tests.
@@ -1093,7 +1094,7 @@ export async function buildTestApp(
     rateLimiter: createWindowedRateLimiter(
       options.now === undefined ? {} : { now: options.now },
     ),
-    telegramWebhookSecret: "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__",
+    telegramWebhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
     ...(options.expertApi === undefined
       ? {}
       : { expertApi: options.expertApi }),

@@ -19,6 +19,7 @@ import {
   buildEarlyBirdRoleProvisioningSql,
   loadEarlyBirdRoleCapabilities,
 } from "../../scripts/provision-early-bird-runtime-roles.mjs";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only";
 
 const folder = "packages/db/migrations";
 const dbRequire = createRequire(
@@ -180,7 +181,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
       const login = mapping[capability.role]!;
       const address = new URL(connection);
       address.username = login;
-      address.password = "synthetic-only";
+      address.password = SYNTHETIC_FIXTURE_VALUE_1;
       const pool = new Pool({ connectionString: address.toString(), max: 1 });
       limitedPools.push(pool);
       expect(

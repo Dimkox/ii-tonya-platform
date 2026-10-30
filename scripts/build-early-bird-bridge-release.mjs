@@ -12,6 +12,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { archiveSource, hashFile } from "./early-bird-bridge/archive-hash.mjs";
 
 const sourceSha = process.env.SOURCE_SHA;
 const oldArchive = resolve(process.env.OLD_RELEASE_ARCHIVE || "");
@@ -31,7 +32,7 @@ if (
   run("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim() !== sourceSha
 )
   throw Error("SOURCE_SHA must identify HEAD");
-if (hash(readFileSync(oldArchive)) !== oldArchiveHash)
+if ((await hashFile(oldArchive)) !== oldArchiveHash)
   throw Error("old archive digest mismatch");
 const tmp = mkdtempSync(join(tmpdir(), "ii-tonya-bridge-"));
 try {
@@ -40,9 +41,9 @@ try {
   mkdirSync(src);
   mkdirSync(bundle);
   mkdirSync(output, { recursive: true });
-  const sourceArchive = run("git", ["archive", "--format=tar", sourceSha]);
   const sourceTar = join(tmp, "source.tar");
-  writeFileSync(sourceTar, sourceArchive);
+  archiveSource(sourceSha, sourceTar);
+  const sourceArchiveHash = await hashFile(sourceTar);
   run("tar", ["-xf", sourceTar, "-C", src]);
   run("tar", [
     "-xzf",
@@ -124,7 +125,7 @@ try {
   writeFileSync(join(bundle, "SOURCE_SHA"), sourceSha + "\n");
   const provenance = {
     source_sha: sourceSha,
-    source_archive_sha256: hash(sourceArchive),
+    source_archive_sha256: sourceArchiveHash,
     format: "ii-tonya-native-v1",
     profile: "early-bird-compatibility-bridge-v1",
     runtime_source_sha: oldSha,
@@ -162,7 +163,11 @@ try {
   ];
   writeFileSync(
     join(output, "native-release.sha256"),
-    names.map((n) => `${hash(readFileSync(join(output, n)))}  ${n}\n`).join(""),
+    (
+      await Promise.all(
+        names.map(async (n) => `${await hashFile(join(output, n))}  ${n}\n`),
+      )
+    ).join(""),
   );
 } finally {
   rmSync(tmp, { recursive: true, force: true });

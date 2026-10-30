@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
 import { loadEnv } from "./env.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic_work_secret_123456789012";
+
 const base = {
   DATABASE_URL: "postgresql://local:local@localhost/test",
   ALLOW_INSECURE_LOCAL_DATABASE: "true",
@@ -21,7 +23,7 @@ it("enables wave workspace only with an explicit configured card feature", () =>
     EXPERT_CARD_WORK_BOT_KEY: "expert-work",
     EXPERT_CARD_WORK_BOT_USERNAME: "synthetic_work_bot",
     EXPERT_CARD_MESSAGING_CONSENT_POLICY_VERSION: "policy-v1",
-    TELEGRAM_WEBHOOK_SECRET: "synthetic_work_secret_123456789012",
+    TELEGRAM_WEBHOOK_SECRET: SYNTHETIC_FIXTURE_VALUE_1,
   });
   expect(config.features.waveWorkspace).toBe(true);
 });

@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import { assertExpertApplicantCapability } from "./expert-applicant-composition.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic_promo_secret_1234567890";
 
 it("rejects wave configuration when the applicant cannot provide wave handling", () => {
   const config = {
@@ -9,14 +10,14 @@ it("rejects wave configuration when the applicant cannot provide wave handling",
     expertApplicant: {
       botId: "123456",
       botKey: "promo-v1",
-      webhookSecret: "synthetic_promo_secret_1234567890",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       messagingConsentPolicyVersion: "policy-v1",
     },
   } as unknown as RuntimeConfig;
   const capability = {
     botId: "123456",
     botKey: "promo-v1",
-    webhookSecret: "synthetic_promo_secret_1234567890",
+    webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
     separatedSalesEnabled: true,
     service: { handle: async () => ({ status: "disabled" as const }) },
   };
@@ -32,7 +33,7 @@ it("does not accept a wave boolean as proof of a composed checkout", () => {
     expertApplicant: {
       botId: "123456",
       botKey: "promo-v1",
-      webhookSecret: "synthetic_promo_secret_1234567890",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       messagingConsentPolicyVersion: "policy-v1",
     },
   } as unknown as RuntimeConfig;
@@ -40,7 +41,7 @@ it("does not accept a wave boolean as proof of a composed checkout", () => {
     assertExpertApplicantCapability(config, {
       botId: "123456",
       botKey: "promo-v1",
-      webhookSecret: "synthetic_promo_secret_1234567890",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       separatedSalesEnabled: true,
       earlyBirdEnabled: true,
       service: { handle: async () => ({ status: "disabled" as const }) },
@@ -58,14 +59,14 @@ it("allows configured wave to fall back to the standard flow at client launch", 
     expertApplicant: {
       botId: "123456",
       botKey: "promo-v1",
-      webhookSecret: "synthetic_promo_secret_1234567890",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       messagingConsentPolicyVersion: "policy-v1",
     },
   } as unknown as RuntimeConfig;
   const capability = {
     botId: "123456",
     botKey: "promo-v1",
-    webhookSecret: "synthetic_promo_secret_1234567890",
+    webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
     separatedSalesEnabled: true,
     service: { handle: async () => ({ status: "disabled" as const }) },
   };

@@ -5,6 +5,8 @@ import {
   createProductionWorkerRuntimeFactory,
   productionWorkerOutboxRegistryFactory,
 } from "./main.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic_work_secret_123456789012";
+
 vi.mock("@ii-tonya/db", async (original) => {
   const actual = await original<typeof db>();
   return {
@@ -30,7 +32,7 @@ it("fails worker startup and closes its pool when wave DB grants are unavailable
     EXPERT_CARD_WORK_BOT_KEY: "expert-work",
     EXPERT_CARD_WORK_BOT_USERNAME: "synthetic_work_bot",
     EXPERT_CARD_MESSAGING_CONSENT_POLICY_VERSION: "policy-v1",
-    TELEGRAM_WEBHOOK_SECRET: "synthetic_work_secret_123456789012",
+    TELEGRAM_WEBHOOK_SECRET: SYNTHETIC_FIXTURE_VALUE_1,
   });
   const end = vi.fn(async () => {});
   const execute = vi.fn(async () => ({ rows: [{ available: false }] }));

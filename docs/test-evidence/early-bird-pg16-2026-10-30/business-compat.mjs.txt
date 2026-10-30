@@ -4,6 +4,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import assert from 'node:assert/strict';
+const SYNTHETIC_FIXTURE_VALUE_1 = 'synthetic-only';
+
 
 const root='/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.getzilla/runtime/early-bird-rebase-20261029/worktree';
 const bundle='/tmp/early-bird-production-old-20261030/release';
@@ -54,7 +56,7 @@ try {
   await owner.query(`create role ${role} login password 'synthetic-only' noinherit nosuperuser nocreatedb nocreaterole nobypassrls`);
   await owner.query(`grant usage on schema public to ${role}; grant select on users, experts, channel_identities, expert_referrals, expert_referral_abuse_holds, expert_referral_feature_controls, expert_card_main_orders, expert_residency_tariff_versions, expert_referral_reward_grants, expert_referral_ledger_allocations, expert_referral_ledger_entries to ${role}; grant select, update on experts, expert_referrals, expert_referral_abuse_holds, expert_referral_feature_controls, expert_card_main_orders, expert_referral_reward_grants, expert_referral_ledger_allocations, expert_referral_ledger_entries to ${role}; grant select, insert, update on expert_residency_orders, expert_residency_provider_event_inbox, expert_residency_payment_attempts, expert_first_residency_settlements to ${role}; grant select, insert, update on expert_referral_reward_maturities, expert_referral_ledger_entries, expert_referral_ledger_allocations to ${role}; grant select on expert_referral_balances to ${role}; grant insert on audit_events, integration_outbox to ${role}; grant select(idempotency_key) on integration_outbox to ${role}; grant update on consent_document_versions to ${role}; grant usage on sequence expert_first_residency_settlements_settlement_sequence_seq to ${role}`);
   await owner.query('begin');await owner.query("select set_config('ii_tonya.legacy_settlement_role',$1,true)",[role]);await owner.query(readFileSync(root+'/scripts/sql/provision-early-bird-legacy-coverage.sql','utf8'));await owner.query('commit');
-  const limitedUrl=new URL(url);limitedUrl.username=role;limitedUrl.password='synthetic-only';limitedDb=old.createDb(limitedUrl.toString(),{connectionTimeoutMillis:5000,options:'-c statement_timeout=15000 -c lock_timeout=5000'});
+  const limitedUrl=new URL(url);limitedUrl.username=role;limitedUrl.password=SYNTHETIC_FIXTURE_VALUE_1;limitedDb=old.createDb(limitedUrl.toString(),{connectionTimeoutMillis:5000,options:'-c statement_timeout=15000 -c lock_timeout=5000'});
  });
  await step('old_tariff_checkout',async()=>{
   assert(state.expert); const repo=new old.PostgresExpertResidencyRepository(adminDb);const a=await audit('expert_residency.tariff_create',randomUUID());
@@ -69,7 +71,7 @@ try {
   const success=await one("select count(*)::int n from early_bird_payment_successes where user_id=$1",[state.user]);assert.equal(success.n,0);
  });
  await step('restricted_coverage_authority',async()=>{
-  assert(limitedDb&&role);const p=new Client({connectionString:(()=>{const u=new URL(url);u.username=role;u.password='synthetic-only';return u.toString();})(),connectionTimeoutMillis:5000});await p.connect();try{const x=await p.query('select early_bird_active_coverage_end($1)',[state.user]);assert.equal(x.rows.length,1);let denied=false;try{await p.query('select * from early_bird_payment_successes');}catch(e){denied=e.code==='42501';}assert.equal(denied,true);}finally{await p.end();}
+  assert(limitedDb&&role);const p=new Client({connectionString:(()=>{const u=new URL(url);u.username=role;u.password=SYNTHETIC_FIXTURE_VALUE_1;return u.toString();})(),connectionTimeoutMillis:5000});await p.connect();try{const x=await p.query('select early_bird_active_coverage_end($1)',[state.user]);assert.equal(x.rows.length,1);let denied=false;try{await p.query('select * from early_bird_payment_successes');}catch(e){denied=e.code==='42501';}assert.equal(denied,true);}finally{await p.end();}
  });
  await step('old_card_gate_rejects_unqualified',async()=>{
   assert(state.tariff);const card=new old.PostgresExpertOnboardingMainPaymentRepository(adminDb,{messagingConsentPolicyVersion:'client-messaging-v1',providerMode:'test'});

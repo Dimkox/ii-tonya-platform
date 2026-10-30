@@ -15,6 +15,7 @@ import type { createPostgresEarlyBirdAuthority } from "./expert-early-bird-autho
 import { PostgresReceiptRevocationOutbox } from "@ii-tonya/db";
 import { ExperimentalGatewayIpc } from "@ii-tonya/integrations";
 import { createReceiptContactFence } from "./receipt-disclosure-contact-fence.js";
+import type { TestExpertTrialMetricEvent } from "@ii-tonya/application";
 import {
   PostgresYooKassaPaymentPurposeRepository,
   assertWaveWorkspaceCapabilities,
@@ -228,9 +229,7 @@ export const createDefaultLifecycle = (
       confirmationBufferMs: number,
     ) => ProtectedWaitlistRepository;
     testExpertMetricSink?: {
-      record(
-        event: import("@ii-tonya/application").TestExpertTrialMetricEvent,
-      ): void;
+      record(event: TestExpertTrialMetricEvent): void;
     };
   } = {},
 ): ServerLifecycle => ({
@@ -1096,8 +1095,11 @@ export async function closeServer(
   lifecycle: ServerLifecycle,
   db: DrizzleDb,
 ): Promise<void> {
-  await app.close();
-  await lifecycle.close(db);
+  try {
+    await app.close();
+  } finally {
+    await lifecycle.close(db);
+  }
 }
 
 export async function listenServer(
@@ -1136,9 +1138,13 @@ export async function main(injectedLifecycle?: ServerLifecycle): Promise<void> {
           ...baseLifecycle,
           async close(db) {
             try {
-              await baseLifecycle.close(db);
+              await bootstrap.stopReconciliation();
             } finally {
-              await bootstrap.close();
+              try {
+                await baseLifecycle.close(db);
+              } finally {
+                await bootstrap.close();
+              }
             }
           },
         }
@@ -1161,6 +1167,7 @@ export async function main(injectedLifecycle?: ServerLifecycle): Promise<void> {
   const host = process.env.HOST ?? "127.0.0.1";
   const port = Number(process.env.PORT ?? "3000");
   await listenServer(app, lifecycle, db, { host, port });
+  bootstrap?.startReconciliation();
   // Неперехваченное исключение иначе уходит в stderr мимо санитизатора.
   const removeFatalLogging = installFatalProcessLogging({
     logger: createLogger(),
@@ -1168,7 +1175,13 @@ export async function main(injectedLifecycle?: ServerLifecycle): Promise<void> {
   let closing: Promise<void> | undefined;
   const shutdown = () => {
     removeFatalLogging();
-    return (closing ??= closeServer(app, lifecycle, db));
+    return (closing ??= (async () => {
+      try {
+        await bootstrap?.stopReconciliation();
+      } finally {
+        await closeServer(app, lifecycle, db);
+      }
+    })());
   };
   process.once("SIGTERM", shutdown);
   process.once("SIGINT", shutdown);

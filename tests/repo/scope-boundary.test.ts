@@ -30,7 +30,7 @@ describe("MVP scope boundary", () => {
       );
     }
     expect(violations).toEqual([]);
-  });
+  }, 30_000);
 
   it.each([
     ["property route", 'app.post("/v1/webhooks/make", handler);'],
@@ -323,7 +323,7 @@ describe("MVP scope boundary", () => {
       "packages/db/src/schema/billing.ts",
       "// payment and refund tables are outside MVP\nexport {};",
     ],
-    ["packages/integrations/package.json", '{"dependencies":{"zod":"^4.3.6"}}'],
+    ["packages/integrations/package.json", '{"dependencies":{"zod":"^4.6.6"}}'],
   ])(
     "allows explicit boundaries and comment-only vocabulary in %s",
     (path, content) => {

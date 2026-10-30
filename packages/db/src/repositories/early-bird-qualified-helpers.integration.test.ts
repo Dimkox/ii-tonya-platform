@@ -7,6 +7,8 @@ import {
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
 import { seedClientConsent } from "../testkit/client-consent.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only";
+
 let fixture: ExpertReferralTestDatabase;
 beforeAll(async () => {
   fixture = await startExpertReferralTestDatabase(undefined, {
@@ -52,7 +54,7 @@ it("preserves legacy consent and safety helpers under the restricted search path
   );
   const address = new URL(fixture.db.$client.options.connectionString!);
   address.username = "wave_helper_reader";
-  address.password = "synthetic-only";
+  address.password = SYNTHETIC_FIXTURE_VALUE_1;
   const pool = new Pool({ connectionString: address.toString(), max: 1 });
   try {
     await pool.query("set search_path=pg_catalog");

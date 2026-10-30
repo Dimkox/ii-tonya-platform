@@ -1,0 +1,781 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "rule": "getzilla.sast.rules.getzilla.python.unsafe-deserialization",
+      "path": ".agents/skills/bmad-retrospective/scripts/sprint_status.py",
+      "line": "53",
+      "sha256": "a697eecd53cd9177657aee4cfdb2eab06d7d81f3e855b096cfe0482a74c50ebe",
+      "category": "ruamel-roundtrip",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.python.unsafe-deserialization",
+      "path": ".agents/skills/bmad-sprint-planning/scripts/sprint_plan.py",
+      "line": "231",
+      "sha256": "4c30f62c261599fc1da3fd319ea6ce5092aa0332221cedee1763a1040627e6bc",
+      "category": "ruamel-roundtrip",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.python.unsafe-deserialization",
+      "path": ".agents/skills/bmad-sprint-planning/scripts/sprint_plan.py",
+      "line": "609",
+      "sha256": "4c30f62c261599fc1da3fd319ea6ce5092aa0332221cedee1763a1040627e6bc",
+      "category": "ruamel-roundtrip",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/app.ts",
+      "line": "855",
+      "sha256": "57d1f6f774f28771ed1bd6c7e7d2dbbe032a9e964deb8ed5f4af99ff5f3036a5",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/app.ts",
+      "line": "877",
+      "sha256": "57d1f6f774f28771ed1bd6c7e7d2dbbe032a9e964deb8ed5f4af99ff5f3036a5",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/app.ts",
+      "line": "899",
+      "sha256": "57d1f6f774f28771ed1bd6c7e7d2dbbe032a9e964deb8ed5f4af99ff5f3036a5",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/client-booking-body.ts",
+      "line": "39",
+      "sha256": "46940199a3b09aaaeeeb172531ef3851c3f64d3b751ae5020a26e620d84f94c0",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/client-session-body.ts",
+      "line": "49",
+      "sha256": "69737001aa08511c3aba1bac64356bf6f712c52846ce3b48846601a98d8e4665",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "apps/api/src/payer-receipt-production.test.ts",
+      "line": "301",
+      "sha256": "605fd636e3b1b299d5b0a493aed592677afcedfd3f2b626a5b52a7c955493a3b",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "apps/api/src/payer-receipt-production.test.ts",
+      "line": "358",
+      "sha256": "605fd636e3b1b299d5b0a493aed592677afcedfd3f2b626a5b52a7c955493a3b",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "199",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "334",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "366",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "393",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "394",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "421",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "423",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "463",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "536",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/admin.ts",
+      "line": "537",
+      "sha256": "1c641ac55cc18983ca3efddb7ab9f5079138084fdfcb9612953fea54fd677dfd",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/browser-account.ts",
+      "line": "276",
+      "sha256": "2899098118ffdea22d538ed9fc1f49d6d33bac4212356fb86dd14e7b338eb4e7",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/browser-account.ts",
+      "line": "401",
+      "sha256": "2899098118ffdea22d538ed9fc1f49d6d33bac4212356fb86dd14e7b338eb4e7",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/browser-account.ts",
+      "line": "527",
+      "sha256": "2899098118ffdea22d538ed9fc1f49d6d33bac4212356fb86dd14e7b338eb4e7",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/browser-account.ts",
+      "line": "532",
+      "sha256": "2899098118ffdea22d538ed9fc1f49d6d33bac4212356fb86dd14e7b338eb4e7",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/browser-account.ts",
+      "line": "580",
+      "sha256": "2899098118ffdea22d538ed9fc1f49d6d33bac4212356fb86dd14e7b338eb4e7",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/client-booking.ts",
+      "line": "250",
+      "sha256": "3f97b94c4fa2aca97222aedf127e0398e0291e813b0722052874aee783a4e1fe",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/client-booking.ts",
+      "line": "384",
+      "sha256": "3f97b94c4fa2aca97222aedf127e0398e0291e813b0722052874aee783a4e1fe",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/client-booking.ts",
+      "line": "445",
+      "sha256": "3f97b94c4fa2aca97222aedf127e0398e0291e813b0722052874aee783a4e1fe",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/client-catalog.ts",
+      "line": "91",
+      "sha256": "5aaa566d60dd972cd87513b8db74baf0afb28eaa812becc0b2642cc417ff7547",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/client-catalog.ts",
+      "line": "135",
+      "sha256": "5aaa566d60dd972cd87513b8db74baf0afb28eaa812becc0b2642cc417ff7547",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/client-privacy.ts",
+      "line": "339",
+      "sha256": "fb20b1ac85420b0e378417d6318ff9c799797f12b8807d1a93c789f275f6d225",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/client-privacy.ts",
+      "line": "377",
+      "sha256": "fb20b1ac85420b0e378417d6318ff9c799797f12b8807d1a93c789f275f6d225",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/client-sessions.ts",
+      "line": "146",
+      "sha256": "5cd417ef067041fdf787f7b56ac725e34cb1422d95264b463186fc6180b7d19c",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-ai-ingress.ts",
+      "line": "76",
+      "sha256": "cf86192a4b5bc04122960190e9bf88e52044569e3d27ab58d203661acdb97920",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-browser-session.ts",
+      "line": "98",
+      "sha256": "bf079ab8ef0bac7ff1e6aa4c1123b2bcc625afd9be3fa9070a8a96e0846c10fa",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-browser-session.ts",
+      "line": "100",
+      "sha256": "bf079ab8ef0bac7ff1e6aa4c1123b2bcc625afd9be3fa9070a8a96e0846c10fa",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "12",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "79",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "108",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "125",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "139",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "154",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "181",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "216",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-cards.ts",
+      "line": "239",
+      "sha256": "4d180c620c3886b1ef5f9b696e8760ef4d48f2e268938f2eb8f2d01c375dc7e6",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/expert-manager-telegram.ts",
+      "line": "41",
+      "sha256": "85fd251694f719007d2bdeb1f3b76b125ce4bf57ddfb96b084bdb28d272baf44",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/expert-manager-telegram.ts",
+      "line": "92",
+      "sha256": "85fd251694f719007d2bdeb1f3b76b125ce4bf57ddfb96b084bdb28d272baf44",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/expert-referral-admin.ts",
+      "line": "86",
+      "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-referral-admin.ts",
+      "line": "357",
+      "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "apps/api/src/routes/expert-referral-admin.ts",
+      "line": "400",
+      "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
+      "category": "domain-command-execute",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-referral-admin.ts",
+      "line": "416",
+      "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-referral-admin.ts",
+      "line": "417",
+      "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-referral-admin.ts",
+      "line": "450",
+      "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-referral.ts",
+      "line": "297",
+      "sha256": "86e34a3b9812875885198ef668818c57a31bfd84dd95f1842f2d8151e2bd69bf",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-referral.ts",
+      "line": "298",
+      "sha256": "86e34a3b9812875885198ef668818c57a31bfd84dd95f1842f2d8151e2bd69bf",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-referral.ts",
+      "line": "300",
+      "sha256": "86e34a3b9812875885198ef668818c57a31bfd84dd95f1842f2d8151e2bd69bf",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-referral.ts",
+      "line": "307",
+      "sha256": "86e34a3b9812875885198ef668818c57a31bfd84dd95f1842f2d8151e2bd69bf",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-sessions.ts",
+      "line": "103",
+      "sha256": "c1e3f92b48a404702a10584c5a0192e929033aa8130bdd114e969a6e1f467ddb",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "9",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "85",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "101",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "125",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "146",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "169",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "198",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "256",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "291",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "318",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "346",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "361",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "388",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/expert-verification.ts",
+      "line": "422",
+      "sha256": "e0b6874642cff02677bc0c01a2976d1a50089b30ce1d2543866eb1913b9ae990",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/operator-cases.ts",
+      "line": "85",
+      "sha256": "2655c20bfb18c782b26a95ba8feb50b30dda28ae1eb2d1414ec02c0cb3f6c972",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/operator-cases.ts",
+      "line": "122",
+      "sha256": "2655c20bfb18c782b26a95ba8feb50b30dda28ae1eb2d1414ec02c0cb3f6c972",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/owner-pricing-approved.ts",
+      "line": "63",
+      "sha256": "64f6c33523c0b46eb56f1b56f66f068dbc410e9680c8fd5cd2f60e898974f638",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/owner-pricing-approved.ts",
+      "line": "91",
+      "sha256": "64f6c33523c0b46eb56f1b56f66f068dbc410e9680c8fd5cd2f60e898974f638",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/owner-pricing-approved.ts",
+      "line": "157",
+      "sha256": "64f6c33523c0b46eb56f1b56f66f068dbc410e9680c8fd5cd2f60e898974f638",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/api/src/routes/resident-lifecycle.ts",
+      "line": "10",
+      "sha256": "e984f6fffcb50cabce4c14fb423fbae49acbcbfbe8ff6500fdbf0cb7b8dff38a",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/telegram-webhook.ts",
+      "line": "259",
+      "sha256": "126f697a47959c5e9c9767b38e80b64f13060307a6df79e84957827d74e5ced3",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/telegram-webhook.ts",
+      "line": "408",
+      "sha256": "126f697a47959c5e9c9767b38e80b64f13060307a6df79e84957827d74e5ced3",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/telegram-webhook.ts",
+      "line": "423",
+      "sha256": "126f697a47959c5e9c9767b38e80b64f13060307a6df79e84957827d74e5ced3",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "apps/sandbox-api/src/routes.ts",
+      "line": "98",
+      "sha256": "941d1b29bd0c6a96f51681aed71515a622c40a0dd8fda807fe7419e2d513e523",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/sandbox-api/src/routes.ts",
+      "line": "176",
+      "sha256": "941d1b29bd0c6a96f51681aed71515a622c40a0dd8fda807fe7419e2d513e523",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/sandbox-api/src/routes.ts",
+      "line": "218",
+      "sha256": "941d1b29bd0c6a96f51681aed71515a622c40a0dd8fda807fe7419e2d513e523",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "apps/sandbox-api/src/routes.ts",
+      "line": "269",
+      "sha256": "941d1b29bd0c6a96f51681aed71515a622c40a0dd8fda807fe7419e2d513e523",
+      "category": "domain-command-execute",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/sandbox-api/src/routes.ts",
+      "line": "285",
+      "sha256": "941d1b29bd0c6a96f51681aed71515a622c40a0dd8fda807fe7419e2d513e523",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/consent-evidence-repository.ts",
+      "line": "130",
+      "sha256": "d765ffe83afdfe3adc05130597d65df0ae929a711c55c0c42b3f9955a74a57d1",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/expert-held-onboarding-repository.ts",
+      "line": "217",
+      "sha256": "adb05580f48aa4232b19ba9d8de7d0b36bd5d3ef06e784e3d584be10bb11d260",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/expert-held-onboarding-repository.ts",
+      "line": "220",
+      "sha256": "adb05580f48aa4232b19ba9d8de7d0b36bd5d3ef06e784e3d584be10bb11d260",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "packages/integrations/src/documents/private-verification.ts",
+      "line": "562",
+      "sha256": "fa411e0e795a58b909aba0d59929f48ef5b9cf9a9e179938afe8beb5fe908137",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "packages/integrations/src/documents/private-verification.ts",
+      "line": "564",
+      "sha256": "fa411e0e795a58b909aba0d59929f48ef5b9cf9a9e179938afe8beb5fe908137",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
+      "path": "packages/integrations/src/yookassa/early-bird-deferred-checkout-sender.ts",
+      "line": "131",
+      "sha256": "7bb9ae6fe5be847466f6cf57d36ba4b602df88cda675451dadc94cae60273916",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "scripts/assert-ci-db-results.mjs",
+      "line": "82",
+      "sha256": "8601073b27526749c862183739357c5c2b178c07e84bca7ba9ff424be99fe893",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "scripts/assert-ci-db-results.mjs",
+      "line": "88",
+      "sha256": "8601073b27526749c862183739357c5c2b178c07e84bca7ba9ff424be99fe893",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "scripts/preflight-expert-referral-migration.mjs",
+      "line": "32",
+      "sha256": "2a8eb2ca11e1bd145186c6ea96cd91bddf48c06f46fd7e183226411f555cabe1",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.ssrf",
+      "path": "scripts/smoke.mjs",
+      "line": "24",
+      "sha256": "9ffc2b71eb2ec9e6ea5ce14ce5a5e672188a4c1079680c8fc8efb029513dcb33",
+      "category": "operator-health-fetch",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.ssrf",
+      "path": "scripts/smoke.mjs",
+      "line": "27",
+      "sha256": "9ffc2b71eb2ec9e6ea5ce14ce5a5e672188a4c1079680c8fc8efb029513dcb33",
+      "category": "operator-health-fetch",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    }
+  ]
+}

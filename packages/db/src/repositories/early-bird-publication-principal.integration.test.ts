@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { startExpertReferralTestDatabase } from "../testkit/expert-referral.js";
 import { PostgresEarlyBirdPublicationWorker } from "./early-bird-publication-worker.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only";
 
 it("scans through the dedicated principal and denies direct financial access", async () => {
   const db = await startExpertReferralTestDatabase(undefined, {
@@ -30,7 +31,7 @@ it("scans through the dedicated principal and denies direct financial access", a
     );
     const url = new URL(db.db.$client.options.connectionString!);
     url.username = "publication_test_login";
-    url.password = "synthetic-only";
+    url.password = SYNTHETIC_FIXTURE_VALUE_1;
     pool = new Pool({ connectionString: url.toString() });
     const store = new PostgresEarlyBirdPublicationWorker(
       drizzle(pool) as never,

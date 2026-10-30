@@ -1,0 +1,29 @@
+[Unit]
+Description=Prepare ii-Tonya Early Bird database roles and gateway state
+After=postgresql.service
+Before=ii-tonya-yookassa-gateway.service
+
+[Service]
+Type=oneshot
+TimeoutStartSec=90s
+User=root
+Group=root
+ExecStart=/usr/bin/node --jitless /usr/local/lib/ii-tonya/prepare-native.mjs
+UnsetEnvironment=NODE_OPTIONS NODE_PATH LD_PRELOAD LD_LIBRARY_PATH PYTHONPATH PYTHONHOME PGPASSWORD PGHOST PGPORT PGUSER PGDATABASE PGSERVICE PGSERVICEFILE PGPASSFILE
+UMask=0077
+NoNewPrivileges=yes
+AmbientCapabilities=CAP_SETUID CAP_SETGID
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+ReadWritePaths=-/var/lib/ii-tonya-yookassa
+StateDirectory=ii-tonya-yookassa-code
+StateDirectoryMode=0755

@@ -15,6 +15,7 @@ import {
   buildEarlyBirdMigrationCandidate,
   assertCandidateSourcesUnchanged,
 } from "../../../../scripts/build-early-bird-migration-candidate.mjs";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only";
 
 let fixture: TestDatabase;
 let limited: Pool;
@@ -72,7 +73,7 @@ it("replays the complete real chain plus hash-observed 0081 and keeps the limite
   );
   const address = new URL(fixture.db.$client.options.connectionString!);
   address.username = "aggregate_legacy_login";
-  address.password = "synthetic-only";
+  address.password = SYNTHETIC_FIXTURE_VALUE_1;
   limited = new Pool({ connectionString: address.toString(), max: 1 });
   await expect(
     limited.query("select early_bird_touch_coverage_epoch($1::uuid)", [user]),

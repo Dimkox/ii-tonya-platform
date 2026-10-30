@@ -13,6 +13,7 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-reader-password";
 
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
@@ -162,7 +163,7 @@ it("uses a separate least-privilege LOGIN to read a candidate intent", async () 
   );
   const connection = new URL(db.db.$client.options.connectionString!);
   connection.username = "wave_reader_test_login";
-  connection.password = "synthetic-reader-password";
+  connection.password = SYNTHETIC_FIXTURE_VALUE_1;
   const pool = new Pool({ connectionString: connection.toString() });
   try {
     await expect(

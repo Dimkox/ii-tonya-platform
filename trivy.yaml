@@ -1,0 +1,7 @@
+# Generated, third-party dependencies and local build/runtime outputs are not
+# maintained as project source; lockfile auditing remains separately enabled.
+scan:
+  skip-dirs:
+    - "**/node_modules"
+    - ".getzilla/runtime"
+    - ".native-release"

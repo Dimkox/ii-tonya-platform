@@ -81,6 +81,10 @@ jobs:
             python -m pip install --disable-pip-version-check -r .getzilla/config/python-test-requirements.txt
           fi
           python -m pip install --disable-pip-version-check -r .getzilla/config/python-quality-requirements.txt
+      - name: Run bridge and provisioning Node tests
+        run: node --test scripts/early-bird-bridge/*.test.mjs deploy/gateway-provision/*.test.mjs
+      - name: Verify isolated systemd provisioning sandbox
+        run: sudo -n bash deploy/gateway-provision/test_prepare_systemd_sandbox.sh
       - name: Install OpenGrep for taint analysis
         shell: bash
         env:
@@ -92,6 +96,18 @@ jobs:
           echo "${OPENGREP_SHA256}  $RUNNER_TEMP/opengrep/opengrep" | sha256sum -c -
           chmod 0755 "$RUNNER_TEMP/opengrep/opengrep"
           echo "$RUNNER_TEMP/opengrep" >> "$GITHUB_PATH"
+      - name: Install pinned Trivy
+        shell: bash
+        env:
+          TRIVY_VERSION: "0.76.1"
+          TRIVY_SHA256: "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0"
+        run: |
+          mkdir -p "$RUNNER_TEMP/trivy"
+          curl -fsSL -o "$RUNNER_TEMP/trivy/trivy.tar.gz" "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  $RUNNER_TEMP/trivy/trivy.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/trivy/trivy.tar.gz" -C "$RUNNER_TEMP/trivy" trivy
+          test "$("$RUNNER_TEMP/trivy/trivy" --version | head -n 1)" = "Version: ${TRIVY_VERSION}"
+          echo "$RUNNER_TEMP/trivy" >> "$GITHUB_PATH"
       - name: Record startup capacity
         run: python scripts/getzilla_startup_cpu.py --no-probe
       - name: Getzilla verification

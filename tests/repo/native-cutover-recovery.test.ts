@@ -145,13 +145,24 @@ function drill(fault = "", action = "deploy", first = false) {
     payload,
     ".",
   ]);
-  const digest = createHash("sha256")
-    .update(readFileSync(join(incoming, "native-release.tar.gz")))
-    .digest("hex");
-  put(
-    "incoming/unique-upload/native-release.sha256",
-    `${digest}  native-release.tar.gz\n`,
+  writeFileSync(
+    join(incoming, "native-release.provenance.json"),
+    readFileSync(join(payload, "provenance.json")),
   );
+  put("incoming/unique-upload/native-release.spdx.json", "{}\n");
+  const checksums = [
+    "native-release.tar.gz",
+    "native-release.spdx.json",
+    "native-release.provenance.json",
+  ]
+    .map((name) => {
+      const digest = createHash("sha256")
+        .update(readFileSync(join(incoming, name)))
+        .digest("hex");
+      return `${digest}  ${name}\n`;
+    })
+    .join("");
+  put("incoming/unique-upload/native-release.sha256", checksums);
   const checksumDigest = createHash("sha256")
     .update(readFileSync(join(incoming, "native-release.sha256")))
     .digest("hex");

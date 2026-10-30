@@ -12,6 +12,7 @@ import {
 } from "../testkit/expert-referral.js";
 import { PostgresExpertResidencyRepository } from "./expert-residency-repository.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "./expert-residency-provider-inbox-repository.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only";
 
 let fixture: ExpertReferralTestDatabase;
 let limited: Pool;
@@ -34,7 +35,7 @@ beforeAll(async () => {
   );
   const address = new URL(fixture.db.$client.options.connectionString!);
   address.username = role;
-  address.password = "synthetic-only";
+  address.password = SYNTHETIC_FIXTURE_VALUE_1;
   limited = new Pool({ connectionString: address.toString(), max: 1 });
 }, 120_000);
 afterAll(async () => {

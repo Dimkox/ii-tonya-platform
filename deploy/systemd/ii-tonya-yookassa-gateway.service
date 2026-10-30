@@ -9,10 +9,11 @@ NotifyAccess=main
 TimeoutStartSec=30s
 User=ii_tonya_gateway
 Group=ii_tonya_gateway
-WorkingDirectory=/opt/ii-tonya-platform/current/gateway
-ExecStart=/usr/bin/python3 -B /opt/ii-tonya-platform/current/gateway/launcher.py --config /etc/ii-tonya-yookassa/config.json
+WorkingDirectory=/var/lib/ii-tonya-yookassa-code
+ExecStartPre=+/usr/bin/node --jitless /usr/local/lib/ii-tonya/prepare-native.mjs --select-code-only
+ExecStart=/usr/bin/python3 -B /var/lib/ii-tonya-yookassa-code/current/gateway/launcher.py --config /etc/ii-tonya-yookassa/config.json
 Environment=PYTHONNOUSERSITE=1
-UnsetEnvironment=PYTHONPATH PYTHONHOME
+UnsetEnvironment=PYTHONPATH PYTHONHOME NODE_OPTIONS NODE_PATH LD_PRELOAD LD_LIBRARY_PATH
 Restart=no
 TimeoutStopSec=15s
 NoNewPrivileges=yes

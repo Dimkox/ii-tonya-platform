@@ -20,6 +20,9 @@ import { PostgresHeldOnboardingCheckout } from "../../packages/db/src/repositori
 import { PostgresPayerReceiptContactRepository } from "../../packages/db/src/repositories/payer-receipt-contact-repository.js";
 import { PostgresExpertSalesScheduler } from "../../packages/db/src/repositories/expert-sales-scheduler.js";
 import { startHeldOnboardingLocal } from "../support/held-onboarding-local.js";
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic_sales_secret_1234567890";
+const SYNTHETIC_FIXTURE_VALUE_2 = "synthetic_recovery_manager_token_12345";
+
 let db: ExpertReferralTestDatabase;
 let tariff: string;
 let session: string;
@@ -288,7 +291,7 @@ it("expired waiting payment is GET-verified and canceled, never captured", async
       EXPERT_ONBOARDING_HELD_ENABLED: "true",
       EXPERT_PROMO_TELEGRAM_BOT_ID: policy.botId,
       EXPERT_PROMO_TELEGRAM_BOT_KEY: policy.botKey,
-      EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: "synthetic_sales_secret_1234567890",
+      EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: SYNTHETIC_FIXTURE_VALUE_1,
       EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION:
         policy.messagingConsentPolicyVersion,
       EXPERT_VERIFICATION_ENABLED: "true",
@@ -1191,7 +1194,7 @@ it("review R6 operational recovery requires fresh manager and records the real G
     await expect(
       f.checkout.createCheckout({ invoiceId: f.invoice.id }),
     ).rejects.toThrow();
-    const token = "synthetic_recovery_manager_token_12345",
+    const token = SYNTHETIC_FIXTURE_VALUE_2,
       sessionHash = `sha256:${hash(token)}`;
     await db.db.execute(
       sql`insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) select ${sessionHash},admin_id,clock_timestamp(),clock_timestamp()+interval '1 hour' from admin_sessions where session_id_hash=${session}`,
@@ -1291,7 +1294,7 @@ it.each(["foreign_bot", "foreign_chat", "matching"] as const)(
       EXPERT_SEPARATED_SALES_ENABLED: "true",
       EXPERT_PROMO_TELEGRAM_BOT_ID: policy.botId,
       EXPERT_PROMO_TELEGRAM_BOT_KEY: policy.botKey,
-      EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: "synthetic_sales_secret_1234567890",
+      EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: SYNTHETIC_FIXTURE_VALUE_1,
       EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION:
         policy.messagingConsentPolicyVersion,
     });
@@ -1375,8 +1378,7 @@ it.each(["waiting", "canceled"] as const)(
         EXPERT_ONBOARDING_HELD_ENABLED: "true",
         EXPERT_PROMO_TELEGRAM_BOT_ID: policy.botId,
         EXPERT_PROMO_TELEGRAM_BOT_KEY: policy.botKey,
-        EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET:
-          "synthetic_sales_secret_1234567890",
+        EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: SYNTHETIC_FIXTURE_VALUE_1,
         EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION:
           policy.messagingConsentPolicyVersion,
         EXPERT_VERIFICATION_ENABLED: "true",
