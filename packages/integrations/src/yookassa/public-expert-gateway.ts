@@ -24,6 +24,7 @@ export class PublicExpertGatewayTransport {
       cursors: Set<string>;
       cursor: string | undefined;
       pages: number;
+      completedAt: number | null;
     }
   >();
   private readonly scanning = new Map<
@@ -31,7 +32,20 @@ export class PublicExpertGatewayTransport {
     Promise<PublicExpertCompleteList<YooKassaPayment | YooKassaRefund>>
   >();
   hasIncompleteScan(key: string) {
+    // Includes complete discovery waiting for its mandatory fresh verification.
     return this.scans.has(key);
+  }
+  hasPendingVerification(key: string) {
+    const completedAt = this.scans.get(key)?.completedAt;
+    return (
+      completedAt !== undefined &&
+      completedAt !== null &&
+      Date.now() >= completedAt &&
+      Date.now() - completedAt < 120000
+    );
+  }
+  forgetScan(key: string) {
+    this.scans.delete(key);
   }
   constructor(
     private readonly ipc: Pick<
@@ -104,7 +118,8 @@ export class PublicExpertGatewayTransport {
       ]);
     const previous = key ? this.scans.get(key) : undefined;
     const scan =
-      previous?.signature === signature
+      previous?.signature === signature &&
+      (previous.completedAt === null || this.hasPendingVerification(key!))
         ? previous
         : {
             signature,
@@ -113,6 +128,7 @@ export class PublicExpertGatewayTransport {
             cursors: new Set<string>(),
             cursor: undefined as string | undefined,
             pages: 0,
+            completedAt: null,
           };
     const forget = () => {
       if (key) this.scans.delete(key);
@@ -122,6 +138,11 @@ export class PublicExpertGatewayTransport {
         this.scans.delete(this.scans.keys().next().value!);
       this.scans.set(key, scan);
     }
+    // A completed traversal is still discovery-only. Retain it for at most two
+    // minutes so the next bounded turn can GET afresh; never expose cached GET
+    // facts or let callers mutate retained discovery through returned items.
+    if (scan.completedAt !== null)
+      return { complete: true, items: structuredClone(scan.items) };
     try {
       while (scan.pages < maxPages && !input.signal?.aborted) {
         const page = await this.ipc.listPublicPage(
@@ -150,8 +171,8 @@ export class PublicExpertGatewayTransport {
         }
         scan.pages++;
         if (page.nextCursor === undefined) {
-          forget();
-          return { complete: true, items: scan.items };
+          scan.completedAt = Date.now();
+          return { complete: true, items: structuredClone(scan.items) };
         }
         if (page.items.length === 0 || scan.cursors.has(page.nextCursor)) {
           forget();

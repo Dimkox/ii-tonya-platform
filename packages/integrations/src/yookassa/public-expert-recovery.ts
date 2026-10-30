@@ -35,7 +35,8 @@ export interface PublicExpertObservationWriter {
 export type PublicExpertRecoveryTransport = Pick<
   PublicExpertGatewayTransport,
   "getPayment" | "getRefund" | "listPayments" | "listRefunds"
->;
+> &
+  Partial<Pick<PublicExpertGatewayTransport, "forgetScan">>;
 export type PublicExpertRecoveryResult =
   | { readonly kind: "pending" | "unavailable" }
   | {
@@ -111,7 +112,17 @@ export class PublicExpertRecovery {
     const signal = options.signal;
     if (signal?.aborted) return { kind: "pending" };
     const s = await this.deps.binder.candidate(requestId);
-    if (!s || signal?.aborted) return { kind: "unavailable" };
+    const refuse = () => {
+      this.deps.transport.forgetScan?.(requestId);
+      return { kind: "pending" as const };
+    };
+    if (!s) {
+      this.deps.transport.forgetScan?.(requestId);
+      return { kind: "unavailable" };
+    }
+    if (signal?.aborted) return { kind: "pending" };
+    if (s.providerObjectId !== null)
+      this.deps.transport.forgetScan?.(requestId);
     try {
       let id = s.providerObjectId;
       if (id === null) {
@@ -131,24 +142,34 @@ export class PublicExpertRecovery {
             : await this.deps.transport.listPayments(window);
         if (!list.complete || signal?.aborted) return { kind: "pending" };
         const exact = list.items.filter((p) => matches(s, p));
-        if (exact.length !== 1) return { kind: "pending" };
+        if (exact.length !== 1) return refuse();
         id = exact[0]!.id;
       }
-      const item =
-        s.product === "refund"
-          ? await this.deps.transport.getRefund(id, signal)
-          : await this.deps.transport.getPayment(id, signal);
-      if (signal?.aborted || item.id !== id || !matches(s, item))
-        return { kind: "pending" };
+      let item: YooKassaPayment | YooKassaRefund;
       let parent: YooKassaPayment | null = null;
+      if (s.product === "refund") {
+        // Both identities come from the immutable source snapshot. Do not make
+        // a second slow read spend only the first read's remaining turn budget,
+        // and do not return while a failed read's sibling is still running.
+        const [refundResult, parentResult] = await Promise.allSettled([
+          this.deps.transport.getRefund(id, signal),
+          this.deps.transport.getPayment(s.parentPaymentId!, signal),
+        ]);
+        if (signal?.aborted) return { kind: "pending" };
+        if (
+          refundResult.status !== "fulfilled" ||
+          parentResult.status !== "fulfilled"
+        )
+          return refuse();
+        item = refundResult.value;
+        parent = parentResult.value;
+      } else item = await this.deps.transport.getPayment(id, signal);
+      if (signal?.aborted) return { kind: "pending" };
+      if (item.id !== id || !matches(s, item)) return refuse();
       const observedAt = this.deps.now?.() ?? new Date().toISOString();
       if (s.product === "refund") {
-        parent = await this.deps.transport.getPayment(
-          s.parentPaymentId!,
-          signal,
-        );
         if (
-          signal?.aborted ||
+          !parent ||
           parent.id !== s.parentPaymentId ||
           parent.status !== "succeeded" ||
           !parent.paid ||
@@ -163,7 +184,7 @@ export class PublicExpertRecovery {
           Date.parse(parent.capturedAt) < Date.parse(parent.createdAt) ||
           Date.parse(parent.capturedAt) > Date.parse(observedAt)
         )
-          return { kind: "pending" };
+          return refuse();
       }
       const payment = "test" in item ? item : null;
       const parsed = publicExpertVerifiedObservationSchema.parse({
@@ -221,9 +242,12 @@ export class PublicExpertRecovery {
       if (signal?.aborted) return { kind: "pending" };
       if (s.providerObjectId === null) {
         const result = await this.deps.binder.bind(requestId, fact);
-        if (!result) return { kind: "pending" };
+        if (!result) return refuse();
         bound = result;
       }
+      // Once binding is durable, retries use the bound ID and fresh GET. A lost
+      // observation write never requires keeping LIST data or replaying POST.
+      this.deps.transport.forgetScan?.(requestId);
       if (signal?.aborted) return { kind: "pending" };
       const observationId = await this.deps.observations.observe(fact);
       if (!observationId) return { kind: "pending" };
@@ -237,6 +261,7 @@ export class PublicExpertRecovery {
       };
     } catch {
       // An unavailable GET/binder/writer preserves uncertainty; no catch branch sends POST.
+      if (!signal?.aborted) this.deps.transport.forgetScan?.(requestId);
       return { kind: "pending" };
     }
   }

@@ -286,8 +286,14 @@ export function createPublicExpertPaymentRuntime(
         }
         // Resume an interrupted multi-page scan before admitting another batch;
         // an immutable creation window and complete traversal remain mandatory.
-        if (!observed && pendingTransport.hasIncompleteScan(item.id))
-          pending.push({ id: item.id, discovered: false });
+        if (!observed && pendingTransport.hasIncompleteScan(item.id)) {
+          const retry = { id: item.id, discovered: false };
+          // A completed discovery gets its fresh GET on the next turn before
+          // its bounded discovery lifetime expires; partial traversals rotate.
+          if (pendingTransport.hasPendingVerification(item.id))
+            pending.unshift(retry);
+          else pending.push(retry);
+        }
       }
     };
     const refundLane = async (signal: AbortSignal) => {
