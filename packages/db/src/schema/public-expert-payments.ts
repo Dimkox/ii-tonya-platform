@@ -59,6 +59,8 @@ export const publicExpertPaymentRequests = pgTable(
     applyAction: text("apply_action"),
     applyXid: xid8("apply_xid"),
     applyLogin: pgName("apply_login"),
+    applyExpectedStart: instant("apply_expected_start"),
+    applyExpectedEnd: instant("apply_expected_end"),
   },
   (t) => [unique().on(t.legacyOperationId, t.kind)],
 );

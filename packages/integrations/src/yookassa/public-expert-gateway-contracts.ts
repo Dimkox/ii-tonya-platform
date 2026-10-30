@@ -245,6 +245,10 @@ export const publicExpertApplyActionSchema = z
       .strictObject({
         snapshot: immutableSnapshot.superRefine(checkSnapshot),
         observation: publicExpertVerifiedObservationSchema,
+        // Filled only by the trusted same-transaction apply guard; immutable after commit.
+        expectedPeriod: z
+          .strictObject({ startsAt: instant, endsAt: instant })
+          .nullable(),
         legacyEventId: z
           .string()
           .regex(/^public:[0-9a-f-]{36}:[0-9a-f-]{36}$/u),
@@ -264,6 +268,13 @@ export const publicExpertApplyActionSchema = z
         code: "custom",
         message: "public_apply_evidence_required",
       });
+    if (
+      v.evidence?.expectedPeriod &&
+      (v.action !== "main_settle" ||
+        Date.parse(v.evidence.expectedPeriod.startsAt) >=
+          Date.parse(v.evidence.expectedPeriod.endsAt))
+    )
+      ctx.addIssue({ code: "custom", message: "public_apply_period_mismatch" });
     if (
       v.evidence &&
       (v.evidence.snapshot.requestId !== v.requestId ||

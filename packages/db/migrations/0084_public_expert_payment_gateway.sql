@@ -18,6 +18,8 @@ CREATE TABLE public_expert_payment_requests (
  created_at timestamptz NOT NULL DEFAULT early_bird_current_time(),
  -- Mutable transaction context, separate from immutable evidence. Only apply_guard sets it.
  apply_attempt_id uuid, apply_observation_id uuid, apply_action text, apply_xid xid8, apply_login name,
+ apply_expected_start timestamptz, apply_expected_end timestamptz,
+ CHECK((apply_expected_start IS NULL AND apply_expected_end IS NULL) OR (apply_expected_start IS NOT NULL AND apply_expected_end IS NOT NULL AND isfinite(apply_expected_start) AND isfinite(apply_expected_end) AND apply_expected_end>apply_expected_start AND apply_action='main_settle')),
  UNIQUE(legacy_operation_id,kind),
  CHECK((product='onboarding' AND kind LIKE 'onboarding_%' AND invoice_id=legacy_source_id AND order_id IS NULL AND amount_minor=300000)
    OR(product='main' AND kind='main_create' AND order_id=legacy_source_id AND invoice_id IS NULL)
@@ -230,8 +232,10 @@ END $$;
 CREATE FUNCTION early_bird_private.public_request_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 BEGIN
  IF TG_OP='DELETE' THEN RAISE EXCEPTION 'public_request_immutable'; END IF;
- IF (to_jsonb(NEW)-ARRAY['state','admitted_at','dispatched_at','provider_object_id','encrypted_body','key_reference','apply_attempt_id','apply_observation_id','apply_action','apply_xid','apply_login']) IS DISTINCT FROM
-    (to_jsonb(OLD)-ARRAY['state','admitted_at','dispatched_at','provider_object_id','encrypted_body','key_reference','apply_attempt_id','apply_observation_id','apply_action','apply_xid','apply_login'])
+ IF (to_jsonb(NEW)-ARRAY['state','admitted_at','dispatched_at','provider_object_id','encrypted_body','key_reference','apply_attempt_id','apply_observation_id','apply_action','apply_xid','apply_login','apply_expected_start','apply_expected_end']) IS DISTINCT FROM
+    (to_jsonb(OLD)-ARRAY['state','admitted_at','dispatched_at','provider_object_id','encrypted_body','key_reference','apply_attempt_id','apply_observation_id','apply_action','apply_xid','apply_login','apply_expected_start','apply_expected_end'])
+  OR (OLD.apply_expected_start IS NOT NULL AND ROW(NEW.apply_expected_start,NEW.apply_expected_end) IS DISTINCT FROM ROW(OLD.apply_expected_start,OLD.apply_expected_end))
+  OR (OLD.apply_expected_start IS NULL AND NEW.apply_expected_start IS NOT NULL AND (NEW.apply_xid IS DISTINCT FROM pg_current_xact_id() OR NEW.apply_login IS DISTINCT FROM session_user OR NEW.apply_action IS DISTINCT FROM 'main_settle'))
   OR (OLD.provider_object_id IS NOT NULL AND NEW.provider_object_id IS DISTINCT FROM OLD.provider_object_id)
   OR (OLD.admitted_at IS NOT NULL AND NEW.admitted_at IS DISTINCT FROM OLD.admitted_at)
   OR (OLD.dispatched_at IS NOT NULL AND NEW.dispatched_at IS DISTINCT FROM OLD.dispatched_at)
@@ -360,7 +364,7 @@ END $$;
 --> statement-breakpoint
 CREATE FUNCTION early_bird_private.public_apply_result(r public.public_expert_payment_requests,o public.public_expert_payment_observations,result_kind text,action_name text,attempt uuid) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
  SELECT jsonb_build_object('version',1,'kind',result_kind,'requestId',r.id,'observationId',o.id,'legacySourceId',r.legacy_source_id,'legacyOperationId',r.legacy_operation_id,'providerObjectId',r.provider_object_id,'action',action_name,'applyAttemptId',attempt,
- 'evidence',CASE WHEN action_name IS NULL THEN NULL ELSE jsonb_build_object('snapshot',r.snapshot,'observation',o.fact,'legacyEventId','public:'||r.id::text||':'||o.id::text) END)
+ 'evidence',CASE WHEN action_name IS NULL THEN NULL ELSE jsonb_build_object('snapshot',r.snapshot,'observation',o.fact,'legacyEventId','public:'||r.id::text||':'||o.id::text,'expectedPeriod',CASE WHEN r.apply_expected_start IS NULL THEN NULL ELSE jsonb_build_object('startsAt',early_bird_private.public_time(r.apply_expected_start),'endsAt',early_bird_private.public_time(r.apply_expected_end)) END) END)
 $$;
 CREATE FUNCTION early_bird_private.public_resolution(target_request uuid,target_observation uuid,expiry boolean) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 DECLARE r public.public_expert_payment_requests%ROWTYPE; o public.public_expert_payment_observations%ROWTYPE; prior public.public_expert_payment_resolutions%ROWTYPE;
@@ -415,14 +419,78 @@ CREATE FUNCTION early_bird_private.public_payment_expire(target_request uuid,tar
  SELECT early_bird_private.public_resolution(target_request,target_observation,true)
 $$;
 CREATE FUNCTION early_bird_private.public_payment_apply_guard(target_request uuid,target_observation uuid,target_attempt uuid) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
-DECLARE result jsonb;
+DECLARE result jsonb; r public.public_expert_payment_requests%ROWTYPE; o public.public_expert_payment_observations%ROWTYPE;
+ expected_start timestamptz; expected_end timestamptz; ord public.expert_residency_orders%ROWTYPE;
 BEGIN
+ SELECT * INTO r FROM public.public_expert_payment_requests WHERE id=target_request;
+ IF NOT FOUND THEN RETURN NULL; END IF;
+ -- Same subject/coverage lock order as the canonical financial engine, before row locks.
+ PERFORM pg_advisory_xact_lock(hashtextextended(r.user_id::text,0));
+ IF r.product='main' THEN PERFORM public.early_bird_touch_coverage_epoch(r.user_id); END IF;
  result:=early_bird_private.public_resolution(target_request,target_observation,false);
  IF result->>'kind' IS DISTINCT FROM 'ready_to_apply' OR result->>'applyAttemptId' IS DISTINCT FROM target_attempt::text THEN RETURN NULL; END IF;
- UPDATE public.public_expert_payment_requests SET apply_attempt_id=target_attempt,apply_observation_id=target_observation,apply_action=result->>'action',apply_xid=pg_current_xact_id(),apply_login=session_user WHERE id=target_request;
- RETURN result;
+ SELECT * INTO r FROM public.public_expert_payment_requests WHERE id=target_request;
+ SELECT * INTO o FROM public.public_expert_payment_observations WHERE id=target_observation;
+ IF result->>'action'='main_settle' THEN
+  SELECT * INTO ord FROM public.expert_residency_orders WHERE id=r.order_id FOR UPDATE;
+  expected_start:=greatest(o.provider_captured_at,
+   (SELECT max(residency_ends_at) FROM public.expert_residency_orders WHERE expert_id=ord.expert_id AND status='settled' AND id<>ord.id),
+   public.early_bird_active_coverage_end(r.user_id),
+   (SELECT max(ends_at) FROM public.early_bird_deferred_effective_coverages WHERE user_id=r.user_id));
+  expected_end:=expected_start+make_interval(secs=>ord.duration_seconds);
+  IF r.apply_expected_start IS NOT NULL THEN
+   -- A committed context is immutable, including a crash between posting and completion.
+   IF ord.status<>'settled' AND ROW(expected_start,expected_end) IS DISTINCT FROM ROW(r.apply_expected_start,r.apply_expected_end) THEN
+    INSERT INTO public.public_expert_payment_resolutions(request_id,kind,observation_id,apply_attempt_id,action,provider_object_id,captured_at,payment_deadline,disposition,reason)
+    VALUES(r.id,'manual_reconciliation',o.id,target_attempt,'main_settle',r.provider_object_id,o.provider_captured_at,r.payment_deadline,'paid_manual_reconciliation','committed_period_conflict') ON CONFLICT DO NOTHING;
+    RETURN early_bird_private.public_apply_result(r,o,'manual_reconciliation','main_settle',target_attempt);
+   END IF;
+   expected_start:=r.apply_expected_start; expected_end:=r.apply_expected_end;
+  END IF;
+ END IF;
+ UPDATE public.public_expert_payment_requests SET apply_attempt_id=target_attempt,apply_observation_id=target_observation,apply_action=result->>'action',apply_xid=pg_current_xact_id(),apply_login=session_user,
+  apply_expected_start=expected_start,apply_expected_end=expected_end WHERE id=target_request RETURNING * INTO r;
+ RETURN early_bird_private.public_apply_result(r,o,'ready_to_apply',result->>'action',target_attempt);
 END $$;
 --> statement-breakpoint
+-- Called only while the canonical financial transition owns the source row.
+-- Subject serialization is shared with prepare/admit/claim; lock requests only afterwards.
+CREATE FUNCTION early_bird_private.public_never_sent(target_source uuid,target_user uuid) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+DECLARE proof_row public.public_expert_payment_requests%ROWTYPE;
+BEGIN
+ -- Legacy releaseExpiredOrders can arrive holding only an order lock. Never wait
+ -- for a subject owner that may itself be waiting for that order; refuse and retry.
+ IF NOT pg_try_advisory_xact_lock(hashtextextended(target_user::text,0)) THEN RETURN false; END IF;
+ PERFORM 1 FROM public.public_expert_payment_requests WHERE legacy_source_id=target_source ORDER BY id FOR UPDATE;
+ IF NOT FOUND THEN RETURN false; END IF;
+ IF EXISTS(SELECT 1 FROM public.public_expert_payment_requests WHERE legacy_source_id=target_source AND
+  (user_id<>target_user OR kind NOT IN('main_create','onboarding_create') OR state NOT IN('prepared','abandoned') OR admitted_at IS NOT NULL OR dispatched_at IS NOT NULL OR provider_object_id IS NOT NULL OR parent_payment_id IS NOT NULL OR apply_attempt_id IS NOT NULL))
+ OR EXISTS(SELECT 1 FROM public.public_expert_payment_observations o JOIN public.public_expert_payment_requests r ON r.id=o.request_id WHERE r.legacy_source_id=target_source)
+ OR EXISTS(SELECT 1 FROM public.early_bird_gateway_claims g JOIN public.public_expert_payment_requests r ON g.intent_id=r.id OR g.idempotency_key=r.idempotency_key WHERE r.legacy_source_id=target_source) THEN RETURN false; END IF;
+ FOR proof_row IN SELECT * FROM public.public_expert_payment_requests WHERE legacy_source_id=target_source LOOP
+  IF NOT early_bird_private.public_source_valid(proof_row,false) THEN RETURN false; END IF;
+ END LOOP;
+ SELECT * INTO proof_row FROM public.public_expert_payment_requests WHERE legacy_source_id=target_source LIMIT 1;
+ IF proof_row.product='main' THEN
+  PERFORM 1 FROM public.expert_residency_provider_operations WHERE order_id=target_source ORDER BY id FOR UPDATE;
+  PERFORM 1 FROM public.expert_residency_payment_attempts WHERE order_id=target_source ORDER BY id FOR UPDATE;
+  IF EXISTS(SELECT 1 FROM public.expert_residency_orders WHERE id=target_source AND provider_payment_id IS NOT NULL)
+   OR EXISTS(SELECT 1 FROM public.expert_residency_provider_event_inbox WHERE order_id=target_source)
+   OR EXISTS(SELECT 1 FROM public.expert_residency_provider_operations op WHERE op.order_id=target_source AND
+    (op.operation_kind<>'create_payment' OR op.status<>'claimed' OR op.provider_object_id IS NOT NULL OR op.parent_payment_id IS NOT NULL OR op.resolved_at IS NOT NULL OR op.reconciliation_claimed_at IS NOT NULL OR op.recovery_attempt<>0 OR op.recovery_lease_token IS NOT NULL OR op.manual_review_at IS NOT NULL
+     OR NOT EXISTS(SELECT 1 FROM public.public_expert_payment_requests req WHERE req.legacy_operation_id=op.id AND req.legacy_source_id=op.order_id AND req.id=op.command_id AND req.request_digest=op.request_digest AND req.idempotency_key=op.idempotency_key)))
+   OR EXISTS(SELECT 1 FROM public.expert_residency_payment_attempts pa WHERE pa.order_id=target_source AND
+    (pa.status<>'created' OR pa.resolved_at IS NOT NULL OR NOT EXISTS(SELECT 1 FROM public.expert_residency_provider_operations op WHERE op.payment_attempt_id=pa.id AND op.order_id=target_source AND pa.provider_request_id='command:'||op.command_id::text))) THEN RETURN false; END IF;
+ ELSE
+  PERFORM 1 FROM public.expert_onboarding_payment_operations WHERE invoice_id=target_source FOR UPDATE;
+  PERFORM 1 FROM public.expert_sales_provider_requests WHERE invoice_id=target_source ORDER BY id FOR UPDATE;
+  IF EXISTS(SELECT 1 FROM public.expert_onboarding_payment_operations WHERE invoice_id=target_source AND(status<>'created' OR provider_object_id IS NOT NULL))
+   OR EXISTS(SELECT 1 FROM public.expert_sales_provider_requests req WHERE req.invoice_id=target_source AND(kind<>'create' OR status NOT IN('prepared','cancelled') OR dispatched_at IS NOT NULL OR provider_object_id IS NOT NULL OR NOT EXISTS(SELECT 1 FROM public.public_expert_payment_requests p WHERE p.id=req.id AND p.invoice_id=req.invoice_id AND p.idempotency_key=req.idempotency_key AND p.request_digest=req.request_digest)))
+   OR EXISTS(SELECT 1 FROM public.expert_sales_provider_observations WHERE invoice_id=target_source)
+   OR EXISTS(SELECT 1 FROM public.expert_onboarding_payment_facts WHERE invoice_id=target_source) THEN RETURN false; END IF;
+ END IF;
+ RETURN true;
+END $$;
 -- Protect canonical posting and release even when an old batch/command bypasses the new runner.
 CREATE FUNCTION early_bird_private.public_financial_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 DECLARE source uuid; allowed boolean; expected_action text; row_data jsonb; owner_request public.public_expert_payment_requests%ROWTYPE;
@@ -442,6 +510,20 @@ BEGIN
  END IF;
  SELECT * INTO owner_request FROM public.public_expert_payment_requests WHERE legacy_source_id=source LIMIT 1;
  IF NOT FOUND THEN RETURN NEW; END IF;
+ -- Local expiry has no provider observation: abandon only a positively proven never-sent cohort.
+ IF (TG_TABLE_NAME='expert_residency_orders' AND row_data->>'status'='expired' AND to_jsonb(OLD)->>'status'='payment_pending'
+     AND (row_data->>'payment_deadline')::timestamptz<=public.early_bird_current_time())
+ OR (TG_TABLE_NAME='expert_onboarding_invoices' AND row_data->>'status'='cancelled' AND to_jsonb(OLD)->>'status'='pending'
+     AND EXISTS(SELECT 1 FROM public.expert_sales_fee_attempts WHERE invoice_id=source AND expires_at<=public.early_bird_current_time())) THEN
+  IF early_bird_private.public_never_sent(source,owner_request.user_id) THEN
+   UPDATE public.public_expert_payment_requests SET state='abandoned' WHERE legacy_source_id=source AND state='prepared';
+   RETURN NEW;
+  END IF;
+ ELSIF TG_TABLE_NAME='expert_referral_ledger_entries' AND row_data->>'entry_kind'='release'
+   AND EXISTS(SELECT 1 FROM public.expert_residency_orders WHERE id=source AND status='expired')
+   AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_requests WHERE legacy_source_id=source AND state<>'abandoned') THEN
+  IF early_bird_private.public_never_sent(source,owner_request.user_id) THEN RETURN NEW; END IF;
+ END IF;
  SELECT EXISTS(SELECT 1 FROM public.public_expert_payment_requests r JOIN public.public_expert_payment_observations o ON o.id=r.apply_observation_id AND o.request_id=r.id
   JOIN public.public_expert_payment_resolutions a ON a.request_id=r.id AND a.kind='apply_attempt' AND a.apply_attempt_id=r.apply_attempt_id AND a.observation_id=o.id
   WHERE r.legacy_source_id=source AND r.apply_xid=pg_current_xact_id() AND r.apply_login=session_user
@@ -449,7 +531,7 @@ BEGIN
    AND(a.action=r.apply_action) AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind='manual_reconciliation')
    AND(CASE TG_TABLE_NAME
     WHEN 'expert_onboarding_payment_facts' THEN row_data->>'provider_object_id'=r.provider_object_id AND row_data->>'operation_id'=r.legacy_operation_id::text AND row_data->>'user_id'=r.user_id::text AND row_data->>'amount_minor'=r.amount_minor::text AND(row_data->>'captured_at')::timestamptz=o.provider_captured_at AND row_data->>'provider_mode'=r.mode
-    WHEN 'expert_residency_orders' THEN CASE WHEN expected_action='main_settle' THEN row_data->>'provider_payment_id'=r.provider_object_id AND(row_data->>'residency_starts_at')::timestamptz>=o.provider_captured_at ELSE true END
+    WHEN 'expert_residency_orders' THEN CASE WHEN expected_action='main_settle' THEN row_data->>'provider_payment_id'=r.provider_object_id AND(row_data->>'residency_starts_at')::timestamptz=r.apply_expected_start AND(row_data->>'residency_ends_at')::timestamptz=r.apply_expected_end ELSE true END
     WHEN 'expert_residency_provider_event_inbox' THEN row_data->>'external_event_id'='public:'||r.id::text||':'||o.id::text AND row_data->>'payload_digest'=substring(o.evidence_digest FROM 8) AND row_data->>'amount_minor'=r.amount_minor::text AND row_data->>'payment_id'=CASE WHEN r.product='refund' THEN r.parent_payment_id ELSE r.provider_object_id END
     ELSE true END)) INTO allowed;
  IF NOT allowed THEN RAISE EXCEPTION 'public_financial_apply_context_required' USING ERRCODE='23514'; END IF;
@@ -480,7 +562,7 @@ BEGIN
   SELECT e.id::text INTO legacy_id FROM public.expert_residency_provider_event_inbox e JOIN public.expert_residency_orders ord ON ord.id=e.order_id
   WHERE e.external_event_id='public:'||r.id::text||':'||o.id::text AND e.provider='yookassa' AND e.order_id=r.order_id AND e.amount_minor=r.amount_minor AND e.currency=r.currency AND e.payload_digest=substring(o.evidence_digest FROM 8) AND e.status='processed'
    AND e.payment_id=CASE WHEN r.product='refund' THEN r.parent_payment_id ELSE r.provider_object_id END
-   AND((a.action='main_settle' AND e.event_kind='settled' AND ord.status='settled' AND ord.provider_payment_id=r.provider_object_id AND e.occurred_at=o.provider_captured_at AND ord.residency_starts_at>=o.provider_captured_at AND ord.residency_ends_at=ord.residency_starts_at+make_interval(secs=>ord.duration_seconds))
+   AND((a.action='main_settle' AND e.event_kind='settled' AND ord.status='settled' AND ord.provider_payment_id=r.provider_object_id AND e.occurred_at=o.provider_captured_at AND ord.residency_starts_at=r.apply_expected_start AND ord.residency_ends_at=r.apply_expected_end AND ord.residency_ends_at=ord.residency_starts_at+make_interval(secs=>ord.duration_seconds))
     OR(a.action='main_refund' AND e.event_kind='refunded' AND e.result_code IN('terminated','partial_refund')));
  ELSE
   IF r.product='onboarding' THEN SELECT id::text INTO legacy_id FROM public.expert_onboarding_invoices WHERE id=r.invoice_id AND status='cancelled' AND NOT EXISTS(SELECT 1 FROM public.expert_onboarding_payment_facts WHERE invoice_id=r.invoice_id);
