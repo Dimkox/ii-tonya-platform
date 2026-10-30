@@ -9,28 +9,31 @@ import {
 import {
   startPublicExpertTestDatabase,
   createPublicOnboardingFixture,
-  publicTestPrincipal,
   publicTestVault,
   publicTestNow,
   publicFixtureVersion,
 } from "../testkit/public-expert-payment.js";
 import { createPublicExpertPaymentRuntime } from "../public-expert-payment-runtime.js";
-import type { DrizzleDb } from "../client.js";
+import { createPublicExpertRuntimePrincipals } from "../testkit/public-expert-runtime-principals.js";
 import { createReceiptContactFence } from "../../../../apps/api/src/receipt-disclosure-contact-fence.js";
 import { composeReceiptRetention } from "../../../../apps/worker/src/receipt-disclosure-retention.js";
 import { PostgresPayerReceiptContactRepository } from "./payer-receipt-contact-repository.js";
 import { PostgresPrivacyRepository } from "./privacy-repository.js";
 
 let context: Awaited<ReturnType<typeof startPublicExpertTestDatabase>>;
-const pools: DrizzleDb[] = [];
+let principals: Awaited<ReturnType<typeof createPublicExpertRuntimePrincipals>>;
 beforeAll(async () => {
   context = await startPublicExpertTestDatabase();
   expect(await publicFixtureVersion(context.db)).toBe("170005");
+  principals = await createPublicExpertRuntimePrincipals(context.db.db);
 }, 120000);
 afterEach(() => vi.restoreAllMocks());
 afterAll(async () => {
-  await Promise.all(pools.map((pool) => pool.$client.end()));
-  await context?.db.stop();
+  try {
+    await principals?.close();
+  } finally {
+    await context?.db.stop();
+  }
 }, 120000);
 async function fixture() {
   const f = await createPublicOnboardingFixture(context);
@@ -62,35 +65,8 @@ async function fixture() {
       sql`alter table payer_receipt_contacts enable trigger payer_receipt_contact_guard`,
     );
   });
-  const connections = {} as Parameters<
-    typeof createPublicExpertPaymentRuntime
-  >[1]["connections"];
-  for (const [name, label] of [
-    ["onboardingSender", "onboarding"],
-    ["mainSender", "main"],
-    ["refundSender", "refund"],
-    ["binder", "binder"],
-    ["observations", "writer"],
-  ] as const) {
-    const db = await publicTestPrincipal(context, label);
-    pools.push(db);
-    connections[name] = {
-      db,
-      login: decodeURIComponent(
-        new URL(db.$client.options.connectionString!).username,
-      ),
-    };
-  }
-  for (const signature of [
-    "public_payment_pending(integer,uuid)",
-    "public_payment_hint(text,uuid,boolean)",
-  ])
-    await context.db.db.$client.query(
-      `grant execute on function early_bird_private.${signature} to ${connections.binder.login}`,
-    );
-  await context.db.db.$client.query(
-    `grant execute on function early_bird_private.public_refund_pending(integer,uuid) to ${connections.refundSender.login}`,
-  );
+  // Serial cases share the one canonical LOGIN per capability in this cluster.
+  const { connections } = principals;
   const key = randomBytes(32);
   let posts = 0,
     payment: YooKassaPayment | undefined,
