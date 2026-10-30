@@ -427,9 +427,9 @@
     {
       "idx": 84,
       "tag": "0084_public_expert_payment_gateway",
-      "sha256": "02a07402c41e4d664730b16f887d770107623bb24bfb681c7dcd7c6c05dbf38e"
+      "sha256": "096198197a0b5a1c522a7ec3978183c16c6994998d6bf86b6048cb7f3baacb26"
     }
   ],
   "snapshotSha256": "df3328c8dfd6bb9bf24534d84ef9eec2947882c8aaf571619e6aaaff17d4dca7",
-  "sqlObjectsSha256": "090b270d8beb5eae96bf25a9c196537935a8a8af94b8cd2230fe928788a47753"
+  "sqlObjectsSha256": "d3b4735a98d82a9326676f3797c6dc5b4b6ee60635fbefb3a4b4bf6655ad31a4"
 }
