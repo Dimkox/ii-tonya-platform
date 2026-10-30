@@ -1,5 +1,14 @@
 # Early Bird payment integration continuation — 2026-10-30
 
+Full-spec continuation now includes confirmed missing PUBLIC_LAUNCH payments.
+Use `docs/superpowers/plans/2026-10-30-public-expert-payment-gateway.md` and its
+plan-owned SDD ledger. The public design/spec are independently investigated;
+implementation starts with additive0084 (index84,85 journal entries), not0085.
+Preserve existing0000..0083. The successfully built3ca55b1d bridge approves only
+84 entries and is NOT rollback evidence for this next schema. No production
+mutation is authorized merely by that local artifact. Full CI permission remains
+pending after the two consumed failed runs below; do not push/run CI3 on silence.
+
 Active worktree: `.getzilla/runtime/early-bird-rebase-20261029/worktree`, branch
 `codex/early-bird-wave1-main-sync-20261029`, based on
 `1df0d7b9c5c4db1c244c12d4525470bf1275c738`. Read live Git identity first.
