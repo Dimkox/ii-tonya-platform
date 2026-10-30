@@ -1,5 +1,4 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { createDb, closeDb, type DrizzleDb } from "../client.js";
 import {
@@ -11,19 +10,8 @@ let fixture: TestDatabase;
 let worker: DrizzleDb;
 beforeAll(async () => {
   fixture = await startDisposableTestPostgres();
+  // The full journal installs the reviewed worker functions in canonical 0082.
   await fixture.migrate();
-  await fixture.db.$client.query(
-    readFileSync(
-      "docs/superpowers/implementation-artifacts/drafts/worker_receipt_retention_capabilities.sql",
-      "utf8",
-    ),
-  );
-  await fixture.db.$client.query(
-    readFileSync(
-      "docs/superpowers/implementation-artifacts/drafts/worker_review_capabilities.sql",
-      "utf8",
-    ),
-  );
   await fixture.db.$client.query(
     `create role test_retention login password 'synthetic'; grant usage on schema public to test_retention; grant execute on function public.early_bird_wave_retention_list(integer), public.early_bird_wave_retention_expire(uuid,uuid), public.early_bird_worker_review_list(uuid,integer), public.early_bird_worker_review_resolve(uuid,uuid) to test_retention`,
   );
