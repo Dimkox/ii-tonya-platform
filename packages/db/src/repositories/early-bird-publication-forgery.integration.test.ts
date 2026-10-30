@@ -1,91 +1,53 @@
-import { applyEarlyBirdDraftIfNeeded } from "../testkit/early-bird-draft-helper.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { expertResidencyPaymentEventSchema } from "@ii-tonya/contracts";
-import { verifiedEventFixture } from "../../../integrations/src/expert-residency/verified-event.js";
-import {
-  startExpertReferralTestDatabase,
-  type ExpertReferralTestDatabase,
-} from "../testkit/expert-referral.js";
-import { PostgresExpertResidencyRepository } from "./expert-residency-repository.js";
-let fixture: ExpertReferralTestDatabase;
+import { createEarlyBirdCanonicalCoverageFixture } from "../testkit/early-bird-canonical-coverage-fixture.js";
+
+let coverage: Awaited<
+  ReturnType<typeof createEarlyBirdCanonicalCoverageFixture>
+>;
 beforeAll(async () => {
-  fixture = await startExpertReferralTestDatabase();
-  await fixture.enableExpertReferralCommands();
+  coverage = await createEarlyBirdCanonicalCoverageFixture();
+  await coverage.recordWaveSuccess();
+  // Both isolated clocks pass the immutable launch; a real paid period is active.
+  await coverage.advanceClock(
+    (Date.parse("2027-01-12T12:00:00Z") - Date.now()) / 1000,
+  );
 }, 120_000);
 afterAll(async () => {
-  await fixture?.stop();
+  await coverage?.stop();
 }, 120_000);
+async function state() {
+  return (
+    await coverage.db.db.execute<{
+      paid: boolean;
+      active: boolean;
+      approvedCards: number;
+      admissions: number;
+      publications: number;
+      refunds: number;
+    }>(sql`select
+    exists(select 1 from early_bird_payment_successes where intent_id=${coverage.intentId}::uuid and user_id=${coverage.expert.userId}::uuid and provider_object_id=${coverage.payment.id} and disposition='eligible') paid,
+    exists(select 1 from early_bird_effective_coverages where intent_id=${coverage.intentId}::uuid and starts_at<=clock_timestamp() and ends_at>clock_timestamp()) active,
+    (select count(*)::int from expert_card_drafts where user_id=${coverage.expert.userId}::uuid and status='approved') as "approvedCards",
+    (select count(*)::int from early_bird_admissions where intent_id=${coverage.intentId}::uuid) admissions,
+    (select count(*)::int from experts_published where expert_id=${coverage.expert.expertId}::uuid) publications,
+    (select count(*)::int from early_bird_payment_full_refunds where intent_id=${coverage.intentId}::uuid) refunds
+  `)
+  ).rows[0];
+}
 it("rejects a forged wave publication without an admission", async () => {
-  const expert = await fixture.createExpertIdentity();
-  const repository = new PostgresExpertResidencyRepository(fixture.db);
-  const audit = await fixture.createAdminAudit({
-    action: "expert_residency.tariff_create",
-    objectId: randomUUID(),
+  const fixture = coverage.db,
+    expert = coverage.expert,
+    intent = coverage.intentId;
+  expect(await state()).toEqual({
+    paid: true,
+    active: true,
+    approvedCards: 0,
+    admissions: 0,
+    publications: 0,
+    refunds: 0,
   });
-  const tariff = await repository.createTariffVersion({
-    tariffKey: `test-${randomUUID()}`,
-    displayName: "Test",
-    priceMinor: 50000n,
-    durationSeconds: 86400,
-    activeFrom: new Date(Date.now() - 1000),
-    activeTo: new Date(Date.now() + 86400000),
-    approvalId: audit.approvalId,
-    adminSessionIdHash: audit.sessionIdHash,
-  });
-  const order = await repository.createCheckoutOrder({
-    expertId: expert.expertId,
-    tariffVersionId: tariff.id,
-    providerDeadline: new Date(Date.now() + 3600000),
-    idempotencyKey: randomUUID(),
-  });
-  const event = verifiedEventFixture(
-    expertResidencyPaymentEventSchema.parse({
-      kind: "settled",
-      provider: "sandbox",
-      eventId: `evt_${randomUUID()}`,
-      paymentId: `pay_${randomUUID()}`,
-      orderId: order.id,
-      amountMinor: "50000",
-      currency: "RUB",
-      occurredAt: new Date().toISOString(),
-      payloadDigest: `sha256:${"a".repeat(64)}`,
-    }),
-    {
-      verificationId: `verify_${randomUUID()}`,
-      verifierKeyVersion: "test-v1",
-      verifiedAt: new Date().toISOString(),
-    },
-  );
-  void event;
-  const intent = randomUUID();
-  await fixture.db.execute(
-    sql`create table early_bird_composite_intents(id uuid primary key, invoice_id uuid not null, user_id uuid not null, provider_mode text not null, pricing_policy text not null, price_kind text not null, onboarding_minor bigint not null, subscription_minor bigint not null, total_minor bigint not null, base_offer_shown_at timestamptz not null, expires_at timestamptz not null, launch_at timestamptz not null, status text not null, unique(id,user_id))`,
-  );
-  await fixture.db.execute(
-    sql`create table early_bird_verified_bindings(intent_id uuid primary key, user_id uuid not null, provider_object_id text not null)`,
-  );
-  await applyEarlyBirdDraftIfNeeded(
-    fixture.db,
-    "docs/superpowers/implementation-artifacts/drafts/0082_early_bird_settlement.sql",
-  );
-  await fixture.db.execute(
-    sql`insert into early_bird_composite_intents values(${intent}::uuid,${randomUUID()}::uuid,${expert.userId}::uuid,'live','owner_test_10_20_v1','fixed_test',1000,2000,3000,'2026-01-01Z','2026-01-11Z','2027-01-11T00:00:00+03:00','unknown')`,
-  );
-  await fixture.db.execute(
-    sql`insert into early_bird_verified_bindings values(${intent}::uuid,${expert.userId}::uuid,'reverse-pay')`,
-  );
-  await fixture.db.execute(
-    sql`select early_bird_record_success(${intent}::uuid,${expert.userId}::uuid,'reverse-pay',${`sha256:${"a".repeat(64)}`},'2026-01-02T00:00:00Z'::timestamptz)`,
-  );
-  await fixture.db.execute(
-    sql`alter table early_bird_composite_intents add column choice_id uuid`,
-  );
-  await applyEarlyBirdDraftIfNeeded(
-    fixture.db,
-    "docs/superpowers/implementation-artifacts/drafts/wave_admission_projection.sql",
-  );
   let rejection: unknown;
   try {
     await fixture.db.execute(
@@ -95,4 +57,12 @@ it("rejects a forged wave publication without an admission", async () => {
     rejection = (error as { cause?: { message?: string } }).cause?.message;
   }
   expect(rejection).toContain("expert_published_wave_source");
+  expect(await state()).toEqual({
+    paid: true,
+    active: true,
+    approvedCards: 0,
+    admissions: 0,
+    publications: 0,
+    refunds: 0,
+  });
 }, 120_000);
