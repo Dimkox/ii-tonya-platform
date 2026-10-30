@@ -182,6 +182,7 @@ export class PostgresPublicExpertPaymentPosting {
       !action ||
       action.kind !== "ready_to_apply" ||
       !action.applyAttemptId ||
+      !action.observationId ||
       !action.evidence
     )
       return action;
@@ -200,7 +201,13 @@ export class PostgresPublicExpertPaymentPosting {
       action.evidence.snapshot.product === "onboarding"
         ? this.onboarding
         : this.residency;
-    await poster.applyPublic(requestId, observationId, action.applyAttemptId);
+    // A fresh equivalent GET corroborates the original durable attempt. Its
+    // stored observation owns financial event/digest provenance across retries.
+    await poster.applyPublic(
+      requestId,
+      action.observationId,
+      action.applyAttemptId,
+    );
     return this.observations.complete(requestId, action.applyAttemptId);
   }
 }

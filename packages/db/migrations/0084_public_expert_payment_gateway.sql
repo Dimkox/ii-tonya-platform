@@ -484,8 +484,8 @@ $$;
 REVOKE ALL ON FUNCTION early_bird_private.public_onboarding_committed_matches(public.public_expert_payment_requests,public.public_expert_payment_observations) FROM PUBLIC;
 --> statement-breakpoint
 CREATE FUNCTION early_bird_private.public_resolution(target_request uuid,target_observation uuid,expiry boolean) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
-DECLARE r public.public_expert_payment_requests%ROWTYPE; o public.public_expert_payment_observations%ROWTYPE; prior public.public_expert_payment_resolutions%ROWTYPE;
- action_name text; disposition_name text; attempt uuid; manual_reason text; repaired jsonb;
+DECLARE r public.public_expert_payment_requests%ROWTYPE; o public.public_expert_payment_observations%ROWTYPE; origin public.public_expert_payment_observations%ROWTYPE; prior public.public_expert_payment_resolutions%ROWTYPE;
+ action_name text; disposition_name text; attempt uuid; manual_reason text;
 BEGIN
  SELECT * INTO r FROM public.public_expert_payment_requests WHERE id=target_request;
  IF NOT FOUND THEN RETURN NULL; END IF;
@@ -493,10 +493,25 @@ BEGIN
  SELECT * INTO r FROM public.public_expert_payment_requests WHERE id=target_request FOR UPDATE;
  SELECT * INTO o FROM public.public_expert_payment_observations WHERE id=target_observation AND request_id=r.id AND provider_object_id=r.provider_object_id;
  IF NOT FOUND OR NOT early_bird_private.public_source_valid(r,false) THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
- SELECT * INTO prior FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind='applied';
+ SELECT * INTO prior FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind='manual_reconciliation';
+ IF FOUND THEN RETURN early_bird_private.public_apply_result(r,o,'manual_reconciliation',prior.action,prior.apply_attempt_id); END IF;
+ SELECT * INTO prior FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind IN('applied','apply_attempt') ORDER BY CASE kind WHEN 'applied' THEN 0 ELSE 1 END LIMIT 1;
  IF FOUND THEN
-  IF prior.observation_id=o.id OR early_bird_private.public_onboarding_committed_matches(r,o) THEN RETURN early_bird_private.public_apply_result(r,o,'already_applied',prior.action,prior.apply_attempt_id); END IF;
-  RETURN early_bird_private.public_apply_result(r,o,'manual_reconciliation',NULL,NULL);
+  IF prior.observation_id<>o.id THEN
+   SELECT * INTO origin FROM public.public_expert_payment_observations WHERE id=prior.observation_id AND request_id=r.id AND provider_object_id=r.provider_object_id;
+   -- Fresh GET observations retain their own immutable evidence, but do not
+   -- replace the event/digest selected by the durable financial attempt. Compare
+   -- typed provider facts (including exact microseconds), excluding only the
+   -- fresh observation identity, observed_at and its evidence digest.
+   IF NOT FOUND OR ROW(o.request_id,o.provider_object_id,o.parent_payment_id,o.status,o.paid,o.amount_minor,o.currency,o.mode,o.provider_created_at,o.provider_captured_at,o.payment_method_type,o.identity)
+    IS DISTINCT FROM ROW(origin.request_id,origin.provider_object_id,origin.parent_payment_id,origin.status,origin.paid,origin.amount_minor,origin.currency,origin.mode,origin.provider_created_at,origin.provider_captured_at,origin.payment_method_type,origin.identity) THEN
+    INSERT INTO public.public_expert_payment_resolutions(request_id,kind,observation_id,apply_attempt_id,action,provider_object_id,captured_at,payment_deadline,disposition,reason)
+    VALUES(r.id,'manual_reconciliation',o.id,prior.apply_attempt_id,prior.action,r.provider_object_id,o.provider_captured_at,r.payment_deadline,'paid_manual_reconciliation','fresh_terminal_fact_conflict') ON CONFLICT DO NOTHING;
+    RETURN early_bird_private.public_apply_result(r,o,'manual_reconciliation',prior.action,prior.apply_attempt_id);
+   END IF;
+   o:=origin;
+  END IF;
+  IF prior.kind='applied' THEN RETURN early_bird_private.public_apply_result(r,o,'already_applied',prior.action,prior.apply_attempt_id); END IF;
  END IF;
  IF o.status NOT IN('succeeded','canceled') OR (expiry AND o.status<>'canceled') OR r.state NOT IN('bound','resolved') THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
  -- A newer contradictory terminal fact is never overwritten. Successful paid evidence wins over expiry.
@@ -516,13 +531,7 @@ BEGIN
  END IF;
  SELECT * INTO prior FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind='apply_attempt';
  IF FOUND THEN
-  IF prior.observation_id<>o.id OR prior.action<>action_name THEN
-   IF prior.action='onboarding_settle' AND action_name='onboarding_settle' AND early_bird_private.public_onboarding_committed_matches(r,o) THEN
-    repaired:=early_bird_private.public_payment_complete(r.id,prior.apply_attempt_id);
-    IF repaired->>'kind'='already_applied' THEN RETURN early_bird_private.public_apply_result(r,o,'already_applied',prior.action,prior.apply_attempt_id); END IF;
-   END IF;
-   RETURN early_bird_private.public_apply_result(r,o,'manual_reconciliation',NULL,NULL);
-  END IF;
+  IF prior.observation_id<>o.id OR prior.action<>action_name THEN manual_reason:='apply_attempt_conflict'; END IF;
   attempt:=prior.apply_attempt_id;
  ELSE attempt:=gen_random_uuid(); END IF;
  IF manual_reason IS NOT NULL THEN
@@ -551,7 +560,7 @@ BEGIN
  PERFORM pg_advisory_xact_lock(hashtextextended(r.user_id::text,0));
  IF r.product='main' THEN PERFORM public.early_bird_touch_coverage_epoch(r.user_id); END IF;
  result:=early_bird_private.public_resolution(target_request,target_observation,false);
- IF result->>'kind' IS DISTINCT FROM 'ready_to_apply' OR result->>'applyAttemptId' IS DISTINCT FROM target_attempt::text THEN RETURN NULL; END IF;
+ IF result->>'kind' IS DISTINCT FROM 'ready_to_apply' OR result->>'applyAttemptId' IS DISTINCT FROM target_attempt::text OR result->>'observationId' IS DISTINCT FROM target_observation::text THEN RETURN NULL; END IF;
  SELECT * INTO r FROM public.public_expert_payment_requests WHERE id=target_request;
  SELECT * INTO o FROM public.public_expert_payment_observations WHERE id=target_observation;
  IF result->>'action'='main_settle' THEN
