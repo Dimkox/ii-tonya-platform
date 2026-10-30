@@ -1,7 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { ownerPricingApproval } from "../testkit/owner-pricing-approval.js";
 import { bridgeEarlyBirdForm } from "./early-bird-form-bridge.js";
-import { PostgresResidentReviewRepository } from "./resident-review-repository.js";
+import {
+  PostgresResidentReviewRepository,
+  type ResidentReviewTransport,
+} from "./resident-review-repository.js";
 import { afterAll, beforeAll, expect, it, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import {
@@ -28,7 +31,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await db?.stop();
 }, 120_000);
-it("does not deliver a prelaunch message after cutoff", async () => {
+it("delivers only an audited post-launch replacement after cutoff, preserving the prelaunch original", async () => {
   const { seedClientConsent } = await import("../testkit/client-consent.js");
   const user = await db.createUser();
   await seedClientConsent(db.db, user, "client_messaging");
@@ -109,7 +112,7 @@ it("does not deliver a prelaunch message after cutoff", async () => {
   await db.db.execute(
     sql`insert into admin_role_assignments(admin_id,role) values(${manager}::uuid,'support')`,
   );
-  const send = vi.fn(async () => ({
+  const send = vi.fn<ResidentReviewTransport["send"]>(async () => ({
     botId: "1",
     chatId: "123456",
     messageId: "1",
@@ -133,6 +136,13 @@ it("does not deliver a prelaunch message after cutoff", async () => {
     preview.hash,
   );
   expect(confirmed.action).toBe("APPROVED_BASIC");
+  const original = (
+    await db.db.execute<{ text: string; hash: string }>(
+      sql`select final_text as text,final_hash as hash from resident_review_messages where event_id=${confirmed.eventId}::uuid`,
+    )
+  ).rows[0]!;
+  expect(original.text).toContain("Старт для клиентов — 11 января 2027 года.");
+  expect(original.hash).toBe(preview.hash);
   await db.db.execute(
     sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2027-01-11T00:00:00+03:00'::timestamptz $$`,
   );
@@ -140,6 +150,37 @@ it("does not deliver a prelaunch message after cutoff", async () => {
     await review.deliverMaterials(confirmed.eventId, {
       signal: new AbortController().signal,
     }),
-  ).toEqual({ kind: "cancelled" });
-  expect(send).not.toHaveBeenCalled();
+  ).toEqual({ kind: "delivered" });
+  const replacement =
+    "Здравствуйте!\n\nАнкета одобрена. Категория: Базовая. Платформа открыта для клиентов. Актуальные условия участия доступны в /my_tariff.";
+  expect(send).toHaveBeenCalledOnce();
+  expect(send).toHaveBeenCalledWith({
+    botId: "1",
+    botKey: "fixture-bot",
+    chatId: "123456",
+    text: replacement,
+    signal: expect.any(AbortSignal),
+  });
+  expect(send.mock.calls[0]![0].text).not.toContain("Старт для клиентов");
+  expect(
+    (
+      await db.db.execute(
+        sql`select user_id as "userId",original_hash as "originalHash",replacement_text as text,replacement_hash as hash from early_bird_message_replacements where event_id=${confirmed.eventId}::uuid`,
+      )
+    ).rows,
+  ).toEqual([
+    {
+      userId: user,
+      originalHash: original.hash,
+      text: replacement,
+      hash: createHash("sha256").update(replacement).digest("hex"),
+    },
+  ]);
+  expect(
+    (
+      await db.db.execute(
+        sql`select final_text as text,final_hash as hash,status,receipt,attempts from resident_review_messages where event_id=${confirmed.eventId}::uuid`,
+      )
+    ).rows,
+  ).toEqual([{ ...original, status: "delivered", receipt: "1", attempts: 1 }]);
 }, 120_000);

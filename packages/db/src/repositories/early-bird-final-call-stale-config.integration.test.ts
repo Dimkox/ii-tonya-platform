@@ -7,7 +7,9 @@ import { syntheticFinalCallConfig } from "../testkit/early-bird-queue-synthetic-
 let fixture: TestDatabase;
 beforeAll(async () => {
   fixture = await startTestPostgres();
-  await fixture.db.execute(sql`create function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`);
+  await fixture.db.execute(
+    sql`create function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
+  );
   await fixture.db.execute(
     sql`create table users(id uuid primary key default gen_random_uuid(),active boolean not null default true)`,
   );
@@ -37,9 +39,16 @@ it("cancels only unsent stale generations under locked current config, preservin
   await fixture.db.execute(
     sql`alter table early_bird_final_call_queue disable trigger early_bird_final_call_admission`,
   );
+  // Every notice in the same configuration generation has the same dates. The
+  // synthetic authority may observe either of the two preparing claims below.
+  const { now } = (
+    await fixture.db.execute<{ now: string }>(
+      sql`select date_trunc('milliseconds',clock_timestamp())::text as now`,
+    )
+  ).rows[0]!;
   const add = (id: string) =>
     fixture.db.execute(
-      sql`with t as (select clock_timestamp() as now) insert into early_bird_final_call_queue(user_id,kind,config_version,trigger_at,client_start_at,scheduled_at,available_at) select ${id}::uuid,'first','wave-v1',now-interval '1 day',now+interval '1 day',now-interval '1 day',now-interval '1 day' from t`,
+      sql`with t as (select ${now}::timestamptz as now) insert into early_bird_final_call_queue(user_id,kind,config_version,trigger_at,client_start_at,scheduled_at,available_at) select ${id}::uuid,'first','wave-v1',now-interval '1 day',now+interval '1 day',now-interval '1 day',now-interval '1 day' from t`,
     );
   await add(first);
   const bare = new PostgresFinalCallQueue(fixture.db);
