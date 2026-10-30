@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sql } from "drizzle-orm";
 import { beforeAll, afterAll, it, expect } from "vitest";
 import {
   startPublicExpertTestDatabase,
@@ -644,10 +645,14 @@ it("continues a genuine paid wave card with a fresh explicit public quote and at
     await wq(
       "create or replace function pg_catalog.clock_timestamp() returns timestamptz language sql volatile as $$select '2027-01-11T21:00:01Z'::timestamptz$$",
     );
-    await wc("public.early_bird_activate_projection", [
-      w.user,
-      w.identity.operationId,
-    ]);
+    await w.db.db.transaction(
+      async (tx) => {
+        await tx.execute(
+          sql`select public.early_bird_activate_projection(${w.user}::uuid,${w.identity.operationId}::uuid)`,
+        );
+      },
+      { isolationLevel: "serializable" },
+    );
     const previous = (
       await wq(
         "select wave_intent_id,paid_order_id,review_id,draft_id from experts_published where user_id=$1",

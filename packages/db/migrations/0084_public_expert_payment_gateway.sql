@@ -1079,3 +1079,67 @@ BEGIN
  IF NOT resident_verification_price_allowed(NEW.user_id) THEN RAISE EXCEPTION 'resident_verification_required'; END IF;
  RETURN NEW;
 END $$;
+
+--> statement-breakpoint
+-- A separated-sales paid main quote is a new quote, not the original unpaid
+-- form bridge. Preserve the unpaid authority and admit only the exact immutable
+-- paid price plus current canonical card/acceptance. This authority is also used
+-- for retention: only a real matching bound order may outlive quote expiry.
+CREATE OR REPLACE FUNCTION expert_sales_receipt_authority(quote uuid,owner uuid) RETURNS boolean LANGUAGE sql VOLATILE AS $$
+ SELECT EXISTS(SELECT 1 FROM expert_sales_form_bridges b JOIN expert_campaign_quotes q ON q.id=b.quote_id AND q.user_id=b.user_id AND q.rule_version='expert_separated_sales_v3' JOIN expert_sales_selections original ON original.id=b.selection_id JOIN expert_sales_bases base ON base.id=original.base_id AND base.user_id=b.user_id JOIN expert_onboarding_applications a ON a.id=b.application_id AND a.verification_status IN('pending','approved') JOIN users u ON u.id=b.user_id AND u.active WHERE b.quote_id=quote AND b.user_id=owner AND expert_sales_form_valid(b.application_id,b.user_id) AND expert_card_current_messaging_authority(b.user_id,base.consent_version) AND NOT EXISTS(SELECT 1 FROM expert_sales_paid_locks WHERE user_id=b.user_id))
+ OR EXISTS(SELECT 1 FROM expert_campaign_quotes q
+ JOIN expert_sales_paid_locks l ON l.invoice_id=q.paid_lock_invoice_id AND l.user_id=q.user_id AND l.selection_id=q.sales_selection_id AND l.final_locked_price=q.price_minor AND l.term_months=q.term_months
+ JOIN expert_sales_selections selected ON selected.id=l.selection_id AND selected.user_id=q.user_id AND selected.selected_total_minor=q.price_minor AND selected.term_months=q.term_months
+ JOIN expert_sales_bases base ON base.id=selected.base_id AND base.user_id=q.user_id AND base.tariff_version_id=q.tariff_version_id AND base.profile_revision=q.profile_revision
+ JOIN expert_onboarding_invoices invoice ON invoice.id=l.invoice_id AND invoice.user_id=q.user_id AND invoice.purpose='onboarding' AND invoice.status='settled'
+ JOIN expert_onboarding_payment_facts paid ON paid.invoice_id=invoice.id AND paid.user_id=invoice.user_id AND paid.admission='interview' AND paid.amount_minor=invoice.amount_minor AND paid.currency=invoice.currency AND paid.provider_mode=invoice.provider_mode
+ JOIN expert_onboarding_applications app ON app.id=invoice.application_id AND app.user_id=q.user_id AND app.verification_status='approved' AND app.archived_at IS NULL AND app.archive_until_date IS NULL
+ JOIN expert_sales_form_bridges bridge ON bridge.application_id=app.id AND bridge.user_id=q.user_id
+ JOIN expert_sales_selections original ON original.id=bridge.selection_id AND original.user_id=q.user_id AND original.base_id=selected.base_id
+ JOIN users u ON u.id=q.user_id AND u.active
+ JOIN expert_card_drafts d ON d.application_id=app.id AND d.user_id=q.user_id AND d.status='approved'
+ JOIN expert_card_reviews review ON review.id=d.approved_review_id AND review.draft_id=d.id AND review.user_id=d.user_id AND review.action='approve' AND review.revision=d.revision AND review.public_payload=d.public_payload
+ JOIN expert_card_main_acceptances accepted ON accepted.quote_id=q.id AND accepted.user_id=q.user_id AND accepted.application_id=app.id AND accepted.review_id=review.id AND accepted.revision=d.revision AND accepted.public_digest=review.public_digest
+ WHERE q.id=quote AND q.user_id=owner AND q.rule_version='expert_separated_sales_v3' AND q.quoted_at<=clock_timestamp()
+ AND expert_card_current_messaging_authority(q.user_id,base.consent_version)
+ AND expert_card_activation_gate_valid(q.user_id,accepted.review_id) AND expert_campaign_current_profile_valid(q.user_id,q.id)
+ AND((q.expires_at>clock_timestamp() AND NOT EXISTS(SELECT 1 FROM expert_residency_orders o WHERE o.campaign_quote_id=q.id))
+  OR EXISTS(SELECT 1 FROM payer_receipt_order_bindings binding
+   JOIN payer_receipt_contacts c ON c.id=binding.contact_id AND c.quote_id=binding.quote_id AND c.user_id=binding.user_id AND c.redacted_at IS NULL AND c.expires_at>clock_timestamp()
+   JOIN expert_residency_orders o ON o.id=binding.order_id AND o.campaign_quote_id=q.id AND o.expert_id=accepted.expert_id
+   JOIN experts e ON e.id=o.expert_id AND e.user_id=q.user_id
+   JOIN expert_card_main_orders m ON m.order_id=o.id AND m.acceptance_id=accepted.id AND m.user_id=q.user_id AND m.quote_id=q.id AND m.expert_id=e.id AND m.purpose='main_residency'
+   WHERE binding.quote_id=q.id AND binding.user_id=q.user_id)))
+$$;
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION payer_receipt_redaction_due(contact payer_receipt_contacts) RETURNS boolean LANGUAGE sql VOLATILE AS $$
+ SELECT CASE WHEN EXISTS(SELECT 1 FROM expert_campaign_quotes q WHERE q.id=contact.quote_id AND q.rule_version='expert_separated_sales_v3') THEN
+  contact.expires_at<=clock_timestamp() OR NOT expert_sales_receipt_authority(contact.quote_id,contact.user_id)
+  -- An unused contact must not borrow another contact's bound retention.
+  OR(EXISTS(SELECT 1 FROM expert_campaign_quotes q JOIN expert_residency_orders o ON o.campaign_quote_id=q.id WHERE q.id=contact.quote_id AND q.paid_lock_invoice_id IS NOT NULL)
+   AND NOT EXISTS(SELECT 1 FROM payer_receipt_order_bindings binding
+    JOIN expert_residency_orders o ON o.id=binding.order_id AND o.campaign_quote_id=binding.quote_id
+    JOIN expert_card_main_orders m ON m.order_id=o.id AND m.quote_id=binding.quote_id AND m.user_id=binding.user_id AND m.expert_id=o.expert_id AND m.purpose='main_residency'
+    JOIN experts e ON e.id=o.expert_id AND e.user_id=binding.user_id
+    WHERE binding.contact_id=contact.id AND binding.quote_id=contact.quote_id AND binding.user_id=contact.user_id))
+ ELSE payer_receipt_redaction_due_v2(contact) END
+$$;
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION protect_payer_receipt_contact() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ IF TG_OP='INSERT' THEN
+  IF NEW.redacted_at IS NOT NULL OR NEW.captured_at>clock_timestamp()
+   OR EXISTS(SELECT 1 FROM expert_campaign_quotes q WHERE q.id=NEW.quote_id AND q.rule_version='expert_separated_sales_v3' AND q.paid_lock_invoice_id IS NOT NULL
+    AND(q.quoted_at>NEW.captured_at OR q.expires_at<=clock_timestamp() OR EXISTS(SELECT 1 FROM expert_residency_orders o WHERE o.campaign_quote_id=q.id)))
+   OR(NOT expert_sales_receipt_authority(NEW.quote_id,NEW.user_id) AND NOT EXISTS(
+    SELECT 1 FROM expert_campaign_quotes q JOIN users u ON u.id=q.user_id JOIN expert_residency_tariff_versions t ON t.id=q.tariff_version_id
+    WHERE q.id=NEW.quote_id AND q.user_id=NEW.user_id AND u.active AND q.rule_version<>'expert_separated_sales_v3' AND q.quoted_at<=NEW.captured_at AND q.expires_at>clock_timestamp()
+     AND t.active_from<=clock_timestamp() AND t.active_to>clock_timestamp() AND NOT EXISTS(SELECT 1 FROM expert_residency_orders o WHERE o.campaign_quote_id=q.id))) THEN
+   RAISE EXCEPTION 'payer_receipt_unavailable' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+ END IF;
+ IF TG_OP='UPDATE' AND OLD.redacted_at IS NULL AND NEW.redacted_at IS NOT NULL AND NEW.redacted_at<=clock_timestamp() AND NEW.key_id IS NULL AND NEW.ciphertext IS NULL
+  AND(to_jsonb(NEW)-ARRAY['key_id','ciphertext','redacted_at'])=(to_jsonb(OLD)-ARRAY['key_id','ciphertext','redacted_at']) AND payer_receipt_redaction_due(OLD) THEN RETURN NEW; END IF;
+ RAISE EXCEPTION 'payer_receipt_immutable' USING ERRCODE='23514';
+END $$;
