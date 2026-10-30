@@ -193,6 +193,7 @@ type Transaction = Parameters<DrizzleDb["transaction"]>[0] extends (
 
 type SlotRow = {
   native?: boolean;
+  slotFresh?: boolean;
   scheduleBusy?: boolean;
   slotId: string;
   expertId: string;
@@ -409,14 +410,6 @@ function one<T>(rows: T[], description: string): T {
 
 function finiteDate(date: Date): boolean {
   return Number.isFinite(date.getTime());
-}
-
-function isFresh(observedAt: Date | null, now: Date): boolean {
-  return (
-    observedAt !== null &&
-    observedAt.getTime() <= now.getTime() &&
-    observedAt.getTime() >= now.getTime() - SLOT_FRESHNESS_MS
-  );
 }
 
 function hasConstraint(error: unknown, constraint: string): boolean {
@@ -1494,6 +1487,7 @@ export class PostgresBookingRepository {
         s.starts_at as "startsAt",
         s.ends_at as "endsAt",
         s.observed_at as "observedAt",
+        resident_slot_fresh(s.id,${command.now}) as "slotFresh",
         (s.provider='resident_native') as native,
         exists(select 1 from resident_schedule_busy busy where busy.expert_id=e.id and busy.starts_at<s.ends_at and busy.ends_at>s.starts_at) as "scheduleBusy",
         s.capacity,
@@ -1589,7 +1583,10 @@ export class PostgresBookingRepository {
       command = { ...command, now: new Date(current.now) };
       if (!current.valid) return { kind: "unavailable", reason: "stale_slot" };
     }
-    if (!slot.native && !isFresh(slot.observedAt, command.now)) {
+    // Compare the original PostgreSQL timestamps against the supplied command
+    // instant. Date normalization loses microseconds and can admit future facts.
+    // Protected choices already checked freshness at their locked database clock.
+    if (!slot.native && !protectedTiming && slot.slotFresh !== true) {
       return { kind: "unavailable", reason: "stale_slot" };
     }
     if (!slot.expertActive || !slot.expertVerified || !slot.serviceActive) {
@@ -1761,6 +1758,7 @@ export class PostgresBookingRepository {
         s.starts_at as "startsAt",
         s.ends_at as "endsAt",
         s.observed_at as "observedAt",
+        resident_slot_fresh(s.id,${command.now}) as "slotFresh",
         (s.provider='resident_native') as native,
         exists(select 1 from resident_schedule_busy busy where busy.expert_id=e.id and busy.starts_at<s.ends_at and busy.ends_at>s.starts_at) as "scheduleBusy",
         s.capacity,
@@ -1892,10 +1890,7 @@ export class PostgresBookingRepository {
         if (reservation.startsAt.getTime() <= command.now.getTime()) {
           throw new Error("Slot is no longer confirmable");
         }
-        if (
-          !reservation.native &&
-          !isFresh(reservation.observedAt, command.now)
-        ) {
+        if (!reservation.native && reservation.slotFresh !== true) {
           throw new Error("Slot observation is stale");
         }
         if (
