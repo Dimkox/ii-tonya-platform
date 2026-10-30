@@ -215,6 +215,7 @@ export { recoverExactYooKassaOperation } from "./yookassa/exact-body-recovery.js
 export type {
   YooKassaExactRecoveryClaim,
   YooKassaExactRecoveryCompletion,
+  YooKassaExactRecoveryAdmission,
   YooKassaExactRecoveryOperationKind,
   YooKassaExactRecoveryTransport,
   YooKassaReplayDecryptor,

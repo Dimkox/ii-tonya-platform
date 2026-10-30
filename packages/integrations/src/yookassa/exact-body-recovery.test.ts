@@ -24,6 +24,7 @@ describe("exact-body YooKassa recovery", () => {
         enabled: false,
         claim,
         decryptor: { decrypt },
+        admission: { admit: vi.fn().mockResolvedValue(true) },
         transport: { postExact },
         completion: { bind, manualReview: vi.fn(), reschedule: vi.fn() },
       }),
@@ -45,6 +46,7 @@ describe("exact-body YooKassa recovery", () => {
         enabled: true,
         claim,
         decryptor: { decrypt },
+        admission: { admit: vi.fn().mockResolvedValue(true) },
         transport: { postExact },
         completion: { bind, manualReview: vi.fn(), reschedule: vi.fn() },
       }),
@@ -81,6 +83,7 @@ describe("exact-body YooKassa recovery", () => {
         decryptor: {
           decrypt: vi.fn().mockResolvedValue({ body: "{}", bodyVersion: 2 }),
         },
+        admission: { admit: vi.fn().mockResolvedValue(true) },
         transport: { postExact: vi.fn() },
         completion: { bind: vi.fn(), manualReview, reschedule: vi.fn() },
       }),
@@ -98,12 +101,20 @@ describe("exact-body YooKassa recovery", () => {
       recoverExactYooKassaOperation({
         enabled: true,
         claim,
-        decryptor: { decrypt: vi.fn().mockResolvedValue({ body: "{}", bodyVersion: 1 }) },
-        transport: { postExact: vi.fn().mockRejectedValue(new Error("network")) },
+        decryptor: {
+          decrypt: vi.fn().mockResolvedValue({ body: "{}", bodyVersion: 1 }),
+        },
+        admission: { admit: vi.fn().mockResolvedValue(true) },
+        transport: {
+          postExact: vi.fn().mockRejectedValue(new Error("network")),
+        },
         completion: { bind: vi.fn(), manualReview: vi.fn(), reschedule },
       }),
     ).resolves.toEqual({ kind: "rescheduled" });
-    expect(reschedule).toHaveBeenCalledWith(claim.operationId, claim.leaseToken);
+    expect(reschedule).toHaveBeenCalledWith(
+      claim.operationId,
+      claim.leaseToken,
+    );
   });
 
   it.each([
@@ -120,8 +131,13 @@ describe("exact-body YooKassa recovery", () => {
           enabled: true,
           claim: { ...claim, status, providerObjectId },
           decryptor: { decrypt: vi.fn() },
+          admission: { admit: vi.fn().mockResolvedValue(true) },
           transport: { postExact },
-          completion: { bind: vi.fn(), manualReview: vi.fn(), reschedule: vi.fn() },
+          completion: {
+            bind: vi.fn(),
+            manualReview: vi.fn(),
+            reschedule: vi.fn(),
+          },
         }),
       ).resolves.toEqual({ kind: "ineligible" });
       expect(postExact).not.toHaveBeenCalled();

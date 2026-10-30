@@ -58,6 +58,11 @@ export interface YooKassaExactRecoveryTransport {
   }): Promise<{ readonly providerObjectId: string }>;
 }
 
+export interface YooKassaExactRecoveryAdmission {
+  /** Revalidates the current lease/cohort immediately before the irreversible POST. */
+  admit(operationId: string, leaseToken: string): Promise<boolean>;
+}
+
 export interface YooKassaExactRecoveryCompletion {
   /** Must fence by leaseToken and bind provider ID in one database transaction. */
   bind(
@@ -77,10 +82,14 @@ export async function recoverExactYooKassaOperation(input: {
   readonly enabled: boolean;
   readonly claim: YooKassaExactRecoveryClaim;
   readonly decryptor: YooKassaReplayDecryptor;
+  readonly admission: YooKassaExactRecoveryAdmission;
   readonly transport: YooKassaExactRecoveryTransport;
   readonly completion: YooKassaExactRecoveryCompletion;
 }): Promise<
-  | { readonly kind: "disabled" | "manual_review" | "ineligible" | "rescheduled" }
+  | {
+      readonly kind:
+        "disabled" | "manual_review" | "ineligible" | "rescheduled";
+    }
   | { readonly kind: "bound"; readonly providerObjectId: string }
 > {
   if (!input.enabled) return { kind: "disabled" };
@@ -109,6 +118,15 @@ export async function recoverExactYooKassaOperation(input: {
     );
     return { kind: "manual_review" };
   }
+  // Decryption can outlive a recovery lease or race a cohort transition. This
+  // database check is the final gate before request material reaches the provider.
+  if (
+    !(await input.admission.admit(
+      input.claim.operationId,
+      input.claim.leaseToken,
+    ))
+  )
+    return { kind: "ineligible" };
   let response: { readonly providerObjectId: string };
   try {
     response = await input.transport.postExact({

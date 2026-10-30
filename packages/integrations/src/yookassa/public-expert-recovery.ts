@@ -8,9 +8,15 @@ import {
 } from "./public-expert-gateway-contracts.js";
 
 const verified = new WeakSet<object>();
-export type PublicExpertFreshObservation = PublicExpertVerifiedObservation & {
-  readonly __publicFreshObservation: unique symbol;
-};
+type DeepReadonly<T> = T extends (...args: never[]) => unknown
+  ? T
+  : T extends object
+    ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+    : T;
+export type PublicExpertFreshObservation =
+  DeepReadonly<PublicExpertVerifiedObservation> & {
+    readonly __publicFreshObservation: unique symbol;
+  };
 export function assertPublicExpertFreshObservation(
   value: PublicExpertVerifiedObservation,
 ): asserts value is PublicExpertFreshObservation {
@@ -148,7 +154,7 @@ export class PublicExpertRecovery {
           return { kind: "pending" };
       }
       const payment = "test" in item ? item : null;
-      const fact = publicExpertVerifiedObservationSchema.parse({
+      const parsed = publicExpertVerifiedObservationSchema.parse({
         version: 1,
         requestId,
         providerObjectId: id,
@@ -193,6 +199,10 @@ export class PublicExpertRecovery {
           )
           .digest("hex")}`,
         observedAt,
+      });
+      const fact = Object.freeze({
+        ...parsed,
+        identity: Object.freeze({ ...parsed.identity }),
       }) as PublicExpertFreshObservation;
       verified.add(fact);
       let bound = s;
