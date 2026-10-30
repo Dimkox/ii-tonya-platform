@@ -4,9 +4,10 @@ export interface EarlyBirdRoleCapability {
   runtimeKeys: string[];
   functions: string[];
 }
-export function loadEarlyBirdRoleCapabilities(): Promise<
-  EarlyBirdRoleCapability[]
->;
+export function loadEarlyBirdRoleCapabilities(
+  throughMigration?: number,
+): Promise<EarlyBirdRoleCapability[]>;
 export function buildEarlyBirdRoleProvisioningSql(
   mapping: Record<string, string>,
+  options?: { financialLogin?: string },
 ): Promise<string>;

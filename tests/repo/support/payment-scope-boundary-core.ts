@@ -15,6 +15,10 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 ]);
 
 export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
+  "packages/integrations/src/yookassa/public-expert-gateway-contracts.ts",
+  "packages/integrations/src/yookassa/public-expert-gateway.ts",
+  "packages/integrations/src/yookassa/public-expert-recovery.ts",
+
   // Early Bird candidate inventory: explicit paths, independently reviewed before release.
   "packages/integrations/src/yookassa/early-bird-candidate-verifier.ts",
   "packages/integrations/src/yookassa/early-bird-deferred-checkout-sender.ts",
@@ -122,6 +126,11 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0084_public_expert_payment_gateway.sql",
+  "packages/db/migrations/meta/0084_snapshot.json",
+  "packages/db/migrations/state/0084_manifest.json",
+  "packages/db/migrations/state/0084_sql_objects.json",
+
   "packages/db/migrations/0083_early_bird_launch_publication.sql",
   "packages/db/migrations/meta/0083_snapshot.json",
   "packages/db/migrations/state/0083_manifest.json",
@@ -207,6 +216,11 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "public_expert_payment_requests",
+  "public_expert_payment_observations",
+  "public_expert_payment_resolutions",
+  "public_expert_provider_identities",
+
   "early_bird_launch_kit_jobs",
   // Exact relations introduced by canonical early-bird migrations.
   "early_bird_admission_candidates",
@@ -557,10 +571,23 @@ const approvedPaymentBoundaryPaths = new Set([
   ...YOOKASSA_PAYMENT_ALLOWED_PATHS,
 ]);
 const approvedPaymentBoundaryHashes = new Map([
+  [
+    "packages/integrations/src/yookassa/public-expert-gateway-contracts.ts",
+    "06020f93a396eec4258edbb0fe797d508036c571e40a6346ed6fa9b15028f366",
+  ],
+  [
+    "packages/integrations/src/yookassa/public-expert-gateway.ts",
+    "7d9117f6a7cfa536bbaa839b821b7f915f43a54b47c35c70be0c1f2c89175275",
+  ],
+  [
+    "packages/integrations/src/yookassa/public-expert-recovery.ts",
+    "865b7e41fb46db39f7a24965835629797fad264dc4f2bc263b4af5c7df2a2e7c",
+  ],
+
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "02640802bf781e8ec5605967a8d923556602ecd8a707c570b7ae8d077a2b9657",
+    "d62bcad8c4fa9517e478679ef57cf098a89b88f5ca1eac196051580d47b1064e",
   ],
   [
     "packages/contracts/src/index.ts",
@@ -568,7 +595,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/db/src/schema/index.ts",
-    "3ec7000804c76bd46cb148e459dc624acedec53372d0c5c4d4515fc09c46d08c",
+    "6feaf37da800ae379f968ee450cbee9d41a2ab5dd3fa76195331928384b19c89",
   ],
   [
     "apps/api/src/routes/public-client-catalog.ts",
@@ -614,7 +641,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "e8ab1ac6f434f3e7ea7f56c469ab18d780709468b238c9f8f9a21aee0c073d3f",
+    "66867a134b42d3359790287918f22acee6baedef27773fad48d302ca98d2a387",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -630,15 +657,15 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/contracts.ts",
-    "d3fffa812ea229b60911002a86ccfa0da7bc0a9acac224e9a8c2066f47250a0c",
+    "86eb749413850c6f3d2ca2979fb7faeed7f54c91271eed767010248c09167c9d",
   ],
   [
     "packages/integrations/src/yookassa/exact-body-recovery.ts",
-    "f1adc2c5e4d610f8d7977a0e048313ae44b8365ce3fe7247785544c6362e47f3",
+    "d2e361878ca06c405670c5d03071b39c0040a03530756799f0ce8038f00892a6",
   ],
   [
     "packages/integrations/src/yookassa/operation-port.ts",
-    "e05e7a6d3806837ddecf651c575856ec0869d31a3d8782d53aaa6fe280e0ac5b",
+    "6f79563e0f5676d4ea4e39b339654b1794e7c3ad21f60b0e68aff0184e4cb3c2",
   ],
   [
     "packages/integrations/src/yookassa/receipt-contact-source.ts",
@@ -746,6 +773,19 @@ const reviewedDomHarnessHashes = new Map([
 
 const approvedAutomationArtifactHashes = new Map([
   [
+    "scripts/experimental/yookassa_gateway/test_public_dispatch.py",
+    "eb4a8367068457864657a40edbebae150e6b7a87f8d6178b57666ccd871dc688",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_public_dispatch_response.py",
+    "0af5600221ee3eb90efd166623b06f2bf08e661195c0627368699ff9381d85e6",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_public_provider_projection.py",
+    "78b71bfb1281bfca676e615ad509db7d0f800ca144bded4d66ec11f97c1c3e4b",
+  ],
+
+  [
     "deploy/gateway-provision/sandbox-node-resolution.test.mjs",
     "93824ccd347fd699abf2b07d0047f9c05d91b2ef0cbe8eaf9bd39234ff0adf34",
   ],
@@ -780,7 +820,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "apps/api/src/early-bird-gateway-bootstrap.ts",
-    "f49a1a1c5dc7657bfbc8299804174812233eb503d57d0e070a6e8775bfea8ee1",
+    "47e6e1d629a90d01f49cc9d9e036c13b9845db2585e4680c1f18f302f2e27acb",
   ],
   [
     "apps/api/src/expert-early-bird-webhook-runtime.ts",
@@ -788,7 +828,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "apps/api/src/server.ts",
-    "af51974f8ccfa042eeac468a4f5e05f66e85662ab839767542ee24d5d3132065",
+    "d3f290dd170493f4ec439968de283594156d55d256ffa8e95019b4253e0a520e",
   ],
 
   [
@@ -869,7 +909,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "tests/repo/python-ci-discovery.test.ts",
-    "18200f2c018e03d3033eb786ca395642db7fffcf8bdbf806a967c03056123806",
+    "47938a713547abb0f44313d589d0c916fa1a7e879e0de1b2272f739135719efb",
   ],
 
   [
@@ -930,7 +970,7 @@ const approvedAutomationArtifactHashes = new Map([
   // Early Bird transport and isolation experiment inventory.
   [
     "scripts/experimental/yookassa_gateway/bound_gateway.py",
-    "fd2de8d25d3f9cad04a04b31f0022ee85ae61fcfa5713f7c2710a5ac197aa963",
+    "af73e40afacbc085bbbc77ba5251a9068af77d753387aac33531f7bdd0822f14",
   ],
   [
     "scripts/experimental/yookassa_gateway/docker_isolation_probe.py",
@@ -950,7 +990,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/experimental/yookassa_gateway/ipc.py",
-    "6b608d16c8dced513d98b9e6d4bf7a194d8b3fb8eab83d2e5d32d8772b53987f",
+    "79513ade279773ba25cac17ee716f193d9020323c988cfaa5244f81b23ee59c2",
   ],
   [
     "scripts/experimental/yookassa_gateway/launcher.py",
@@ -962,11 +1002,11 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/experimental/yookassa_gateway/pg_authority.py",
-    "7dde5bb588e215c9a22909a23e96fdef748020ba0d185f4775c35336c1917813",
+    "f95e6b1403963176382f2e0f7b81f215473fd841f65ed148c665e0d487f9d1aa",
   ],
   [
     "scripts/experimental/yookassa_gateway/provider_reader.py",
-    "47933326dd5ca5cdf3901a9247b0d34a3f9ed2d9072b69687e4d5a6c38e72175",
+    "a3c372d686289e91340b27a2f1236ab435e6c679ff50620562d8c223937a7895",
   ],
   [
     "scripts/experimental/yookassa_gateway/revocation.py",
@@ -1405,6 +1445,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.6.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0084_public_expert_payment_gateway.sql",
+    "1351262c0cb38f9e8a7c0a333485449978fc6f168fb14550346fcd4ceefc9b24",
+  ],
+  [
+    "packages/db/migrations/meta/0084_snapshot.json",
+    "df3328c8dfd6bb9bf24534d84ef9eec2947882c8aaf571619e6aaaff17d4dca7",
+  ],
+  [
+    "packages/db/migrations/state/0084_manifest.json",
+    "53504d0a59852b72b3ee408ead1bf5294c821041e8ca9478dc33d5530d696e8b",
+  ],
+  [
+    "packages/db/migrations/state/0084_sql_objects.json",
+    "2f3c9a26019f77dd457480642552a1301a79f0cfdd767c7a46c0ddaba68b6049",
+  ],
+
   [
     "packages/db/migrations/0083_early_bird_launch_publication.sql",
     "69427ca04b5b16004764d8cc6c20c061e1fad85b89eed60352f56529048918f7",
@@ -2353,7 +2410,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "b09dbb2decac2323923e8a4bb929c01811c7ea04e440749602d3f7dd9e91b80b",
+    "a3eea07160f3d8ca13e7cc4f4dd93396bd18755e1490540de196934315288031",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -2433,7 +2490,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "b09dbb2decac2323923e8a4bb929c01811c7ea04e440749602d3f7dd9e91b80b",
+    "a3eea07160f3d8ca13e7cc4f4dd93396bd18755e1490540de196934315288031",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -2636,6 +2693,10 @@ const isVersionedGetzillaToolingPath = (path: string): boolean =>
 
 // Exact reviewed deployment and CI discovery inventory.
 const reviewedGatewayProvisionArtifacts = new Set([
+  "scripts/experimental/yookassa_gateway/test_public_dispatch.py",
+  "scripts/experimental/yookassa_gateway/test_public_dispatch_response.py",
+  "scripts/experimental/yookassa_gateway/test_public_provider_projection.py",
+
   "deploy/gateway-provision/sandbox-node-resolution.test.mjs",
   "scripts/early-bird-bridge/migration-tags.mjs",
   "scripts/early-bird-bridge/migration-tags.test.mjs",
@@ -3606,6 +3667,9 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0084_snapshot.json", 1192800],
+    ["packages/db/migrations/state/0084_sql_objects.json", 1860501],
+
     ["packages/db/migrations/state/0083_sql_objects.json", 1416389],
     ["packages/db/migrations/meta/0083_snapshot.json", 1166391],
     ["packages/db/migrations/state/0075_sql_objects.json", 1064832],

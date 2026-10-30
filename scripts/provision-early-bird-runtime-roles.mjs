@@ -6,16 +6,27 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
-export async function loadEarlyBirdRoleCapabilities() {
+export async function loadEarlyBirdRoleCapabilities(
+  throughMigration = Infinity,
+) {
   return JSON.parse(
     await readFile(
       path.join(directory, "early-bird-role-capabilities.json"),
       "utf8",
     ),
-  ).capabilities;
+  )
+    .capabilities.filter((entry) => entry.migration <= throughMigration)
+    .map((entry) => ({
+      ...entry,
+      functions: entry.functions.filter(
+        (signature) =>
+          (entry.functionMigrations?.[signature] ?? entry.migration) <=
+          throughMigration,
+      ),
+    }));
 }
 /** Mapping contains existing login NAMES only; never credentials or DSNs. */
-export async function buildEarlyBirdRoleProvisioningSql(mapping) {
+export async function buildEarlyBirdRoleProvisioningSql(mapping, options = {}) {
   if (
     !mapping ||
     typeof mapping !== "object" ||
@@ -39,21 +50,56 @@ export async function buildEarlyBirdRoleProvisioningSql(mapping) {
     logins.add(login);
     entries.push({ capability: role, login, functions: capability.functions });
   }
+  if (
+    !options ||
+    typeof options !== "object" ||
+    Array.isArray(options) ||
+    Object.keys(options).some((key) => key !== "financialLogin") ||
+    (options.financialLogin !== undefined &&
+      (typeof options.financialLogin !== "string" ||
+        !/^[a-z][a-z0-9_]{0,62}$/u.test(options.financialLogin) ||
+        capabilities.some((entry) => entry.role === options.financialLogin) ||
+        logins.has(options.financialLogin)))
+  )
+    throw new Error("early_bird_financial_login_invalid");
+  const financialFunctions = JSON.parse(
+    await readFile(
+      path.join(directory, "early-bird-role-capabilities.json"),
+      "utf8",
+    ),
+  ).financialFunctions;
+  const financial = JSON.stringify(
+    options.financialLogin === undefined
+      ? null
+      : {
+          login: options.financialLogin,
+          functions: financialFunctions,
+        },
+  ).replaceAll("'", "''");
   const value = JSON.stringify(entries).replaceAll("'", "''");
   const body = await readFile(
     path.join(directory, "sql/provision-early-bird-runtime-roles.sql"),
     "utf8",
   );
-  return `BEGIN;\nSET LOCAL statement_timeout='30s';\nSET LOCAL lock_timeout='5s';\nSELECT set_config('ii_tonya.runtime_role_provision','${value}',true);\n${body}\nCOMMIT;\n`;
+  return `BEGIN;\nSET LOCAL statement_timeout='30s';\nSET LOCAL lock_timeout='5s';\nSELECT set_config('ii_tonya.runtime_role_provision','${value}',true);\nSELECT set_config('ii_tonya.runtime_financial_provision','${financial}',true);\n${body}\nCOMMIT;\n`;
 }
 
 async function main(args) {
-  if (args.length !== 2 || args[0] !== "--mapping")
-    throw new Error("usage: --mapping LOGIN_MAPPING_JSON_FILE");
+  if (
+    (args.length !== 2 && args.length !== 4) ||
+    args[0] !== "--mapping" ||
+    (args.length === 4 && args[2] !== "--financial-login")
+  )
+    throw new Error(
+      "usage: --mapping LOGIN_MAPPING_JSON_FILE [--financial-login EXISTING_PRIMARY_LOGIN]",
+    );
   // libpq credentials come exclusively from an operator-managed PGSERVICE/
   // PGPASSFILE environment. No connection URI/password CLI options are accepted.
   const mapping = JSON.parse(await readFile(args[1], "utf8"));
-  const sql = await buildEarlyBirdRoleProvisioningSql(mapping);
+  const sql = await buildEarlyBirdRoleProvisioningSql(
+    mapping,
+    args.length === 4 ? { financialLogin: args[3] } : {},
+  );
   const temporary = await mkdtemp(
     path.join(tmpdir(), "early-bird-role-provision-"),
   );

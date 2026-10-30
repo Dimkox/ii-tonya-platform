@@ -26,5 +26,10 @@
   "ii_tonya_worker_deferred_retention": "wave_worker_deferred_retention_v1",
   "ii_tonya_wave_final_call_worker": "wave_final_call_worker_v1",
   "ii_tonya_wave_publication_worker": "wave_publication_worker_v1",
-  "ii_tonya_wave_launch_kit_worker": "wave_launch_kit_worker_v1"
+  "ii_tonya_wave_launch_kit_worker": "wave_launch_kit_worker_v1",
+  "ii_tonya_public_onboarding_sender": "public_onboarding_sender_v1",
+  "ii_tonya_public_main_sender": "public_main_sender_v1",
+  "ii_tonya_public_refund_sender": "public_refund_sender_v1",
+  "ii_tonya_public_payment_binder": "public_payment_binder_v1",
+  "ii_tonya_public_payment_fact_writer": "public_payment_fact_writer_v1"
 }

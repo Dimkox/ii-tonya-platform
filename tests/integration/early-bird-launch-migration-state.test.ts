@@ -41,7 +41,15 @@ let output: string;
 const limitedPools: TestDatabase["db"]["$client"][] = [];
 beforeAll(async () => {
   database = await startDisposableTestPostgres();
-  await database.migrate();
+  const journal = read(`${folder}/meta/_journal.json`);
+  for (const entry of journal.entries.filter(
+    (entry: { idx: number }) => entry.idx <= latest,
+  ))
+    for (const statement of readFileSync(
+      `${folder}/${entry.tag}.sql`,
+      "utf8",
+    ).split("--> statement-breakpoint"))
+      if (statement.trim()) await database.db.$client.query(statement);
 }, 120_000);
 afterAll(async () => {
   await Promise.all(limitedPools.map((pool) => pool.end()));
@@ -57,7 +65,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
   ).rows[0]?.version;
   expect(version).toBe("170005");
   const journal = read(`${folder}/meta/_journal.json`);
-  expect(journal.entries.at(-1)).toMatchObject({
+  expect(journal.entries[latest]).toMatchObject({
     idx: latest,
     tag: "0083_early_bird_launch_publication",
     breakpoints: true,
@@ -153,7 +161,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
       String(row.definition).includes("FUNCTION early_bird_private."),
     ),
   ).toBe(false);
-  const capabilities = (await loadEarlyBirdRoleCapabilities()).filter(
+  const capabilities = (await loadEarlyBirdRoleCapabilities(latest)).filter(
     (capability) => capability.migration <= latest,
   );
   expect(capabilities).toHaveLength(28);

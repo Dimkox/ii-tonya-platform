@@ -6,9 +6,13 @@
       "runtimeKeys": ["gateway"],
       "functions": [
         "public.early_bird_gateway_revoke(uuid)",
-        "public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text)"
+        "public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text)",
+        "public.public_expert_gateway_claim(uuid,uuid,uuid,uuid,text,text)"
       ],
-      "migration": 81
+      "migration": 81,
+      "functionMigrations": {
+        "public.public_expert_gateway_claim(uuid,uuid,uuid,uuid,text,text)": 84
+      }
     },
     {
       "role": "ii_tonya_wave_sender",
@@ -206,6 +210,73 @@
       "runtimeKeys": ["launchKit"],
       "functions": ["public.early_bird_launch_kit_worker(text,jsonb)"],
       "migration": 83
+    },
+    {
+      "role": "ii_tonya_public_onboarding_sender",
+      "runtimeKeys": ["onboardingSender"],
+      "functions": [
+        "early_bird_private.public_onboarding_source(uuid,uuid)",
+        "early_bird_private.public_onboarding_prepare(uuid,uuid,uuid,jsonb)",
+        "early_bird_private.public_onboarding_snapshot(uuid,uuid)",
+        "early_bird_private.public_onboarding_admit(uuid,uuid,text)",
+        "early_bird_private.public_onboarding_invoice(uuid)",
+        "early_bird_private.public_onboarding_pending(integer,uuid)"
+      ],
+      "migration": 84
+    },
+    {
+      "role": "ii_tonya_public_main_sender",
+      "runtimeKeys": ["mainSender"],
+      "functions": [
+        "early_bird_private.public_main_source(uuid,uuid)",
+        "early_bird_private.public_main_prepare(uuid,uuid,uuid,jsonb)",
+        "early_bird_private.public_main_snapshot(uuid,uuid)",
+        "early_bird_private.public_main_admit(uuid,uuid,text)"
+      ],
+      "migration": 84
+    },
+    {
+      "role": "ii_tonya_public_refund_sender",
+      "runtimeKeys": ["refundSender"],
+      "functions": [
+        "early_bird_private.public_refund_source(uuid,uuid)",
+        "early_bird_private.public_refund_prepare(uuid,uuid,uuid,jsonb)",
+        "early_bird_private.public_refund_snapshot(uuid,uuid)",
+        "early_bird_private.public_refund_admit(uuid,uuid,text)",
+        "early_bird_private.public_refund_pending(integer,uuid)"
+      ],
+      "migration": 84
+    },
+    {
+      "role": "ii_tonya_public_payment_binder",
+      "runtimeKeys": ["binder"],
+      "functions": [
+        "early_bird_private.public_payment_candidate(uuid)",
+        "early_bird_private.public_payment_bound(uuid)",
+        "early_bird_private.public_payment_bind(uuid,text,jsonb)",
+        "early_bird_private.public_payment_pending(integer,uuid)",
+        "early_bird_private.public_payment_hint(text,uuid,boolean)"
+      ],
+      "migration": 84
+    },
+    {
+      "role": "ii_tonya_public_payment_fact_writer",
+      "runtimeKeys": ["observations"],
+      "functions": [
+        "early_bird_private.public_payment_observe(uuid,text,jsonb)",
+        "early_bird_private.public_payment_resolve(uuid,uuid)",
+        "early_bird_private.public_payment_expire(uuid,uuid)",
+        "early_bird_private.public_payment_complete(uuid,uuid)"
+      ],
+      "migration": 84
     }
+  ],
+  "financialFunctions": [
+    "early_bird_private.public_payment_apply_guard(uuid,uuid,uuid)",
+    "early_bird_private.public_payment_complete(uuid,uuid)",
+    "early_bird_private.public_time(timestamp with time zone)",
+    "early_bird_private.public_order_expiry_allowed(uuid)",
+    "early_bird_private.public_wave_application(uuid)",
+    "early_bird_private.public_current_wave_end(uuid)"
   ]
 }

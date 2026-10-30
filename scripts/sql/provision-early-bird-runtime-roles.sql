@@ -9,7 +9,7 @@ BEGIN
  FOR item IN SELECT value FROM jsonb_array_elements(entries) LOOP
   capability:=item->>'capability'; login_name:=item->>'login';
   IF capability IS NULL OR login_name IS NULL OR jsonb_typeof(item->'functions') IS DISTINCT FROM 'array' OR jsonb_array_length(item->'functions')=0
-    OR capability !~ '^ii_tonya_(wave|deferred|worker)_[a-z_]+$' OR login_name !~ '^[a-z][a-z0-9_]{0,62}$'
+    OR capability !~ '^ii_tonya_(wave|deferred|worker|public)_[a-z_]+$' OR login_name !~ '^[a-z][a-z0-9_]{0,62}$'
     OR capability=login_name OR login_name=current_user
     OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=login_name AND rolcanlogin AND rolinherit AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls)
   THEN RAISE EXCEPTION 'early_bird_role_login_unsafe'; END IF;
@@ -17,11 +17,11 @@ BEGIN
     EXECUTE format('CREATE ROLE %I NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS',capability);
   END IF;
   IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=capability AND NOT rolcanlogin AND NOT rolinherit AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls)
-    OR EXISTS(SELECT 1 FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member WHERE member_role.rolname=capability)
+    OR EXISTS(SELECT 1 FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member JOIN pg_roles granted ON granted.oid=m.roleid WHERE member_role.rolname=capability OR (granted.rolname=capability AND member_role.rolname<>login_name))
     OR EXISTS(SELECT 1 FROM pg_auth_members m JOIN pg_roles member_role ON member_role.oid=m.member JOIN pg_roles granted ON granted.oid=m.roleid WHERE member_role.rolname=login_name AND (granted.rolname<>capability OR m.admin_option))
   THEN RAISE EXCEPTION 'early_bird_role_membership_unsafe'; END IF;
   FOR signature IN SELECT jsonb_array_elements_text(item->'functions') LOOP
-    IF signature !~ '^(public|early_bird_private)\.[a-z_]+\((uuid|text|integer|bigint|jsonb|timestamp with time zone)(,(uuid|text|integer|bigint|jsonb|timestamp with time zone))*\)$' THEN RAISE EXCEPTION 'early_bird_role_function_invalid'; END IF;
+    IF signature !~ '^(public|early_bird_private)\.[a-z_]+\((uuid|text|integer|bigint|boolean|jsonb|timestamp with time zone)(,(uuid|text|integer|bigint|boolean|jsonb|timestamp with time zone))*\)$' THEN RAISE EXCEPTION 'early_bird_role_function_invalid'; END IF;
     fn:=to_regprocedure(signature);
     IF fn IS NULL OR NOT EXISTS(SELECT 1 FROM pg_proc WHERE oid=fn AND prosecdef)
       OR has_function_privilege('public',fn,'EXECUTE')
@@ -41,4 +41,29 @@ BEGIN
   END LOOP;
   EXECUTE format('GRANT %I TO %I',capability,login_name);
  END LOOP;
+END $$;
+
+-- The existing primary financial LOGIN is explicitly named by the operator.
+-- Its pre-existing financial table privileges are retained, never expanded here.
+-- These are only direct invocations by the canonical repositories/invoker gates;
+-- definer-only identity/credit/never-sent helpers are deliberately absent.
+DO $$
+DECLARE item jsonb:=current_setting('ii_tonya.runtime_financial_provision',true)::jsonb;
+ login_name text; signature text; fn oid;
+BEGIN
+ IF item IS NULL OR item='null'::jsonb THEN RETURN; END IF;
+ login_name:=item->>'login';
+ IF login_name IS NULL OR login_name !~ '^[a-z][a-z0-9_]{0,62}$'
+  OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=login_name AND rolcanlogin AND rolinherit AND NOT rolsuper AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolbypassrls)
+  OR EXISTS(SELECT 1 FROM jsonb_array_elements(current_setting('ii_tonya.runtime_role_provision')::jsonb) e WHERE e->>'login'=login_name OR e->>'capability'=login_name)
+  OR EXISTS(SELECT 1 FROM pg_roles r WHERE r.rolname LIKE 'ii\_tonya\_%' ESCAPE '\' AND r.rolname ~ '^ii_tonya_(wave|deferred|worker|public)_' AND pg_has_role(login_name,r.oid,'MEMBER'))
+ THEN RAISE EXCEPTION 'early_bird_financial_login_unsafe'; END IF;
+ FOR signature IN SELECT jsonb_array_elements_text(item->'functions') LOOP
+  IF signature !~ '^early_bird_private\.[a-z_]+\((uuid|timestamp with time zone)(,(uuid|timestamp with time zone))*\)$' THEN RAISE EXCEPTION 'early_bird_financial_function_invalid'; END IF;
+  fn:=to_regprocedure(signature);
+  IF fn IS NULL OR NOT EXISTS(SELECT 1 FROM pg_proc WHERE oid=fn AND prosecdef)
+   OR has_function_privilege('public',fn,'EXECUTE') THEN RAISE EXCEPTION 'early_bird_financial_function_unsafe'; END IF;
+  EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO %I',signature,login_name);
+ END LOOP;
+ EXECUTE format('GRANT USAGE ON SCHEMA early_bird_private TO %I',login_name);
 END $$;

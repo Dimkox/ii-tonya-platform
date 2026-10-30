@@ -108,5 +108,27 @@
       "urlFile": "/run/credentials/ii-tonya-api.service/deferredBoundReader-db",
       "login": "wave_deferred_bound_reader_v1"
     }
+  },
+  "publicDatabases": {
+    "onboardingSender": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-onboardingSender-db",
+      "login": "public_onboarding_sender_v1"
+    },
+    "mainSender": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-mainSender-db",
+      "login": "public_main_sender_v1"
+    },
+    "refundSender": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-refundSender-db",
+      "login": "public_refund_sender_v1"
+    },
+    "binder": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-binder-db",
+      "login": "public_payment_binder_v1"
+    },
+    "observations": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-observations-db",
+      "login": "public_payment_fact_writer_v1"
+    }
   }
 }

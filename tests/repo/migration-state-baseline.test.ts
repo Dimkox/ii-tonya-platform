@@ -7,7 +7,7 @@ const read = (path: string) =>
   existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
 
 describe("database-derived migration state baseline", () => {
-  it.each([81, 82, 83])(
+  it.each([81, 82, 83, 84])(
     "records protected private schemas and PUBLIC execution at state %i",
     (last) => {
       const tag = String(last).padStart(4, "0");
@@ -23,7 +23,7 @@ describe("database-derived migration state baseline", () => {
         supplement.functionPrivileges.filter(
           (entry: { schema: string }) => entry.schema === "early_bird_private",
         ),
-      ).toHaveLength(7);
+      ).toHaveLength(last === 84 ? 53 : 7);
       expect(
         supplement.functionPrivileges
           .filter(
@@ -36,6 +36,35 @@ describe("database-derived migration state baseline", () => {
       ).toBe(true);
     },
   );
+  it("pins the85-entry public state and identity-backed observation order", () => {
+    const snapshot = read(`${folder}/meta/0084_snapshot.json`),
+      state = read(`${folder}/state/0084_sql_objects.json`);
+    expect(Object.keys(snapshot.tables)).toHaveLength(280);
+    expect(snapshot.prevId).toBe(read(`${folder}/meta/0083_snapshot.json`).id);
+    expect(
+      read(`${folder}/state/0084_manifest.json`).migrations.slice(0, 84),
+    ).toEqual(read(`${folder}/state/0083_manifest.json`).migrations);
+    expect(state.functions).toHaveLength(323);
+    expect(state.triggers).toHaveLength(293);
+    expect(state.constraints).toHaveLength(1922);
+    expect(state.indexes).toHaveLength(672);
+    expect(state.sequences).toHaveLength(4);
+    expect(
+      state.sequences.find(
+        (entry: { name: string }) =>
+          entry.name ===
+          "public_expert_payment_observations_observation_sequence_seq",
+      ),
+    ).toMatchObject({
+      table_name: "public_expert_payment_observations",
+      column_name: "observation_sequence",
+      identity_kind: "a",
+      increment: "1",
+      public_usage: false,
+      public_select: false,
+      public_update: false,
+    });
+  });
   it("preserves composite FK position, index opclasses and unvalidated constraints", () => {
     const snapshot = read(`${folder}/meta/0039_snapshot.json`);
     expect(
@@ -95,7 +124,7 @@ describe("database-derived migration state baseline", () => {
 
   it.each([
     39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 70, 71, 72, 73, 74, 75,
-    76, 77, 78, 79, 80, 81, 82, 83,
+    76, 77, 78, 79, 80, 81, 82, 83, 84,
   ])(
     "binds state %i evidence to every SQL input and exact snapshot bytes",
     (last) => {

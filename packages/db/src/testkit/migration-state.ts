@@ -54,6 +54,7 @@ where n.nspname='public' order by table_name,name`;
 export async function captureMigrationSqlState(
   db: Pick<DrizzleDb, "execute">,
   includeEarlyBirdPrivate = false,
+  includeSequences = false,
 ) {
   const namespaces = includeEarlyBirdPrivate
     ? sql`n.nspname in ('public','early_bird_private')`
@@ -103,8 +104,30 @@ export async function captureMigrationSqlState(
     where ${namespaces} and not exists(select 1 from pg_depend d
       where d.classid='pg_proc'::regclass and d.objid=p.oid and d.deptype='e')
     order by schema,name,arguments`);
+  // Identity-backed observation order is authoritative catalogue evidence only
+  // for the new baseline; historical supplements retain their exact old shape.
+  const sequences = includeSequences
+    ? (
+        await db.execute(sql`
+    select n.nspname schema,c.relname name,s.seqstart::text start,
+      s.seqincrement::text increment,s.seqmin::text minimum,s.seqmax::text maximum,
+      s.seqcache::text cache,s.seqcycle cycle,
+      owner.relname table_name,a.attname column_name,a.attidentity identity_kind,
+      has_sequence_privilege('public',c.oid,'USAGE') public_usage,
+      has_sequence_privilege('public',c.oid,'SELECT') public_select,
+      has_sequence_privilege('public',c.oid,'UPDATE') public_update
+    from pg_sequence s join pg_class c on c.oid=s.seqrelid
+    join pg_namespace n on n.oid=c.relnamespace
+    left join pg_depend d on d.classid='pg_class'::regclass and d.objid=c.oid
+      and d.refclassid='pg_class'::regclass and d.deptype in ('a','i')
+    left join pg_class owner on owner.oid=d.refobjid
+    left join pg_attribute a on a.attrelid=d.refobjid and a.attnum=d.refobjsubid
+    where n.nspname='public' order by schema,name`)
+      ).rows
+    : undefined;
   return {
     ...historical,
+    ...(sequences ? { sequences } : {}),
     schemas: schemas.rows,
     functionPrivileges: functionPrivileges.rows,
   };

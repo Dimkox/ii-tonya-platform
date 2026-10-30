@@ -12,6 +12,7 @@ test("maps each audited capability only to its reviewed function set", async () 
     ii_tonya_wave_gateway: [
       "public.early_bird_gateway_revoke(uuid)",
       "public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text)",
+      "public.public_expert_gateway_claim(uuid,uuid,uuid,uuid,text,text)",
     ],
     ii_tonya_wave_sender: [
       "early_bird_private.owner_send_snapshot(uuid,uuid,uuid)",
@@ -99,6 +100,40 @@ test("maps each audited capability only to its reviewed function set", async () 
     ii_tonya_wave_launch_kit_worker: [
       "public.early_bird_launch_kit_worker(text,jsonb)",
     ],
+    ii_tonya_public_onboarding_sender: [
+      "early_bird_private.public_onboarding_source(uuid,uuid)",
+      "early_bird_private.public_onboarding_prepare(uuid,uuid,uuid,jsonb)",
+      "early_bird_private.public_onboarding_snapshot(uuid,uuid)",
+      "early_bird_private.public_onboarding_admit(uuid,uuid,text)",
+      "early_bird_private.public_onboarding_invoice(uuid)",
+      "early_bird_private.public_onboarding_pending(integer,uuid)",
+    ],
+    ii_tonya_public_main_sender: [
+      "early_bird_private.public_main_source(uuid,uuid)",
+      "early_bird_private.public_main_prepare(uuid,uuid,uuid,jsonb)",
+      "early_bird_private.public_main_snapshot(uuid,uuid)",
+      "early_bird_private.public_main_admit(uuid,uuid,text)",
+    ],
+    ii_tonya_public_refund_sender: [
+      "early_bird_private.public_refund_source(uuid,uuid)",
+      "early_bird_private.public_refund_prepare(uuid,uuid,uuid,jsonb)",
+      "early_bird_private.public_refund_snapshot(uuid,uuid)",
+      "early_bird_private.public_refund_admit(uuid,uuid,text)",
+      "early_bird_private.public_refund_pending(integer,uuid)",
+    ],
+    ii_tonya_public_payment_binder: [
+      "early_bird_private.public_payment_candidate(uuid)",
+      "early_bird_private.public_payment_bound(uuid)",
+      "early_bird_private.public_payment_bind(uuid,text,jsonb)",
+      "early_bird_private.public_payment_pending(integer,uuid)",
+      "early_bird_private.public_payment_hint(text,uuid,boolean)",
+    ],
+    ii_tonya_public_payment_fact_writer: [
+      "early_bird_private.public_payment_observe(uuid,text,jsonb)",
+      "early_bird_private.public_payment_resolve(uuid,uuid)",
+      "early_bird_private.public_payment_expire(uuid,uuid)",
+      "early_bird_private.public_payment_complete(uuid,uuid)",
+    ],
   };
   assert.deepEqual(
     Object.fromEntries(catalogue.map((entry) => [entry.role, entry.functions])),
@@ -109,11 +144,11 @@ test("maps each audited capability only to its reviewed function set", async () 
     catalogue.flatMap((entry) => entry.runtimeKeys).length,
   );
   assert.deepEqual(
-    [81, 82, 83].map(
+    [81, 82, 83, 84].map(
       (migration) =>
         catalogue.filter((entry) => entry.migration === migration).length,
     ),
-    [22, 4, 2],
+    [22, 4, 2, 5],
   );
 });
 
@@ -216,7 +251,12 @@ test("operational API and worker examples use the same valid dedicated logins as
         "utf8",
       ),
     );
-    for (const group of ["databases", "webhookDatabases", "deferredDatabases"])
+    for (const group of [
+      "databases",
+      "webhookDatabases",
+      "deferredDatabases",
+      "publicDatabases",
+    ])
       for (const [key, value] of Object.entries(config[group] ?? {})) {
         const runtimeKey =
           group === "deferredDatabases" ? deferredKeys[key] : key;
@@ -262,4 +302,47 @@ test("worker example uses an actual consent-policy version and the shared contac
       `CLIENT_MESSAGING_CONSENT_POLICY_VERSION=${worker.messagingPolicyVersion}`,
     ),
   );
+});
+
+test("historical provisioning preserves the83-entry contract", async () => {
+  const catalogue = await loadEarlyBirdRoleCapabilities(83);
+  assert.equal(catalogue.length, 28);
+  assert.equal(catalogue[0].functions.length, 2);
+  assert.ok(catalogue.every((entry) => entry.migration <= 83));
+});
+
+test("existing primary financial login is explicit and cannot alias an isolated sender", async () => {
+  const mapping = { ii_tonya_public_main_sender: "public_main_runtime" };
+  const sql = await buildEarlyBirdRoleProvisioningSql(mapping, {
+    financialLogin: "existing_primary",
+  });
+  const entries = JSON.parse(
+    sql.match(
+      /set_config\('ii_tonya.runtime_financial_provision','([^']+)'/u,
+    )[1],
+  );
+  assert.deepEqual(entries, {
+    login: "existing_primary",
+    functions: [
+      "early_bird_private.public_payment_apply_guard(uuid,uuid,uuid)",
+      "early_bird_private.public_payment_complete(uuid,uuid)",
+      "early_bird_private.public_time(timestamp with time zone)",
+      "early_bird_private.public_order_expiry_allowed(uuid)",
+      "early_bird_private.public_wave_application(uuid)",
+      "early_bird_private.public_current_wave_end(uuid)",
+    ],
+  });
+  for (const financialLogin of [
+    "public_main_runtime",
+    "ii_tonya_public_main_sender",
+    "x';grant all",
+    {},
+    "postgres://secret",
+  ])
+    await assert.rejects(
+      buildEarlyBirdRoleProvisioningSql(mapping, { financialLogin }),
+      /early_bird_financial_login_invalid/,
+    );
+  const unchanged = await buildEarlyBirdRoleProvisioningSql(mapping);
+  assert.match(unchanged, /runtime_financial_provision','null'/u);
 });

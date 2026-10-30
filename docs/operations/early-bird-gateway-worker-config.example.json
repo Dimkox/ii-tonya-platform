@@ -39,5 +39,39 @@
       "login": "wave_launch_kit_worker_v1",
       "urlFile": "/run/credentials/ii-tonya-worker.service/launch-kit-db"
     }
+  },
+  "publicDatabases": {
+    "onboardingSender": {
+      "urlFile": "/run/credentials/ii-tonya-worker.service/public-onboardingSender-db",
+      "login": "public_onboarding_sender_v1"
+    },
+    "mainSender": {
+      "urlFile": "/run/credentials/ii-tonya-worker.service/public-mainSender-db",
+      "login": "public_main_sender_v1"
+    },
+    "refundSender": {
+      "urlFile": "/run/credentials/ii-tonya-worker.service/public-refundSender-db",
+      "login": "public_refund_sender_v1"
+    },
+    "binder": {
+      "urlFile": "/run/credentials/ii-tonya-worker.service/public-binder-db",
+      "login": "public_payment_binder_v1"
+    },
+    "observations": {
+      "urlFile": "/run/credentials/ii-tonya-worker.service/public-observations-db",
+      "login": "public_payment_fact_writer_v1"
+    }
+  },
+  "requestKeys": {
+    "activeReference": "request:v1",
+    "files": {
+      "request:v1": "/run/credentials/ii-tonya-worker.service/early-bird-request-key"
+    }
+  },
+  "receiptKeys": {
+    "activeKeyId": "receipt-v1",
+    "files": {
+      "receipt-v1": "/run/credentials/ii-tonya-worker.service/early-bird-receipt-key"
+    }
   }
 }
