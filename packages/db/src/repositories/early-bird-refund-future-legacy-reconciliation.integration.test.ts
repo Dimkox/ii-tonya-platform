@@ -1,25 +1,25 @@
-import { applyEarlyBirdDraftIfNeeded } from "../testkit/early-bird-draft-helper.js";
+import { createEarlyBirdCanonicalCoverageFixture } from "../testkit/early-bird-canonical-coverage-fixture.js";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { expertResidencyPaymentEventSchema } from "@ii-tonya/contracts";
 import { verifiedEventFixture } from "../../../integrations/src/expert-residency/verified-event.js";
-import {
-  startExpertReferralTestDatabase,
-  type ExpertReferralTestDatabase,
-} from "../testkit/expert-referral.js";
+import type { ExpertReferralTestDatabase } from "../testkit/expert-referral.js";
 import { PostgresExpertResidencyRepository } from "./expert-residency-repository.js";
 import { PostgresExpertResidencyProviderInboxRepository } from "./expert-residency-provider-inbox-repository.js";
 let fixture: ExpertReferralTestDatabase;
+let coverage: Awaited<
+  ReturnType<typeof createEarlyBirdCanonicalCoverageFixture>
+>;
 beforeAll(async () => {
-  fixture = await startExpertReferralTestDatabase();
-  await fixture.enableExpertReferralCommands();
+  coverage = await createEarlyBirdCanonicalCoverageFixture();
+  fixture = coverage.db;
 }, 120_000);
 afterAll(async () => {
-  await fixture?.stop();
+  await coverage?.stop();
 }, 120_000);
 it("records reconciliation when a wave refund precedes a future legacy coverage", async () => {
-  const expert = await fixture.createExpertIdentity();
+  const expert = coverage.expert;
   const repository = new PostgresExpertResidencyRepository(fixture.db);
   const audit = await fixture.createAdminAudit({
     action: "expert_residency.tariff_create",
@@ -59,39 +59,49 @@ it("records reconciliation when a wave refund precedes a future legacy coverage"
       verifiedAt: new Date().toISOString(),
     },
   );
-  const intent = randomUUID();
-  await fixture.db.execute(
-    sql`create table early_bird_composite_intents(id uuid primary key, invoice_id uuid not null, user_id uuid not null, provider_mode text not null, pricing_policy text not null, price_kind text not null, onboarding_minor bigint not null, subscription_minor bigint not null, total_minor bigint not null, base_offer_shown_at timestamptz not null, expires_at timestamptz not null, launch_at timestamptz not null, status text not null, unique(id,user_id))`,
-  );
-  await fixture.db.execute(
-    sql`create table early_bird_verified_bindings(intent_id uuid primary key, user_id uuid not null, provider_object_id text not null)`,
-  );
-  await applyEarlyBirdDraftIfNeeded(
+  const intent = coverage.intentId;
+  await coverage.recordWaveSuccess();
+  const wave = (
+    await fixture.db.execute<{ starts: string | Date; ends: string | Date }>(
+      sql`select starts_at as starts,ends_at as ends from early_bird_effective_coverages where intent_id=${intent}::uuid`,
+    )
+  ).rows[0]!;
+  const settled = await new PostgresExpertResidencyProviderInboxRepository(
     fixture.db,
-    "docs/superpowers/implementation-artifacts/drafts/0082_early_bird_settlement.sql",
+  ).settle(event as never);
+  expect(settled.residencyStartsAt).toBe(new Date(wave.ends).toISOString());
+  expect(new Date(settled.residencyStartsAt).getTime()).toBeGreaterThan(
+    Date.now(),
   );
+  const immutableOrder = (
+    await fixture.db.execute(
+      sql`select to_jsonb(o) value from expert_residency_orders o where id=${order.id}::uuid`,
+    )
+  ).rows[0]!.value;
+  await coverage.recordFullRefund();
+  // Replay the exact persisted canonical refund command, preserving SQL times
+  // and its original verified identity. Do not manufacture another provider fact.
   await fixture.db.execute(
-    sql`insert into early_bird_composite_intents values(${intent}::uuid,${randomUUID()}::uuid,${expert.userId}::uuid,'live','owner_test_10_20_v1','fixed_test',1000,2000,3000,'2026-01-01Z','2026-01-11Z','2027-01-11T00:00:00+03:00','unknown')`,
-  );
-  await fixture.db.execute(
-    sql`insert into early_bird_verified_bindings values(${intent}::uuid,${expert.userId}::uuid,'reverse-pay')`,
-  );
-  await fixture.db.execute(
-    sql`select early_bird_record_success(${intent}::uuid,${expert.userId}::uuid,'reverse-pay',${`sha256:${"a".repeat(64)}`},'2026-01-02T00:00:00Z'::timestamptz)`,
-  );
-  await new PostgresExpertResidencyProviderInboxRepository(fixture.db).settle(
-    event as never,
-  );
-  await fixture.db.execute(
-    sql`select early_bird_record_full_refund(${intent}::uuid,${expert.userId}::uuid,'reverse-refund',${`sha256:${"b".repeat(64)}`},3000::bigint,'2026-01-03T00:00:00Z'::timestamptz)`,
-  );
-  await fixture.db.execute(
-    sql`select early_bird_record_full_refund(${intent}::uuid,${expert.userId}::uuid,'reverse-refund',${`sha256:${"b".repeat(64)}`},3000::bigint,'2026-01-03T00:00:00Z'::timestamptz)`,
+    sql`select early_bird_record_full_refund(r.intent_id,r.user_id,r.provider_refund_id,r.evidence_digest,r.amount_minor,r.occurred_at) from early_bird_payment_full_refunds r where r.intent_id=${intent}::uuid`,
   );
   const pending = await fixture.db.execute<{ orderId: string }>(
     sql`select order_id as "orderId" from early_bird_coverage_reconciliation where intent_id=${intent}::uuid`,
   );
   expect(pending.rows.map((row) => row.orderId)).toEqual([order.id]);
+  expect(
+    (
+      await fixture.db.execute(
+        sql`select count(*)::int n from early_bird_payment_full_refunds where intent_id=${intent}::uuid`,
+      )
+    ).rows[0]?.n,
+  ).toBe(1);
+  expect(
+    (
+      await fixture.db.execute(
+        sql`select to_jsonb(o) value from expert_residency_orders o where id=${order.id}::uuid`,
+      )
+    ).rows[0]!.value,
+  ).toEqual(immutableOrder);
   await expect(
     fixture.db.execute(
       sql`select early_bird_active_coverage_end(${expert.userId}::uuid)`,

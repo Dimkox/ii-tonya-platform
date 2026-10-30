@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { copyFile, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { expertResidencyPaymentEventSchema } from "@ii-tonya/contracts";
@@ -16,11 +20,33 @@ const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only";
 
 let fixture: ExpertReferralTestDatabase;
 let limited: Pool;
+let prefixDirectory: string | undefined;
 const role = "early_bird_legacy_witness";
 beforeAll(async () => {
-  fixture = await startExpertReferralTestDatabase(undefined, {
-    forceDisposableCluster: true,
-  });
+  const journal = JSON.parse(
+    readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+  ) as { entries: Array<{ idx: number; tag: string }> };
+  const prefix = journal.entries.filter((entry) => entry.idx <= 80);
+  expect(prefix).toHaveLength(81);
+  expect(prefix.at(-1)?.tag).toBe("0080_early_bird_form_bridge");
+  // The first payment genuinely predates the Wave migration. Keep every real
+  // historical SQL file and journal hash; never remove installed capabilities.
+  prefixDirectory = await mkdtemp(join(tmpdir(), "legacy-role-prefix-"));
+  await mkdir(join(prefixDirectory, "meta"));
+  await writeFile(
+    join(prefixDirectory, "meta/_journal.json"),
+    JSON.stringify({ ...journal, entries: prefix }),
+  );
+  for (const entry of prefix)
+    await copyFile(
+      `packages/db/migrations/${entry.tag}.sql`,
+      join(prefixDirectory, `${entry.tag}.sql`),
+    );
+  const migrationsFolder = prefixDirectory;
+  fixture = await startExpertReferralTestDatabase(
+    (db) => migrate(db, { migrationsFolder }),
+    { forceDisposableCluster: true },
+  );
   await fixture.enableExpertReferralCommands();
   await fixture.db.execute(
     sql.raw(`create role ${role} login password 'synthetic-only' noinherit nosuperuser nocreatedb nocreaterole nobypassrls;
@@ -39,8 +65,16 @@ beforeAll(async () => {
   limited = new Pool({ connectionString: address.toString(), max: 1 });
 }, 120_000);
 afterAll(async () => {
-  await limited?.end();
-  await fixture?.stop();
+  try {
+    await limited?.end();
+  } finally {
+    try {
+      await fixture?.stop();
+    } finally {
+      if (prefixDirectory)
+        await rm(prefixDirectory, { recursive: true, force: true });
+    }
+  }
 }, 120_000);
 
 function hasCode(error: unknown, code: string): boolean {
@@ -53,7 +87,7 @@ function hasCode(error: unknown, code: string): boolean {
   return false;
 }
 
-it("preserves existing legacy settlement through real 0081/0082 schema with only coverage helper grants", async () => {
+it("preserves legacy settlement across the canonical Wave migrations with only coverage helper grants", async () => {
   const expert = await fixture.createExpertIdentity();
   const repository = new PostgresExpertResidencyRepository(fixture.db);
   const audit = await fixture.createAdminAudit({
@@ -100,23 +134,31 @@ it("preserves existing legacy settlement through real 0081/0082 schema with only
     drizzle(limited) as never,
   );
   const before = await makeEvent();
+  expect(
+    (
+      await fixture.db.execute(
+        sql`select to_regclass('public.early_bird_payment_successes') is null as absent,(select count(*)::int from drizzle.__drizzle_migrations) as migrations`,
+      )
+    ).rows[0],
+  ).toEqual({ absent: true, migrations: 81 });
   await expect(inbox.settle(before)).resolves.toMatchObject({
     kind: "settled",
     paymentId: before.paymentId,
   });
-  for (const draft of [
-    "0081_early_bird_composite.sql",
-    "0082_early_bird_settlement.sql",
-  ]) {
-    await fixture.db.execute(
-      sql.raw(
-        readFileSync(
-          `docs/superpowers/implementation-artifacts/drafts/${draft}`,
-          "utf8",
-        ),
-      ),
-    );
-  }
+  await migrate(fixture.db, { migrationsFolder: "packages/db/migrations" });
+  expect(
+    (
+      await fixture.db.execute(
+        sql`select count(*)::int n from drizzle.__drizzle_migrations`,
+      )
+    ).rows[0]?.n,
+  ).toBe(
+    (
+      JSON.parse(
+        readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+      ) as { entries: unknown[] }
+    ).entries.length,
+  );
   const after = await makeEvent();
   await expect(inbox.settle(after)).rejects.toSatisfy((error: unknown) =>
     hasCode(error, "42501"),
