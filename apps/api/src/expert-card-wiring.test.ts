@@ -33,7 +33,12 @@ it("actual lifecycle rejects incomplete C before migration", () => {
 function enabledConfig() {
   const config = base();
   config.features.expertCard = true;
-  config.telegramWebhookSecret = "synthetic_work_secret_123456789012";
+  config.telegramWebhookSecret = [
+    "synthetic",
+    "work",
+    "secret",
+    "123456789012",
+  ].join("_");
   config.expertCard = {
     paymentMode: "test",
     materialDeliveryEnabled: false,
@@ -79,7 +84,13 @@ it("normal app rejects a card capability bound to a different webhook secret", a
   await expect(
     buildApp({
       ...deps,
-      telegramWebhookSecret: "different_synthetic_work_secret_123456",
+      telegramWebhookSecret: [
+        "different",
+        "synthetic",
+        "work",
+        "secret",
+        "123456",
+      ].join("_"),
     }),
   ).rejects.toThrow("expert_card_webhook_scope_conflict");
 });

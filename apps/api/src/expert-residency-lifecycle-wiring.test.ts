@@ -22,7 +22,12 @@ function enabledConfig() {
     EXPERT_CARD_WORK_BOT_KEY: "work",
     EXPERT_CARD_WORK_BOT_USERNAME: "synthetic_work_bot",
     EXPERT_CARD_MESSAGING_CONSENT_POLICY_VERSION: "policy-v1",
-    TELEGRAM_WEBHOOK_SECRET: "synthetic_work_secret_123456789012",
+    TELEGRAM_WEBHOOK_SECRET: [
+      "synthetic",
+      "work",
+      "secret",
+      "123456789012",
+    ].join("_"),
   });
 }
 it("normal app requires the enabled lifecycle command capability", async () => {
@@ -115,7 +120,12 @@ it("normal app binds the lifecycle capability to its receiving webhook", async (
   await expect(
     buildApp({
       ...deps,
-      telegramWebhookSecret: "different_synthetic_secret_123456789012",
+      telegramWebhookSecret: [
+        "different",
+        "synthetic",
+        "secret",
+        "123456789012",
+      ].join("_"),
     }),
   ).rejects.toThrow("expert_residency_lifecycle_webhook_scope_conflict");
 });

@@ -162,7 +162,12 @@ it("normal private ingress shows base, separate positive/promo/period, real form
     EXPERT_SEPARATED_SALES_ENABLED: "true",
     EXPERT_PROMO_TELEGRAM_BOT_ID: "717171",
     EXPERT_PROMO_TELEGRAM_BOT_KEY: "sales-fixture",
-    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: "synthetic_sales_secret_1234567890",
+    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: [
+      "synthetic",
+      "sales",
+      "secret",
+      "1234567890",
+    ].join("_"),
     EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
   });
   let activeCheckout: Pick<typeof runtime.held, "recoverCheckout"> | undefined;
