@@ -1,6 +1,6 @@
 import { applyEarlyBirdDraftIfNeeded } from "../testkit/early-bird-draft-helper.js";
-import { drizzle } from "drizzle-orm/node-postgres";
-import type { DrizzleDb } from "../client.js";
+import { createDb, type DrizzleDb } from "../client.js";
+import { buildEarlyBirdRoleProvisioningSql } from "../../../../scripts/provision-early-bird-runtime-roles.mjs";
 import { PostgresEarlyBirdOwnerSendAdmission } from "./early-bird-owner-send-admission.js";
 import { openEarlyBirdOwnerRequest } from "../../../integrations/src/yookassa/early-bird-sealed-request.js";
 import { createEarlyBirdOwnerPrepareAuthority } from "../../../integrations/src/yookassa/early-bird-owner-prepare-authority.js";
@@ -297,26 +297,32 @@ it("admits one exact owner request and blocks concurrent/restarted POST admissio
   await db.db.execute(
     sql`DO $$ DECLARE p record; BEGIN FOR p IN SELECT oid::regprocedure as fn FROM pg_proc WHERE prosecdef AND pronamespace IN(SELECT oid FROM pg_namespace WHERE nspname in('public','early_bird_private')) LOOP EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC',p.fn); END LOOP; END $$`,
   );
-  await db.db.execute(sql`CREATE ROLE ii_tonya_wave_sender NOLOGIN NOINHERIT`);
-  await db.db.execute(sql`CREATE ROLE wave_sender_login LOGIN INHERIT`);
-  await db.db.execute(sql`GRANT ii_tonya_wave_sender TO wave_sender_login`);
+  const senderPassword = randomBytes(24).toString("hex");
   await db.db.execute(
-    sql`GRANT USAGE ON SCHEMA early_bird_private TO ii_tonya_wave_sender`,
+    sql.raw(
+      `CREATE ROLE wave_sender_login LOGIN INHERIT PASSWORD '${senderPassword}'`,
+    ),
   );
   await db.db.execute(
-    sql`GRANT EXECUTE ON FUNCTION early_bird_private.owner_send_snapshot(uuid,uuid,uuid), early_bird_private.owner_admit_send(uuid,uuid,uuid,text) TO ii_tonya_wave_sender`,
+    sql.raw(
+      await buildEarlyBirdRoleProvisioningSql({
+        ii_tonya_wave_sender: "wave_sender_login",
+      }),
+    ),
   );
-  const senderClient = await db.db.$client.connect();
-  const secondClient = await db.db.$client.connect();
-  await senderClient.query("SET SESSION AUTHORIZATION wave_sender_login");
-  await secondClient.query("SET SESSION AUTHORIZATION wave_sender_login");
+  const senderUrl = new URL(db.db.$client.options.connectionString!);
+  senderUrl.username = "wave_sender_login";
+  senderUrl.password = senderPassword;
+  const senderDb = createDb(senderUrl.toString(), { max: 1 });
+  const secondDb = createDb(senderUrl.toString(), { max: 1 });
+  let gatewayDb: DrizzleDb | undefined;
   try {
     const admission = new PostgresEarlyBirdOwnerSendAdmission(
-      drizzle(senderClient) as unknown as DrizzleDb,
+      senderDb,
       "wave_sender_login",
     );
     const concurrentAdmission = new PostgresEarlyBirdOwnerSendAdmission(
-      drizzle(secondClient) as unknown as DrizzleDb,
+      secondDb,
       "wave_sender_login",
     );
     const sendInput = {
@@ -357,27 +363,48 @@ it("admits one exact owner request and blocks concurrent/restarted POST admissio
     ).toEqual({ value: "30.00", currency: "RUB" });
     if (successful?.kind !== "initial_send_admitted")
       throw new Error("missing admission");
-    await db.db.execute(sql`CREATE ROLE wave_gateway_login LOGIN INHERIT`);
-    await db.db.execute(sql`GRANT ii_tonya_wave_gateway TO wave_gateway_login`);
-    const gatewayClient = await db.db.$client.connect();
-    try {
-      await gatewayClient.query("SET SESSION AUTHORIZATION wave_gateway_login");
-      const readiness = await gatewayClient.query(
-        readFileSync(
-          "scripts/experimental/yookassa_gateway/readiness.sql",
-          "utf8",
-        ),
-      );
-      expect(Object.values(readiness.rows[0]!)[0]).toBe(true);
-    } finally {
-      await gatewayClient.query("RESET SESSION AUTHORIZATION");
-      gatewayClient.release();
-    }
+    const gatewayPassword = randomBytes(24).toString("hex");
+    await db.db.execute(
+      sql.raw(
+        `CREATE ROLE wave_gateway_login LOGIN INHERIT PASSWORD '${gatewayPassword}'`,
+      ),
+    );
+    const gatewayProvisioning = await buildEarlyBirdRoleProvisioningSql({
+      ii_tonya_wave_gateway: "wave_gateway_login",
+    });
+    await db.db.execute(sql.raw(gatewayProvisioning));
+    const gatewayUrl = new URL(db.db.$client.options.connectionString!);
+    gatewayUrl.username = "wave_gateway_login";
+    gatewayUrl.password = gatewayPassword;
+    gatewayDb = createDb(gatewayUrl.toString(), { max: 1 });
+    const readinessSQL = readFileSync(
+      "scripts/experimental/yookassa_gateway/readiness.sql",
+      "utf8",
+    );
+    const ready = async () =>
+      Object.values((await gatewayDb!.$client.query(readinessSQL)).rows[0]!)[0];
+    expect(
+      (
+        await gatewayDb.$client.query(
+          "select session_user as login,current_user as effective",
+        )
+      ).rows[0],
+    ).toEqual({ login: "wave_gateway_login", effective: "wave_gateway_login" });
+    expect(await ready()).toBe(true);
+    await expect(
+      gatewayDb.$client.query("select * from early_bird_composite_intents"),
+    ).rejects.toMatchObject({ code: "42501" });
+    await db.db.execute(
+      sql`revoke execute on function public.public_expert_gateway_claim(uuid,uuid,uuid,uuid,text,text) from ii_tonya_wave_gateway`,
+    );
+    expect(await ready()).toBe(false);
+    await db.db.execute(sql.raw(gatewayProvisioning));
+    expect(await ready()).toBe(true);
     await db.db.execute(
       sql`insert into receipt_revocation_outbox(subject_id,contact_id,token,key_version) values(${user}::uuid,${saved.id}::uuid,${"a".repeat(64)},'v1')`,
     );
     const claim = () =>
-      db.db.execute<{ admitted: boolean }>(
+      gatewayDb!.execute<{ admitted: boolean }>(
         sql`select public.early_bird_gateway_claim(${user}::uuid,${successful.operationId}::uuid,${saved.id}::uuid,${successful.idempotencyKey}::uuid,${successful.digest}) as admitted`,
       );
     expect((await claim()).rows[0]!.admitted).toBe(false);
@@ -392,14 +419,14 @@ it("admits one exact owner request and blocks concurrent/restarted POST admissio
     expect((await claim()).rows[0]!.admitted).toBe(false);
     expect(
       (
-        await db.db.execute<{ revoked: boolean }>(
+        await gatewayDb.execute<{ revoked: boolean }>(
           sql`select public.early_bird_gateway_revoke(${saved.id}::uuid) as revoked`,
         )
       ).rows[0]!.revoked,
     ).toBe(true);
     expect((await claim()).rows[0]!.admitted).toBe(false);
     const restarted = new PostgresEarlyBirdOwnerSendAdmission(
-      drizzle(senderClient) as unknown as DrizzleDb,
+      senderDb,
       "wave_sender_login",
     );
     expect(
@@ -421,9 +448,10 @@ it("admits one exact owner request and blocks concurrent/restarted POST admissio
       "early_bird_send_principal_unsafe",
     );
   } finally {
-    await senderClient.query("RESET SESSION AUTHORIZATION");
-    senderClient.release();
-    await secondClient.query("RESET SESSION AUTHORIZATION");
-    secondClient.release();
+    await Promise.all([
+      senderDb.$client.end(),
+      secondDb.$client.end(),
+      gatewayDb?.$client.end(),
+    ]);
   }
 }, 120_000);

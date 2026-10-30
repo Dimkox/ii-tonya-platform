@@ -1,5 +1,5 @@
 import { applyEarlyBirdDraftIfNeeded } from "../testkit/early-bird-draft-helper.js";
-import { afterAll, expect, it } from "vitest";
+import { afterAll, expect, it, vi } from "vitest";
 import {
   spawn,
   execFileSync,
@@ -10,10 +10,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { drizzle } from "drizzle-orm/node-postgres";
 import { sql } from "drizzle-orm";
-import type { PoolClient } from "pg";
-import type { DrizzleDb } from "../client.js";
+import { createDb, type DrizzleDb } from "../client.js";
+import { startExpertReferralTestDatabase } from "../testkit/expert-referral.js";
+import { startPublicExpertFuturePostgres } from "../../../../tests/support/public-expert-gateway-provider.mjs";
+import { buildEarlyBirdRoleProvisioningSql } from "../../../../scripts/provision-early-bird-runtime-roles.mjs";
 import { createEarlyBirdOwnerJourney } from "../testkit/early-bird-owner-journey.js";
 import { createEarlyBirdOwnerRuntimeComposition } from "../../../../apps/api/src/expert-early-bird-runtime-composition.js";
 import { PostgresPrivacyRepository } from "./privacy-repository.js";
@@ -24,7 +25,11 @@ let f: Awaited<ReturnType<typeof createEarlyBirdOwnerJourney>> | undefined;
 let child: ChildProcessWithoutNullStreams | undefined;
 let clientContainer: string | undefined;
 let temp: string | undefined;
-const dbClients: PoolClient[] = [];
+const principalPools: DrizzleDb[] = [];
+let database:
+  Awaited<ReturnType<typeof startExpertReferralTestDatabase>> | undefined;
+let clock:
+  Awaited<ReturnType<typeof startPublicExpertFuturePostgres>> | undefined;
 afterAll(async () => {
   if (child && child.exitCode === null) {
     child.stdin.end("stop\n");
@@ -39,19 +44,66 @@ afterAll(async () => {
       });
     });
   }
-  for (const c of dbClients) {
-    await c.query("reset session authorization");
-    c.release();
-  }
+  await Promise.all(principalPools.map((db) => db.$client.end()));
   if (clientContainer)
     execFileSync("docker", ["rm", "-f", clientContainer], { stdio: "ignore" });
   if (temp) rmSync(temp, { recursive: true, force: true });
-  await f?.db.stop();
+  try {
+    await database?.stop();
+  } finally {
+    try {
+      await clock?.stop();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }
 }, 120000);
 
 it("runs approved owner checkout through PG admission, authenticated IPC, real TLS, binding recovery and acknowledged contact revocation", async () => {
-  f = await createEarlyBirdOwnerJourney();
+  clock = await startPublicExpertFuturePostgres();
+  await clock.advance(
+    (Date.parse("2026-11-02T12:00:00Z") - Date.parse("2027-01-11T12:00:00Z")) /
+      1000,
+  );
+  const NativeDate = Date;
+  vi.stubGlobal(
+    "Date",
+    new Proxy(NativeDate, {
+      construct(target, args) {
+        return Reflect.construct(
+          target,
+          args.length ? args : [NativeDate.now() + clock!.offsetSeconds * 1000],
+        );
+      },
+      get(target, property) {
+        return property === "now"
+          ? () => NativeDate.now() + clock!.offsetSeconds * 1000
+          : Reflect.get(target, property);
+      },
+    }),
+  );
+  const previousAdmin = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
+  process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL = clock.connectionString;
+  try {
+    database = await startExpertReferralTestDatabase();
+  } finally {
+    if (previousAdmin === undefined)
+      delete process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
+    else process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL = previousAdmin;
+  }
+  f = await createEarlyBirdOwnerJourney({ database });
   const db = f.db.db;
+  expect(
+    Math.abs(
+      Number(
+        (
+          await db.$client.query(
+            "select extract(epoch from clock_timestamp())*1000 n",
+          )
+        ).rows[0]!.n,
+      ) - Date.now(),
+    ),
+  ).toBeLessThan(1500);
   for (const file of [
     "0082_early_bird_settlement.sql",
     "0083_early_bird_verified_settlement.sql",
@@ -71,53 +123,43 @@ it("runs approved owner checkout through PG admission, authenticated IPC, real T
   await db.execute(
     sql`DO $$ DECLARE p record; BEGIN FOR p IN SELECT oid::regprocedure as fn FROM pg_proc WHERE prosecdef AND pronamespace IN(SELECT oid FROM pg_namespace WHERE nspname in('public','early_bird_private')) LOOP EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC',p.fn); END LOOP; END $$`,
   );
-  const roles = [
-    [
-      "ii_tonya_wave_sender",
-      "runtime_send",
-      "early_bird_private.owner_send_snapshot(uuid,uuid,uuid), early_bird_private.owner_admit_send(uuid,uuid,uuid,text)",
-    ],
-    [
-      "ii_tonya_wave_intent_reader",
-      "runtime_candidate",
-      "early_bird_private.find_candidate_intent(uuid)",
-    ],
-    [
-      "ii_tonya_wave_verifier",
-      "runtime_binding",
-      "early_bird_private.bind_verified(uuid,uuid,text,text,jsonb)",
-    ],
-    [
-      "ii_tonya_wave_verified_payment_reader",
-      "runtime_known",
-      "early_bird_private.find_verified_payment(text,text)",
-    ],
-  ] as const;
+  const roles = {
+    ii_tonya_wave_sender: "runtime_send",
+    ii_tonya_wave_intent_reader: "runtime_candidate",
+    ii_tonya_wave_verifier: "runtime_binding",
+    ii_tonya_wave_verified_payment_reader: "runtime_known",
+    ii_tonya_wave_gateway: "runtime_gateway",
+  };
   const connections: Record<string, DrizzleDb> = {};
-  for (const [cap, login, functions] of roles) {
+  const gatewayPassword = randomBytes(24).toString("hex");
+  for (const login of Object.values(roles))
     await db.execute(
       sql.raw(
-        `CREATE ROLE ${cap} NOLOGIN NOINHERIT; CREATE ROLE ${login} LOGIN INHERIT; GRANT ${cap} TO ${login}; GRANT USAGE ON SCHEMA early_bird_private TO ${cap}; GRANT EXECUTE ON FUNCTION ${functions} TO ${cap}`,
+        `CREATE ROLE ${login} LOGIN INHERIT PASSWORD '${gatewayPassword}'`,
       ),
     );
-    const c = await db.$client.connect();
-    dbClients.push(c);
-    await c.query(`SET SESSION AUTHORIZATION ${login}`);
-    connections[login] = drizzle(c) as unknown as DrizzleDb;
+  await db.execute(sql.raw(await buildEarlyBirdRoleProvisioningSql(roles)));
+  for (const login of Object.values(roles)) {
+    const url = new URL(db.$client.options.connectionString!);
+    url.username = login;
+    url.password = gatewayPassword;
+    const connection = createDb(url.toString(), { max: 1 });
+    principalPools.push(connection);
+    connections[login] = connection;
+    expect(
+      (
+        await connection.$client.query(
+          "select session_user as login,current_user as effective",
+        )
+      ).rows[0],
+    ).toEqual({ login, effective: login });
   }
-  const gatewayPassword = randomBytes(24).toString("hex");
-  await db.execute(
-    sql.raw(
-      `CREATE ROLE runtime_gateway LOGIN INHERIT PASSWORD '${gatewayPassword}'; GRANT ii_tonya_wave_gateway TO runtime_gateway; GRANT EXECUTE ON FUNCTION public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text),public.early_bird_gateway_revoke(uuid) TO ii_tonya_wave_gateway`,
-    ),
-  );
   const readinessSQL = readFileSync(
     "scripts/experimental/yookassa_gateway/readiness.sql",
     "utf8",
   );
-  const readyClient = await db.$client.connect();
+  const readyClient = await connections.runtime_gateway!.$client.connect();
   try {
-    await readyClient.query("set session authorization runtime_gateway");
     const ready = (await readyClient.query(readinessSQL)).rows[0];
     if (ready?.exists !== true) {
       const diagnostics = (
@@ -125,12 +167,12 @@ it("runs approved owner checkout through PG admission, authenticated IPC, real T
         'login', jsonb_build_object('name',l.rolname,'login',l.rolcanlogin,'super',l.rolsuper,'createdb',l.rolcreatedb,'createrole',l.rolcreaterole,'replication',l.rolreplication,'bypass',l.rolbypassrls),
         'cap',jsonb_build_object('login',c.rolcanlogin,'inherit',c.rolinherit,'super',c.rolsuper),
         'membership',(select jsonb_agg(jsonb_build_object('member',member::regrole::text,'role',roleid::regrole::text,'admin',admin_option)) from pg_auth_members where member in(l.oid,c.oid) or roleid=c.oid),
-        'functions',(select jsonb_agg(jsonb_build_object('oid',p.oid::regprocedure::text,'definer',p.prosecdef,'owner',p.proowner::regrole::text,'settings',p.proconfig,'public',has_function_privilege('public',p.oid,'EXECUTE'),'login',has_function_privilege(l.oid,p.oid,'EXECUTE'))) from pg_proc p where p.oid in('public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text)'::regprocedure,'public.early_bird_gateway_revoke(uuid)'::regprocedure)),
+        'functions',(select jsonb_agg(jsonb_build_object('oid',p.oid::regprocedure::text,'definer',p.prosecdef,'owner',p.proowner::regrole::text,'settings',p.proconfig,'public',has_function_privilege('public',p.oid,'EXECUTE'),'login',has_function_privilege(l.oid,p.oid,'EXECUTE'))) from pg_proc p where p.oid in('public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text)'::regprocedure,'public.early_bird_gateway_revoke(uuid)'::regprocedure,'public.public_expert_gateway_claim(uuid,uuid,uuid,uuid,text,text)'::regprocedure)),
         'dbcreate',has_database_privilege(l.oid,current_database(),'CREATE'),
         'publiccreate',has_schema_privilege('public','public','CREATE'),
         'schemaaccess',(select jsonb_agg(nspname) from pg_namespace n where n.nspname not like 'pg_%' and n.nspname<>'information_schema' and (has_schema_privilege(l.oid,n.oid,'CREATE') or has_schema_privilege(c.oid,n.oid,'CREATE'))),
         'tableaccess',(select jsonb_agg(n.nspname||'.'||t.relname) from pg_class t join pg_namespace n on n.oid=t.relnamespace where n.nspname not like 'pg_%' and n.nspname<>'information_schema' and t.relkind in('r','p','v','m','f') and (pg_has_role(l.oid,t.relowner,'MEMBER') or pg_has_role(c.oid,t.relowner,'MEMBER') or has_table_privilege(l.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') or has_table_privilege(c.oid,t.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') or has_any_column_privilege(l.oid,t.oid,'SELECT,INSERT,UPDATE,REFERENCES') or has_any_column_privilege(c.oid,t.oid,'SELECT,INSERT,UPDATE,REFERENCES'))),
-        'extraFunctions',(select jsonb_agg(p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname not like 'pg_%' and n.nspname<>'information_schema' and p.oid not in('public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text)'::regprocedure,'public.early_bird_gateway_revoke(uuid)'::regprocedure) and p.prosecdef and (has_function_privilege(l.oid,p.oid,'EXECUTE') or has_function_privilege(c.oid,p.oid,'EXECUTE')))
+        'extraFunctions',(select jsonb_agg(p.oid::regprocedure::text) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname not like 'pg_%' and n.nspname<>'information_schema' and p.oid not in('public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text)'::regprocedure,'public.early_bird_gateway_revoke(uuid)'::regprocedure,'public.public_expert_gateway_claim(uuid,uuid,uuid,uuid,text,text)'::regprocedure) and p.prosecdef and (has_function_privilege(l.oid,p.oid,'EXECUTE') or has_function_privilege(c.oid,p.oid,'EXECUTE')))
       ) as checks from pg_roles l,pg_roles c where l.rolname=session_user and c.rolname='ii_tonya_wave_gateway'`)
       ).rows[0];
       throw new Error(
@@ -138,7 +180,6 @@ it("runs approved owner checkout through PG admission, authenticated IPC, real T
       );
     }
   } finally {
-    await readyClient.query("reset session authorization");
     readyClient.release();
   }
   temp = mkdtempSync(join(tmpdir(), "early-bird-runtime-tls-"));
@@ -195,7 +236,7 @@ it("runs approved owner checkout through PG admission, authenticated IPC, real T
   expect(readinessOutput).toBe("t\n");
   const address = "\0runtime-checkout-" + randomUUID();
   const program = String.raw`
-import sys,json,os,tempfile,threading,ssl,socket,http.server,http.client
+import sys,json,os,tempfile,threading,ssl,socket,http.server,http.client,datetime
 from unittest.mock import patch
 sys.path.insert(0,'scripts/experimental/yookassa_gateway')
 from bound_gateway import BoundGateway
@@ -203,7 +244,7 @@ from durable_state import DurableState
 from nonce_registry import NonceRegistry
 from pg_authority import PgAuthority
 import test_gateway
-base=sys.argv[1]; address='\0'+sys.argv[2]
+base=sys.argv[1]; address='\0'+sys.argv[2]; offset=float(sys.argv[3])
 test_gateway.HttpGatewayTests.setUpClass()
 helper=test_gateway.HttpGatewayTests
 payments={}; post_count=0
@@ -218,7 +259,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
   command=json.loads(self.rfile.read(int(self.headers['Content-Length'])))
   if command['amount']!={'value':'30.00','currency':'RUB'} or len(command['receipt']['items'])!=2:self.send_error(400);return
   post_count+=1
-  p={'id':'f0000000-0000-4000-8000-000000000001','status':'pending','paid':False,'refundable':False,'test':False,'amount':command['amount'],'metadata':command['metadata'],'created_at':'2026-11-02T00:00:01.000Z','confirmation':{'type':'redirect','confirmation_url':'https://yoomoney.ru/checkout/fixture'}}
+  p={'id':'f0000000-0000-4000-8000-000000000001','status':'pending','paid':False,'refundable':False,'test':False,'amount':command['amount'],'metadata':command['metadata'],'created_at':(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(seconds=offset)).isoformat(timespec='milliseconds').replace('+00:00','Z'),'confirmation':{'type':'redirect','confirmation_url':'https://yoomoney.ru/checkout/fixture'}}
   payments[p['id']]=p;self.respond(p)
  def do_GET(self):
   if self.headers.get('Authorization')!='Basic MTIzOmZpeHR1cmUtc2VjcmV0':self.send_error(403);return
@@ -253,9 +294,13 @@ with patch('bound_gateway.prepare_yookassa_tls',prepare),patch('provider_reader.
  server.close();thread.join(3)
 registry.close();runtime.close();httpd.shutdown();httpd.server_close();test_gateway.HttpGatewayTests.tearDownClass()
 `;
-  child = spawn("python3", ["-c", program, temp, address.slice(1)], {
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  child = spawn(
+    "python3",
+    ["-c", program, temp, address.slice(1), String(clock.offsetSeconds)],
+    {
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
   let stderr = "";
   child.stderr.on("data", (chunk) => {
     stderr += chunk.toString();
