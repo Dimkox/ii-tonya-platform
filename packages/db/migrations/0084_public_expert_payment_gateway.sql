@@ -596,6 +596,47 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION early_bird_private.public_order_expiry_allowed(uuid) FROM PUBLIC;
 --> statement-breakpoint
+-- Canonical terminating reversal may invalidate credit reserved by a DIFFERENT
+-- public order. Derive that narrow authority from real source/allocation facts,
+-- never from a canceled payment for the consuming order or a caller-selected delta.
+CREATE FUNCTION early_bird_private.public_credit_reversal_source(qualifying_order uuid,consuming_order uuid) RETURNS boolean LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT EXISTS(
+ SELECT 1 FROM public.expert_residency_orders source
+ JOIN public.expert_first_residency_settlements marker ON marker.qualifying_order_id=source.id
+ JOIN public.expert_residency_orders consuming ON consuming.id=consuming_order AND consuming.expert_id=marker.settlement_inviter_expert_id AND consuming.status IN('payment_pending','failed')
+ JOIN public.expert_residency_provider_event_inbox reversal ON reversal.order_id=source.id AND reversal.payment_id=source.provider_payment_id AND reversal.currency=source.currency
+ WHERE source.id=qualifying_order AND source.id<>consuming.id AND source.status='settled'
+  AND marker.eligibility='cancelled_by_refund' AND marker.reason_code='terminating_provider_reversal'
+  -- xmin is the actual physical writing transaction, not a caller-set context.
+  -- Compare the low32 bits of xid8 so ordinary transaction-ID wrap is supported.
+  AND marker.xmin::text::numeric=mod(pg_current_xact_id()::text::numeric,4294967296)
+  AND reversal.xmin::text::numeric=mod(pg_current_xact_id()::text::numeric,4294967296)
+  AND reversal.status='processing' AND reversal.event_kind IN('refunded','charged_back') AND reversal.authenticated AND reversal.identity_version=1
+  AND reversal.verification_id IS NOT NULL AND reversal.verifier_key_version IS NOT NULL AND reversal.verified_at IS NOT NULL
+  AND reversal.amount_minor>0 AND reversal.amount_minor+coalesce((SELECT sum(prior.amount_minor) FROM public.expert_residency_provider_event_inbox prior WHERE prior.provider=reversal.provider AND prior.payment_id=reversal.payment_id AND prior.status='processed' AND prior.event_kind IN('refunded','charged_back')),0)<=source.cash_minor
+  AND(reversal.event_kind='charged_back' OR reversal.amount_minor+coalesce((SELECT sum(prior.amount_minor) FROM public.expert_residency_provider_event_inbox prior WHERE prior.provider=reversal.provider AND prior.payment_id=reversal.payment_id AND prior.status='processed' AND prior.event_kind IN('refunded','charged_back')),0)=source.cash_minor)
+  AND EXISTS(SELECT 1 FROM public.expert_residency_payment_attempts original WHERE original.id=marker.qualifying_payment_attempt_id AND original.order_id=source.id AND original.provider=reversal.provider AND original.provider_request_id=reversal.payment_id AND original.status='settled')
+  -- Public A needs its own real refund apply context. Legacy A retains its
+  -- existing trusted branded-inbox authority; neither borrows B's request.
+  AND(NOT EXISTS(SELECT 1 FROM public.public_expert_payment_requests r WHERE r.legacy_source_id=source.id)
+   OR EXISTS(SELECT 1 FROM public.public_expert_payment_requests r
+    JOIN public.public_expert_payment_observations fact ON fact.id=r.apply_observation_id AND fact.request_id=r.id
+    JOIN public.public_expert_payment_resolutions attempt ON attempt.request_id=r.id AND attempt.kind='apply_attempt' AND attempt.apply_attempt_id=r.apply_attempt_id AND attempt.observation_id=fact.id AND attempt.action='main_refund'
+    WHERE r.legacy_source_id=source.id AND r.product='refund' AND r.apply_action='main_refund' AND r.apply_xid=pg_current_xact_id() AND r.apply_login=session_user
+     AND fact.status='succeeded' AND r.parent_payment_id=reversal.payment_id AND fact.amount_minor=reversal.amount_minor
+     AND reversal.external_event_id='public:'||r.id::text||':'||fact.id::text AND reversal.payload_digest=substring(fact.evidence_digest FROM 8)
+     AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_resolutions conflict WHERE conflict.request_id=r.id AND conflict.kind='manual_reconciliation')))
+  AND EXISTS(SELECT 1 FROM public.expert_referral_ledger_entries reservation
+   JOIN public.expert_referral_ledger_allocations allocation ON allocation.ledger_entry_id=reservation.id AND allocation.expert_id=consuming.expert_id
+   JOIN public.expert_referral_reward_grants grant_row ON grant_row.id=allocation.reward_grant_id AND grant_row.expert_id=consuming.expert_id
+   WHERE reservation.order_id=consuming.id AND reservation.expert_id=consuming.expert_id AND reservation.entry_kind='reservation'
+    AND(grant_row.first_settlement_id=marker.id OR EXISTS(SELECT 1 FROM public.expert_referral_ledger_entries benefit
+     JOIN public.expert_referral_ledger_allocations replenishment ON replenishment.ledger_entry_id=benefit.id AND replenishment.reward_grant_id=grant_row.id AND replenishment.expert_id=consuming.expert_id
+     WHERE benefit.entry_kind='debt_repayment' AND benefit.source_id=marker.id AND benefit.source_type IN('first_settlement','held_reward_replay') AND benefit.expert_id=consuming.expert_id AND replenishment.amount_minor>0)))
+ )
+$$;
+REVOKE ALL ON FUNCTION early_bird_private.public_credit_reversal_source(uuid,uuid) FROM PUBLIC;
+--> statement-breakpoint
 -- Protect canonical posting and release even when an old batch/command bypasses the new runner.
 CREATE FUNCTION early_bird_private.public_financial_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 DECLARE source uuid; allowed boolean; expected_action text; row_data jsonb; owner_request public.public_expert_payment_requests%ROWTYPE;
@@ -615,6 +656,27 @@ BEGIN
  END IF;
  SELECT * INTO owner_request FROM public.public_expert_payment_requests WHERE legacy_source_id=source LIMIT 1;
  IF NOT FOUND THEN RETURN NEW; END IF;
+ -- Derivative credit invalidation is distinct from unpaid expiry. Require the
+ -- exact original reservation inverse and canonical deterministic release key.
+ IF TG_TABLE_NAME='expert_referral_ledger_entries' AND row_data->>'entry_kind'='release' AND row_data->>'source_type'='provider_reversal' THEN
+  SELECT EXISTS(SELECT 1 FROM public.expert_referral_ledger_entries original
+   JOIN public.expert_first_residency_settlements marker ON marker.qualifying_order_id=(row_data->>'source_id')::uuid
+   WHERE original.id=(row_data->>'original_entry_id')::uuid AND original.order_id=source AND original.entry_kind='reservation' AND original.expert_id=(row_data->>'expert_id')::uuid
+    AND(row_data->>'amount_minor')::bigint>0 AND(row_data->>'amount_minor')::bigint=-original.amount_minor-coalesce((SELECT sum(released.amount_minor) FROM public.expert_referral_ledger_entries released WHERE released.original_entry_id=original.id AND released.entry_kind='release'),0)
+    AND(row_data->>'idempotency_key'='refund-release:'||marker.id::text||':'||original.id::text OR row_data->>'idempotency_key'='refund-release:'||marker.id::text||':'||original.id::text||':remainder:'||(row_data->>'amount_minor'))
+    AND early_bird_private.public_credit_reversal_source(marker.qualifying_order_id,source)) INTO allowed;
+  IF allowed THEN RETURN NEW; END IF;
+ ELSIF TG_TABLE_NAME='expert_residency_orders' AND row_data->>'status'='failed' AND to_jsonb(OLD)->>'status'='payment_pending'
+  AND(row_data-ARRAY['status','updated_at'])=(to_jsonb(OLD)-ARRAY['status','updated_at']) THEN
+  SELECT EXISTS(SELECT 1 FROM public.expert_referral_ledger_entries released
+   WHERE released.order_id=source AND released.expert_id=(row_data->>'expert_id')::uuid AND released.entry_kind='release' AND released.source_type='provider_reversal'
+    AND released.xmin::text::numeric=mod(pg_current_xact_id()::text::numeric,4294967296)
+    AND early_bird_private.public_credit_reversal_source(released.source_id,source))
+   AND NOT EXISTS(SELECT 1 FROM public.expert_referral_ledger_entries original WHERE original.order_id=source AND original.entry_kind='reservation'
+    AND -original.amount_minor<>(SELECT coalesce(sum(released.amount_minor),0) FROM public.expert_referral_ledger_entries released WHERE released.original_entry_id=original.id AND released.entry_kind='release'))
+   AND NOT EXISTS(SELECT 1 FROM public.expert_referral_ledger_entries spent WHERE spent.order_id=source AND spent.entry_kind='spend') INTO allowed;
+  IF allowed THEN RETURN NEW; END IF;
+ END IF;
  -- Local expiry has no provider observation: abandon only a positively proven never-sent cohort.
  IF (TG_TABLE_NAME='expert_residency_orders' AND row_data->>'status'='expired' AND to_jsonb(OLD)->>'status'='payment_pending'
      AND (row_data->>'payment_deadline')::timestamptz<=public.early_bird_current_time())
