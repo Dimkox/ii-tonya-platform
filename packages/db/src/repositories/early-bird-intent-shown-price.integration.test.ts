@@ -1,16 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import {
-  startExpertReferralTestDatabase,
-  type ExpertReferralTestDatabase,
-} from "../testkit/expert-referral.js";
+import { type ExpertReferralTestDatabase } from "../testkit/expert-referral.js";
 import { ownerPricingApproval } from "../testkit/owner-pricing-approval.js";
+import { startHistoricalEarlyBirdIntentDatabase } from "../testkit/early-bird-historical-intent.js";
 let db: ExpertReferralTestDatabase;
 let configId: string;
 beforeAll(async () => {
-  db = await startExpertReferralTestDatabase();
+  db = await startHistoricalEarlyBirdIntentDatabase();
   const cfg = await db.db.transaction(async (tx) => {
     await tx.execute(
       sql`update early_bird_launch_configs set active=false where active`,
@@ -25,11 +22,6 @@ beforeAll(async () => {
   await db.db.execute(
     sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
   );
-  const draft = readFileSync(
-    "docs/superpowers/implementation-artifacts/drafts/0078_early_bird_intents.sql",
-    "utf8",
-  );
-  await db.db.execute(sql.raw(draft));
 }, 120_000);
 afterAll(async () => {
   await db?.stop();

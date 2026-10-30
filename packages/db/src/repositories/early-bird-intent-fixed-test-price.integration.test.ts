@@ -1,17 +1,14 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { seedEarlyBirdDraftRequest } from "../testkit/early-bird-draft-request.js";
-import {
-  startExpertReferralTestDatabase,
-  type ExpertReferralTestDatabase,
-} from "../testkit/expert-referral.js";
+import { type ExpertReferralTestDatabase } from "../testkit/expert-referral.js";
 import { ownerPricingApproval } from "../testkit/owner-pricing-approval.js";
+import { startHistoricalEarlyBirdIntentDatabase } from "../testkit/early-bird-historical-intent.js";
 let db: ExpertReferralTestDatabase;
 let configId: string;
 beforeAll(async () => {
-  db = await startExpertReferralTestDatabase();
+  db = await startHistoricalEarlyBirdIntentDatabase();
   const cfg = await db.db.transaction(async (tx) => {
     await tx.execute(
       sql`update early_bird_launch_configs set active=false where active`,
@@ -26,11 +23,6 @@ beforeAll(async () => {
   await db.db.execute(
     sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
   );
-  const draft = readFileSync(
-    "docs/superpowers/implementation-artifacts/drafts/0078_early_bird_intents.sql",
-    "utf8",
-  );
-  await db.db.execute(sql.raw(draft));
 }, 120_000);
 afterAll(async () => {
   await db?.stop();
@@ -60,9 +52,6 @@ it("keeps the owner test price fixed and distinct from promotional savings", asy
   await db.db.execute(
     sql`insert into expert_sales_choices(id,base_id,user_id,revision,action,request_key,request_digest) values(${positive}::uuid,${base}::uuid,${user}::uuid,1,'positive','positive-1',${"a".repeat(64)})`,
   );
-  await db.db.execute(
-    sql`insert into early_bird_choices(id,user_id,base_id,positive_choice_id,revision,choice,request_key,request_digest) values(${choice}::uuid,${user}::uuid,${base}::uuid,${positive}::uuid,1,'now','wave-1',${"b".repeat(64)})`,
-  );
   const admin = await db.createAdminAudit({
     action: "fixture",
     objectId: randomUUID(),
@@ -76,6 +65,12 @@ it("keeps the owner test price fixed and distinct from promotional savings", asy
   const grant = randomUUID();
   await db.db.execute(
     sql`insert into owner_test_pricing_grants(id,user_id,granted_by,grant_session_hash,grant_approval_id) values(${grant}::uuid,${user}::uuid,${admin.adminId}::uuid,${admin.sessionIdHash},${approval}::uuid)`,
+  );
+  await db.db.execute(
+    sql`insert into early_bird_positive_price_snapshots(positive_choice_id,user_id,base_id,grant_id) values(${positive}::uuid,${user}::uuid,${base}::uuid,${grant}::uuid)`,
+  );
+  await db.db.execute(
+    sql`insert into early_bird_choices(id,user_id,base_id,positive_choice_id,revision,choice,request_key,request_digest) values(${choice}::uuid,${user}::uuid,${base}::uuid,${positive}::uuid,1,'now','wave-1',${"b".repeat(64)})`,
   );
   const operation = randomUUID(),
     invoice = randomUUID(),
