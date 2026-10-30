@@ -821,7 +821,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "packages/db/src/repositories/early-bird-bound-reconciliation.integration.test.ts",
-    "3f6be5e703b25278a78fe641b553fcfbccc6b9ae1258d3ed73207a48ae77e157",
+    "ac49f85a12713c584bdef353a9b009ac5e00ed8194c41af7a7fd3be1c4c39564",
   ],
   [
     "apps/api/src/early-bird-gateway-bootstrap.ts",

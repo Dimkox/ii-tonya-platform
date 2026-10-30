@@ -70,6 +70,7 @@ describe("YooKassa operation concurrency on an isolated canonical database", () 
     tariffId = await fixture.createResidencyTariff({
       tariffKey: "concurrency",
       displayName: "Concurrency fixture",
+      commercialPolicyVersion: "legacy_residency_v1",
       priceMinor: 50000,
       durationSeconds: 2592000,
     });
