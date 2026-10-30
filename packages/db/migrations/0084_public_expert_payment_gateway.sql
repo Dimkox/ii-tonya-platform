@@ -990,11 +990,17 @@ REVOKE ALL ON FUNCTION early_bird_private.public_wave_application(uuid) FROM PUB
 --> statement-breakpoint
 ALTER FUNCTION expert_card_activation_gate_valid(uuid,uuid) RENAME TO expert_card_activation_before_public_continuation;
 CREATE FUNCTION expert_card_activation_gate_valid(target_user uuid,target_review uuid) RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
-DECLARE d expert_card_drafts%ROWTYPE; r expert_card_reviews%ROWTYPE; v resident_card_versions%ROWTYPE; assessment jsonb;
+DECLARE d expert_card_drafts%ROWTYPE; r expert_card_reviews%ROWTYPE; v resident_card_versions%ROWTYPE; assessment jsonb; helper oid; wave_application uuid;
 BEGIN
  IF expert_card_activation_before_public_continuation(target_user,target_review) THEN RETURN true; END IF;
+ -- Resolve optional private capabilities only after schema permission succeeds.
+ IF NOT has_schema_privilege(current_user,'early_bird_private','USAGE') THEN RETURN false; END IF;
+ helper:=to_regprocedure('early_bird_private.public_wave_application(uuid)');
+ IF helper IS NULL THEN RETURN false; END IF;
+ IF NOT has_function_privilege(current_user,helper,'EXECUTE') THEN RETURN false; END IF;
+ EXECUTE 'SELECT early_bird_private.public_wave_application($1)' INTO wave_application USING target_user;
  SELECT * INTO d FROM expert_card_drafts WHERE user_id=target_user AND approved_review_id=target_review AND status='approved';
- IF NOT FOUND OR d.application_id IS DISTINCT FROM early_bird_private.public_wave_application(target_user)
+ IF NOT FOUND OR d.application_id IS DISTINCT FROM wave_application
   OR NOT expert_card_current_messaging_authority(target_user,d.messaging_policy_version)
   OR NOT EXISTS(SELECT 1 FROM users WHERE id=target_user AND active)
   OR NOT EXISTS(SELECT 1 FROM channel_identities WHERE user_id=target_user AND provider='telegram' AND bot_key=d.work_bot_key AND external_id=d.work_chat_id AND external_chat_id=d.work_chat_id AND status='active') THEN RETURN false; END IF;
@@ -1016,14 +1022,36 @@ REVOKE ALL ON FUNCTION early_bird_private.public_current_wave_end(uuid) FROM PUB
 --> statement-breakpoint
 -- A queued public continuation can join currently active wave coverage. The returned
 -- source is always an actual settled main order; wave history itself stays immutable.
-CREATE OR REPLACE FUNCTION expert_residency_current_coverage(target_expert uuid) RETURNS TABLE(source_order_id uuid,ends_at timestamptz) LANGUAGE sql VOLATILE AS $$
+CREATE OR REPLACE FUNCTION expert_residency_current_coverage(target_expert uuid) RETURNS TABLE(source_order_id uuid,ends_at timestamptz) LANGUAGE plpgsql VOLATILE AS $$
+DECLARE helper oid;
+BEGIN
+ IF has_schema_privilege(current_user,'early_bird_private','USAGE') THEN
+  helper:=to_regprocedure('early_bird_private.public_current_wave_end(uuid)');
+  IF helper IS NOT NULL THEN
+   IF has_function_privilege(current_user,helper,'EXECUTE') THEN
+    -- Keep the authorized coverage query intact, including its clock/snapshot.
+    RETURN QUERY EXECUTE $coverage$
+     WITH RECURSIVE instant AS MATERIALIZED(SELECT clock_timestamp() AS at), chain AS (
+      SELECT o.id,o.residency_ends_at FROM public.expert_residency_orders o,instant
+      WHERE o.expert_id=$1 AND o.status='settled' AND o.residency_ends_at>instant.at AND
+       (o.residency_starts_at<=instant.at OR o.residency_starts_at<=early_bird_private.public_current_wave_end($1))
+      UNION
+      SELECT o.id,o.residency_ends_at FROM public.expert_residency_orders o JOIN chain c ON o.residency_starts_at<=c.residency_ends_at AND o.residency_ends_at>c.residency_ends_at WHERE o.expert_id=$1 AND o.status='settled'
+     ) SELECT id,residency_ends_at FROM chain ORDER BY residency_ends_at DESC,id LIMIT 1
+    $coverage$ USING target_expert;
+    RETURN;
+   END IF;
+  END IF;
+ END IF;
+ -- Genuine legacy coverage remains available without private schema/function rights.
+ RETURN QUERY
  WITH RECURSIVE instant AS MATERIALIZED(SELECT clock_timestamp() AS at), chain AS (
-  SELECT o.id,o.residency_ends_at FROM expert_residency_orders o,instant
-  WHERE o.expert_id=target_expert AND o.status='settled' AND o.residency_ends_at>instant.at AND
-   (o.residency_starts_at<=instant.at OR o.residency_starts_at<=early_bird_private.public_current_wave_end(target_expert))
+  SELECT o.id,o.residency_ends_at FROM public.expert_residency_orders o,instant
+  WHERE o.expert_id=target_expert AND o.status='settled' AND o.residency_starts_at<=instant.at AND o.residency_ends_at>instant.at
   UNION
-  SELECT o.id,o.residency_ends_at FROM expert_residency_orders o JOIN chain c ON o.residency_starts_at<=c.residency_ends_at AND o.residency_ends_at>c.residency_ends_at WHERE o.expert_id=target_expert AND o.status='settled'
- ) SELECT id,residency_ends_at FROM chain ORDER BY residency_ends_at DESC,id LIMIT 1
+  SELECT o.id,o.residency_ends_at FROM public.expert_residency_orders o JOIN chain c ON o.residency_starts_at<=c.residency_ends_at AND o.residency_ends_at>c.residency_ends_at WHERE o.expert_id=target_expert AND o.status='settled'
+ ) SELECT id,residency_ends_at FROM chain ORDER BY residency_ends_at DESC,id LIMIT 1;
+END
 $$;
 
 --> statement-breakpoint
@@ -1070,12 +1098,24 @@ END $$;
 -- A paid public continuation is a narrow exception to the resident legacy-price
 -- gate. Every quote still passes the existing tariff/profile/arithmetic guards.
 CREATE OR REPLACE FUNCTION resident_verification_price_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE helper oid; wave_application uuid;
 BEGIN
  PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text,0));
  IF NEW.rule_version='expert_separated_sales_v3' AND EXISTS(SELECT 1 FROM expert_sales_bases b WHERE b.user_id=NEW.user_id AND b.base_offer_shown_at=NEW.calculation_timestamp) THEN RETURN NEW; END IF;
- IF NEW.rule_version='expert_energy_start_v2' AND early_bird_private.public_wave_application(NEW.user_id) IS NOT NULL
-  AND EXISTS(SELECT 1 FROM expert_card_drafts d WHERE d.user_id=NEW.user_id AND d.application_id=early_bird_private.public_wave_application(NEW.user_id) AND d.status='approved' AND expert_card_activation_gate_valid(d.user_id,d.approved_review_id))
-  AND EXISTS(SELECT 1 FROM expert_offer_profile_verifications v WHERE v.user_id=NEW.user_id AND v.profile_revision=(SELECT max(revision) FROM expert_offer_profiles WHERE user_id=NEW.user_id)) THEN RETURN NEW; END IF;
+ IF NEW.rule_version='expert_energy_start_v2' THEN
+  IF has_schema_privilege(current_user,'early_bird_private','USAGE') THEN
+   helper:=to_regprocedure('early_bird_private.public_wave_application(uuid)');
+   IF helper IS NOT NULL THEN
+    IF has_function_privilege(current_user,helper,'EXECUTE') THEN
+     EXECUTE 'SELECT early_bird_private.public_wave_application($1)' INTO wave_application USING NEW.user_id;
+     IF wave_application IS NOT NULL THEN
+      IF EXISTS(SELECT 1 FROM expert_card_drafts d WHERE d.user_id=NEW.user_id AND d.application_id=wave_application AND d.status='approved' AND expert_card_activation_gate_valid(d.user_id,d.approved_review_id))
+       AND EXISTS(SELECT 1 FROM expert_offer_profile_verifications v WHERE v.user_id=NEW.user_id AND v.profile_revision=(SELECT max(revision) FROM expert_offer_profiles WHERE user_id=NEW.user_id)) THEN RETURN NEW; END IF;
+     END IF;
+    END IF;
+   END IF;
+  END IF;
+ END IF;
  IF NOT resident_verification_price_allowed(NEW.user_id) THEN RAISE EXCEPTION 'resident_verification_required'; END IF;
  RETURN NEW;
 END $$;
