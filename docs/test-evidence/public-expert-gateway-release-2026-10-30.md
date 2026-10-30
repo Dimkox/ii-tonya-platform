@@ -81,7 +81,8 @@ publication, authorized refund/recovery and delayed main capture remain
 **unverified by this file**. Its expiry fixture also does not establish nonzero
 reserved referral-credit preservation.
 
-The capture-versus-cancel case exposed an unresolved production-source defect.
+The capture-versus-cancel case exposed a production-source defect, subsequently
+fixed and independently reviewed; the original journey has not been rerun.
 The CREATE and CAPTURE request contexts can independently observe the same
 successful parent payment. Once one has committed the canonical paid fact, the
 other can receive a new apply attempt.
@@ -94,14 +95,18 @@ before the new attempt has an apply context. This results in
 `verification_payment_binding_mismatch` during ordinary reconciliation of the
 same provider payment after CAPTURE. The final failing run did not record which
 request context won the race; the exact first committer remains unobserved. The failing test and original assertions
-remain. Task 7 made no source repair and did not weaken replay checks.
+remain. Subsequent commits `ac0b2a938573ff2b8c62455be0a53086762e57e0` and
+`328148f15b775fa112b817113141c160ae3041ed` address the replay and nested
+transaction boundary. Focused PostgreSQL tests passed 6/6 and 2/2 respectively,
+and scoped independent reviews approved the fixes. Those tests do not replace
+the incomplete full journey.
 
 All base 3/3 plus explicitly authorized owner extra 2/2 runs are consumed. No
 further run is implied by the fixture correction. The final focused log is
 `task-7-journey-owner5.log` (three failed/two passed), with tested clock image
 `sha256:e9a2b4834ba728dc26b0a612f72d4e8a08b2d2c19ceacf21dd465228610ea117`.
-Independent source repair/review and separately authorized verification remain
-necessary before claiming the Task 7 journey complete.
+Separately authorized verification remains necessary before claiming the Task 7
+journey complete.
 
 ## Release blockers retained
 
