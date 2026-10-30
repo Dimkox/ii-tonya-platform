@@ -50,6 +50,9 @@ it("rejects replay and new decisions after the launch cutoff", async () => {
   await db.db.execute(
     sql`insert into expert_sales_choices(id,base_id,user_id,revision,action,request_key,request_digest) values (${positive}::uuid,${base}::uuid,${user}::uuid,1,'positive','positive-1',${"a".repeat(64)})`,
   );
+  await db.db.execute(
+    sql`insert into early_bird_positive_price_snapshots(positive_choice_id,user_id,base_id) values(${positive}::uuid,${user}::uuid,${base}::uuid)`,
+  );
   const repo = new PostgresEarlyBirdChoiceRepository(db.db, {
     botId: "1",
     botKey: "fixture-bot",
