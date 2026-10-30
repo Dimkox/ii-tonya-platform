@@ -1,26 +1,15 @@
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { seedEarlyBirdDraftRequest } from "../testkit/early-bird-draft-request.js";
 import { calculateSeparatedSalesTerms } from "@ii-tonya/domain";
-import {
-  startExpertReferralTestDatabase,
-  type ExpertReferralTestDatabase,
-} from "../testkit/expert-referral.js";
+import { type ExpertReferralTestDatabase } from "../testkit/expert-referral.js";
+import { startHistoricalEarlyBirdIntentDatabase } from "../testkit/early-bird-historical-intent.js";
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
-  db = await startExpertReferralTestDatabase();
+  db = await startHistoricalEarlyBirdIntentDatabase();
   await db.db.execute(
     sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
-  );
-  await db.db.execute(
-    sql.raw(
-      readFileSync(
-        "docs/superpowers/implementation-artifacts/drafts/0078_early_bird_intents.sql",
-        "utf8",
-      ),
-    ),
   );
 }, 120_000);
 afterAll(async () => {
@@ -61,6 +50,9 @@ it("admits the standard one-payment price only under the active wave configurati
       )
     ).rows[0]!.id;
   });
+  await db.db.execute(
+    sql`insert into early_bird_positive_price_snapshots(positive_choice_id,user_id,base_id) values(${positive}::uuid,${user}::uuid,${base}::uuid)`,
+  );
   await db.db.execute(
     sql`insert into early_bird_choices(id,user_id,base_id,positive_choice_id,revision,choice,request_key,request_digest) values(${choice}::uuid,${user}::uuid,${base}::uuid,${positive}::uuid,1,'now','wave-1',${"b".repeat(64)})`,
   );
