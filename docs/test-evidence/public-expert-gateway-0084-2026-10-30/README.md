@@ -13,27 +13,32 @@ bridge cannot accept this history and is obsolete for this increment.
 and hashes of the local archive, SPDX SBOM and provenance. The actual artifacts
 are intentionally outside Git at `/tmp/public-expert-0084-task6-bridge`.
 The manifest was checked against every committed migration hash/timestamp and
-against the actual assembled tar archive; this did not invoke the exhaustedPG16
+against the actual assembled tar archive; this did not invoke the exhausted PG16
 upgrade witness or mutate any target database. The first build request carried
 an incorrectly transcribed source SHA and the existing guard rejected it before
 assembly; the successful build used live Git HEAD. Both raw logs are retained
-in the plan-ownedTask6 SDD evidence.
+in the plan-ownedTask 6 SDD evidence.
 
-A separate normal artifact will be built from this documentation successor so
-its source SHA differs from the bridge source. Task7 must verify/rebuild the
-final exact source pair after independent review and authorized CI. Neither
-artifact is signed, deployed, or claimed to satisfy rollback/release gates.
+A separate normal artifact was built from documentation successor
+`879c03990a204166bff2fa1ccb9d105d9e4e5787`, so its source differs from the bridge.
+`normal-manifest.json` records its provenance and hashes. All 85 migration SQL
+byte hashes, 33-role catalogue, six primary helper functions, operator financial
+LOGIN argument and public gateway readiness claim were verified in the actual
+archive. Local output is `/tmp/public-expert-0084-task6-normal`. This final
+evidence-only successor changes documentation after those builds. Task 7 must
+verify/rebuild the final exact source pair after independent review and authorized
+CI. Neither artifact is signed, deployed, or claimed to satisfy release gates.
 
-Focused verification: newPG17.5 state/provisioning acceptance3/3 passed on its
-second of three permitted invocations;33 real restricted LOGINs, genuine
+Focused verification: new PG17.5 state/provisioning acceptance3/3 passed on its
+second of three permitted invocations; 33 real restricted LOGINs, genuine
 approved onboarding prepare/admit/claim, six explicit existing-primary helper
 EXECUTEs, exact state reconstruction and denial evidence passed. Full state is
-280tables/323functions/293triggers/1922constraints/672indexes/4sequences.
+280 tables / 323 functions / 293 triggers / 1922 constraints / 672 indexes / 4 sequences.
 Historical0000–0083 SQL and all old state artefacts remain unchanged. No real
 provider request, financial role production provisioning, full CI, signing or
 production mutation occurred.
 
 Release gaps remain: no authenticated live refund initiator; original gateway
-last6/9 and waveA last5/6 failed histories remain unrerun; fullCI authorization
+last 6/9 and waveA last 5/6 failed histories remain unrerun; full CI authorization
 and exact final release gates remain pending. Counters and full commands/results
 are in `.superpowers/sdd/2026-10-30-public-expert-payment-gateway/task-6-report.md`.
