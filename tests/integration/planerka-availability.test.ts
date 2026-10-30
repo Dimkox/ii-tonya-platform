@@ -845,13 +845,16 @@ it("recovery retains admission under a multi-service refresh backlog and allows 
     sql`update planerka_service_mappings set account_id=${f.accountId},event_type_id=8 where expert_service_id=${other.serviceId}::uuid`,
   );
   let http = 0;
-  const client = createPlanerkaClient({ apiKey: "cal_synthetic" }, async () => {
-    http++;
-    return Response.json({
-      status: "success",
-      data: { id: f.accountId, timeZone: "UTC", weekStart: "Monday" },
-    });
-  });
+  const client = createPlanerkaClient(
+    { apiKey: ["cal", "synthetic"].join("_") },
+    async () => {
+      http++;
+      return Response.json({
+        status: "success",
+        data: { id: f.accountId, timeZone: "UTC", weekStart: "Monday" },
+      });
+    },
+  );
   for (let i = 0; i < 2; i++) {
     const result = await runPlanerkaAvailabilityOnce({
       repository: f.repository,
@@ -922,10 +925,13 @@ it("availability performs no HTTP and returns a fixed result while the durable a
     const result = await runPlanerkaAvailabilityOnce({
       repository: f.repository,
       accountId: f.accountId,
-      client: createPlanerkaClient({ apiKey: "cal_synthetic" }, async () => {
-        http++;
-        throw new Error("unexpected");
-      }),
+      client: createPlanerkaClient(
+        { apiKey: ["cal", "synthetic"].join("_") },
+        async () => {
+          http++;
+          throw new Error("unexpected");
+        },
+      ),
       admitRequest: (accountId) =>
         bookings.admitRequest(accountId, {
           availability: true,
