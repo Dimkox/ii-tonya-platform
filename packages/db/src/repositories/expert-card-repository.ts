@@ -361,6 +361,13 @@ async function paidApplication(tx: ExpertCardTransaction, userId: string) {
     )
   ).rows[0];
   if (legacy) return legacy;
+  const publicWave = (
+    await tx.execute<{ applicationId: string | null }>(
+      sql`select early_bird_private.public_wave_application(${userId}::uuid) as "applicationId"`,
+    )
+  ).rows[0];
+  if (publicWave?.applicationId)
+    return { applicationId: publicWave.applicationId };
   const enabled = await tx.execute<{ enabled: boolean }>(
     sql`select coalesce(current_setting('ii_tonya.wave_workspace_enabled',true),'off')='on' as enabled`,
   );

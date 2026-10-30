@@ -96,11 +96,11 @@ export async function restoreSettledMainCardProjection(
     ).rows.length === 1;
   if (existingPublication) {
     await tx.execute(
-      sql`update experts_published set draft_id=${gate.draftId}::uuid,review_id=${gate.reviewId}::uuid,revision=${gate.revision},public_payload=${JSON.stringify(gate.publicPayload)}::jsonb,public_digest=${gate.publicDigest},paid_order_id=${source.orderId}::uuid,next_billing_date=${source.endsAt}::timestamptz,active=true,updated_at=clock_timestamp() where expert_id=${input.expertId}::uuid and user_id=${input.userId}::uuid`,
+      sql`update experts_published set draft_id=${gate.draftId}::uuid,review_id=${gate.reviewId}::uuid,revision=${gate.revision},public_payload=${JSON.stringify(gate.publicPayload)}::jsonb,public_digest=${gate.publicDigest},paid_order_id=${source.orderId}::uuid,wave_intent_id=null,next_billing_date=${source.endsAt}::timestamptz,active=true,updated_at=clock_timestamp() where expert_id=${input.expertId}::uuid and user_id=${input.userId}::uuid`,
     );
   } else {
     await tx.execute(
-      sql`insert into experts_published(expert_id,user_id,application_audit_id,draft_id,review_id,revision,public_payload,public_digest,paid_order_id,next_billing_date,active) values(${input.expertId}::uuid,${input.userId}::uuid,${gate.applicationId}::uuid,${gate.draftId}::uuid,${gate.reviewId}::uuid,${gate.revision},${JSON.stringify(gate.publicPayload)}::jsonb,${gate.publicDigest},${source.orderId}::uuid,${source.endsAt}::timestamptz,true) on conflict(expert_id) do update set draft_id=excluded.draft_id,review_id=excluded.review_id,revision=excluded.revision,public_payload=excluded.public_payload,public_digest=excluded.public_digest,paid_order_id=excluded.paid_order_id,next_billing_date=excluded.next_billing_date,active=true,updated_at=clock_timestamp()`,
+      sql`insert into experts_published(expert_id,user_id,application_audit_id,draft_id,review_id,revision,public_payload,public_digest,paid_order_id,next_billing_date,active) values(${input.expertId}::uuid,${input.userId}::uuid,${gate.applicationId}::uuid,${gate.draftId}::uuid,${gate.reviewId}::uuid,${gate.revision},${JSON.stringify(gate.publicPayload)}::jsonb,${gate.publicDigest},${source.orderId}::uuid,${source.endsAt}::timestamptz,true) on conflict(expert_id) do update set draft_id=excluded.draft_id,review_id=excluded.review_id,revision=excluded.revision,public_payload=excluded.public_payload,public_digest=excluded.public_digest,paid_order_id=excluded.paid_order_id,wave_intent_id=null,next_billing_date=excluded.next_billing_date,active=true,updated_at=clock_timestamp()`,
     );
   }
   await tx.execute(

@@ -469,6 +469,7 @@ export {
   PostgresPublicExpertPaymentSource,
   PostgresPublicExpertPaymentBinder,
   PostgresPublicExpertPaymentObservations,
+  PostgresPublicExpertPaymentPosting,
   PublicHeldOnboardingCheckout,
   PublicMainResidencyCheckout,
   buildPublicExpertPaymentRequest,

@@ -58,7 +58,7 @@ export class PostgresExpertPersonalOfferRepository {
     private readonly policy: Policy,
   ) {}
   private eligible(userId: string) {
-    return sql`not exists(select 1 from expert_sales_bases where user_id=${userId}::uuid) and resident_verification_price_allowed(${userId}::uuid) and exists(select 1 from users u join expert_promo_enrollments p on p.user_id=u.id where u.id=${userId}::uuid and u.active and p.status='granted' and p.policy_version=${this.policy.promoConsentPolicyVersion ?? this.policy.messagingConsentPolicyVersion} and exists(select 1 from (${originalClientConsentSql(userId, "client_messaging")}) original join consents c on c.id=original."decisionId"::uuid and c.presentation_id=p.presentation_id)) and not exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled')`;
+    return sql`((not exists(select 1 from expert_sales_bases where user_id=${userId}::uuid) and resident_verification_price_allowed(${userId}::uuid)) or early_bird_private.public_wave_application(${userId}::uuid) is not null) and exists(select 1 from users u join expert_promo_enrollments p on p.user_id=u.id where u.id=${userId}::uuid and u.active and p.status='granted' and p.policy_version=${this.policy.promoConsentPolicyVersion ?? this.policy.messagingConsentPolicyVersion} and exists(select 1 from (${originalClientConsentSql(userId, "client_messaging")}) original join consents c on c.id=original."decisionId"::uuid and c.presentation_id=p.presentation_id)) and not exists(select 1 from experts e join expert_residency_orders o on o.expert_id=e.id where e.user_id=${userId}::uuid and o.status='settled')`;
   }
   async refreshDue(
     rawLimit = 10,

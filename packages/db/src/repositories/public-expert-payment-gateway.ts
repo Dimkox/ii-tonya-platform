@@ -19,6 +19,8 @@ import {
   type YooKassaVatCode,
 } from "@ii-tonya/integrations";
 import type { DrizzleDb } from "../client.js";
+import type { PostgresExpertResidencyProviderInboxRepository } from "./expert-residency-provider-inbox-repository.js";
+import type { PostgresExpertVerificationRepository } from "./expert-verification-repository.js";
 type Connection = Pick<DrizzleDb, "execute">;
 type Product = "onboarding" | "main" | "refund";
 const digest = (s: string) =>
@@ -158,6 +160,48 @@ export class PostgresPublicExpertPaymentObservations {
   }
   complete(requestId: string, applyAttemptId: string) {
     return this.action("public_payment_complete", requestId, applyAttemptId);
+  }
+}
+/** Trusted internal runner. Stored identifiers are the only canonical posting inputs.
+ * Completion uses a separate committed transaction and repairs a lost acknowledgement. */
+export class PostgresPublicExpertPaymentPosting {
+  constructor(
+    private readonly observations: PostgresPublicExpertPaymentObservations,
+    private readonly residency: Pick<
+      PostgresExpertResidencyProviderInboxRepository,
+      "applyPublic"
+    >,
+    private readonly onboarding: Pick<
+      PostgresExpertVerificationRepository,
+      "applyPublic"
+    >,
+  ) {}
+  async apply(requestId: string, observationId: string) {
+    const action = await this.observations.resolve(requestId, observationId);
+    if (
+      !action ||
+      action.kind !== "ready_to_apply" ||
+      !action.applyAttemptId ||
+      !action.evidence
+    )
+      return action;
+    // A prior posting may have committed before completion, including one with
+    // reservation release entries. Inspect actual facts before retrying any posting.
+    const repaired = await this.observations.complete(
+      requestId,
+      action.applyAttemptId,
+    );
+    if (
+      repaired?.kind === "already_applied" ||
+      repaired?.kind === "manual_reconciliation"
+    )
+      return repaired;
+    const poster =
+      action.evidence.snapshot.product === "onboarding"
+        ? this.onboarding
+        : this.residency;
+    await poster.applyPublic(requestId, observationId, action.applyAttemptId);
+    return this.observations.complete(requestId, action.applyAttemptId);
   }
 }
 export interface PublicExpertCheckoutDependencies {

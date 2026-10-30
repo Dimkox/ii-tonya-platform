@@ -477,7 +477,7 @@ BEGIN
   action_name:=CASE r.product WHEN 'onboarding' THEN 'onboarding_settle' WHEN 'main' THEN 'main_settle' ELSE 'main_refund' END; disposition_name:='eligible';
   IF r.product<>'refund' AND o.provider_captured_at>r.payment_deadline THEN manual_reason:='capture_after_deadline'; disposition_name:='late_paid_manual_reconciliation'; END IF;
   IF r.product='main' AND EXISTS(SELECT 1 FROM public.expert_residency_orders WHERE id=r.order_id AND(status NOT IN('payment_pending','settled') OR(provider_payment_id IS NOT NULL AND provider_payment_id<>r.provider_object_id))) THEN manual_reason:='financial_source_conflict'; END IF;
-  IF r.product='main' AND EXISTS(SELECT 1 FROM public.expert_referral_ledger_entries WHERE order_id=r.order_id AND entry_kind='release') THEN manual_reason:='credit_already_released'; END IF;
+  IF r.product='main' AND EXISTS(SELECT 1 FROM public.expert_referral_ledger_entries WHERE order_id=r.order_id AND entry_kind='release' AND source_type<>'residency_settlement') THEN manual_reason:='credit_already_released'; END IF;
   IF r.product='onboarding' AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_requests capture JOIN public.public_expert_payment_observations held ON held.provider_object_id=capture.parent_payment_id
     JOIN public.public_expert_payment_requests original ON original.id=held.request_id AND original.invoice_id=capture.invoice_id
     WHERE capture.invoice_id=r.invoice_id AND capture.kind='onboarding_capture' AND capture.dispatched_at IS NOT NULL AND capture.dispatched_at<=o.provider_captured_at AND capture.dispatched_at<capture.payment_deadline
@@ -580,6 +580,22 @@ BEGIN
  END IF;
  RETURN true;
 END $$;
+-- Shared expiry predicate. Unknown/admitted provider outcomes preserve reservation.
+-- It is a preflight only: the transition trigger rechecks under the same transaction.
+CREATE FUNCTION early_bird_private.public_order_expiry_allowed(target_order uuid) RETURNS boolean LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+DECLARE r public.public_expert_payment_requests%ROWTYPE;
+BEGIN
+ SELECT * INTO r FROM public.public_expert_payment_requests WHERE legacy_source_id=target_order AND product='main' LIMIT 1;
+ IF NOT FOUND THEN RETURN true; END IF;
+ IF early_bird_private.public_never_sent(target_order,r.user_id) THEN RETURN true; END IF;
+ RETURN EXISTS(SELECT 1 FROM public.public_expert_payment_requests current_request
+  JOIN public.public_expert_payment_observations o ON o.id=current_request.apply_observation_id AND o.request_id=current_request.id
+  WHERE current_request.legacy_source_id=target_order AND current_request.product='main' AND current_request.apply_action='release_terminal_unpaid'
+   AND current_request.apply_xid=pg_current_xact_id() AND current_request.apply_login=session_user AND o.status='canceled'
+   AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_resolutions conflict WHERE conflict.request_id=current_request.id AND conflict.kind='manual_reconciliation'));
+END $$;
+REVOKE ALL ON FUNCTION early_bird_private.public_order_expiry_allowed(uuid) FROM PUBLIC;
+--> statement-breakpoint
 -- Protect canonical posting and release even when an old batch/command bypasses the new runner.
 CREATE FUNCTION early_bird_private.public_financial_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 DECLARE source uuid; allowed boolean; expected_action text; row_data jsonb; owner_request public.public_expert_payment_requests%ROWTYPE;
@@ -590,7 +606,7 @@ BEGIN
   IF NEW.status IS NOT DISTINCT FROM OLD.status THEN RETURN NEW; END IF;
   source:=NEW.id; expected_action:=CASE NEW.status WHEN 'settled' THEN 'onboarding_settle' ELSE 'release_terminal_unpaid' END;
  ELSIF TG_TABLE_NAME='expert_residency_orders' THEN
-  IF ROW(NEW.status,NEW.residency_starts_at,NEW.residency_ends_at) IS NOT DISTINCT FROM ROW(OLD.status,OLD.residency_starts_at,OLD.residency_ends_at) THEN RETURN NEW; END IF;
+  IF ROW(NEW.status,NEW.settled_at,NEW.provider_payment_id,NEW.residency_starts_at,NEW.residency_ends_at) IS NOT DISTINCT FROM ROW(OLD.status,OLD.settled_at,OLD.provider_payment_id,OLD.residency_starts_at,OLD.residency_ends_at) THEN RETURN NEW; END IF;
   source:=NEW.id; expected_action:=CASE WHEN NEW.status='settled' THEN 'main_settle' WHEN NEW.status IN('refunded','charged_back') THEN 'main_refund' ELSE 'release_terminal_unpaid' END;
  ELSIF TG_TABLE_NAME='expert_referral_ledger_entries' THEN
   IF NEW.order_id IS NULL OR NEW.entry_kind NOT IN('release','spend','reversal') THEN RETURN NEW; END IF; source:=NEW.order_id;
@@ -620,7 +636,7 @@ BEGIN
    AND(a.action=r.apply_action) AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind='manual_reconciliation')
    AND(CASE TG_TABLE_NAME
     WHEN 'expert_onboarding_payment_facts' THEN row_data->>'provider_object_id'=r.provider_object_id AND row_data->>'operation_id'=r.legacy_operation_id::text AND row_data->>'user_id'=r.user_id::text AND row_data->>'amount_minor'=r.amount_minor::text AND(row_data->>'captured_at')::timestamptz=o.provider_captured_at AND row_data->>'provider_mode'=r.mode
-    WHEN 'expert_residency_orders' THEN CASE WHEN expected_action='main_settle' THEN row_data->>'provider_payment_id'=r.provider_object_id AND(row_data->>'residency_starts_at')::timestamptz=r.apply_expected_start AND(row_data->>'residency_ends_at')::timestamptz=r.apply_expected_end ELSE true END
+    WHEN 'expert_residency_orders' THEN CASE WHEN expected_action='main_settle' THEN row_data->>'provider_payment_id'=r.provider_object_id AND(row_data->>'settled_at')::timestamptz=o.provider_captured_at AND(row_data->>'residency_starts_at')::timestamptz=r.apply_expected_start AND(row_data->>'residency_ends_at')::timestamptz=r.apply_expected_end ELSE true END
     WHEN 'expert_residency_provider_event_inbox' THEN row_data->>'external_event_id'='public:'||r.id::text||':'||o.id::text AND row_data->>'payload_digest'=substring(o.evidence_digest FROM 8) AND row_data->>'amount_minor'=r.amount_minor::text AND row_data->>'payment_id'=CASE WHEN r.product='refund' THEN r.parent_payment_id ELSE r.provider_object_id END
     ELSE true END)) INTO allowed;
  IF NOT allowed THEN RAISE EXCEPTION 'public_financial_apply_context_required' USING ERRCODE='23514'; END IF;
@@ -651,7 +667,7 @@ BEGIN
   SELECT e.id::text INTO legacy_id FROM public.expert_residency_provider_event_inbox e JOIN public.expert_residency_orders ord ON ord.id=e.order_id
   WHERE e.external_event_id='public:'||r.id::text||':'||o.id::text AND e.provider='yookassa' AND e.order_id=r.order_id AND e.amount_minor=r.amount_minor AND e.currency=r.currency AND e.payload_digest=substring(o.evidence_digest FROM 8) AND e.status='processed'
    AND e.payment_id=CASE WHEN r.product='refund' THEN r.parent_payment_id ELSE r.provider_object_id END
-   AND((a.action='main_settle' AND e.event_kind='settled' AND ord.status='settled' AND ord.provider_payment_id=r.provider_object_id AND e.occurred_at=o.provider_captured_at AND ord.residency_starts_at=r.apply_expected_start AND ord.residency_ends_at=r.apply_expected_end AND ord.residency_ends_at=ord.residency_starts_at+make_interval(secs=>ord.duration_seconds))
+   AND((a.action='main_settle' AND e.event_kind='settled' AND ord.status='settled' AND ord.provider_payment_id=r.provider_object_id AND ord.settled_at=o.provider_captured_at AND e.occurred_at=o.provider_captured_at AND ord.residency_starts_at=r.apply_expected_start AND ord.residency_ends_at=r.apply_expected_end AND ord.residency_ends_at=ord.residency_starts_at+make_interval(secs=>ord.duration_seconds))
     OR(a.action='main_refund' AND e.event_kind='refunded' AND e.result_code IN('terminated','partial_refund')));
  ELSE
   IF r.product='onboarding' THEN SELECT id::text INTO legacy_id FROM public.expert_onboarding_invoices WHERE id=r.invoice_id AND status='cancelled' AND NOT EXISTS(SELECT 1 FROM public.expert_onboarding_payment_facts WHERE invoice_id=r.invoice_id);
@@ -801,4 +817,120 @@ DO $$ DECLARE fn record; BEGIN
  WHERE (n.nspname='early_bird_private' AND p.proname LIKE 'public_%') OR(n.nspname='public' AND p.proname='public_expert_gateway_claim') LOOP
  EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC',fn.signature);
  END LOOP;
+END $$;
+
+--> statement-breakpoint
+-- Public continuation reuses genuine paid wave onboarding, never a fabricated fee invoice.
+CREATE FUNCTION early_bird_private.public_wave_application(target_user uuid) RETURNS uuid LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT coalesce(public.early_bird_paid_workspace(target_user),(
+ SELECT b.application_id FROM public.early_bird_deferred_accounts i
+ JOIN public.early_bird_deferred_invoices ob ON ob.account_id=i.id AND ob.user_id=i.user_id AND ob.stage='onboarding' AND ob.amount_minor=i.onboarding_minor AND ob.captured_at IS NOT NULL
+ JOIN public.early_bird_deferred_verified_bindings paid ON paid.invoice_id=ob.id AND paid.user_id=ob.user_id AND paid.provider_id=ob.provider_id AND paid.amount_minor=ob.amount_minor AND paid.evidence_digest=ob.evidence_digest
+ JOIN public.early_bird_choices current_choice ON current_choice.id=i.choice_id AND current_choice.user_id=i.user_id
+ JOIN public.early_bird_choices approved_choice ON approved_choice.base_id=current_choice.base_id AND approved_choice.user_id=current_choice.user_id
+ JOIN public.early_bird_form_bridges b ON b.choice_id=approved_choice.id AND b.user_id=i.user_id
+ JOIN public.expert_onboarding_applications app ON app.id=b.application_id AND app.user_id=b.user_id AND app.verification_status='approved' AND app.archived_at IS NULL AND app.archive_until_date IS NULL
+ JOIN public.users u ON u.id=i.user_id AND u.active
+ WHERE i.user_id=target_user AND public.early_bird_final_call_refund_free(i.id)
+ AND NOT EXISTS(SELECT 1 FROM public.early_bird_coverage_reconciliation WHERE user_id=i.user_id)
+ AND NOT EXISTS(SELECT 1 FROM public.early_bird_refund_reconciliation WHERE user_id=i.user_id)
+ AND EXISTS(SELECT 1 FROM public.residents_applications f
+  JOIN public.expert_verification_decisions d ON d.application_id=b.application_id AND d.user_id=b.user_id AND d.decision='approved'
+  JOIN public.resident_review_events re ON re.attempt_id=f.id AND re.manager_id=d.manager_id AND re.session_hash=d.manager_session_hash AND re.action=f.status AND re.action IN('APPROVED_BASIC','APPROVED_EXCLUSIVE')
+  WHERE f.id=b.form_id AND f.user_id=b.user_id AND f.is_current AND re.submitted_revision=b.submitted_revision AND re.submitted_digest=b.submitted_digest AND f.submitted_revision=b.submitted_revision AND encode(public.digest(f.submitted_draft::text,'sha256'),'hex')=b.submitted_digest)
+ ORDER BY i.id LIMIT 1))
+ WHERE EXISTS(SELECT 1 FROM public.early_bird_launch_configs WHERE active AND client_start_at<=public.early_bird_current_time())
+$$;
+REVOKE ALL ON FUNCTION early_bird_private.public_wave_application(uuid) FROM PUBLIC;
+--> statement-breakpoint
+ALTER FUNCTION expert_card_activation_gate_valid(uuid,uuid) RENAME TO expert_card_activation_before_public_continuation;
+CREATE FUNCTION expert_card_activation_gate_valid(target_user uuid,target_review uuid) RETURNS boolean LANGUAGE plpgsql VOLATILE AS $$
+DECLARE d expert_card_drafts%ROWTYPE; r expert_card_reviews%ROWTYPE; v resident_card_versions%ROWTYPE; assessment jsonb;
+BEGIN
+ IF expert_card_activation_before_public_continuation(target_user,target_review) THEN RETURN true; END IF;
+ SELECT * INTO d FROM expert_card_drafts WHERE user_id=target_user AND approved_review_id=target_review AND status='approved';
+ IF NOT FOUND OR d.application_id IS DISTINCT FROM early_bird_private.public_wave_application(target_user)
+  OR NOT expert_card_current_messaging_authority(target_user,d.messaging_policy_version)
+  OR NOT EXISTS(SELECT 1 FROM users WHERE id=target_user AND active)
+  OR NOT EXISTS(SELECT 1 FROM channel_identities WHERE user_id=target_user AND provider='telegram' AND bot_key=d.work_bot_key AND external_id=d.work_chat_id AND external_chat_id=d.work_chat_id AND status='active') THEN RETURN false; END IF;
+ SELECT * INTO r FROM expert_card_reviews WHERE id=target_review AND draft_id=d.id AND user_id=target_user AND action='approve' AND revision=d.revision AND public_payload=d.public_payload;
+ IF NOT FOUND THEN RETURN false; END IF;
+ SELECT * INTO v FROM resident_card_versions WHERE review_id=r.id AND draft_id=d.id AND revision=r.revision;
+ IF FOUND THEN assessment:=resident_safety_assess(v.safety_fields,v.revision); RETURN NOT (assessment->>'blocked')::boolean AND assessment=v.safety_proof; END IF;
+ assessment:=resident_safety_assess(resident_card_effective_fields(d.id),r.revision);
+ RETURN r.safety_proof IS NOT NULL AND NOT (assessment->>'blocked')::boolean AND assessment=r.safety_proof;
+END $$;
+--> statement-breakpoint
+-- Current coverage may bridge only an interval covering this instant, never a
+-- disconnected future wave interval. Definer lookup keeps source tables private.
+CREATE FUNCTION early_bird_private.public_current_wave_end(target_expert uuid) RETURNS timestamptz LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT greatest((SELECT max(c.ends_at) FROM public.early_bird_effective_coverages c JOIN public.experts e ON e.user_id=c.user_id WHERE e.id=target_expert AND c.starts_at<=clock_timestamp() AND c.ends_at>clock_timestamp()),
+ (SELECT max(c.ends_at) FROM public.early_bird_deferred_effective_coverages c JOIN public.experts e ON e.user_id=c.user_id WHERE e.id=target_expert AND c.starts_at<=clock_timestamp() AND c.ends_at>clock_timestamp()))
+$$;
+REVOKE ALL ON FUNCTION early_bird_private.public_current_wave_end(uuid) FROM PUBLIC;
+--> statement-breakpoint
+-- A queued public continuation can join currently active wave coverage. The returned
+-- source is always an actual settled main order; wave history itself stays immutable.
+CREATE OR REPLACE FUNCTION expert_residency_current_coverage(target_expert uuid) RETURNS TABLE(source_order_id uuid,ends_at timestamptz) LANGUAGE sql VOLATILE AS $$
+ WITH RECURSIVE instant AS MATERIALIZED(SELECT clock_timestamp() AS at), chain AS (
+  SELECT o.id,o.residency_ends_at FROM expert_residency_orders o,instant
+  WHERE o.expert_id=target_expert AND o.status='settled' AND o.residency_ends_at>instant.at AND
+   (o.residency_starts_at<=instant.at OR o.residency_starts_at<=early_bird_private.public_current_wave_end(target_expert))
+  UNION
+  SELECT o.id,o.residency_ends_at FROM expert_residency_orders o JOIN chain c ON o.residency_starts_at<=c.residency_ends_at AND o.residency_ends_at>c.residency_ends_at WHERE o.expert_id=target_expert AND o.status='settled'
+ ) SELECT id,residency_ends_at FROM chain ORDER BY residency_ends_at DESC,id LIMIT 1
+$$;
+
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION enforce_expert_published_card_source() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+
+ IF TG_OP='UPDATE' AND NOT NEW.active AND (to_jsonb(NEW)-ARRAY['active','updated_at'])=(to_jsonb(OLD)-ARRAY['active','updated_at']) THEN RETURN NEW; END IF;
+ -- Wave sources must match immutable admission and current, unrevoked
+ -- eligibility, including reviewed payload, coverage, consent and safety.
+ IF NEW.wave_intent_id IS NOT NULL AND NEW.paid_order_id IS NULL THEN
+  IF TG_OP='INSERT' AND NOT EXISTS(SELECT 1 FROM public.expert_card_drafts d WHERE d.id=NEW.draft_id AND d.user_id=NEW.user_id AND d.status='approved' AND d.approved_review_id=NEW.review_id AND d.revision=NEW.revision) THEN RAISE EXCEPTION 'expert_published_wave_source' USING ERRCODE='23514'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text,0));
+  IF NOT EXISTS(SELECT 1 FROM public.early_bird_admissions a JOIN public.early_bird_admission_candidates c ON c.intent_id=a.intent_id AND c.user_id=a.user_id AND c.expert_id=a.expert_id AND c.draft_id=a.draft_id AND c.review_id=a.review_id AND c.revision=a.revision AND c.public_digest=a.public_digest JOIN public.expert_card_drafts d ON d.id=a.draft_id
+   WHERE EXISTS(SELECT 1 FROM public.experts verified_expert WHERE verified_expert.id=NEW.expert_id AND verified_expert.user_id=NEW.user_id AND verified_expert.active AND verified_expert.verified) AND a.intent_id=NEW.wave_intent_id AND a.user_id=NEW.user_id AND a.expert_id=NEW.expert_id AND a.draft_id=NEW.draft_id AND a.review_id=NEW.review_id AND a.revision=NEW.revision AND a.public_digest=NEW.public_digest AND c.public_payload=NEW.public_payload AND d.application_id=NEW.application_audit_id AND c.ends_at=NEW.next_billing_date) THEN
+    RAISE EXCEPTION 'expert_published_wave_source' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+ END IF;
+
+ IF TG_OP='UPDATE' AND (to_jsonb(NEW)-ARRAY['review_id','revision','public_digest','public_payload','updated_at','active','next_billing_date','paid_order_id','wave_intent_id'])=(to_jsonb(OLD)-ARRAY['review_id','revision','public_digest','public_payload','updated_at','active','next_billing_date','paid_order_id','wave_intent_id']) AND EXISTS(
+ SELECT 1 FROM public.resident_card_versions v JOIN public.expert_card_reviews r ON r.id=v.review_id JOIN public.expert_card_drafts d ON d.id=v.draft_id AND ((r.id=(SELECT latest.review_id FROM public.resident_card_versions latest WHERE latest.draft_id=d.id ORDER BY latest.revision DESC LIMIT 1)) OR (r.id=OLD.review_id AND NEW.review_id=OLD.review_id))
+ JOIN public.expert_card_main_orders m ON m.order_id=NEW.paid_order_id AND m.user_id=NEW.user_id AND m.expert_id=NEW.expert_id
+ JOIN public.expert_main_activation_admissions a ON a.order_id=m.order_id AND a.review_audit_id=m.review_audit_id AND a.public_digest=m.public_digest
+ WHERE v.review_id=NEW.review_id AND v.draft_id=NEW.draft_id AND v.revision=NEW.revision AND r.public_digest=NEW.public_digest AND r.public_payload=NEW.public_payload AND r.user_id=NEW.user_id AND public.expert_card_activation_gate_valid(NEW.user_id,NEW.review_id) AND EXISTS(SELECT 1 FROM public.expert_residency_current_coverage(NEW.expert_id) c WHERE c.source_order_id=NEW.paid_order_id AND c.ends_at=NEW.next_billing_date) AND (NOT NEW.active OR (EXISTS(SELECT 1 FROM public.experts e WHERE e.id=NEW.expert_id AND e.user_id=NEW.user_id AND e.active AND e.verified) AND NOT EXISTS(SELECT 1 FROM public.expert_referral_abuse_holds WHERE expert_id=NEW.expert_id AND status='open') AND NOT EXISTS(SELECT 1 FROM public.expert_residency_lifecycle WHERE expert_id=NEW.expert_id AND status='paused')))
+ ) THEN RETURN NEW; END IF;
+ IF TG_OP='UPDATE' AND NOT NEW.active AND (to_jsonb(NEW)-ARRAY['active','updated_at'])=(to_jsonb(OLD)-ARRAY['active','updated_at']) THEN RETURN NEW; END IF;
+ IF NEW.draft_id IS NULL OR NEW.review_id IS NULL OR NOT EXISTS(
+   SELECT 1 FROM public.experts e JOIN public.users u ON u.id=e.user_id AND u.active JOIN public.expert_card_reviews r ON r.id=NEW.review_id
+   JOIN public.expert_card_drafts d ON d.id=NEW.draft_id AND d.approved_review_id=r.id AND d.revision=r.revision
+   JOIN public.expert_residency_orders o ON o.id=NEW.paid_order_id AND o.expert_id=e.id AND o.status='settled'
+   JOIN public.expert_card_main_orders m ON m.order_id=o.id AND m.expert_id=e.id AND m.user_id=NEW.user_id AND m.review_id=r.id AND m.revision=NEW.revision AND m.public_digest=NEW.public_digest
+   WHERE public.expert_card_activation_gate_valid(NEW.user_id,NEW.review_id) AND e.id=NEW.expert_id AND e.user_id=NEW.user_id AND e.active AND e.verified AND d.user_id=e.user_id
+     AND EXISTS(SELECT 1 FROM public.expert_main_activation_admissions admission WHERE admission.order_id=o.id AND admission.user_id=NEW.user_id AND admission.expert_id=NEW.expert_id AND admission.quote_id=m.quote_id AND admission.application_audit_id=NEW.application_audit_id AND admission.review_audit_id=m.review_audit_id AND admission.public_digest=NEW.public_digest)
+     AND d.application_id=NEW.application_audit_id AND r.action='approve' AND r.revision=NEW.revision
+     AND r.public_digest=NEW.public_digest AND r.public_payload=NEW.public_payload AND o.residency_ends_at=NEW.next_billing_date)
+ OR (NEW.active AND (NEW.next_billing_date<=clock_timestamp() OR NOT EXISTS(
+   SELECT 1 FROM public.expert_residency_current_coverage(NEW.expert_id)))) THEN
+  RAISE EXCEPTION 'expert_published_card_source' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+
+--> statement-breakpoint
+-- A paid public continuation is a narrow exception to the resident legacy-price
+-- gate. Every quote still passes the existing tariff/profile/arithmetic guards.
+CREATE OR REPLACE FUNCTION resident_verification_price_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+ PERFORM pg_advisory_xact_lock(hashtextextended(NEW.user_id::text,0));
+ IF NEW.rule_version='expert_separated_sales_v3' AND EXISTS(SELECT 1 FROM expert_sales_bases b WHERE b.user_id=NEW.user_id AND b.base_offer_shown_at=NEW.calculation_timestamp) THEN RETURN NEW; END IF;
+ IF NEW.rule_version='expert_energy_start_v2' AND early_bird_private.public_wave_application(NEW.user_id) IS NOT NULL
+  AND EXISTS(SELECT 1 FROM expert_card_drafts d WHERE d.user_id=NEW.user_id AND d.application_id=early_bird_private.public_wave_application(NEW.user_id) AND d.status='approved' AND expert_card_activation_gate_valid(d.user_id,d.approved_review_id))
+  AND EXISTS(SELECT 1 FROM expert_offer_profile_verifications v WHERE v.user_id=NEW.user_id AND v.profile_revision=(SELECT max(revision) FROM expert_offer_profiles WHERE user_id=NEW.user_id)) THEN RETURN NEW; END IF;
+ IF NOT resident_verification_price_allowed(NEW.user_id) THEN RAISE EXCEPTION 'resident_verification_required'; END IF;
+ RETURN NEW;
 END $$;
