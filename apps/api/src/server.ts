@@ -185,6 +185,7 @@ export const createDefaultLifecycle = (
     receiptDisclosureGateway?: ExperimentalGatewayIpc;
     receiptDisclosureKeyVersion?: string;
     earlyBirdRuntime?: EarlyBirdOwnerRuntimeConfiguration;
+    publicExpertRuntime?: import("@ii-tonya/db").PublicExpertPaymentRuntime;
     earlyBirdStandardRuntime?: EarlyBirdStandardRuntimeConfiguration;
     earlyBirdDeferred?: Parameters<typeof createPostgresEarlyBirdAuthority>[6];
     /** Explicitly constructed trusted capabilities; absent by default, never enabled from env. */
@@ -234,6 +235,11 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    if (
+      config.yookassaGateway?.publicExpertEnabled === true &&
+      !options.publicExpertRuntime
+    )
+      throw Error("public_expert_gateway_runtime_required");
     if (options.earlyBirdWebhookRouting && !options.yookassaWebhook)
       throw new Error("early_bird_webhook_requires_yookassa");
     if (config.yookassaGateway && !options.earlyBirdRuntime)
@@ -340,6 +346,12 @@ export const createDefaultLifecycle = (
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    if (
+      config.yookassaGateway?.publicExpertEnabled === true &&
+      !options.publicExpertRuntime
+    )
+      throw Error("public_expert_gateway_runtime_required");
+    await options.publicExpertRuntime?.assertReady();
     if (options.receiptDisclosureGateway)
       await new PostgresReceiptRevocationOutbox(db).assertReady("privacy");
     if (options.earlyBirdWebhookRouting && !options.yookassaWebhook)
@@ -855,6 +867,9 @@ export const createDefaultLifecycle = (
         ? {
             yookassaWebhook: {
               ...options.yookassaWebhook,
+              ...(options.publicExpertRuntime
+                ? { publicPayment: options.publicExpertRuntime }
+                : {}),
               ...(options.earlyBirdWebhookRouting ?? {
                 resolvePurpose: (
                   providerObjectId: string,

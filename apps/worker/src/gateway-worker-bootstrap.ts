@@ -11,8 +11,14 @@ import {
   createDb,
   PostgresEarlyBirdPublicationWorker,
   type DrizzleDb,
+  createPublicExpertPaymentRuntime,
+  publicExpertConnectionNames,
+  type PublicExpertRuntimeConfiguration,
 } from "@ii-tonya/db";
-import { ExperimentalGatewayIpc } from "@ii-tonya/integrations";
+import {
+  ExperimentalGatewayIpc,
+  createPayerReceiptVault,
+} from "@ii-tonya/integrations";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import { createDeferredReviewWorker } from "./deferred-review-composition.js";
 import { createDeferredFinalCallRuntime } from "./early-bird-deferred-final-call-composition.js";
@@ -23,12 +29,18 @@ const invalid = (): never => {
   throw new Error("gateway_worker_configuration_invalid");
 };
 type RecordValue = Record<string, unknown>;
-function object(value: unknown, keys: readonly string[]): RecordValue {
+function object(
+  value: unknown,
+  keys: readonly string[],
+  optional: readonly string[] = [],
+): RecordValue {
   if (!value || typeof value !== "object" || Array.isArray(value))
     return invalid();
   const result = value as RecordValue;
   if (
-    Object.keys(result).length !== keys.length ||
+    Object.keys(result).some(
+      (key) => !keys.includes(key) && !optional.includes(key),
+    ) ||
     keys.some((key) => !(key in result))
   )
     return invalid();
@@ -121,6 +133,7 @@ type DbName = (typeof names)[number];
 export function loadGatewayWorkerDescriptor(
   filename: string,
   primaryUrl: string,
+  publicEnabled = false,
 ) {
   let parsed: unknown;
   try {
@@ -128,15 +141,19 @@ export function loadGatewayWorkerDescriptor(
   } catch {
     return invalid();
   }
-  const root = object(parsed, [
-    "version",
-    "ipc",
-    "identityKeyFile",
-    "tokenFile",
-    "botKey",
-    "messagingPolicyVersion",
-    "databases",
-  ]);
+  const root = object(
+    parsed,
+    [
+      "version",
+      "ipc",
+      "identityKeyFile",
+      "tokenFile",
+      "botKey",
+      "messagingPolicyVersion",
+      "databases",
+    ],
+    ["publicDatabases", "requestKeys", "receiptKeys"],
+  );
   if (root.version !== 1) return invalid();
   const ipc = object(root.ipc, [
     "address",
@@ -162,6 +179,73 @@ export function loadGatewayWorkerDescriptor(
   const databases = Object.fromEntries(
     names.map((name) => [name, database(dbs[name], primaryUrl)]),
   ) as Record<DbName, Credential>;
+  let publicSettings:
+    | {
+        databases: Record<
+          (typeof publicExpertConnectionNames)[number],
+          Credential
+        >;
+        requestKey: Buffer;
+        requestKeyReference: string;
+        retainedRequestKeys: ReadonlyMap<string, Buffer>;
+        vault: ReturnType<typeof createPayerReceiptVault>;
+      }
+    | undefined;
+  if (publicEnabled) {
+    const publicDbs = object(root.publicDatabases, publicExpertConnectionNames);
+    const requests = object(root.requestKeys, ["activeReference", "files"]),
+      receipts = object(root.receiptKeys, ["activeKeyId", "files"]);
+    const readKeys = (value: unknown, pattern: RegExp) => {
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        return invalid();
+      const entries = Object.entries(value);
+      if (entries.length < 1 || entries.length > 8) return invalid();
+      return new Map(
+        entries.map(([name, file]) => [text(name, pattern), key(file)]),
+      );
+    };
+    const retainedRequestKeys = readKeys(
+        requests.files,
+        /^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9_-]{1,128}$/u,
+      ),
+      receiptKeys = readKeys(receipts.files, /^[A-Za-z0-9_-]{1,64}$/u);
+    const requestKeyReference = text(
+        requests.activeReference,
+        /^[a-z][a-z0-9_-]{1,31}:[A-Za-z0-9_-]{1,128}$/u,
+      ),
+      requestKey = retainedRequestKeys.get(requestKeyReference);
+    const activeKeyId = text(receipts.activeKeyId, /^[A-Za-z0-9_-]{1,64}$/u);
+    if (!requestKey || !receiptKeys.has(activeKeyId)) return invalid();
+    publicSettings = {
+      databases: Object.fromEntries(
+        publicExpertConnectionNames.map((name) => [
+          name,
+          database(publicDbs[name], primaryUrl),
+        ]),
+      ) as NonNullable<typeof publicSettings>["databases"],
+      requestKey,
+      requestKeyReference,
+      retainedRequestKeys,
+      vault: createPayerReceiptVault({ activeKeyId, keys: receiptKeys }),
+    };
+  } else if (
+    root.publicDatabases !== undefined ||
+    root.requestKeys !== undefined ||
+    root.receiptKeys !== undefined
+  )
+    return invalid();
+  const allDatabases = [
+    ...Object.values(databases),
+    ...Object.values(publicSettings?.databases ?? {}),
+  ];
+  if (
+    new Set(allDatabases.map((item) => item.login)).size !==
+      allDatabases.length ||
+    allDatabases.some(
+      (item) => item.login === decodeURIComponent(new URL(primaryUrl).username),
+    )
+  )
+    return invalid();
   if (new Set(names.map((name) => databases[name].login)).size !== names.length)
     return invalid();
   if (
@@ -190,6 +274,7 @@ export function loadGatewayWorkerDescriptor(
       /^[A-Za-z0-9_.-]{1,100}$/u,
     ),
     databases,
+    publicSettings,
   };
 }
 
@@ -200,7 +285,11 @@ export async function createGatewayWorkerBootstrap(
 ) {
   const filename = config.yookassaGateway?.workerConfigFile;
   if (!filename) return invalid();
-  const settings = loadGatewayWorkerDescriptor(filename, config.databaseUrl);
+  const settings = loadGatewayWorkerDescriptor(
+    filename,
+    config.databaseUrl,
+    config.yookassaGateway?.publicExpertEnabled === true,
+  );
   const gateway = new ExperimentalGatewayIpc({
     address: settings.ipc.address,
     key: settings.ipc.subjectKey,
@@ -269,7 +358,42 @@ export async function createGatewayWorkerBootstrap(
       token: settings.token,
     });
     if (!review || !finalCall || !launchKit) return invalid();
+    const publicConnections =
+      {} as PublicExpertRuntimeConfiguration["connections"];
+    if (settings.publicSettings) {
+      if (
+        !config.expertVerification ||
+        config.expertVerification.paymentMode !== config.yookassaGateway!.mode
+      )
+        return invalid();
+      for (const name of publicExpertConnectionNames) {
+        const credential = settings.publicSettings.databases[name];
+        const pool = createDatabase(credential.url, {
+          max: 2,
+          idleTimeoutMillis: 10000,
+          connectionTimeoutMillis: 4000,
+          options: "-c statement_timeout=4000 -c lock_timeout=2000",
+        });
+        pools.push(pool);
+        publicConnections[name] = { db: pool, login: credential.login };
+      }
+    }
     return {
+      ...(settings.publicSettings
+        ? {
+            createPublicRuntime: (db: DrizzleDb) =>
+              createPublicExpertPaymentRuntime(db, {
+                ...settings.publicSettings!,
+                connections: publicConnections,
+                gateway,
+                mode: config.yookassaGateway!.mode,
+                messagingConsentPolicyVersion:
+                  config.expertVerification!.messagingConsentPolicyVersion,
+                returnUrl: config.yookassaGateway!.returnUrl,
+                vatCode: config.yookassaGateway!.receipt.vatCode,
+              }),
+          }
+        : {}),
       gateway,
       keyVersion: settings.ipc.subjectKeyVersion,
       review,

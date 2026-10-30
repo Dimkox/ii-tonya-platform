@@ -324,9 +324,9 @@ class PublicCheckoutExecution {
         this.deps.vatCode,
       );
       const requestDigest = digest(exactBody);
-      // A refund consumes the exact pre-authorized command; it never rewrites its request identity.
-      if (s.product === "refund" && requestDigest !== s.requestDigest)
-        return { kind: "unavailable" };
+      // Refunds consume an existing immutable financial command. Its authority
+      // digest is not the hash of a provider JSON serialization. Keep that
+      // operation unchanged; this separate request binds the exact gateway bytes.
       const protectedBody = contactFree
         ? null
         : await this.deps.protector.protect({

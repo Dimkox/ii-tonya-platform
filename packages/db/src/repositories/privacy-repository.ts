@@ -407,10 +407,12 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
             sql`update expert_verification_work set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
           );
           await tx.execute(
-            sql`update expert_onboarding_invoices set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+            // Public provider uncertainty survives local privacy invalidation.
+            // Revoked consent denies capture; only fresh GET may prove cancellation.
+            sql`update expert_onboarding_invoices i set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending' and not exists(select 1 from public_expert_payment_requests r where r.invoice_id=i.id and r.state<>'abandoned')`,
           );
           await tx.execute(
-            sql`update expert_onboarding_payment_operations set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome')`,
+            sql`update expert_onboarding_payment_operations op set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome') and not exists(select 1 from public_expert_payment_requests r where r.legacy_operation_id=op.id and r.state<>'abandoned')`,
           );
         }
         // RIGHTS-08 + EVID-01: отзыв PreviouslyGranted != первоначальный отказ.
@@ -1082,10 +1084,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           sql`delete from expert_verification_work where user_id=${command.targetUserId}::uuid`,
         );
         await tx.execute(
-          sql`update expert_onboarding_invoices set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+          sql`update expert_onboarding_invoices i set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending' and not exists(select 1 from public_expert_payment_requests r where r.invoice_id=i.id and r.state<>'abandoned')`,
         );
         await tx.execute(
-          sql`update expert_onboarding_payment_operations set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome')`,
+          sql`update expert_onboarding_payment_operations op set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome') and not exists(select 1 from public_expert_payment_requests r where r.legacy_operation_id=op.id and r.state<>'abandoned')`,
         );
         // Promo acquisition has no financial retention authority. Remove queued
         // sends, pending enrollment and direct identity digests; keep only inactive

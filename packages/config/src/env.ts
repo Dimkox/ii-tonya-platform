@@ -221,6 +221,7 @@ const schema = z
       .default("disabled"),
     YOOKASSA_GATEWAY_CONFIG_FILE: optionalNonEmptyString,
     YOOKASSA_GATEWAY_WORKER_CONFIG_FILE: optionalNonEmptyString,
+    PUBLIC_EXPERT_GATEWAY_ENABLED: z.enum(["true", "false"]).default("false"),
     YOOKASSA_ENABLED: z.enum(["true", "false"]).default("false"),
     YOOKASSA_MODE: z.preprocess(
       (value) => (value === "" ? undefined : value),
@@ -376,6 +377,12 @@ const schema = z
       value.PAYMENT_PROVIDER === "yookassa" ||
       value.PAYMENT_PROVIDER === "yookassa_gateway";
     const gatewayMode = value.PAYMENT_PROVIDER === "yookassa_gateway";
+    if (value.PUBLIC_EXPERT_GATEWAY_ENABLED === "true" && !gatewayMode)
+      context.addIssue({
+        code: "custom",
+        path: ["PUBLIC_EXPERT_GATEWAY_ENABLED"],
+        message: "public_expert_gateway_required",
+      });
     if (value.YOOKASSA_GATEWAY_CONFIG_FILE !== undefined && !gatewayMode)
       context.addIssue({
         code: "custom",
@@ -612,6 +619,7 @@ export type RuntimeConfig = {
     };
   };
   yookassaGateway?: {
+    publicExpertEnabled?: boolean;
     mode: "test" | "live";
     shopId: string;
     configurationFile?: string;
@@ -1185,6 +1193,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(value.PAYMENT_PROVIDER === "yookassa_gateway"
       ? {
           yookassaGateway: {
+            publicExpertEnabled: value.PUBLIC_EXPERT_GATEWAY_ENABLED === "true",
             mode: value.YOOKASSA_MODE!,
             shopId: value.YOOKASSA_SHOP_ID!,
             ...(value.YOOKASSA_GATEWAY_CONFIG_FILE

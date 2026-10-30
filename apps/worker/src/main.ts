@@ -161,6 +161,9 @@ export interface WorkerRuntimeFactory {
   create(config: RuntimeConfig): Promise<WorkerRuntime>;
 }
 export interface ProductionWorkerRuntimeFactoryDependencies {
+  readonly publicExpertRuntimeFactory?: (
+    db: DrizzleDb,
+  ) => import("@ii-tonya/db").PublicExpertPaymentRuntime;
   readonly logger?: ReturnType<typeof createLogger>;
   readonly planerkaTransport?: PlanerkaTransport;
   readonly expertHeldOnboarding?: import("./expert-separated-sales-composition.js").HeldSalesCapabilities;
@@ -452,6 +455,11 @@ export function createProductionWorkerRuntimeFactory(
   const logger = deps.logger ?? createLogger();
   return {
     async create(config) {
+      if (
+        config.yookassaGateway?.publicExpertEnabled === true &&
+        !deps.publicExpertRuntimeFactory
+      )
+        throw Error("public_expert_worker_runtime_required");
       const receiptCheckout =
         config.expertVerification?.checkoutEnabled === true ||
         config.expertCard?.mainCheckoutEnabled === true ||
@@ -510,7 +518,13 @@ export function createProductionWorkerRuntimeFactory(
         deps.yookassaReader,
       );
       const db = createDb(config.databaseUrl);
+      let publicExpert:
+        import("@ii-tonya/db").PublicExpertPaymentRuntime | undefined;
       try {
+        publicExpert = deps.publicExpertRuntimeFactory?.(db);
+        await publicExpert?.assertReady();
+        const personalCheckout =
+          publicExpert?.main ?? deps.expertPersonalOfferCheckout;
         if (deps.receiptDisclosureGateway) {
           await new PostgresReceiptRevocationOutbox(db).assertReady("worker");
         }
@@ -754,8 +768,8 @@ export function createProductionWorkerRuntimeFactory(
                   enabled: true,
                   repository,
                   financial,
-                  ...(deps.expertPersonalOfferCheckout
-                    ? { mainCheckout: deps.expertPersonalOfferCheckout }
+                  ...(personalCheckout
+                    ? { mainCheckout: personalCheckout }
                     : {}),
                 });
                 const abort = new AbortController();
@@ -788,6 +802,7 @@ export function createProductionWorkerRuntimeFactory(
           config,
           deps.expertResidencyNoticeFetch,
           deps.expertHeldOnboarding,
+          publicExpert?.held,
         );
         const deferredReviewPreparationScheduler =
           deps.deferredReviewPreparation
@@ -824,7 +839,7 @@ export function createProductionWorkerRuntimeFactory(
                 ))
             )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000)
           : undefined;
-        return createProductionWorkerRuntime({
+        const workerRuntime = createProductionWorkerRuntime({
           ...(availability === undefined
             ? {}
             : {
@@ -1005,8 +1020,27 @@ export function createProductionWorkerRuntimeFactory(
           closeTelemetry: async () => undefined,
           now: () => new Date(),
         });
+        return publicExpert
+          ? {
+              async runOnce() {
+                await publicExpert!.runOnce();
+                return workerRuntime.runOnce();
+              },
+              async close() {
+                try {
+                  await publicExpert!.stop();
+                } finally {
+                  await workerRuntime.close();
+                }
+              },
+            }
+          : workerRuntime;
       } catch (error) {
-        await db.$client.end();
+        try {
+          await publicExpert?.stop();
+        } finally {
+          await db.$client.end();
+        }
         throw error;
       }
     },
@@ -1127,6 +1161,9 @@ export async function main(options: WorkerMainOptions = {}): Promise<void> {
           ? {
               receiptDisclosureGateway: bootstrap.gateway,
               receiptDisclosureKeyVersion: bootstrap.keyVersion,
+              ...(bootstrap.createPublicRuntime
+                ? { publicExpertRuntimeFactory: bootstrap.createPublicRuntime }
+                : {}),
               earlyBirdReceiptRetention: new PostgresWorkerReceiptRetention(
                 bootstrap.waveRetentionDb,
                 bootstrap.waveRetentionLogin,

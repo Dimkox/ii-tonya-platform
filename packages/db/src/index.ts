@@ -478,3 +478,9 @@ export type {
   PublicExpertCheckoutDependencies,
   PublicMainCheckoutBinding,
 } from "./repositories/public-expert-payment-gateway.js";
+export {
+  createPublicExpertPaymentRuntime,
+  publicExpertConnectionNames,
+  type PublicExpertRuntimeConfiguration,
+  type PublicExpertPaymentRuntime,
+} from "./public-expert-payment-runtime.js";

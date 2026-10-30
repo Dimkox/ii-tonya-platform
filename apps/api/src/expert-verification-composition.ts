@@ -29,6 +29,11 @@ type ServiceDependencies = Parameters<
 >[0];
 export interface ExpertVerificationPaymentCapabilities {
   providerMode: "test" | "live";
+  publicHeldCheckout?: NonNullable<ServiceDependencies["heldCheckout"]> & {
+    readonly strictFirstSendCancellation: true;
+    reconcile(invoiceId: string): Promise<unknown>;
+    reconcileKnown(limit?: number): Promise<unknown>;
+  };
   heldOnboarding?: Omit<
     ConstructorParameters<typeof PostgresHeldOnboardingCheckout>[1],
     "enabled" | "repository" | "mode"
@@ -47,7 +52,9 @@ export interface ExpertVerificationCapability {
   checkoutEnabled: boolean;
   paymentVerificationEnabled: boolean;
   onboardingWebhook?: YooKassaOnboardingWebhookCapability;
-  heldCheckout?: PostgresHeldOnboardingCheckout;
+  heldCheckout?:
+    | PostgresHeldOnboardingCheckout
+    | ExpertVerificationPaymentCapabilities["publicHeldCheckout"];
 }
 export function assertExpertVerificationPayments(
   config: RuntimeConfig,
@@ -59,6 +66,14 @@ export function assertExpertVerificationPayments(
   if (payment && payment.providerMode !== settings.paymentMode)
     throw new Error("expert_verification_payment_mode_conflict");
   if (
+    payment?.publicHeldCheckout &&
+    (payment.publicHeldCheckout.strictFirstSendCancellation !== true ||
+      typeof payment.publicHeldCheckout.createCheckout !== "function" ||
+      typeof payment.publicHeldCheckout.recoverCheckout !== "function" ||
+      typeof payment.publicHeldCheckout.reconcileKnown !== "function")
+  )
+    throw Error("held_onboarding_capability_required");
+  if (
     settings.checkoutEnabled &&
     config.features.expertHeldOnboarding !== true &&
     (payment?.checkout?.strictFirstSendCancellation !== true ||
@@ -69,6 +84,7 @@ export function assertExpertVerificationPayments(
   // Reconciliation of existing invoices remains available with manager/new-checkout off.
   if (
     settings.paymentVerificationEnabled &&
+    !payment?.publicHeldCheckout &&
     (payment?.paymentVerification?.authoritativeGet !== true ||
       typeof payment.paymentVerification.client?.getPayment !== "function")
   )
@@ -122,14 +138,16 @@ export function createExpertVerificationComposition(
     messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
   });
   const heldCheckout =
-    config.features.expertHeldOnboarding === true && payment?.heldOnboarding
-      ? new PostgresHeldOnboardingCheckout(db, {
-          ...payment.heldOnboarding,
-          enabled: true,
-          repository,
-          mode: settings.paymentMode,
-        })
-      : undefined;
+    config.features.expertHeldOnboarding === true && payment?.publicHeldCheckout
+      ? payment.publicHeldCheckout
+      : config.features.expertHeldOnboarding === true && payment?.heldOnboarding
+        ? new PostgresHeldOnboardingCheckout(db, {
+            ...payment.heldOnboarding,
+            enabled: true,
+            repository,
+            mode: settings.paymentMode,
+          })
+        : undefined;
   if (config.features.expertHeldOnboarding === true && !heldCheckout)
     throw new Error("held_onboarding_capability_required");
   const onboardingWebhook =
@@ -141,7 +159,9 @@ export function createExpertVerificationComposition(
             repository,
           ),
           repository,
-          heldCheckout,
+          heldCheckout instanceof PostgresHeldOnboardingCheckout
+            ? heldCheckout
+            : undefined,
         )
       : undefined;
   return {

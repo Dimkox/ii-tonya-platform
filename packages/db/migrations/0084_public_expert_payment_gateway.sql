@@ -272,7 +272,7 @@ BEGIN
   IF NOT FOUND THEN RETURN NULL; END IF;
   r.invoice_id:=invoice.id; r.legacy_source_id:=invoice.id; r.legacy_operation_id:=onboarding_op.id;
   r.mode:=invoice.provider_mode; r.amount_minor:=invoice.amount_minor;
-  SELECT a.expires_at,b.quote_id INTO r.payment_deadline,source_quote FROM public.expert_sales_fee_attempts a JOIN public.expert_sales_form_bridges b ON b.application_id=invoice.application_id AND b.user_id=invoice.user_id WHERE a.invoice_id=invoice.id;
+  SELECT a.expires_at,b.quote_id INTO r.payment_deadline,source_quote FROM public.expert_sales_fee_attempts a LEFT JOIN public.expert_sales_form_bridges b ON b.application_id=invoice.application_id AND b.user_id=invoice.user_id WHERE a.invoice_id=invoice.id;
   IF NOT FOUND THEN RETURN NULL; END IF;
   r.provider_deadline:=r.payment_deadline;
   IF r.kind<>'onboarding_create' THEN r.parent_payment_id:=onboarding_op.provider_object_id; r.provider_object_id:=r.parent_payment_id; END IF;
@@ -280,7 +280,9 @@ BEGIN
  ELSE
   IF product_name='refund' THEN
    SELECT * INTO op FROM public.expert_residency_provider_operations WHERE id=target_source AND operation_kind='create_refund' AND status='claimed' AND provider_object_id IS NULL FOR UPDATE;
-   IF NOT FOUND OR op.idempotency_key<>r.idempotency_key OR op.request_digest<>r.request_digest THEN RETURN NULL; END IF;
+   -- op.request_digest/claim_digest retain immutable financial authorization;
+   -- r.request_digest independently binds the encrypted exact provider body.
+   IF NOT FOUND OR op.idempotency_key<>r.idempotency_key THEN RETURN NULL; END IF;
    SELECT * INTO ord FROM public.expert_residency_orders WHERE id=op.order_id FOR UPDATE;
   ELSE
    SELECT * INTO ord FROM public.expert_residency_orders WHERE id=target_source FOR UPDATE;
@@ -811,7 +813,7 @@ BEGIN
    FROM public.expert_onboarding_invoices i
    JOIN public.expert_onboarding_payment_operations op ON op.invoice_id=i.id AND op.user_id=i.user_id
    JOIN public.expert_sales_fee_attempts a ON a.invoice_id=i.id AND a.user_id=i.user_id
-   JOIN public.expert_sales_form_bridges b ON b.application_id=i.application_id AND b.user_id=i.user_id
+   LEFT JOIN public.expert_sales_form_bridges b ON b.application_id=i.application_id AND b.user_id=i.user_id
    WHERE i.id=target_source AND i.user_id=target_user AND i.amount_minor=op.amount_minor AND i.provider_mode=op.provider_mode AND i.currency='RUB' AND op.currency='RUB';
   IF NOT FOUND THEN RETURN NULL; END IF;
   v_current_frame:=early_bird_private.public_onboarding_current(v_source_id,target_user);
@@ -872,6 +874,36 @@ CREATE FUNCTION early_bird_private.public_onboarding_pending(batch_limit integer
  ) candidates
 $$;
 
+-- Bounded recovery discovery discloses identifiers only. It cannot admit a send,
+-- manufacture a provider fact, or post financial state. UUID cursors rotate past
+-- unresolved records; a missing webhook never requires replaying a POST.
+CREATE FUNCTION early_bird_private.public_payment_pending(batch_limit integer,after_request uuid) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT coalesce(jsonb_agg(id ORDER BY id),'[]'::jsonb) FROM (
+  SELECT r.id FROM public.public_expert_payment_requests r
+  WHERE r.state IN('uncertain','bound') AND (after_request IS NULL OR r.id>after_request)
+   AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_resolutions done WHERE done.request_id=r.id AND done.kind IN('applied','manual_reconciliation'))
+  ORDER BY r.id LIMIT least(10,greatest(1,batch_limit))
+ ) candidates
+$$;
+CREATE FUNCTION early_bird_private.public_payment_hint(object_id text,operation_hint uuid,is_refund boolean) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT coalesce(jsonb_agg(id ORDER BY id),'[]'::jsonb) FROM (
+  SELECT r.id FROM public.public_expert_payment_requests r
+  WHERE (r.product='refund')=is_refund AND (r.provider_object_id=object_id OR r.legacy_operation_id=operation_hint)
+  ORDER BY r.id LIMIT 4
+ ) candidates
+$$;
+-- Only previously authorized, claimed refund commands in a genuine public main
+-- cohort are offered to the refund sender. Source/prepare/admit recheck every fact.
+CREATE FUNCTION early_bird_private.public_refund_pending(batch_limit integer,after_operation uuid) RETURNS jsonb LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT coalesce(jsonb_agg(jsonb_build_object('userId',user_id,'operationId',id) ORDER BY id),'[]'::jsonb) FROM (
+  SELECT op.id,e.user_id FROM public.expert_residency_provider_operations op JOIN public.expert_residency_orders o ON o.id=op.order_id JOIN public.experts e ON e.id=o.expert_id
+  WHERE op.operation_kind='create_refund' AND op.status='claimed' AND op.provider_object_id IS NULL
+   AND (after_operation IS NULL OR op.id>after_operation)
+   AND EXISTS(SELECT 1 FROM public.public_expert_payment_requests main WHERE main.order_id=o.id AND main.product='main')
+   AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_requests sent WHERE sent.legacy_operation_id=op.id AND sent.state<>'prepared')
+  ORDER BY op.id LIMIT least(10,greatest(1,batch_limit))
+ ) commands
+$$;
 -- Revoke every new capability and helper, including the trusted-processor guard.
 -- Task6 provisions exact external LOGIN mappings; this migration guesses no role.
 DO $$ DECLARE fn record; BEGIN

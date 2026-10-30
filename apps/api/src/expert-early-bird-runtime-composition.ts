@@ -196,7 +196,7 @@ export function createEarlyBirdOwnerRuntimeComposition(
         policy.botKey !== config.checkout.policy.botKey ||
         policy.messagingConsentPolicyVersion !==
           config.checkout.policy.messagingConsentPolicyVersion ||
-        phase.configuredPhase !== "WAVE_1_EARLY_BIRD"
+        !["WAVE_1_EARLY_BIRD", "PUBLIC_LAUNCH"].includes(phase.configuredPhase)
       )
         throw new Error("early_bird_runtime_policy_mismatch");
       await config.gateway.barrier();

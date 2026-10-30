@@ -1,4 +1,9 @@
 import { createEarlyBirdDiscoveryPool } from "./early-bird-discovery-pool.js";
+import { createPublicExpertApiRuntime } from "./public-expert-payment-runtime.js";
+import {
+  publicExpertConnectionNames,
+  type PublicExpertPaymentRuntime,
+} from "@ii-tonya/db";
 import type { EarlyBirdBoundReconciliation } from "./early-bird-bound-reconciliation.js";
 import { createExpertEarlyBirdWebhookRuntime } from "./expert-early-bird-webhook-runtime.js";
 import { createEarlyBirdDeferredRuntime } from "./expert-early-bird-deferred-runtime.js";
@@ -106,6 +111,7 @@ function database(
     if (
       !["postgres:", "postgresql:"].includes(url.protocol) ||
       decodeURIComponent(url.username) !== login ||
+      login === decodeURIComponent(primary.username) ||
       !url.password ||
       !url.hostname ||
       url.pathname.length < 2 ||
@@ -128,13 +134,16 @@ function database(
  * A reviewed descriptor must point to distinct, least-privilege database logins;
  * their capabilities are checked by the concrete repositories at execution time.
  */
-export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
+export function loadEarlyBirdGatewayBootstrap(
+  config: RuntimeConfig,
+  createDatabase: typeof createDb = createDb,
+) {
   const settings = config.yookassaGateway;
   if (!settings) return undefined;
   if (!settings.configurationFile) return fail();
   if (
     settings.mode !== "live" ||
-    config.launchPhase?.configuredPhase !== "WAVE_1_EARLY_BIRD" ||
+    !config.launchPhase ||
     config.features.expertApplicant !== true ||
     config.features.expertSeparatedSales !== true ||
     !config.expertApplicant
@@ -156,7 +165,7 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
       "receiptKeys",
       "databases",
     ],
-    ["webhookDatabases", "deferredDatabases"],
+    ["webhookDatabases", "deferredDatabases", "publicDatabases"],
   );
   if (descriptor.version !== 1) return fail();
   const ipc = object(descriptor.ipc, [
@@ -234,6 +243,22 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
     for (const [name, value] of Object.entries(section ?? {}))
       credentials[prefix + "/" + name] = database(value, config.databaseUrl);
   }
+  if (settings.publicExpertEnabled === true) {
+    if (
+      !config.expertVerification ||
+      config.expertVerification.paymentMode !== settings.mode
+    )
+      return fail();
+    const publicDbs = object(
+      descriptor.publicDatabases,
+      publicExpertConnectionNames,
+    );
+    for (const name of publicExpertConnectionNames)
+      credentials["public/" + name] = database(
+        publicDbs[name],
+        config.databaseUrl,
+      );
+  } else if (descriptor.publicDatabases !== undefined) return fail();
   if (
     new Set(Object.values(credentials).map((value) => value.login)).size !==
     Object.keys(credentials).length
@@ -248,11 +273,17 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
   const pools: DrizzleDb[] = [];
   let closing: Promise<void> | undefined;
   let reconciliation: EarlyBirdBoundReconciliation | undefined;
+  let publicRuntime: PublicExpertPaymentRuntime | undefined;
   const close = () =>
     (closing ??= (async () => {
       let stopFailed = false;
       try {
-        await reconciliation?.stop();
+        const stopped = await Promise.allSettled([
+          reconciliation?.stop(),
+          publicRuntime?.stop(),
+        ]);
+        if (stopped.some((result) => result.status === "rejected"))
+          stopFailed = true;
       } catch {
         stopFailed = true;
       }
@@ -269,7 +300,7 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
     if (prior) return prior;
     const credential = credentials[name];
     if (!credential) return fail();
-    const db = createDb(credential.url, {
+    const db = createDatabase(credential.url, {
       max: 2,
       idleTimeoutMillis: 10000,
       connectionTimeoutMillis: 4000,
@@ -315,9 +346,10 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
       close,
       startReconciliation() {
         reconciliation?.start();
+        publicRuntime?.start();
       },
       stopReconciliation() {
-        return reconciliation?.stop();
+        return Promise.all([reconciliation?.stop(), publicRuntime?.stop()]);
       },
       serverOptions(db: DrizzleDb) {
         if (!standardRuntime || !webhook || !deferred || !config.launchPhase)
@@ -381,7 +413,32 @@ export function loadEarlyBirdGatewayBootstrap(config: RuntimeConfig) {
           engagement: new PostgresFinalCallEngagement(db),
           clientStartMs: config.launchPhase.clientStartMs,
         })!;
+        const publicApi =
+          settings.publicExpertEnabled === true
+            ? createPublicExpertApiRuntime(db, {
+                connections: Object.fromEntries(
+                  publicExpertConnectionNames.map((name) => [
+                    name,
+                    connection("public/" + name),
+                  ]),
+                ) as Parameters<
+                  typeof createPublicExpertApiRuntime
+                >[1]["connections"],
+                gateway,
+                mode: settings.mode,
+                messagingConsentPolicyVersion:
+                  config.expertVerification!.messagingConsentPolicyVersion,
+                vault: runtime.checkout.receiptVault,
+                requestKey,
+                requestKeyReference: activeReference,
+                retainedRequestKeys: requestKeys,
+                returnUrl: settings.returnUrl,
+                vatCode: settings.receipt.vatCode,
+              })
+            : undefined;
+        publicRuntime = publicApi?.runtime;
         return {
+          ...publicApi?.options,
           // Recovery reads trusted source facts only. This is the ordinary
           // primary connection, not a claimed read-only database principal.
           // Candidate discovery never POSTs; verification and binding retain

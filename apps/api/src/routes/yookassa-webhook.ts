@@ -14,6 +14,13 @@ export type BoundPaymentPurpose =
   | "COMBINED_EARLY_BIRD"
   | "DEFERRED_EARLY_BIRD";
 export interface YooKassaWebhookDependencies {
+  /** Canonical public candidates consume the notification as a GET discovery hint.
+   * A failed public verification must never enter another product's handler. */
+  readonly publicPayment?: {
+    handle(
+      notification: YooKassaNotification,
+    ): Promise<"absent" | "pending" | "complete">;
+  };
   /** Production supplies the durable binding lookup; metadata never chooses a product. */
   readonly resolvePurpose?: (
     providerObjectId: string,
@@ -104,6 +111,15 @@ export async function yookassaWebhookRoutes(
         return reply.code(503).send({ error: "delivery_pending" });
       }
       try {
+        if (deps.publicPayment) {
+          const result = await deps.publicPayment.handle(parsed.data);
+          if (result === "pending")
+            throw Error("yookassa_public_payment_pending");
+          if (result === "complete") {
+            await deps.inbox.complete(claim.claimId);
+            return reply.send({ accepted: true });
+          }
+        }
         if (deps.resolvePurpose) {
           const purpose = await deps.resolvePurpose(
             parsed.data.object.id,
