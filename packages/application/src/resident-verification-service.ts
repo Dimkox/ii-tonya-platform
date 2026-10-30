@@ -209,6 +209,7 @@ function renderForm(
   policy: ResidentPolicy,
   field: ResidentField | null = s.currentField ??
     residentForm(s.draft, policy, s.formVersion ?? 1).next,
+  wavePaymentFlow = false,
 ): ExpertApplicantReply {
   if (s.status === "INFO_REQUESTED")
     return {
@@ -235,7 +236,9 @@ function renderForm(
           }
         : { remove_keyboard: true },
       text: salesFirst
-        ? "Анкета получена. Выбранные условия доступны в /my_tariff. Менеджер проверит анкету; после одобрения отдельно выставляется взнос за онбординг 3000 ₽. Для электронного чека отправьте /receipt и ваш email. Дополнения можно прислать ответным сообщением."
+        ? wavePaymentFlow
+          ? "Анкета получена. Выбранный способ оплаты сохранён. После одобрения откройте /my_tariff и получите счёт по выбранным условиям: при оплате сразу это единый счёт за онбординг и тариф, при выборе «позже» — только онбординг. Если адрес электронного чека ещё не указан, бот попросит его перед оплатой. Дополнения можно прислать ответным сообщением."
+          : "Анкета получена. Выбранные условия доступны в /my_tariff. Менеджер проверит анкету; после одобрения отдельно выставляется взнос за онбординг 3000 ₽. Для электронного чека отправьте /receipt и ваш email. Дополнения можно прислать ответным сообщением."
         : "Анкета получена. Дополнения можно прислать ответным сообщением. Автоматические проверки и загрузка документов ожидают обработки; результаты пока не подтверждены. Решение менеджера и цены ещё не доступны.",
     };
   const callback = (action: string) => `rv:${s.id}:${s.revision}:${action}`;
@@ -354,6 +357,7 @@ function textPatch(field: ResidentField, text: string): unknown {
 export function createResidentVerificationService(deps: {
   enabled: boolean;
   salesFirst?: boolean;
+  wavePaymentFlow?: boolean;
   repository: ResidentFormRepository;
   policy?: ResidentPolicy;
   privateDocuments?: {
@@ -380,7 +384,13 @@ export function createResidentVerificationService(deps: {
     policy: ResidentPolicy,
     field?: ResidentField | null,
   ) => {
-    const reply = renderForm(deps.salesFirst === true, s, policy, field);
+    const reply = renderForm(
+      deps.salesFirst === true,
+      s,
+      policy,
+      field,
+      deps.wavePaymentFlow === true,
+    );
     return deps.privateDocuments &&
       s.status === "PENDING_DOCS" &&
       reply.status === "handled"

@@ -28,6 +28,71 @@ export class PostgresEarlyBirdChoiceRepository {
       messagingConsentPolicyVersion: string;
     },
   ) {}
+  /** Read the authenticated current decision; never records/reprices a choice. */
+  async currentPayment(
+    input: Pick<
+      EarlyBirdChoiceCommand,
+      "botId" | "botKey" | "telegramUserId" | "chatId"
+    >,
+  ): Promise<{
+    id: string;
+    revision: number;
+    choiceId: string;
+    choice: "now" | "later";
+    baseMonthlyMinor: string;
+    qualified: boolean;
+  } | null> {
+    if (
+      !input ||
+      input.botId !== this.policy.botId ||
+      input.botKey !== this.policy.botKey ||
+      input.telegramUserId !== input.chatId ||
+      !/^[1-9][0-9]{0,19}$/u.test(input.chatId)
+    )
+      return null;
+    return this.db.transaction(async (tx) => {
+      const identities = (
+        await tx.execute<{ id: string }>(
+          sql`select u.id from channel_identities ci join users u on u.id=ci.user_id and u.active where ci.provider='telegram' and ci.bot_key=${input.botKey} and ci.external_id=${input.telegramUserId} and ci.external_chat_id=${input.chatId} and ci.status='active' limit 2`,
+        )
+      ).rows;
+      if (identities.length !== 1) return null;
+      const userId = identities[0]!.id;
+      await lockClientConsentSubject(tx, userId);
+      if (
+        !(await captureClientConsentAuthority(tx, {
+          subjectId: userId,
+          botKey: input.botKey,
+          chatId: input.chatId,
+          externalUserId: input.telegramUserId,
+          messagingPolicyVersion: this.policy.messagingConsentPolicyVersion,
+        }))
+      )
+        return null;
+      if (
+        !(await earlyBirdFormEligible(tx, {
+          userId,
+          botId: input.botId,
+          botKey: input.botKey,
+          chatId: input.chatId,
+        }))
+      )
+        return null;
+      const rows = (
+        await tx.execute<{
+          id: string;
+          revision: number;
+          choiceId: string;
+          choice: "now" | "later";
+          baseMonthlyMinor: string;
+          qualified: boolean;
+        }>(
+          sql`select b.id,c.revision,c.id as "choiceId",c.choice,b.base_tariff_amount::text as "baseMonthlyMinor",early_bird_composite_qualification(b.user_id,c.id) as qualified from expert_sales_bases b join early_bird_choices c on c.base_id=b.id and c.user_id=b.user_id where b.user_id=${userId}::uuid and b.bot_id=${input.botId} and b.bot_key=${input.botKey} and b.chat_id=${input.chatId} and c.id=(select id from early_bird_choices where base_id=b.id order by decision_no desc limit 1) and c.positive_choice_id=(select id from expert_sales_choices where base_id=b.id order by revision desc limit 1) for share of b,c`,
+        )
+      ).rows;
+      return rows.length === 1 ? rows[0]! : null;
+    });
+  }
   async formEligible(
     input: Pick<
       EarlyBirdChoiceCommand,

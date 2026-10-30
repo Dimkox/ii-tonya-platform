@@ -67,11 +67,53 @@ export function createPostgresEarlyBirdAuthority(
         }
       : {}),
     async current(input) {
-      return (
-        (await paid.find(input)) ??
-        (await deferredAuthority?.current(input)) ??
-        null
-      );
+      const settled =
+        (await paid.find(input)) ?? (await deferredAuthority?.current(input));
+      if (settled) return settled;
+      const selected = await choices.currentPayment(input);
+      return selected
+        ? {
+            ...selected,
+            status: selected.qualified
+              ? ("APPROVED_UNPAID" as const)
+              : ("AWAITING_APPROVAL" as const),
+          }
+        : null;
+    },
+    async continuePayment(input) {
+      if (
+        !Number.isSafeInteger(input.updateId) ||
+        input.updateId < 0 ||
+        (await paid.find(input)) ||
+        (await deferredAuthority?.current(input))
+      )
+        return null;
+      const selected = await choices.currentPayment(input);
+      if (!selected?.qualified) return null;
+      const command = {
+        ...input,
+        offerId: selected.id,
+        revision: selected.revision,
+        choice: selected.choice,
+        choiceId: selected.choiceId,
+      };
+      if (selected.choice === "now") {
+        const result = await prepareAuthority?.prepare(command);
+        return {
+          choice: selected.choice,
+          outcome:
+            result?.kind === "invoice" ? result : { kind: "pending" as const },
+        };
+      }
+      if (!deferredAuthority?.choose) return null;
+      const prepared = await deferredAuthority.prepare(command);
+      if (prepared.kind === "unavailable") return null;
+      const result = await deferredAuthority.choose(command);
+      return {
+        choice: selected.choice,
+        outcome:
+          result?.kind === "invoice" ? result : { kind: "pending" as const },
+      };
     },
     async quote(input) {
       const digest = createHash("sha256")

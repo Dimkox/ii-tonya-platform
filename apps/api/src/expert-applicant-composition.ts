@@ -109,6 +109,7 @@ export function createExpertApplicantComposition(
                       ...(privateDocuments ? { privateDocuments } : {}),
                       enabled: true,
                       salesFirst: true,
+                      wavePaymentFlow: true,
                       repository: new PostgresResidentVerificationRepository(
                         db,
                         { ...scope, earlyBirdForm: true },
