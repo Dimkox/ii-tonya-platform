@@ -186,6 +186,14 @@ it("rejects execute access to another security definer function", async () => {
   );
   const minor = BigInt(snapshot.totalMinor as string),
     amount = `${minor / 100n}.${String(minor % 100n).padStart(2, "0")}`;
+  // Synthetic provider creation follows the persisted quote's logical clock.
+  const providerCreatedAt = snapshot.quotedAt as string;
+  expect(Date.parse(providerCreatedAt)).toBeGreaterThanOrEqual(
+    Date.parse(snapshot.baseOfferShownAt as string),
+  );
+  expect(Date.parse(providerCreatedAt)).toBeLessThan(
+    Date.parse(snapshot.expiresAt as string),
+  );
   const verifier = new YooKassaEarlyBirdCandidateVerifier(
     {
       getPayment: async () => ({
@@ -194,7 +202,7 @@ it("rejects execute access to another security definer function", async () => {
         paid: false,
         test: false,
         amount: { value: amount, currency: "RUB" },
-        createdAt: new Date().toISOString(),
+        createdAt: providerCreatedAt,
         metadata: {
           order_id: invoice,
           user_id: user,
