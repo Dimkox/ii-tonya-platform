@@ -457,9 +457,32 @@ CREATE FUNCTION early_bird_private.public_apply_result(r public.public_expert_pa
  SELECT jsonb_build_object('version',1,'kind',result_kind,'requestId',r.id,'observationId',o.id,'legacySourceId',r.legacy_source_id,'legacyOperationId',r.legacy_operation_id,'providerObjectId',r.provider_object_id,'action',action_name,'applyAttemptId',attempt,
  'evidence',CASE WHEN action_name IS NULL THEN NULL ELSE jsonb_build_object('snapshot',r.snapshot,'observation',o.fact,'legacyEventId','public:'||r.id::text||':'||o.id::text,'expectedPeriod',CASE WHEN r.apply_expected_start IS NULL THEN NULL ELSE jsonb_build_object('startsAt',early_bird_private.public_time(r.apply_expected_start),'endsAt',early_bird_private.public_time(r.apply_expected_end)) END) END)
 $$;
+-- CREATE and CAPTURE observe one held payment. A completed fee is identified by
+-- its immutable source/payment tuple, while its original event/digest remain the
+-- canonical evidence. Only a previously COMMITTED fact may acknowledge a no-op.
+CREATE FUNCTION early_bird_private.public_onboarding_committed_matches(r public.public_expert_payment_requests,o public.public_expert_payment_observations) RETURNS boolean LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
+ SELECT coalesce(r.product='onboarding' AND r.kind IN('onboarding_create','onboarding_capture')
+  AND o.request_id=r.id AND o.provider_object_id=r.provider_object_id AND o.parent_payment_id IS NOT DISTINCT FROM r.parent_payment_id
+  AND o.status='succeeded' AND o.paid AND o.amount_minor=r.amount_minor AND o.currency=r.currency AND o.mode=r.mode
+  AND NOT EXISTS(SELECT 1 FROM public.public_expert_payment_resolutions conflict WHERE conflict.request_id=r.id AND conflict.kind='manual_reconciliation')
+  AND EXISTS(SELECT 1 FROM public.expert_onboarding_payment_facts f
+   JOIN public.expert_onboarding_invoices invoice ON invoice.id=f.invoice_id AND invoice.status='settled'
+   JOIN public.expert_onboarding_payment_operations operation ON operation.id=f.operation_id AND operation.invoice_id=f.invoice_id AND operation.status='succeeded'
+   JOIN public.public_expert_payment_requests original ON original.invoice_id=f.invoice_id AND original.product='onboarding' AND original.kind IN('onboarding_create','onboarding_capture') AND original.legacy_operation_id=f.operation_id AND original.user_id=f.user_id AND original.provider_object_id=f.provider_object_id
+   JOIN public.public_expert_payment_observations origin ON origin.request_id=original.id AND origin.id=original.apply_observation_id AND origin.status='succeeded' AND origin.paid
+   JOIN public.public_expert_payment_resolutions admission ON admission.request_id=original.id AND admission.kind='apply_attempt' AND admission.apply_attempt_id=original.apply_attempt_id AND admission.observation_id=origin.id AND admission.action='onboarding_settle'
+   WHERE f.invoice_id=r.invoice_id AND f.operation_id=r.legacy_operation_id AND f.user_id=r.user_id AND f.purpose='onboarding'
+    AND f.provider_object_id=r.provider_object_id AND f.provider_mode=r.mode AND f.amount_minor=r.amount_minor AND f.currency=r.currency AND f.captured_at=o.provider_captured_at
+    AND f.xmin::text::numeric<>mod(pg_current_xact_id()::text::numeric,4294967296)
+    AND original.apply_action='onboarding_settle' AND original.apply_xid IS NOT NULL
+    AND origin.provider_object_id=f.provider_object_id AND origin.mode=f.provider_mode AND origin.amount_minor=f.amount_minor AND origin.currency=f.currency AND origin.provider_captured_at=f.captured_at
+    AND f.event_id='public:'||original.id::text||':'||origin.id::text AND f.evidence_digest=origin.evidence_digest),false)
+$$;
+REVOKE ALL ON FUNCTION early_bird_private.public_onboarding_committed_matches(public.public_expert_payment_requests,public.public_expert_payment_observations) FROM PUBLIC;
+--> statement-breakpoint
 CREATE FUNCTION early_bird_private.public_resolution(target_request uuid,target_observation uuid,expiry boolean) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
 DECLARE r public.public_expert_payment_requests%ROWTYPE; o public.public_expert_payment_observations%ROWTYPE; prior public.public_expert_payment_resolutions%ROWTYPE;
- action_name text; disposition_name text; attempt uuid; manual_reason text;
+ action_name text; disposition_name text; attempt uuid; manual_reason text; repaired jsonb;
 BEGIN
  SELECT * INTO r FROM public.public_expert_payment_requests WHERE id=target_request;
  IF NOT FOUND THEN RETURN NULL; END IF;
@@ -469,7 +492,7 @@ BEGIN
  IF NOT FOUND OR NOT early_bird_private.public_source_valid(r,false) THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
  SELECT * INTO prior FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind='applied';
  IF FOUND THEN
-  IF prior.observation_id=o.id THEN RETURN early_bird_private.public_apply_result(r,o,'already_applied',prior.action,prior.apply_attempt_id); END IF;
+  IF prior.observation_id=o.id OR early_bird_private.public_onboarding_committed_matches(r,o) THEN RETURN early_bird_private.public_apply_result(r,o,'already_applied',prior.action,prior.apply_attempt_id); END IF;
   RETURN early_bird_private.public_apply_result(r,o,'manual_reconciliation',NULL,NULL);
  END IF;
  IF o.status NOT IN('succeeded','canceled') OR (expiry AND o.status<>'canceled') OR r.state NOT IN('bound','resolved') THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
@@ -490,7 +513,13 @@ BEGIN
  END IF;
  SELECT * INTO prior FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind='apply_attempt';
  IF FOUND THEN
-  IF prior.observation_id<>o.id OR prior.action<>action_name THEN RETURN early_bird_private.public_apply_result(r,o,'manual_reconciliation',NULL,NULL); END IF;
+  IF prior.observation_id<>o.id OR prior.action<>action_name THEN
+   IF prior.action='onboarding_settle' AND action_name='onboarding_settle' AND early_bird_private.public_onboarding_committed_matches(r,o) THEN
+    repaired:=early_bird_private.public_payment_complete(r.id,prior.apply_attempt_id);
+    IF repaired->>'kind'='already_applied' THEN RETURN early_bird_private.public_apply_result(r,o,'already_applied',prior.action,prior.apply_attempt_id); END IF;
+   END IF;
+   RETURN early_bird_private.public_apply_result(r,o,'manual_reconciliation',NULL,NULL);
+  END IF;
   attempt:=prior.apply_attempt_id;
  ELSE attempt:=gen_random_uuid(); END IF;
  IF manual_reason IS NOT NULL THEN
@@ -712,7 +741,7 @@ CREATE TRIGGER public_main_state_guard BEFORE UPDATE ON expert_residency_orders 
 CREATE TRIGGER public_credit_state_guard BEFORE INSERT ON expert_referral_ledger_entries FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_financial_guard();
 CREATE TRIGGER public_inbox_fact_guard BEFORE INSERT OR UPDATE ON expert_residency_provider_event_inbox FOR EACH ROW EXECUTE FUNCTION early_bird_private.public_financial_guard();
 CREATE FUNCTION early_bird_private.public_payment_complete(target_request uuid,target_attempt uuid) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public,pg_temp AS $$
-DECLARE r public.public_expert_payment_requests%ROWTYPE; o public.public_expert_payment_observations%ROWTYPE; a public.public_expert_payment_resolutions%ROWTYPE; legacy_id text;
+DECLARE r public.public_expert_payment_requests%ROWTYPE; o public.public_expert_payment_observations%ROWTYPE; a public.public_expert_payment_resolutions%ROWTYPE; legacy_id text; committed_onboarding boolean;
 BEGIN
  SELECT * INTO r FROM public.public_expert_payment_requests WHERE id=target_request;
  IF NOT FOUND THEN RETURN NULL; END IF;
@@ -722,11 +751,15 @@ BEGIN
  IF NOT FOUND THEN RETURN NULL; END IF;
  SELECT * INTO o FROM public.public_expert_payment_observations WHERE id=a.observation_id;
  IF EXISTS(SELECT 1 FROM public.public_expert_payment_resolutions WHERE request_id=r.id AND kind='applied' AND apply_attempt_id=target_attempt) THEN RETURN early_bird_private.public_apply_result(r,o,'already_applied',a.action,target_attempt); END IF;
- IF r.apply_attempt_id IS DISTINCT FROM target_attempt OR r.apply_xid IS NULL OR r.apply_xid=pg_current_xact_id() OR NOT early_bird_private.public_source_valid(r,false) THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
+ IF NOT early_bird_private.public_source_valid(r,false) THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
+ -- A sibling request may already have posted this same held parent. Inspect its
+ -- immutable committed fact before requesting another financial transaction.
+ committed_onboarding:=a.action='onboarding_settle' AND EXISTS(SELECT 1 FROM public.expert_onboarding_payment_facts f WHERE f.invoice_id=r.invoice_id AND f.xmin::text::numeric<>mod(pg_current_xact_id()::text::numeric,4294967296));
+ IF (r.apply_attempt_id IS DISTINCT FROM target_attempt OR r.apply_xid IS NULL OR r.apply_xid=pg_current_xact_id()) AND NOT committed_onboarding THEN RETURN early_bird_private.public_apply_result(r,o,'not_ready',NULL,NULL); END IF;
  IF a.action='onboarding_settle' THEN
   SELECT f.invoice_id::text INTO legacy_id FROM public.expert_onboarding_payment_facts f JOIN public.expert_onboarding_invoices i ON i.id=f.invoice_id AND i.status='settled'
   JOIN public.expert_onboarding_payment_operations op ON op.id=f.operation_id AND op.status='succeeded'
-  WHERE f.invoice_id=r.invoice_id AND f.operation_id=r.legacy_operation_id AND f.user_id=r.user_id AND f.provider_object_id=r.provider_object_id AND f.provider_mode=r.mode AND f.amount_minor=r.amount_minor AND f.currency=r.currency AND f.captured_at=o.provider_captured_at AND f.evidence_digest=o.evidence_digest;
+  WHERE f.invoice_id=r.invoice_id AND f.operation_id=r.legacy_operation_id AND f.user_id=r.user_id AND f.provider_object_id=r.provider_object_id AND f.provider_mode=r.mode AND f.amount_minor=r.amount_minor AND f.currency=r.currency AND f.captured_at=o.provider_captured_at AND early_bird_private.public_onboarding_committed_matches(r,o);
  ELSIF a.action IN('main_settle','main_refund') THEN
   SELECT e.id::text INTO legacy_id FROM public.expert_residency_provider_event_inbox e JOIN public.expert_residency_orders ord ON ord.id=e.order_id
   WHERE e.external_event_id='public:'||r.id::text||':'||o.id::text AND e.provider='yookassa' AND e.order_id=r.order_id AND e.amount_minor=r.amount_minor AND e.currency=r.currency AND e.payload_digest=substring(o.evidence_digest FROM 8) AND e.status='processed'
