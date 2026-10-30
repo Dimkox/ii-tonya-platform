@@ -135,6 +135,7 @@ const HAND_SQL_FUNCTIONS = [
   "early_bird_private.public_main_source",
   "early_bird_private.public_never_sent",
   "early_bird_private.public_onboarding_admit",
+  "early_bird_private.public_onboarding_committed_matches",
   "early_bird_private.public_onboarding_current",
   "early_bird_private.public_onboarding_invoice",
   "early_bird_private.public_onboarding_pending",

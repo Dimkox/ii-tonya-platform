@@ -172,7 +172,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
   actual.prevId = expected.prevId;
   expect(actual).toEqual(expected);
   expect(Object.keys(actual.tables)).toHaveLength(280);
-  expect(state.functions).toHaveLength(323);
+  expect(state.functions).toHaveLength(324);
   expect(state.triggers).toHaveLength(293);
   expect(state.constraints).toHaveLength(1922);
   if (!("sequences" in state)) throw Error("sequence_evidence_missing");
@@ -197,12 +197,20 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
     state.functions.filter((row) =>
       String(row.definition).includes("FUNCTION early_bird_private."),
     ),
-  ).toHaveLength(53);
+  ).toHaveLength(54);
   if (!("schemas" in state) || !("functionPrivileges" in state))
     throw new Error("private_state_evidence_missing");
   expect(state.schemas).toEqual([
     { name: "early_bird_private", public_usage: false, public_create: false },
   ]);
+  expect(state.functionPrivileges).toContainEqual(
+    expect.objectContaining({
+      schema: "early_bird_private",
+      name: "public_onboarding_committed_matches",
+      security_definer: true,
+      public_execute: false,
+    }),
+  );
   const privileged = state.functionPrivileges.filter(
     (row) => row.security_definer === true,
   );
@@ -245,6 +253,13 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
   try {
     await operator.query(provisioning);
     await operator.query(provisioning);
+    // Resolve the private signature as the operator. PUBLIC-only capabilities
+    // intentionally lack private-schema USAGE, but can inspect effective ACLs by OID.
+    const committedMatchOid = (
+      await operator.query<{ oid: number }>(
+        "select 'early_bird_private.public_onboarding_committed_matches(public.public_expert_payment_requests,public.public_expert_payment_observations)'::regprocedure::oid oid",
+      )
+    ).rows[0]!.oid;
     for (const capability of capabilities) {
       const login = mapping[capability.role]!;
       const address = new URL(connection);
@@ -294,6 +309,14 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
           "select nextval('public.public_expert_payment_observations_observation_sequence_seq')",
         ),
       ).rejects.toMatchObject({ code: "42501" });
+      expect(
+        (
+          await pool.query(
+            "select has_function_privilege(current_user,$1::oid,'EXECUTE') allowed",
+            [committedMatchOid],
+          )
+        ).rows[0]?.allowed,
+      ).toBe(false);
       await expect(
         pool.query("select * from public_expert_payment_requests"),
       ).rejects.toMatchObject({ code: "42501" });
