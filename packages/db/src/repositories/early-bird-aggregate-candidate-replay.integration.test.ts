@@ -29,7 +29,7 @@ afterAll(async () => {
   if (directory) await rm(directory, { recursive: true, force: true });
 }, 120_000);
 
-it("replays the complete real chain plus hash-observed 0081 and keeps the limited legacy capability isolated", async () => {
+it("replays the pinned historical chain through 0081 and keeps the limited legacy capability isolated", async () => {
   const root = process.cwd();
   const journalPath = path.join(
     root,
@@ -37,12 +37,12 @@ it("replays the complete real chain plus hash-observed 0081 and keeps the limite
   );
   const priorJournal = await readFile(journalPath);
   directory = await mkdtemp(path.join(tmpdir(), "early-bird-aggregate-"));
-  // Draft owners are active: pin one explicit observation locally, never update
-  // the canonical source manifest or silently treat this as a frozen release.
+  // Historical migration witness, not current runtime/release coverage. Both
+  // source segments and the 0000..0081 SQL are bound to their committed hashes.
   const observation = await buildEarlyBirdMigrationCandidate({
     root,
     output: directory,
-    observeCurrentSources: true,
+    observeCurrentSources: false,
   });
   const bytes = await readFile(path.join(directory, `${observation.tag}.sql`));
   expect(createHash("sha256").update(bytes).digest("hex")).toBe(

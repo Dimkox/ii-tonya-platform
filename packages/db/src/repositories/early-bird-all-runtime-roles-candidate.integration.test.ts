@@ -34,7 +34,7 @@ afterAll(async () => {
   if (directory) await rm(directory, { force: true, recursive: true });
 }, 120_000);
 
-it("installs all current segments and provisions every isolated capability without cross-role or direct-table access", async () => {
+it("installs pinned historical 0081 segments and provisions every 0081 capability without cross-role or direct-table access", async () => {
   directory = await mkdtemp(path.join(tmpdir(), "early-bird-all-roles-"));
   const root = process.cwd();
   const originalJournal = await readFile(
@@ -43,11 +43,13 @@ it("installs all current segments and provisions every isolated capability witho
   const observation = await buildEarlyBirdMigrationCandidate({
     root,
     output: directory,
-    observeCurrentSources: true,
+    observeCurrentSources: false,
   });
   expect(observation.sources).toHaveLength(19);
   await migrate(fixture.db, { migrationsFolder: directory });
-  const capabilities = await loadEarlyBirdRoleCapabilities();
+  // This temporary 82-entry tree stops at 0081. Later runtime capability
+  // additions belong to the separate full-journal role witnesses.
+  const capabilities = await loadEarlyBirdRoleCapabilities(81);
   expect(capabilities).toHaveLength(22);
   const mapping = Object.fromEntries(
     capabilities.map((capability, i) => [
@@ -61,7 +63,9 @@ it("installs all current segments and provisions every isolated capability witho
         `create role ${login} login password 'synthetic-only' inherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
       ),
     );
-  const provisioningSql = await buildEarlyBirdRoleProvisioningSql(mapping);
+  const provisioningSql = await buildEarlyBirdRoleProvisioningSql(mapping, {
+    throughMigration: 81,
+  });
   const admin = await fixture.db.$client.connect();
   try {
     await admin.query(provisioningSql);
@@ -133,9 +137,12 @@ it("installs all current segments and provisions every isolated capability witho
   const migrationOwner = (
     await fixture.db.execute<{ name: string }>(sql`select current_user as name`)
   ).rows[0]!.name;
-  const ownerMapping = await buildEarlyBirdRoleProvisioningSql({
-    [capabilities[0]!.role]: migrationOwner,
-  });
+  const ownerMapping = await buildEarlyBirdRoleProvisioningSql(
+    {
+      [capabilities[0]!.role]: migrationOwner,
+    },
+    { throughMigration: 81 },
+  );
   const rejected = await fixture.db.$client.connect();
   try {
     await expect(rejected.query(ownerMapping)).rejects.toMatchObject({
