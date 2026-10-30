@@ -816,7 +816,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "apps/api/src/early-bird-discovery-pool.test.ts",
-    "4075405f934d0384527a9a600da1aad1ab19f9322a17cabbd4c571f27486f532",
+    "0975a6e930fdc085def9a11ac0f0efe021187813b865306d4b9bb9ad49ce6dcf",
   ],
   [
     "packages/db/src/repositories/early-bird-bound-reconciliation.integration.test.ts",
@@ -922,7 +922,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     ".getzilla/templates/ci/github-actions-verify.yml",
-    "9031caa9293c59481d7716ba0ef304b5a97e360defbce8430c1a96126b68b6d1",
+    "e1fe50a372b9a2e10baa8e40d86afd50a434e7bbafd8fdf058c1a2588c847242",
   ],
   [
     "tests/runtime/test_claw_healthcheck.py",
@@ -1072,7 +1072,7 @@ const approvedAutomationArtifactHashes = new Map([
   // Read-only GitHub Actions gates explicitly authorized for this public repository.
   [
     ".github/workflows/getzilla-verify.yml",
-    "4e13d117cea6ca0ea2e00a49183c694179155a667147eaab9c117438f9981d86",
+    "aebf70b9c82114b31bf1aa805db66bcce0e82ab219a1a546a848d5c01f238833",
   ],
   [
     "scripts/assert-ci-db-results.mjs",
