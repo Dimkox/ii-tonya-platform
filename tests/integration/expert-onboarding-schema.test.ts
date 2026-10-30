@@ -246,7 +246,7 @@ describe("applicant queue foundation (PG17.5)", () => {
   it("matches the hand-authored state supplement for new constraints and indexes", async () => {
     const expected = JSON.parse(
       readFileSync(
-        "packages/db/migrations/state/0074_sql_objects.json",
+        "packages/db/migrations/state/0084_sql_objects.json",
         "utf8",
       ),
     ) as {
