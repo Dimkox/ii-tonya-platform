@@ -1157,7 +1157,11 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "tests/acceptance/private-verification/make-parser-fixtures.py",
-    "8f7227dab0409024f43609cf55e9dd3cbc6c3133f0e6b5964ff125280f8cdf30",
+    "795a063f1a196623535e1c8c0ccc26c2decd4f0ce5052f5558d5f64d667a7e23",
+  ],
+  [
+    "tests/support/managed-private-parser.py",
+    "2d85d53831a00081e82ad81621e0fcc01f261e7b05d09cd9e20c5fbb948f6053",
   ],
   [
     "tests/acceptance/private-verification/sandbox-probe.py",
