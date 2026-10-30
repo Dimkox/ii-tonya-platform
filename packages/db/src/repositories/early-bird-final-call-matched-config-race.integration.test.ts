@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { readFile } from "node:fs/promises";
+import { applyEarlyBirdDraftIfNeeded } from "../testkit/early-bird-draft-helper.js";
 import { sql } from "drizzle-orm";
 import { startTestPostgres, type TestDatabase } from "../testkit/postgres.js";
 import { EarlyBirdLaunchConfigAuthority } from "./early-bird-launch-config.js";
@@ -15,12 +15,10 @@ beforeAll(async () => {
   await fixture.db.execute(
     sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-12-29 10:00:00+03'::timestamptz $$`,
   );
-  const draft = await readFile(
+  await applyEarlyBirdDraftIfNeeded(
+    fixture.db,
     "docs/superpowers/implementation-artifacts/drafts/0077_early_bird_final_call.sql",
-    "utf8",
   );
-  for (const statement of draft.split("--> statement-breakpoint"))
-    if (statement.trim()) await fixture.db.execute(sql.raw(statement));
   await fixture.db.execute(
     sql`alter table early_bird_final_call_queue disable trigger early_bird_final_call_admission`,
   );

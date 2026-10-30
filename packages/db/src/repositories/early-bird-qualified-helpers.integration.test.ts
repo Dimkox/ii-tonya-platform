@@ -1,4 +1,3 @@
-import { applyEarlyBirdDraftIfNeeded } from "../testkit/early-bird-draft-helper.js";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { Pool } from "pg";
@@ -14,20 +13,6 @@ beforeAll(async () => {
   fixture = await startExpertReferralTestDatabase(undefined, {
     forceDisposableCluster: true,
   });
-  await fixture.db.execute(
-    sql`create table early_bird_composite_intents(id uuid primary key, user_id uuid not null, choice_id uuid, unique(id,user_id))`,
-  );
-  await fixture.db.execute(
-    sql`create table early_bird_verified_bindings(intent_id uuid primary key, user_id uuid not null, provider_object_id text not null)`,
-  );
-  await applyEarlyBirdDraftIfNeeded(
-    fixture.db,
-    "docs/superpowers/implementation-artifacts/drafts/0082_early_bird_settlement.sql",
-  );
-  await applyEarlyBirdDraftIfNeeded(
-    fixture.db,
-    "docs/superpowers/implementation-artifacts/drafts/wave_admission_projection.sql",
-  );
 }, 120_000);
 afterAll(async () => {
   await fixture?.stop();

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { readFile } from "node:fs/promises";
+import { applyEarlyBirdDraftIfNeeded } from "../testkit/early-bird-draft-helper.js";
 import { sql } from "drizzle-orm";
 import { startTestPostgres, type TestDatabase } from "../testkit/postgres.js";
 import { EarlyBirdLaunchConfigAuthority } from "./early-bird-launch-config.js";
@@ -9,12 +9,10 @@ let fixture: TestDatabase;
 beforeAll(async () => {
   fixture = await startTestPostgres();
   await fixture.migrate();
-  const schema = await readFile(
+  await applyEarlyBirdDraftIfNeeded(
+    fixture.db,
     "docs/superpowers/implementation-artifacts/drafts/0077_early_bird_final_call.sql",
-    "utf8",
   );
-  for (const statement of schema.split("--> statement-breakpoint"))
-    if (statement.trim()) await fixture.db.execute(sql.raw(statement));
   // Only the isolated test fixture bypasses enqueue: real admission remains closed.
   await fixture.db.execute(
     sql`alter table early_bird_final_call_queue disable trigger early_bird_final_call_admission`,
