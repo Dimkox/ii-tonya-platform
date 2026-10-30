@@ -104,15 +104,22 @@ export class PublicExpertRecovery {
       readonly now?: () => string;
     },
   ) {}
-  async recover(requestId: string): Promise<PublicExpertRecoveryResult> {
+  async recover(
+    requestId: string,
+    options: { signal?: AbortSignal | undefined } = {},
+  ): Promise<PublicExpertRecoveryResult> {
+    const signal = options.signal;
+    if (signal?.aborted) return { kind: "pending" };
     const s = await this.deps.binder.candidate(requestId);
-    if (!s) return { kind: "unavailable" };
+    if (!s || signal?.aborted) return { kind: "unavailable" };
     try {
       let id = s.providerObjectId;
       if (id === null) {
         const from = Date.parse(s.createdAt) - 60_000;
         // Recovery is bounded to the immutable first-send window, even years later.
         const window = {
+          signal,
+          ...(signal ? { scanKey: requestId } : {}),
           createdFrom: new Date(from).toISOString(),
           createdTo: new Date(
             Date.parse(s.createdAt) + 23 * 3600_000,
@@ -122,21 +129,26 @@ export class PublicExpertRecovery {
           s.product === "refund"
             ? await this.deps.transport.listRefunds(window)
             : await this.deps.transport.listPayments(window);
-        if (!list.complete) return { kind: "pending" };
+        if (!list.complete || signal?.aborted) return { kind: "pending" };
         const exact = list.items.filter((p) => matches(s, p));
         if (exact.length !== 1) return { kind: "pending" };
         id = exact[0]!.id;
       }
       const item =
         s.product === "refund"
-          ? await this.deps.transport.getRefund(id)
-          : await this.deps.transport.getPayment(id);
-      if (item.id !== id || !matches(s, item)) return { kind: "pending" };
+          ? await this.deps.transport.getRefund(id, signal)
+          : await this.deps.transport.getPayment(id, signal);
+      if (signal?.aborted || item.id !== id || !matches(s, item))
+        return { kind: "pending" };
       let parent: YooKassaPayment | null = null;
       const observedAt = this.deps.now?.() ?? new Date().toISOString();
       if (s.product === "refund") {
-        parent = await this.deps.transport.getPayment(s.parentPaymentId!);
+        parent = await this.deps.transport.getPayment(
+          s.parentPaymentId!,
+          signal,
+        );
         if (
+          signal?.aborted ||
           parent.id !== s.parentPaymentId ||
           parent.status !== "succeeded" ||
           !parent.paid ||
@@ -206,11 +218,13 @@ export class PublicExpertRecovery {
       }) as PublicExpertFreshObservation;
       verified.add(fact);
       let bound = s;
+      if (signal?.aborted) return { kind: "pending" };
       if (s.providerObjectId === null) {
         const result = await this.deps.binder.bind(requestId, fact);
         if (!result) return { kind: "pending" };
         bound = result;
       }
+      if (signal?.aborted) return { kind: "pending" };
       const observationId = await this.deps.observations.observe(fact);
       if (!observationId) return { kind: "pending" };
       const url = redirect(item);

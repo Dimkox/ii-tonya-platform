@@ -156,22 +156,72 @@ export function createPublicExpertPaymentRuntime(
       transport,
       now: () => new Date(Date.now()).toISOString(),
     });
+  // Background discovery retains at most its ten queued scans independently of
+  // interactive callback traffic, so new hints cannot evict its progress.
+  const pendingTransport = new PublicExpertGatewayTransport(config.gateway);
+  const pendingReader = new PublicExpertRecovery({
+    binder,
+    observations,
+    transport: pendingTransport,
+    now: () => new Date(Date.now()).toISOString(),
+  });
   let accepting = true,
     cursor: string | null = null,
     refundCursor: string | null = null,
     running: Promise<unknown> | undefined,
     timer: ReturnType<typeof setInterval> | undefined;
+  const shutdown = new AbortController(),
+    active = new Set<Promise<unknown>>();
+  const pending: { id: string; discovered: boolean }[] = [];
+  const track = <T>(work: Promise<T>) => {
+    active.add(work);
+    void work.then(
+      () => active.delete(work),
+      () => active.delete(work),
+    );
+    return work;
+  };
+  async function bounded<T>(
+    parent: AbortSignal | undefined,
+    work: (signal: AbortSignal) => Promise<T>,
+  ) {
+    const deadline = new AbortController(),
+      timeout = setTimeout(() => deadline.abort(), 15000);
+    const signal = AbortSignal.any([
+      shutdown.signal,
+      deadline.signal,
+      ...(parent ? [parent] : []),
+    ]);
+    try {
+      return await work(signal);
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  function recoverWith(
+    selected: PublicExpertRecovery,
+    id: string,
+    options: { signal?: AbortSignal | undefined } = {},
+  ) {
+    return track(
+      bounded(options.signal, async (signal) => {
+        if (!accepting || signal.aborted)
+          return { kind: "unavailable" as const };
+        const result = await selected.recover(id, { signal });
+        if (
+          result.kind === "observed" &&
+          accepting &&
+          !signal.aborted &&
+          ["succeeded", "canceled"].includes(result.observation.status)
+        )
+          await posting.apply(id, result.observationId);
+        return result;
+      }),
+    );
+  }
   const recovery = {
-    async recover(id: string) {
-      if (!accepting) return { kind: "unavailable" as const };
-      const result = await reader.recover(id);
-      if (
-        result.kind === "observed" &&
-        accepting &&
-        ["succeeded", "canceled"].includes(result.observation.status)
-      )
-        await posting.apply(id, result.observationId);
-      return result;
+    recover(id: string, options: { signal?: AbortSignal | undefined } = {}) {
+      return recoverWith(reader, id, options);
     },
   };
   const deps = {
@@ -179,6 +229,7 @@ export function createPublicExpertPaymentRuntime(
       return accepting;
     },
     mode: config.mode,
+    signal: shutdown.signal,
     source,
     vault: config.vault,
     ...envelope(config),
@@ -187,7 +238,11 @@ export function createPublicExpertPaymentRuntime(
         ...args: Parameters<PublicExpertGatewayTransport["dispatch"]>
       ) {
         if (!accepting) throw Error("public_runtime_stopped");
-        return transport.dispatch(...args);
+        const signal = AbortSignal.any([
+          shutdown.signal,
+          ...(args[2] ? [args[2]] : []),
+        ]);
+        return track(transport.dispatch(args[0], args[1], signal));
       },
     },
     recovery,
@@ -198,32 +253,45 @@ export function createPublicExpertPaymentRuntime(
     main = new PublicMainResidencyCheckout(deps);
   async function runOnce() {
     if (!accepting || running) return;
-    const work = (async () => {
-      const result = await config.connections.binder.db.execute<{
-        value: string[];
-      }>(
-        sql`select early_bird_private.public_payment_pending(10,${cursor}::uuid) value`,
-      );
-      const ids = result.rows[0]?.value;
-      if (
-        !Array.isArray(ids) ||
-        ids.length > 10 ||
-        ids.some((id) => !/^[0-9a-f-]{36}$/iu.test(id))
-      )
-        throw Error("public_discovery_invalid");
-      if (!ids.length) cursor = null;
-      const deadline = Date.now() + 30000;
-      for (const id of ids) {
-        if (!accepting || Date.now() >= deadline) break;
-        cursor = id;
+    const paymentLane = async (signal: AbortSignal) => {
+      if (signal.aborted) return;
+      if (!pending.length) {
+        const result = await config.connections.binder.db.execute<{
+          value: string[];
+        }>(
+          sql`select early_bird_private.public_payment_pending(10,${cursor}::uuid) value`,
+        );
+        const ids = result.rows[0]?.value;
+        if (
+          !Array.isArray(ids) ||
+          ids.length > 10 ||
+          ids.some((id) => !/^[0-9a-f-]{36}$/iu.test(id))
+        )
+          throw Error("public_discovery_invalid");
+        if (!ids.length) cursor = null;
+        pending.push(...ids.map((id) => ({ id, discovered: true })));
+      }
+      const count = pending.length;
+      for (let index = 0; index < count; index++) {
+        if (!accepting || signal.aborted) break;
+        const item = pending.shift()!;
+        if (item.discovered) cursor = item.id;
+        let observed = false;
         try {
-          await recovery.recover(id);
+          observed =
+            (await recoverWith(pendingReader, item.id, { signal })).kind ===
+            "observed";
         } catch {
           /* preserve durable uncertainty */
         }
+        // Resume an interrupted multi-page scan before admitting another batch;
+        // an immutable creation window and complete traversal remain mandatory.
+        if (!observed && pendingTransport.hasIncompleteScan(item.id))
+          pending.push({ id: item.id, discovered: false });
       }
-      if (accepting) await held.reconcileKnown(10);
-      if (!accepting) return;
+    };
+    const refundLane = async (signal: AbortSignal) => {
+      if (!accepting || signal.aborted) return;
       const refunds = await config.connections.refundSender.db.execute<{
         value: { userId: string; operationId: string }[];
       }>(
@@ -234,15 +302,24 @@ export function createPublicExpertPaymentRuntime(
         throw Error("public_refund_discovery_invalid");
       if (!commands.length) refundCursor = null;
       for (const command of commands) {
-        if (!accepting || Date.now() >= deadline) break;
+        if (!accepting || signal.aborted) break;
         refundCursor = command.operationId;
         try {
-          await main.createOrRecoverRefund(command);
+          await main.createOrRecoverRefund(command, { signal });
         } catch {
           /* exact authorized command remains pending */
         }
       }
-    })();
+    };
+    // Independent deadlines guarantee every lane a turn even under sustained
+    // slow backlog. All I/O receives its lane signal; no timeout abandons work.
+    const work = track(
+      Promise.allSettled([
+        bounded(undefined, paymentLane),
+        bounded(undefined, (signal) => held.reconcileKnown(10, { signal })),
+        bounded(undefined, refundLane),
+      ]),
+    );
     running = work;
     try {
       await work;
@@ -313,39 +390,47 @@ export function createPublicExpertPaymentRuntime(
       event: string;
       object: { id: string };
     }): Promise<"absent" | "pending" | "complete"> {
-      if (!accepting) return "pending";
-      const lookup = async (operation: string | null) =>
-        (
-          await config.connections.binder.db.execute<{ value: string[] }>(
-            sql`select early_bird_private.public_payment_hint(${notification.object.id},${operation}::uuid,${notification.event === "refund.succeeded"}) value`,
-          )
-        ).rows[0]?.value;
-      let ids = await lookup(null);
-      if (Array.isArray(ids) && ids.length === 0) {
-        // The notification parser deliberately retains only the object ID.
-        // Initially unbound objects discover their canonical request through a
-        // fresh provider GET; even that metadata is only a lookup hint.
-        const item =
-          notification.event === "refund.succeeded"
-            ? await transport.getRefund(notification.object.id)
-            : await transport.getPayment(notification.object.id);
-        if (item.id !== notification.object.id) return "pending";
-        const hint = item.metadata?.operation_id;
-        if (hint && /^[0-9a-f-]{36}$/iu.test(hint)) ids = await lookup(hint);
-      }
-      if (!Array.isArray(ids) || ids.length > 3)
-        throw Error("public_hint_invalid");
-      if (!ids.length) return "absent";
-      let complete = false;
-      for (const id of ids) {
-        const result = await recovery.recover(id);
-        if (
-          result.kind === "observed" &&
-          result.observation.providerObjectId === notification.object.id
-        )
-          complete = true;
-      }
-      return complete ? "complete" : "pending";
+      return track(
+        bounded(
+          undefined,
+          async (signal): Promise<"absent" | "pending" | "complete"> => {
+            if (!accepting) return "pending";
+            const lookup = async (operation: string | null) =>
+              (
+                await config.connections.binder.db.execute<{ value: string[] }>(
+                  sql`select early_bird_private.public_payment_hint(${notification.object.id},${operation}::uuid,${notification.event === "refund.succeeded"}) value`,
+                )
+              ).rows[0]?.value;
+            let ids = await lookup(null);
+            if (Array.isArray(ids) && ids.length === 0) {
+              // The notification parser deliberately retains only the object ID.
+              // Initially unbound objects discover their canonical request through a
+              // fresh provider GET; even that metadata is only a lookup hint.
+              const item =
+                notification.event === "refund.succeeded"
+                  ? await transport.getRefund(notification.object.id, signal)
+                  : await transport.getPayment(notification.object.id, signal);
+              if (item.id !== notification.object.id) return "pending";
+              const hint = item.metadata?.operation_id;
+              if (hint && /^[0-9a-f-]{36}$/iu.test(hint))
+                ids = await lookup(hint);
+            }
+            if (!Array.isArray(ids) || ids.length > 3)
+              throw Error("public_hint_invalid");
+            if (!ids.length) return "absent";
+            let complete = false;
+            for (const id of ids) {
+              const result = await recovery.recover(id, { signal });
+              if (
+                result.kind === "observed" &&
+                result.observation.providerObjectId === notification.object.id
+              )
+                complete = true;
+            }
+            return complete ? "complete" : "pending";
+          },
+        ),
+      );
     },
     runOnce,
     start() {
@@ -358,25 +443,14 @@ export function createPublicExpertPaymentRuntime(
     },
     async stop() {
       accepting = false;
+      shutdown.abort();
       if (timer) {
         clearInterval(timer);
         timer = undefined;
       }
-      if (!running) return;
-      let timeout: ReturnType<typeof setTimeout> | undefined;
-      try {
-        await Promise.race([
-          running,
-          new Promise<never>((_, reject) => {
-            timeout = setTimeout(
-              () => reject(Error("public_reconciliation_drain_timeout")),
-              25000,
-            );
-          }),
-        ]);
-      } finally {
-        if (timeout) clearTimeout(timeout);
-      }
+      // Aborted sockets settle before this returns. An already-started canonical
+      // transaction is awaited to completion rather than orphaned by a timer.
+      await Promise.allSettled([...active]);
     },
   };
 }

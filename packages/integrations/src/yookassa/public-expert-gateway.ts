@@ -6,6 +6,8 @@ export interface PublicExpertListWindow {
   readonly createdFrom: string;
   readonly createdTo: string;
   readonly maxPages?: number;
+  readonly signal?: AbortSignal | undefined;
+  readonly scanKey?: string;
 }
 export type PublicExpertCompleteList<T> =
   | { readonly complete: true; readonly items: readonly T[] }
@@ -13,6 +15,24 @@ export type PublicExpertCompleteList<T> =
 
 /** Credentialless transport. Discovery never authorizes a POST or brands settlement facts. */
 export class PublicExpertGatewayTransport {
+  private readonly scans = new Map<
+    string,
+    {
+      signature: string;
+      items: (YooKassaPayment | YooKassaRefund)[];
+      ids: Set<string>;
+      cursors: Set<string>;
+      cursor: string | undefined;
+      pages: number;
+    }
+  >();
+  private readonly scanning = new Map<
+    string,
+    Promise<PublicExpertCompleteList<YooKassaPayment | YooKassaRefund>>
+  >();
+  hasIncompleteScan(key: string) {
+    return this.scans.has(key);
+  }
   constructor(
     private readonly ipc: Pick<
       ExperimentalGatewayIpc,
@@ -20,8 +40,12 @@ export class PublicExpertGatewayTransport {
     >,
   ) {}
 
-  dispatch(snapshot: PublicExpertPaymentSnapshot, exactBody: Uint8Array) {
-    return this.ipc.dispatchPublic(snapshot, exactBody);
+  dispatch(
+    snapshot: PublicExpertPaymentSnapshot,
+    exactBody: Uint8Array,
+    signal?: AbortSignal,
+  ) {
+    return this.ipc.dispatchPublic(snapshot, exactBody, signal);
   }
   getPayment(id: string, signal?: AbortSignal) {
     return this.ipc.getPayment(id, signal);
@@ -47,41 +71,102 @@ export class PublicExpertGatewayTransport {
     resource: "payments" | "refunds",
     input: PublicExpertListWindow,
   ): Promise<PublicExpertCompleteList<YooKassaPayment | YooKassaRefund>> {
-    const maxPages = input.maxPages ?? 10;
-    if (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > 10)
-      return { complete: false, items: [] };
-    const items: (YooKassaPayment | YooKassaRefund)[] = [],
-      ids = new Set<string>(),
-      cursors = new Set<string>();
-    let cursor: string | undefined;
+    if (input.signal?.aborted) return { complete: false, items: [] };
+    const key = input.scanKey;
+    const prior = key ? this.scanning.get(key) : undefined;
+    if (prior) return prior;
+    const work = this.scan(resource, input);
+    if (key) this.scanning.set(key, work);
     try {
-      for (let pageNumber = 0; pageNumber < maxPages; pageNumber++) {
-        const page = await this.ipc.listPublicPage(resource, {
-          createdFrom: input.createdFrom,
-          createdTo: input.createdTo,
-          limit: 100,
-          ...(cursor === undefined ? {} : { cursor }),
-        });
+      return await work;
+    } finally {
+      if (key && this.scanning.get(key) === work) this.scanning.delete(key);
+    }
+  }
+  private async scan(
+    resource: "payments" | "refunds",
+    input: PublicExpertListWindow,
+  ): Promise<PublicExpertCompleteList<YooKassaPayment | YooKassaRefund>> {
+    const maxPages = input.maxPages ?? 10;
+    if (
+      input.signal?.aborted ||
+      !Number.isInteger(maxPages) ||
+      maxPages < 1 ||
+      maxPages > 10
+    )
+      return { complete: false, items: [] };
+    const key = input.scanKey,
+      signature = JSON.stringify([
+        resource,
+        input.createdFrom,
+        input.createdTo,
+        maxPages,
+      ]);
+    const previous = key ? this.scans.get(key) : undefined;
+    const scan =
+      previous?.signature === signature
+        ? previous
+        : {
+            signature,
+            items: [] as (YooKassaPayment | YooKassaRefund)[],
+            ids: new Set<string>(),
+            cursors: new Set<string>(),
+            cursor: undefined as string | undefined,
+            pages: 0,
+          };
+    const forget = () => {
+      if (key) this.scans.delete(key);
+    };
+    if (key) {
+      if (this.scans.size >= 64 && !this.scans.has(key))
+        this.scans.delete(this.scans.keys().next().value!);
+      this.scans.set(key, scan);
+    }
+    try {
+      while (scan.pages < maxPages && !input.signal?.aborted) {
+        const page = await this.ipc.listPublicPage(
+          resource,
+          {
+            createdFrom: input.createdFrom,
+            createdTo: input.createdTo,
+            limit: 100,
+            ...(scan.cursor === undefined ? {} : { cursor: scan.cursor }),
+          },
+          input.signal,
+        );
+        if (input.signal?.aborted) break;
         for (const item of page.items) {
           const time = Date.parse(item.createdAt);
           if (
-            ids.has(item.id) ||
+            scan.ids.has(item.id) ||
             time < Date.parse(input.createdFrom) ||
             time >= Date.parse(input.createdTo)
-          )
+          ) {
+            forget();
             return { complete: false, items: [] };
-          ids.add(item.id);
-          items.push(item);
+          }
+          scan.ids.add(item.id);
+          scan.items.push(item);
         }
-        if (page.nextCursor === undefined) return { complete: true, items };
-        if (page.items.length === 0 || cursors.has(page.nextCursor))
+        scan.pages++;
+        if (page.nextCursor === undefined) {
+          forget();
+          return { complete: true, items: scan.items };
+        }
+        if (page.items.length === 0 || scan.cursors.has(page.nextCursor)) {
+          forget();
           return { complete: false, items: [] };
-        cursors.add(page.nextCursor);
-        cursor = page.nextCursor;
+        }
+        scan.cursors.add(page.nextCursor);
+        scan.cursor = page.nextCursor;
       }
     } catch {
       /* Incomplete/error discovery supplies no binding proof. */
     }
+    // Keep completed pages only when a caller's bounded turn was cancelled.
+    // No partial items escape; binding still requires complete traversal+GET.
+    if (!input.signal?.aborted || scan.pages === 0 || scan.pages >= maxPages)
+      forget();
     return { complete: false, items: [] };
   }
 }

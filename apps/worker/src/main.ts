@@ -803,6 +803,7 @@ export function createProductionWorkerRuntimeFactory(
           deps.expertResidencyNoticeFetch,
           deps.expertHeldOnboarding,
           publicExpert?.held,
+          "runtime",
         );
         const deferredReviewPreparationScheduler =
           deps.deferredReviewPreparation
@@ -858,7 +859,9 @@ export function createProductionWorkerRuntimeFactory(
                   return result;
                 },
               }),
-          ...(expertSeparatedSales ? { expertSeparatedSales } : {}),
+          ...(expertSeparatedSales && !publicExpert
+            ? { expertSeparatedSales }
+            : {}),
           ...(residentLifecycleCompletion
             ? { residentLifecycleCompletion }
             : {}),
@@ -908,7 +911,7 @@ export function createProductionWorkerRuntimeFactory(
                   stopAccepting: () => launchKitScheduler.stop(),
                 },
               }),
-          ...(expertPersonalOffers === undefined
+          ...(expertPersonalOffers === undefined || publicExpert
             ? {}
             : { expertPersonalOffers }),
           ...(expertResidencyLifecycle === undefined
@@ -1021,19 +1024,13 @@ export function createProductionWorkerRuntimeFactory(
           now: () => new Date(),
         });
         return publicExpert
-          ? {
-              async runOnce() {
-                await publicExpert!.runOnce();
-                return workerRuntime.runOnce();
-              },
-              async close() {
-                try {
-                  await publicExpert!.stop();
-                } finally {
-                  await workerRuntime.close();
-                }
-              },
-            }
+          ? composePublicExpertWorkerRuntime(
+              workerRuntime,
+              publicExpert,
+              [expertSeparatedSales, expertPersonalOffers].filter(
+                (job) => job !== undefined,
+              ),
+            )
           : workerRuntime;
       } catch (error) {
         try {
@@ -1043,6 +1040,74 @@ export function createProductionWorkerRuntimeFactory(
         }
         throw error;
       }
+    },
+  };
+}
+
+/** Provider recovery owns a separate single-flight lifecycle. Ordinary safety,
+ * revocation and privacy jobs do not wait for its provider pagination budget. */
+export function composePublicExpertWorkerRuntime(
+  worker: WorkerRuntime,
+  publicRuntime: Pick<
+    import("@ii-tonya/db").PublicExpertPaymentRuntime,
+    "runOnce" | "stop"
+  >,
+  checkoutJobs: readonly {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  }[] = [],
+): WorkerRuntime {
+  let accepting = true,
+    closing: Promise<void> | undefined;
+  const actors = [publicRuntime, ...checkoutJobs];
+  const running = new Map<(typeof actors)[number], Promise<unknown>>();
+  return {
+    runOnce() {
+      if (!accepting) return Promise.reject(Error("Worker runtime is closing"));
+      const ordinary = worker.runOnce();
+      for (const actor of actors)
+        if (!running.has(actor)) {
+          let work: Promise<unknown>;
+          try {
+            work = actor.runOnce();
+          } catch (error) {
+            work = Promise.reject(error);
+          }
+          running.set(actor, work);
+          void work.then(
+            () => {
+              if (running.get(actor) === work) running.delete(actor);
+            },
+            () => {
+              if (running.get(actor) === work) running.delete(actor);
+            },
+          );
+        }
+      return ordinary;
+    },
+    close() {
+      accepting = false;
+      return (closing ??= (async () => {
+        try {
+          const failures: unknown[] = [];
+          for (const job of checkoutJobs)
+            try {
+              job.stopAccepting();
+            } catch (error) {
+              failures.push(error);
+            }
+          const [stopped] = await Promise.allSettled([
+            publicRuntime.stop(),
+            ...running.values(),
+          ]);
+          if (stopped.status === "rejected") failures.push(stopped.reason);
+          if (failures.length === 1) throw failures[0];
+          if (failures.length > 1)
+            throw new AggregateError(failures, "public_worker_shutdown_failed");
+        } finally {
+          await worker.close();
+        }
+      })());
     },
   };
 }

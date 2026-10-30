@@ -206,6 +206,7 @@ export class PostgresPublicExpertPaymentPosting {
 }
 export interface PublicExpertCheckoutDependencies {
   readonly enabled: boolean;
+  readonly signal?: AbortSignal | undefined;
   readonly mode: "test" | "live";
   readonly source: PostgresPublicExpertPaymentSource;
   readonly vault: PayerReceiptVault;
@@ -296,8 +297,13 @@ class PublicCheckoutExecution {
   protected async execute(
     s: PublicExpertPaymentSourceData,
     kind: PublicExpertPrepareDescriptor["kind"],
+    options: { signal?: AbortSignal | undefined } = {},
   ): Promise<PublicExpertRecoveryResult> {
-    if (!this.deps.enabled || s.mode !== this.deps.mode)
+    const signal =
+      this.deps.signal && options.signal
+        ? AbortSignal.any([this.deps.signal, options.signal])
+        : (options.signal ?? this.deps.signal);
+    if (!this.deps.enabled || signal?.aborted || s.mode !== this.deps.mode)
       return { kind: "unavailable" };
     let existing = s.requests.find((r) => r.kind === kind);
     let exactBody: string | undefined;
@@ -341,6 +347,7 @@ class PublicCheckoutExecution {
           });
       if (protectedBody && protectedBody.bodyVersion !== 1)
         throw Error("public_envelope_invalid");
+      if (signal?.aborted) return { kind: "pending" };
       try {
         existing =
           (await this.deps.source.prepare(
@@ -376,6 +383,7 @@ class PublicCheckoutExecution {
       }
     }
     if (!existing) return { kind: "unavailable" };
+    if (signal?.aborted) return { kind: "pending" };
     if (existing.state === "prepared") {
       if (!exactBody) {
         if (kind === "onboarding_capture" || kind === "onboarding_cancel")
@@ -400,18 +408,24 @@ class PublicCheckoutExecution {
       }
       if (digest(exactBody) !== existing.requestDigest)
         return { kind: "pending" };
+      if (signal?.aborted) return { kind: "pending" };
       // This function call commits before IPC. No source/invoice/consent lock spans the gateway claim.
       const admitted = await this.deps.source.admit(existing);
-      if (admitted) {
+      if (admitted && !signal?.aborted) {
         try {
-          await this.deps.transport.dispatch(admitted, Buffer.from(exactBody));
+          await this.deps.transport.dispatch(
+            admitted,
+            Buffer.from(exactBody),
+            signal,
+          );
         } catch {
           /* Uncertain; only recovery may run now. */
         }
       }
     }
     // Even a successful POST result is not financial evidence or discovery completeness.
-    return this.deps.recovery.recover(existing.requestId);
+    if (signal?.aborted) return { kind: "pending" };
+    return this.deps.recovery.recover(existing.requestId, { signal });
   }
 }
 /** Owns the gateway fence; the legacy unfenced instance remains explicitly non-strict. */
@@ -449,8 +463,13 @@ export class PublicHeldOnboardingCheckout extends PublicCheckoutExecution {
     if (result.kind !== "ready") throw Error("held_checkout_unavailable");
     return { url: result.url, paymentId: result.paymentId };
   }
-  async reconcile(invoiceId: string) {
-    if (!this.deps.enabled) return { kind: "unavailable" as const };
+  async reconcile(
+    invoiceId: string,
+    options: { signal?: AbortSignal | undefined } = {},
+  ) {
+    const signal = options.signal ?? this.deps.signal;
+    if (!this.deps.enabled || signal?.aborted)
+      return { kind: "unavailable" as const };
     let s = await this.deps.source.invoice(invoiceId);
     if (!s) return { kind: "unavailable" as const };
     // Observe every known parent mutation before considering any new operation.
@@ -458,7 +477,8 @@ export class PublicHeldOnboardingCheckout extends PublicCheckoutExecution {
     for (const request of s.requests.filter(
       (r) => r.state !== "prepared" && r.state !== "abandoned",
     )) {
-      result = await this.deps.recovery.recover(request.requestId);
+      if (signal?.aborted) return { kind: "pending" as const };
+      result = await this.deps.recovery.recover(request.requestId, { signal });
       if (
         result.kind === "observed" &&
         ["succeeded", "canceled"].includes(result.observation.status)
@@ -466,6 +486,7 @@ export class PublicHeldOnboardingCheckout extends PublicCheckoutExecution {
         return { kind: "observed" as const, status: result.observation.status };
     }
     if (result.kind !== "observed") return { kind: "pending" as const };
+    if (signal?.aborted) return { kind: "pending" as const };
     if (result.observation.status === "waiting_for_capture") {
       s = await this.deps.source.invoice(invoiceId);
       if (!s) return { kind: "pending" as const };
@@ -480,22 +501,30 @@ export class PublicHeldOnboardingCheckout extends PublicCheckoutExecution {
         )
       )
         return { kind: "pending" as const };
-      await this.execute(s, kind);
+      await this.execute(s, kind, { signal });
     }
     return { kind: "observed" as const, status: result.observation.status };
   }
-  async reconcileKnown(limit = 20) {
-    if (!this.deps.enabled) return { examined: 0 };
+  async reconcileKnown(
+    limit = 20,
+    options: { signal?: AbortSignal | undefined } = {},
+  ) {
+    const signal = options.signal ?? this.deps.signal;
+    if (!this.deps.enabled || signal?.aborted) return { examined: 0 };
     const ids = await this.deps.source.pending(limit, this.cursor);
-    this.cursor = ids.at(-1) ?? null;
+    if (ids.length === 0) this.cursor = null;
+    let examined = 0;
     for (const id of ids) {
+      if (signal?.aborted) break;
+      this.cursor = id;
+      examined++;
       try {
-        await this.reconcile(id);
+        await this.reconcile(id, { signal });
       } catch {
         /* retain unresolved source */
       }
     }
-    return { examined: ids.length };
+    return { examined };
   }
 }
 export interface PublicMainCheckoutBinding {
@@ -543,15 +572,23 @@ export class PublicMainResidencyCheckout extends PublicCheckoutExecution {
               : ("pending" as const),
         };
   }
-  async createOrRecoverRefund(input: { userId: string; operationId: string }) {
-    if (!this.deps.enabled) return { kind: "unavailable" as const };
+  async createOrRecoverRefund(
+    input: { userId: string; operationId: string },
+    options: { signal?: AbortSignal | undefined } = {},
+  ) {
+    if (
+      !this.deps.enabled ||
+      this.deps.signal?.aborted ||
+      options.signal?.aborted
+    )
+      return { kind: "unavailable" as const };
     const s = await this.deps.source.source(
       "refund",
       input.userId,
       input.operationId,
     );
     return s
-      ? this.execute(s, "main_refund")
+      ? this.execute(s, "main_refund", options)
       : { kind: "unavailable" as const };
   }
 }

@@ -26,6 +26,7 @@ export function createSeparatedSalesRunner(
     >;
     reconcileKnown(limit?: number): Promise<unknown>;
   },
+  publicReconciliationOwner: "runner" | "runtime" = "runner",
 ) {
   if (config.features.expertSeparatedSales !== true) return undefined;
   const scope = config.expertApplicant!;
@@ -144,7 +145,8 @@ export function createSeparatedSalesRunner(
   return {
     async runOnce() {
       if (abort.signal.aborted) return { stopped: true };
-      await held?.reconcileKnown();
+      if (!publicHeld || publicReconciliationOwner === "runner")
+        await held?.reconcileKnown();
       return {
         ...(await scheduler.refresh()),
         ...(await scheduler.deliver(abort.signal)),

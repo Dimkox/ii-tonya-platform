@@ -256,6 +256,7 @@ export class ExperimentalGatewayIpc {
   async dispatchPublic(
     snapshot: import("./public-expert-gateway-contracts.js").PublicExpertPaymentSnapshot,
     exactBody: Uint8Array,
+    signal?: AbortSignal,
   ): Promise<PublicGatewayDispatchResult> {
     try {
       const { publicExpertPaymentSnapshotSchema } =
@@ -272,30 +273,33 @@ export class ExperimentalGatewayIpc {
         return { kind: "unknown" };
       const free =
         row.kind === "onboarding_capture" || row.kind === "onboarding_cancel";
-      const outcome = await this.authenticatedRequest({
-        op: "public_dispatch",
-        request_id: row.requestId,
-        user_id: row.userId,
-        idempotency_key: row.idempotencyKey,
-        kind: row.kind,
-        contact_id: row.contactId,
-        subject:
-          row.contactId === null
-            ? null
-            : gatewayContactToken(this.key, row.contactId),
-        ...(free
-          ? {
-              operation_token: gatewayPublicOperationToken(
-                this.key,
-                row.requestId,
-              ),
-            }
-          : {}),
-        attempt: createHash("sha256")
-          .update(Buffer.from(row.idempotencyKey.replaceAll("-", ""), "hex"))
-          .digest("hex"),
-        request: Buffer.from(exactBody).toString("base64"),
-      });
+      const outcome = await this.authenticatedRequest(
+        {
+          op: "public_dispatch",
+          request_id: row.requestId,
+          user_id: row.userId,
+          idempotency_key: row.idempotencyKey,
+          kind: row.kind,
+          contact_id: row.contactId,
+          subject:
+            row.contactId === null
+              ? null
+              : gatewayContactToken(this.key, row.contactId),
+          ...(free
+            ? {
+                operation_token: gatewayPublicOperationToken(
+                  this.key,
+                  row.requestId,
+                ),
+              }
+            : {}),
+          attempt: createHash("sha256")
+            .update(Buffer.from(row.idempotencyKey.replaceAll("-", ""), "hex"))
+            .digest("hex"),
+          request: Buffer.from(exactBody).toString("base64"),
+        },
+        signal,
+      );
       if (outcome === "cancelled") return { kind: "cancelled" };
       if (!outcome.startsWith("response:")) return { kind: "unknown" };
       const encoded = outcome.slice(9),
@@ -361,6 +365,7 @@ export class ExperimentalGatewayIpc {
       limit: number;
       cursor?: string;
     },
+    signal?: AbortSignal,
   ): Promise<{
     items: readonly (YooKassaPayment | YooKassaRefund)[];
     nextCursor?: string;
@@ -378,16 +383,19 @@ export class ExperimentalGatewayIpc {
         !/^[\x21-\x7e]{1,512}$/u.test(input.cursor))
     )
       throw new Error("gateway_provider_read_invalid");
-    const raw = await this.readProvider({
-      op:
-        resource === "payments"
-          ? "public_list_payments"
-          : "public_list_refunds",
-      created_from: input.createdFrom,
-      created_to: input.createdTo,
-      limit: input.limit,
-      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
-    });
+    const raw = await this.readProvider(
+      {
+        op:
+          resource === "payments"
+            ? "public_list_payments"
+            : "public_list_refunds",
+        created_from: input.createdFrom,
+        created_to: input.createdTo,
+        limit: input.limit,
+        ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+      },
+      signal,
+    );
     const page = z
       .strictObject({
         items: z
@@ -536,6 +544,8 @@ export class ExperimentalGatewayIpc {
     command: object,
     signal?: AbortSignal,
   ): Promise<string> {
+    if (signal?.aborted)
+      return Promise.reject(new Error("gateway acknowledgement unavailable"));
     const nonce = randomBytes(32).toString("hex");
     return new Promise((resolve, reject) => {
       const socket = createConnection(this.address);
