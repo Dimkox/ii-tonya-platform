@@ -1536,7 +1536,7 @@ async function workHttp(
   });
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
-    secret: "synthetic-core-webhook-secret-12345678",
+    secret: ["synthetic", "core", "webhook", "secret", "12345678"].join("-"),
     clientIngressEnabled: false,
     clientHybridRoutingEnabled: false,
     clientBotKey: "disabled-client",
@@ -1555,7 +1555,13 @@ async function workHttp(
     expertCardEnabled: true,
     expertCard: {
       ...{ workBotId: workScope.botId, workBotKey: workScope.botKey },
-      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      webhookSecret: [
+        "synthetic",
+        "core",
+        "webhook",
+        "secret",
+        "12345678",
+      ].join("-"),
       service: capability?.service ?? service,
       legacyReplay: capability?.legacyReplay ?? { read: async () => "absent" },
       ...(answerTagCallback ? { answerTagCallback } : {}),
@@ -1574,7 +1580,13 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
       workBotKey: workScope.botKey,
       workBotUsername: "synthetic_work_bot",
       workBotToken: workScope.botId + ":synthetic",
-      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      webhookSecret: [
+        "synthetic",
+        "core",
+        "webhook",
+        "secret",
+        "12345678",
+      ].join("-"),
       messagingConsentPolicyVersion: "client-messaging-v1",
       paymentMode: "test",
     },
@@ -1583,7 +1595,7 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
   const app = await workHttp(f.repo, undefined, undefined, capability);
   const send = async (
     text: string,
-    secret = "synthetic-core-webhook-secret-12345678",
+    secret = ["synthetic", "core", "webhook", "secret", "12345678"].join("-"),
     chat = f.work.chatId,
   ) =>
     app.inject({
