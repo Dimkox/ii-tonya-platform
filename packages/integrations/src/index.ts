@@ -414,3 +414,4 @@ export {
 } from "./yookassa/early-bird-standard-checkout-sender.js";
 
 export * from "./yookassa/public-expert-gateway-contracts.js";
+export * from "./yookassa/public-expert-gateway.js";

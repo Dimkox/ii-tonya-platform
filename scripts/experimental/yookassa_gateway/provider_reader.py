@@ -3,9 +3,11 @@
 import base64
 import datetime
 import http.client
-import json
 import re
 import ssl
+import uuid
+
+from pg_authority import strict_json
 from urllib.parse import urlencode, urlsplit
 
 
@@ -39,7 +41,7 @@ class ProviderReader:
             data = response.read(65537)
             if len(data) > 65536:
                 raise ValueError("provider response too large")
-            value = json.loads(data)
+            value = strict_json(data)
             if not isinstance(value, dict):
                 raise ValueError("invalid provider response")
             return value
@@ -93,6 +95,8 @@ class ProviderReader:
         return result
 
     def _payment(self, value):
+        if not isinstance(value, dict):
+            raise ValueError("invalid payment")
         result = {
             "id": self._id(value.get("id")),
             "status": value.get("status"),
@@ -109,6 +113,15 @@ class ProviderReader:
         ):
             raise ValueError("invalid payment")
         self._timestamp(result["created_at"])
+        if "payment_method" in value and value["payment_method"] is not None:
+            method = value["payment_method"]
+            if (
+                not isinstance(method, dict)
+                or not isinstance(method.get("type"), str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", method["type"])
+            ):
+                raise ValueError("invalid payment method")
+            result["payment_method"] = {"type": method["type"]}
         if "captured_at" in value and value["captured_at"] is not None:
             self._timestamp(value["captured_at"])
             result["captured_at"] = value["captured_at"]
@@ -146,21 +159,46 @@ class ProviderReader:
             raise ValueError("provider id mismatch")
         return value
 
-    def inspect_refund(self, refund_id):
-        raw = self._get("/v3/refunds/" + self._id(refund_id))
+    @staticmethod
+    def _refund(raw):
+        if not isinstance(raw, dict):
+            raise ValueError("invalid refund")
         result = {
-            "id": self._id(raw.get("id")),
-            "payment_id": self._id(raw.get("payment_id")),
+            "id": ProviderReader._id(raw.get("id")),
+            "payment_id": ProviderReader._id(raw.get("payment_id")),
             "status": raw.get("status"),
-            "amount": self._amount(raw.get("amount")),
+            "amount": ProviderReader._amount(raw.get("amount")),
             "created_at": raw.get("created_at"),
         }
-        if result["id"] != refund_id or result["status"] not in ("pending", "succeeded", "canceled"):
+        if result["status"] not in ("pending", "succeeded", "canceled"):
             raise ValueError("invalid refund")
-        self._timestamp(result["created_at"])
+        ProviderReader._timestamp(result["created_at"])
+        if "metadata" in raw:
+            metadata = raw["metadata"]
+            if not isinstance(metadata, dict):
+                raise ValueError("invalid refund identity")
+            if metadata.get("purpose") == "public_main_refund":
+                if set(metadata) != {"purpose", "operation_id", "order_id", "user_id"}:
+                    raise ValueError("invalid refund identity")
+                for key in ("operation_id", "order_id", "user_id"):
+                    if not isinstance(metadata[key], str) or str(uuid.UUID(metadata[key])) != metadata[key]:
+                        raise ValueError("invalid refund identity")
+            result["metadata"] = ProviderReader._metadata(metadata)
         return result
 
+    def inspect_refund(self, refund_id):
+        result = self._refund(self._get("/v3/refunds/" + self._id(refund_id)))
+        if result["id"] != refund_id:
+            raise ValueError("provider id mismatch")
+        return result
+
+    def list_refunds(self, created_from, created_to, limit, cursor):
+        return self._list("refunds", self._refund, created_from, created_to, limit, cursor)
+
     def list_payments(self, created_from, created_to, limit, cursor):
+        return self._list("payments", self._payment, created_from, created_to, limit, cursor)
+
+    def _list(self, resource, project, created_from, created_to, limit, cursor):
         start, end = self._timestamp(created_from), self._timestamp(created_to)
         if (
             start >= end
@@ -179,13 +217,18 @@ class ProviderReader:
         params = {"created_at.gte": created_from, "created_at.lt": created_to, "limit": str(limit)}
         if cursor is not None:
             params["cursor"] = cursor
-        raw = self._get("/v3/payments?" + urlencode(params))
+        raw = self._get("/v3/" + resource + "?" + urlencode(params))
         if not isinstance(raw.get("items"), list) or len(raw["items"]) > limit:
             raise ValueError("invalid page")
-        items = [self._payment(item) for item in raw["items"] if isinstance(item, dict)]
-        if len(items) != len(raw["items"]):
+        items = [project(item) for item in raw["items"] if isinstance(item, dict)]
+        if len(items) != len(raw["items"]) or len({item["id"] for item in items}) != len(items):
             raise ValueError("invalid page")
         next_cursor = raw.get("next_cursor")
-        if next_cursor is not None and (not isinstance(next_cursor, str) or not next_cursor or len(next_cursor) > 512):
+        if next_cursor is not None and (
+            not isinstance(next_cursor, str)
+            or not next_cursor
+            or len(next_cursor) > 512
+            or any(ord(c) < 33 or ord(c) > 126 for c in next_cursor)
+        ):
             raise ValueError("invalid page cursor")
         return {"items": items, **({"next_cursor": next_cursor} if next_cursor is not None else {})}

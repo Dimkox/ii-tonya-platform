@@ -47,6 +47,18 @@ export function gatewayContactToken(
     .digest("hex");
 }
 
+export function gatewayPublicOperationToken(
+  key: Uint8Array,
+  requestId: string,
+): string {
+  if (key.length < 32 || !z.uuid().safeParse(requestId).success)
+    throw new Error("invalid gateway identity");
+  return createHmac("sha256", key)
+    .update(Buffer.from("ii-tonya-gateway-public-operation-v1\0", "utf8"))
+    .update(Buffer.from(requestId.replaceAll("-", ""), "hex"))
+    .digest("hex");
+}
+
 export class ExperimentalGatewayIpc {
   private readonly key: Buffer;
   private readonly authKey: Buffer;
@@ -238,6 +250,165 @@ export class ExperimentalGatewayIpc {
     } catch {
       return { kind: "unknown" };
     }
+  }
+
+  /** Typed public packet carries exact JSON body only. Path and amount authority stay in PG/gateway. */
+  async dispatchPublic(
+    snapshot: import("./public-expert-gateway-contracts.js").PublicExpertPaymentSnapshot,
+    exactBody: Uint8Array,
+  ): Promise<PublicGatewayDispatchResult> {
+    try {
+      const { publicExpertPaymentSnapshotSchema } =
+        await import("./public-expert-gateway-contracts.js");
+      const row = publicExpertPaymentSnapshotSchema.parse(snapshot);
+      if (
+        row.state !== "admitted" ||
+        !(exactBody instanceof Uint8Array) ||
+        exactBody.length < 1 ||
+        exactBody.length > 49152 ||
+        `sha256:${createHash("sha256").update(exactBody).digest("hex")}` !==
+          row.requestDigest
+      )
+        return { kind: "unknown" };
+      const free =
+        row.kind === "onboarding_capture" || row.kind === "onboarding_cancel";
+      const outcome = await this.authenticatedRequest({
+        op: "public_dispatch",
+        request_id: row.requestId,
+        user_id: row.userId,
+        idempotency_key: row.idempotencyKey,
+        kind: row.kind,
+        contact_id: row.contactId,
+        subject:
+          row.contactId === null
+            ? null
+            : gatewayContactToken(this.key, row.contactId),
+        ...(free
+          ? {
+              operation_token: gatewayPublicOperationToken(
+                this.key,
+                row.requestId,
+              ),
+            }
+          : {}),
+        attempt: createHash("sha256")
+          .update(Buffer.from(row.idempotencyKey.replaceAll("-", ""), "hex"))
+          .digest("hex"),
+        request: Buffer.from(exactBody).toString("base64"),
+      });
+      if (outcome === "cancelled") return { kind: "cancelled" };
+      if (!outcome.startsWith("response:")) return { kind: "unknown" };
+      const encoded = outcome.slice(9),
+        bytes = Buffer.from(encoded, "base64url");
+      if (
+        !/^[A-Za-z0-9_-]{1,10000}$/u.test(encoded) ||
+        bytes.toString("base64url") !== encoded
+      )
+        return { kind: "unknown" };
+      const parsed = z
+        .strictObject({
+          payment_id: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/u),
+          payment_status: z.enum([
+            "pending",
+            "waiting_for_capture",
+            "succeeded",
+            "canceled",
+          ]),
+          confirmation_url: z.url().max(2048).optional(),
+        })
+        .parse(JSON.parse(bytes.toString("utf8")));
+      if (
+        (row.parentPaymentId !== null &&
+          row.kind !== "main_refund" &&
+          parsed.payment_id !== row.parentPaymentId) ||
+        (row.kind === "main_refund" &&
+          (parsed.payment_status === "waiting_for_capture" ||
+            parsed.confirmation_url !== undefined))
+      )
+        return { kind: "unknown" };
+      if (parsed.confirmation_url !== undefined) {
+        const url = new URL(parsed.confirmation_url);
+        if (
+          url.protocol !== "https:" ||
+          url.username ||
+          url.password ||
+          url.port ||
+          url.hash ||
+          !["yookassa.ru", "pay.yookassa.ru", "yoomoney.ru"].includes(
+            url.hostname,
+          )
+        )
+          return { kind: "unknown" };
+      }
+      return {
+        kind: "response",
+        providerObjectId: parsed.payment_id,
+        status: parsed.payment_status,
+        ...(parsed.confirmation_url === undefined
+          ? {}
+          : { confirmationUrl: parsed.confirmation_url }),
+      };
+    } catch {
+      return { kind: "unknown" };
+    }
+  }
+
+  async listPublicPage(
+    resource: "payments" | "refunds",
+    input: {
+      createdFrom: string;
+      createdTo: string;
+      limit: number;
+      cursor?: string;
+    },
+  ): Promise<{
+    items: readonly (YooKassaPayment | YooKassaRefund)[];
+    nextCursor?: string;
+  }> {
+    const from = Date.parse(input.createdFrom),
+      to = Date.parse(input.createdTo);
+    if (
+      ![from, to].every(Number.isFinite) ||
+      to <= from ||
+      to - from > 31 * 86400000 ||
+      !Number.isInteger(input.limit) ||
+      input.limit < 1 ||
+      input.limit > 100 ||
+      (input.cursor !== undefined &&
+        !/^[\x21-\x7e]{1,512}$/u.test(input.cursor))
+    )
+      throw new Error("gateway_provider_read_invalid");
+    const raw = await this.readProvider({
+      op:
+        resource === "payments"
+          ? "public_list_payments"
+          : "public_list_refunds",
+      created_from: input.createdFrom,
+      created_to: input.createdTo,
+      limit: input.limit,
+      ...(input.cursor === undefined ? {} : { cursor: input.cursor }),
+    });
+    const page = z
+      .strictObject({
+        items: z
+          .array(
+            resource === "payments"
+              ? yooKassaPaymentSchema
+              : yooKassaRefundSchema,
+          )
+          .max(input.limit),
+        next_cursor: z
+          .string()
+          .regex(/^[\x21-\x7e]{1,512}$/u)
+          .optional(),
+      })
+      .parse(raw);
+    return {
+      items: page.items,
+      ...(page.next_cursor === undefined
+        ? {}
+        : { nextCursor: page.next_cursor }),
+    };
   }
 
   private async readProvider(
@@ -459,3 +630,12 @@ export class ExperimentalGatewayIpc {
     });
   }
 }
+
+export type PublicGatewayDispatchResult =
+  | { kind: "unknown" | "cancelled" }
+  | {
+      kind: "response";
+      providerObjectId: string;
+      status: "pending" | "waiting_for_capture" | "succeeded" | "canceled";
+      confirmationUrl?: string;
+    };

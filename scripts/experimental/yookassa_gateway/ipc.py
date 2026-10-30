@@ -47,6 +47,7 @@ class GatewayServer:
         contact_key=None,
         allowed_uid=None,
         barrier=None,
+        public_dispatch=None,
     ):
         if not isinstance(address, str) or not address.startswith("\0") or len(address) < 2:
             raise ValueError("Linux abstract socket address required")
@@ -89,6 +90,7 @@ class GatewayServer:
         self.erase = erase
         self.stop_all = stop_all
         self._dispatch = dispatch
+        self._public_dispatch = public_dispatch
         self.allowed_pids = None if allowed_pids is None else frozenset(allowed_pids)
         self.callback_timeout = callback_timeout
         self.ready = threading.Event()
@@ -236,11 +238,70 @@ class GatewayServer:
                 "payment_id" if operation == "inspect_payment" else "refund_id",
             }:
                 subject = None
-            elif operation == "list_payments" and set(command) in (
+            elif operation in ("list_payments", "public_list_payments", "public_list_refunds") and set(command) in (
                 {"op", "created_from", "created_to", "limit"},
                 {"op", "created_from", "created_to", "limit", "cursor"},
             ):
                 subject = None
+            elif operation == "public_dispatch":
+                from pg_authority import PUBLIC_KINDS, strict_json
+                from subject_tokens import contact_token
+
+                free = command.get("kind") in ("onboarding_capture", "onboarding_cancel")
+                keys = {
+                    "op",
+                    "user_id",
+                    "request_id",
+                    "idempotency_key",
+                    "kind",
+                    "contact_id",
+                    "subject",
+                    "attempt",
+                    "request",
+                }
+                if set(command) != (keys | {"operation_token"} if free else keys):
+                    raise ValueError()
+                if self._contact_key is None or self._public_dispatch is None or command["kind"] not in PUBLIC_KINDS:
+                    raise ValueError()
+                for key in ("user_id", "request_id", "idempotency_key"):
+                    if not isinstance(command[key], str) or str(uuid.UUID(command[key])) != command[key]:
+                        raise ValueError()
+                if not isinstance(command["request"], str) or len(command["request"]) > 65536:
+                    raise ValueError()
+                request = base64.b64decode(command["request"], validate=True)
+                if not 1 <= len(request) <= 49152 or base64.b64encode(request).decode() != command["request"]:
+                    raise ValueError()
+                if not isinstance(strict_json(request), dict):
+                    raise ValueError()
+                attempt = command["attempt"]
+                expected_attempt = hashlib.sha256(uuid.UUID(command["idempotency_key"]).bytes).hexdigest()
+                if not isinstance(attempt, str) or not hmac.compare_digest(attempt, expected_attempt):
+                    raise ValueError()
+                if free:
+                    if command["contact_id"] is not None or command["subject"] is not None:
+                        raise ValueError()
+                    subject = command["operation_token"]
+                    expected_subject = hmac.new(
+                        self._contact_key,
+                        b"ii-tonya-gateway-public-operation-v1\0" + uuid.UUID(command["request_id"]).bytes,
+                        hashlib.sha256,
+                    ).hexdigest()
+                else:
+                    contact = command["contact_id"]
+                    if not isinstance(contact, str) or str(uuid.UUID(contact)) != contact:
+                        raise ValueError()
+                    subject = command["subject"]
+                    expected_subject = contact_token(self._contact_key, contact).hex()
+                if not isinstance(subject, str) or not hmac.compare_digest(subject, expected_subject):
+                    raise ValueError()
+                authority_claim = (
+                    command["user_id"],
+                    command["request_id"],
+                    command["contact_id"],
+                    command["idempotency_key"],
+                    "sha256:" + hashlib.sha256(request).hexdigest(),
+                    command["kind"],
+                )
             elif operation == "dispatch" and set(command) == (
                 {"op", "subject", "attempt", "request"}
                 | (
@@ -301,14 +362,29 @@ class GatewayServer:
                     "revoke_contact",
                     "stop_all",
                     "dispatch",
+                    "public_dispatch",
+                    "public_list_payments",
+                    "public_list_refunds",
                     "inspect_payment",
                     "inspect_refund",
                     "list_payments",
                     "barrier",
                 )
-                or (operation in ("erase", "revoke_user", "revoke_contact", "dispatch") and subject is None)
                 or (
-                    operation in ("stop_all", "inspect_payment", "inspect_refund", "list_payments", "barrier")
+                    operation in ("erase", "revoke_user", "revoke_contact", "dispatch", "public_dispatch")
+                    and subject is None
+                )
+                or (
+                    operation
+                    in (
+                        "stop_all",
+                        "inspect_payment",
+                        "inspect_refund",
+                        "list_payments",
+                        "public_list_payments",
+                        "public_list_refunds",
+                        "barrier",
+                    )
                     and subject is not None
                 )
             ):
@@ -330,7 +406,13 @@ class GatewayServer:
                 if operation == "barrier":
                     result.append(self.barrier is not None and self.barrier() is True)
                     return
-                if operation in ("inspect_payment", "inspect_refund", "list_payments"):
+                if operation in (
+                    "inspect_payment",
+                    "inspect_refund",
+                    "list_payments",
+                    "public_list_payments",
+                    "public_list_refunds",
+                ):
                     if self.provider_reader is None:
                         raise RuntimeError("provider reader unavailable")
                     if operation == "inspect_payment":
@@ -338,10 +420,23 @@ class GatewayServer:
                     elif operation == "inspect_refund":
                         response = self.provider_reader.inspect_refund(command["refund_id"])
                     else:
-                        response = self.provider_reader.list_payments(
+                        method = (
+                            self.provider_reader.list_refunds
+                            if operation == "public_list_refunds"
+                            else self.provider_reader.list_payments
+                        )
+                        response = method(
                             command["created_from"], command["created_to"], command["limit"], command.get("cursor")
                         )
                     result.append(response)
+                    return
+                if operation == "public_dispatch":
+                    if self._merchant_auth is None:
+                        result.append("unknown")
+                        return
+                    result.append(
+                        self._public_dispatch(bytes.fromhex(subject), bytes.fromhex(attempt), request, authority_claim)
+                    )
                     return
                 if operation == "dispatch":
                     if self._merchant_auth is None:
@@ -380,15 +475,21 @@ class GatewayServer:
         threading.Thread(target=run, daemon=True).start()
         if not done.wait(self.callback_timeout) or not result[0]:
             # The timed-out callback may still complete: this is an unknown outcome.
-            return {"outcome": "unknown" if operation == "dispatch" else "unavailable"}
-        if operation in ("inspect_payment", "inspect_refund", "list_payments"):
+            return {"outcome": "unknown" if operation in ("dispatch", "public_dispatch") else "unavailable"}
+        if operation in (
+            "inspect_payment",
+            "inspect_refund",
+            "list_payments",
+            "public_list_payments",
+            "public_list_refunds",
+        ):
             encoded = (
                 base64.urlsafe_b64encode(json.dumps(result[0], sort_keys=True, separators=(",", ":")).encode())
                 .decode()
                 .rstrip("=")
             )
             return {"outcome": "response:" + encoded}
-        if operation == "dispatch":
+        if operation in ("dispatch", "public_dispatch"):
             response = result[0]
             if not isinstance(response, dict) or response.get("outcome") != "response":
                 return {"outcome": response if response in ("cancelled", "unknown") else "unknown"}
