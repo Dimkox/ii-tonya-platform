@@ -41,7 +41,13 @@ describe("repeat Vitest runner", () => {
       {
         cwd: process.cwd(),
         encoding: "utf8",
-        env: { ...process.env, CI: "", GITHUB_ACTIONS: "" },
+        // Hosted coverage/report evidence belongs to the outer Vitest process.
+        env: {
+          ...process.env,
+          CI: "",
+          GITHUB_ACTIONS: "",
+          II_TONYA_CI_DB_REPORT: "",
+        },
         timeout: 60_000,
       },
     );
