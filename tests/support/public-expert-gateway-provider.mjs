@@ -87,13 +87,14 @@ client_ctx=ssl.create_default_context(cafile=cert)
 def prepare():return client_ctx.wrap_socket(socket.create_connection(('127.0.0.1',port),timeout=3),server_hostname='localhost')
 original_https=http.client.HTTPSConnection
 def connection(*args,**kwargs):return original_https('localhost',port,timeout=3,context=client_ctx)
-def reader(merchant_auth,**options):return OriginalProviderReader(merchant_auth,factory=connection,**options)
+class LocalProviderReader(OriginalProviderReader):
+ def __init__(self,merchant_auth,**options):super().__init__(merchant_auth,factory=connection,**options)
 authority=PgAuthority(psql_path=os.path.join(base,'psql'),service='fixture',service_file=os.path.join(base,'service'),pass_file=os.path.join(base,'pass'),timeout=8)
 runtime=BoundGateway(os.path.join(base,'state'),authority=authority,require_existing=True)
 if not runtime.resume_from_authority():raise RuntimeError('authority readiness failed')
 path=os.path.join(base,'nonce')
 registry=NonceRegistry.initialize(path,b'a'*32) if not os.path.exists(path) else NonceRegistry(path,b'a'*32)
-with patch('bound_gateway.prepare_yookassa_tls',prepare),patch('provider_reader.ProviderReader',reader):
+with patch('bound_gateway.prepare_yookassa_tls',prepare),patch('provider_reader.ProviderReader',LocalProviderReader):
  server=runtime.create_ipc_server('\0'+address,auth_key=b'a'*32,nonce_registry=registry,allowed_pids={node_pid},confirmation_hosts={'yoomoney.ru'},merchant_auth=('123','fixture-secret'),subject_key=b'k'*32)
  thread=threading.Thread(target=server.serve,daemon=True);thread.start()
  if not server.ready.wait(3):raise RuntimeError('IPC startup failed')
