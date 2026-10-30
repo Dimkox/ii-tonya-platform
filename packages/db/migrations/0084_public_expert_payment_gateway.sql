@@ -147,13 +147,14 @@ DECLARE r public.public_expert_payment_requests%ROWTYPE; old public.public_exper
  op public.expert_residency_provider_operations%ROWTYPE; ord public.expert_residency_orders%ROWTYPE; main public.expert_card_main_orders%ROWTYPE;
  attempt uuid; source_quote uuid;
 BEGIN
- IF target_user IS NULL OR target_source IS NULL OR descriptor IS NULL OR NOT public.expert_jsonb_has_exact_keys(descriptor,ARRAY['requestId','idempotencyKey','kind','requestDigest','bodyVersion','ciphertext','keyReference','bodyExpiresAt']) THEN RETURN NULL; END IF;
+ IF target_user IS NULL OR target_source IS NULL OR descriptor IS NULL OR NOT public.expert_jsonb_has_exact_keys(descriptor,ARRAY['requestId','idempotencyKey','kind','legacyDeliveryOperationId','requestDigest','bodyVersion','ciphertext','keyReference','bodyExpiresAt']) THEN RETURN NULL; END IF;
  IF jsonb_typeof(descriptor->'requestDigest') IS DISTINCT FROM 'string' OR jsonb_typeof(descriptor->'kind') IS DISTINCT FROM 'string' OR jsonb_typeof(descriptor->'ciphertext') NOT IN('string','null') OR jsonb_typeof(descriptor->'keyReference') NOT IN('string','null') OR jsonb_typeof(descriptor->'bodyExpiresAt') NOT IN('string','null') OR descriptor->'bodyVersion' IS DISTINCT FROM '1'::jsonb OR descriptor->>'requestDigest' !~ '^sha256:[a-f0-9]{64}$' THEN RETURN NULL; END IF;
  r.id:=(descriptor->>'requestId')::uuid; r.idempotency_key:=(descriptor->>'idempotencyKey')::uuid;
- r.kind:=descriptor->>'kind'; r.product:=product_name; r.user_id:=target_user; r.contact_id:=target_contact; r.request_digest:=descriptor->>'requestDigest';
+ r.kind:=descriptor->>'kind'; r.legacy_operation_id:=(descriptor->>'legacyDeliveryOperationId')::uuid; r.product:=product_name; r.user_id:=target_user; r.contact_id:=target_contact; r.request_digest:=descriptor->>'requestDigest';
  r.snapshot_version:=1; r.currency:='RUB'; r.state:='prepared'; r.created_at:=public.early_bird_current_time();
  r.encrypted_body:=descriptor->>'ciphertext'; r.key_reference:=descriptor->>'keyReference'; r.body_expires_at:=(descriptor->>'bodyExpiresAt')::timestamptz;
  IF r.id IS NULL OR r.idempotency_key IS NULL OR r.kind IS NULL OR NOT((product_name='onboarding' AND r.kind IN('onboarding_create','onboarding_capture','onboarding_cancel')) OR(product_name='main' AND r.kind='main_create') OR(product_name='refund' AND r.kind='main_refund')) THEN RETURN NULL; END IF;
+ IF (r.kind='main_create') IS DISTINCT FROM (r.legacy_operation_id IS NOT NULL) OR r.legacy_operation_id=r.id THEN RETURN NULL; END IF;
  IF (r.kind IN('onboarding_capture','onboarding_cancel')) IS DISTINCT FROM (target_contact IS NULL) THEN RETURN NULL; END IF;
  IF target_contact IS NULL AND (r.encrypted_body IS NOT NULL OR r.key_reference IS NOT NULL OR r.body_expires_at IS NOT NULL) THEN RETURN NULL; END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended(target_user::text,0));
@@ -161,6 +162,7 @@ BEGIN
  IF FOUND THEN
   IF old.id=r.id AND old.idempotency_key=r.idempotency_key AND old.user_id=target_user AND old.product=product_name AND old.kind=r.kind
    AND (CASE WHEN product_name='refund' THEN old.legacy_operation_id ELSE old.legacy_source_id END)=target_source
+   AND (product_name<>'main' OR old.legacy_operation_id=r.legacy_operation_id)
    AND old.contact_id IS NOT DISTINCT FROM target_contact AND old.request_digest=r.request_digest
    AND old.encrypted_body IS NOT DISTINCT FROM r.encrypted_body AND old.key_reference IS NOT DISTINCT FROM r.key_reference AND old.body_expires_at IS NOT DISTINCT FROM r.body_expires_at
    THEN RETURN early_bird_private.public_snapshot(old); END IF;
@@ -198,7 +200,12 @@ BEGIN
   r.order_id:=ord.id; r.legacy_source_id:=ord.id; r.mode:=main.provider_mode; r.payment_deadline:=ord.payment_deadline; r.provider_deadline:=ord.provider_deadline; source_quote:=main.quote_id;
   IF product_name='main' THEN
    IF EXISTS(SELECT 1 FROM public.expert_residency_provider_operations WHERE order_id=ord.id AND operation_kind='create_payment') THEN RETURN NULL; END IF;
-   r.amount_minor:=ord.cash_minor; r.legacy_operation_id:=gen_random_uuid(); attempt:=gen_random_uuid();
+   IF EXISTS(SELECT 1 FROM public.expert_residency_provider_operations WHERE id=r.legacy_operation_id)
+    OR EXISTS(SELECT 1 FROM public.expert_onboarding_payment_operations WHERE id=r.legacy_operation_id)
+    OR EXISTS(SELECT 1 FROM public.public_expert_payment_requests WHERE id=r.legacy_operation_id OR legacy_operation_id=r.legacy_operation_id)
+    OR EXISTS(SELECT 1 FROM public.early_bird_composite_intents WHERE id=r.legacy_operation_id OR invoice_id=r.legacy_operation_id)
+    OR EXISTS(SELECT 1 FROM public.early_bird_deferred_invoices WHERE id=r.legacy_operation_id) THEN RETURN NULL; END IF;
+   r.amount_minor:=ord.cash_minor; attempt:=gen_random_uuid();
    -- These are delivery records only, atomically linked to the public request below.
    INSERT INTO public.expert_residency_payment_attempts(id,order_id,provider,provider_request_id,expected_amount_minor,currency,status,idempotency_key)
     VALUES(attempt,ord.id,'yookassa','command:'||r.id::text,r.amount_minor,'RUB','created','public:'||r.id::text);

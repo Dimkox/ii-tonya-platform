@@ -27,6 +27,7 @@ export const publicExpertPrepareDescriptorSchema = z
     requestId: uuid,
     idempotencyKey: uuid,
     kind: publicExpertPaymentKindSchema,
+    legacyDeliveryOperationId: uuid.nullable(),
     requestDigest: digest,
     bodyVersion: z.literal(1),
     ciphertext: envelope.shape.ciphertext.nullable(),
@@ -36,6 +37,14 @@ export const publicExpertPrepareDescriptorSchema = z
   .superRefine((v, ctx) => {
     const contactFree =
       v.kind === "onboarding_capture" || v.kind === "onboarding_cancel";
+    if (
+      (v.kind === "main_create") !== (v.legacyDeliveryOperationId !== null) ||
+      v.legacyDeliveryOperationId === v.requestId
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "public_delivery_identity_mismatch",
+      });
     if (
       contactFree
         ? v.ciphertext !== null ||

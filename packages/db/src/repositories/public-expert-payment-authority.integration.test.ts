@@ -33,6 +33,7 @@ const descriptor = (kind: string) => ({
   requestId: randomUUID(),
   idempotencyKey: randomUUID() as string,
   kind,
+  legacyDeliveryOperationId: kind === "main_create" ? randomUUID() : null,
   requestDigest: digest(kind),
   bodyVersion: 1,
   ciphertext:
@@ -859,6 +860,7 @@ it("atomically prepares main delivery from accepted order money and protects unr
     product: "main",
     amountMinor: f.order.cashMinor,
     legacySourceId: f.order.orderId,
+    legacyOperationId: d.legacyDeliveryOperationId,
     mode: "test",
   });
   expect(
