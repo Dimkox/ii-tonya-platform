@@ -14,6 +14,7 @@ import {
   captureMigrationSqlState,
   normalizeMigrationSnapshot,
 } from "../../packages/db/src/testkit/migration-state.js";
+import { replayMigrationsThrough } from "../../packages/db/src/testkit/replay-migrations-through.js";
 import {
   buildEarlyBirdRoleProvisioningSql,
   loadEarlyBirdRoleCapabilities,
@@ -45,7 +46,7 @@ let output: string;
 const limitedPools: TestDatabase["db"]["$client"][] = [];
 beforeAll(async () => {
   database = await startDisposableTestPostgres();
-  await database.migrate();
+  await replayMigrationsThrough(database.db, latest);
 }, 120_000);
 afterAll(async () => {
   await Promise.all(limitedPools.map((pool) => pool.end()));
@@ -54,7 +55,7 @@ afterAll(async () => {
 }, 120_000);
 
 it("provisions exactly five public roles and the existing gateway extension", async () => {
-  const capabilities = await loadEarlyBirdRoleCapabilities();
+  const capabilities = await loadEarlyBirdRoleCapabilities(latest);
   expect(capabilities).toHaveLength(33);
   const byRole = Object.fromEntries(
     capabilities.map((c) => [c.role, c.functions]),
@@ -108,7 +109,9 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
   ).rows[0]?.version;
   expect(version).toBe("170005");
   const journal = read(`${folder}/meta/_journal.json`);
-  expect(journal.entries.at(-1)).toMatchObject({
+  expect(
+    journal.entries.find((entry: { idx: number }) => entry.idx === latest),
+  ).toMatchObject({
     idx: latest,
     tag: "0084_public_expert_payment_gateway",
     breakpoints: true,
@@ -232,7 +235,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
       String(row.definition).includes("FUNCTION early_bird_private."),
     ),
   ).toBe(false);
-  const capabilities = (await loadEarlyBirdRoleCapabilities()).filter(
+  const capabilities = (await loadEarlyBirdRoleCapabilities(latest)).filter(
     (capability) => capability.migration <= latest,
   );
   expect(capabilities).toHaveLength(33);
@@ -248,7 +251,9 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
         `create role ${login} login password 'synthetic-only' inherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
       ),
     );
-  const provisioning = await buildEarlyBirdRoleProvisioningSql(mapping);
+  const provisioning = await buildEarlyBirdRoleProvisioningSql(mapping, {
+    throughMigration: latest,
+  });
   const operator = await database.db.$client.connect();
   try {
     await operator.query(provisioning);
@@ -334,9 +339,12 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
       .name as string;
     await expect(
       operator.query(
-        await buildEarlyBirdRoleProvisioningSql({
-          [capabilities[0]!.role]: owner,
-        }),
+        await buildEarlyBirdRoleProvisioningSql(
+          {
+            [capabilities[0]!.role]: owner,
+          },
+          { throughMigration: latest },
+        ),
       ),
     ).rejects.toMatchObject({ message: "early_bird_role_login_unsafe" });
     await operator.query("ROLLBACK");
@@ -383,6 +391,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
     const before = await privileges();
     const financialSql = await buildEarlyBirdRoleProvisioningSql(mapping, {
       financialLogin: "task6_existing_primary",
+      throughMigration: latest,
     });
     await operator.query(financialSql);
     await operator.query(financialSql);
@@ -430,11 +439,13 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
     await expect(
       buildEarlyBirdRoleProvisioningSql(mapping, {
         financialLogin: "x'; grant all",
+        throughMigration: latest,
       }),
     ).rejects.toThrow("early_bird_financial_login_invalid");
     await expect(
       buildEarlyBirdRoleProvisioningSql(mapping, {
         financialLogin: "state_runtime_0",
+        throughMigration: latest,
       }),
     ).rejects.toThrow("early_bird_financial_login_invalid");
   } finally {
@@ -464,7 +475,11 @@ it("uses operator-provisioned sender and gateway LOGINs for a genuine approved o
       await q.query(
         `create role ${login} login password 'synthetic-only' inherit`,
       );
-    await q.query(await buildEarlyBirdRoleProvisioningSql(mapping));
+    await q.query(
+      await buildEarlyBirdRoleProvisioningSql(mapping, {
+        throughMigration: latest,
+      }),
+    );
     const connect = (login: string) => {
       const url = new URL(q.options.connectionString!);
       url.username = login;

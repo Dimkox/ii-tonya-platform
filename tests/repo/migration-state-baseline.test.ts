@@ -7,7 +7,7 @@ const read = (path: string) =>
   existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
 
 describe("database-derived migration state baseline", () => {
-  it.each([81, 82, 83, 84])(
+  it.each([81, 82, 83, 84, 85])(
     "records protected private schemas and PUBLIC execution at state %i",
     (last) => {
       const tag = String(last).padStart(4, "0");
@@ -23,7 +23,7 @@ describe("database-derived migration state baseline", () => {
         supplement.functionPrivileges.filter(
           (entry: { schema: string }) => entry.schema === "early_bird_private",
         ),
-      ).toHaveLength(last === 84 ? 55 : 7);
+      ).toHaveLength(last >= 84 ? 55 : 7);
       expect(
         supplement.functionPrivileges
           .filter(
@@ -64,6 +64,42 @@ describe("database-derived migration state baseline", () => {
       public_select: false,
       public_update: false,
     });
+  });
+  it("pins the function-only0085 state to its0084 predecessor", () => {
+    const previousSnapshot = read(`${folder}/meta/0084_snapshot.json`);
+    const snapshot = read(`${folder}/meta/0085_snapshot.json`);
+    expect(snapshot.id).not.toBe(previousSnapshot.id);
+    expect(snapshot).toEqual({
+      ...previousSnapshot,
+      id: snapshot.id,
+      prevId: previousSnapshot.id,
+    });
+    expect(
+      read(`${folder}/state/0085_manifest.json`).migrations.slice(0, 85),
+    ).toEqual(read(`${folder}/state/0084_manifest.json`).migrations);
+    const previous = read(`${folder}/state/0084_sql_objects.json`);
+    const state = read(`${folder}/state/0085_sql_objects.json`);
+    expect({ ...state, functions: previous.functions }).toEqual(previous);
+    const signature = (entry: { name: string; arguments: string }) => [
+      entry.name,
+      entry.arguments,
+    ];
+    expect(state.functions.map(signature)).toEqual(
+      previous.functions.map(signature),
+    );
+    expect(
+      state.functions
+        .filter(
+          (entry: { definition: string }, index: number) =>
+            entry.definition !== previous.functions[index]?.definition,
+        )
+        .map((entry: { name: string }) => entry.name),
+    ).toEqual([
+      "resident_materialize_approved_services",
+      "resident_native_slot_source",
+      "resident_schedule_version_source",
+      "resident_service_version_source",
+    ]);
   });
   it("preserves composite FK position, index opclasses and unvalidated constraints", () => {
     const snapshot = read(`${folder}/meta/0039_snapshot.json`);
@@ -124,7 +160,7 @@ describe("database-derived migration state baseline", () => {
 
   it.each([
     39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 70, 71, 72, 73, 74, 75,
-    76, 77, 78, 79, 80, 81, 82, 83, 84,
+    76, 77, 78, 79, 80, 81, 82, 83, 84, 85,
   ])(
     "binds state %i evidence to every SQL input and exact snapshot bytes",
     (last) => {

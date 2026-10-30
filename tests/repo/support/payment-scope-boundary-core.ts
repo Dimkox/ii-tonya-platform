@@ -126,6 +126,11 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0085_resident_native_uuid_sources.sql",
+  "packages/db/migrations/meta/0085_snapshot.json",
+  "packages/db/migrations/state/0085_manifest.json",
+  "packages/db/migrations/state/0085_sql_objects.json",
+
   "packages/db/migrations/0084_public_expert_payment_gateway.sql",
   "packages/db/migrations/meta/0084_snapshot.json",
   "packages/db/migrations/state/0084_manifest.json",
@@ -773,6 +778,15 @@ const reviewedDomHarnessHashes = new Map([
 ]);
 
 const approvedAutomationArtifactHashes = new Map([
+  [
+    "tests/integration/resident-native-uuid-migration-state.test.ts",
+    "d41061fc847629859d2fa17a8dd270dcd8184ff0ce4556a69c28e12634315e5d",
+  ],
+  [
+    "packages/db/src/repositories/resident-native-uuid-sources.integration.test.ts",
+    "f6bf537e33983b80adfa0f95ed88a7ce24c745764bf6eb541f309010369797fd",
+  ],
+
   [
     "scripts/experimental/yookassa_gateway/test_public_journey_reader_seam.py",
     "a7493e386749d328290a61caf3a05abddea62832aa44f4606e0dd723911c4ea6",
@@ -1455,6 +1469,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.6.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0085_resident_native_uuid_sources.sql",
+    "5b45f11ac06f88f603d1b300ebc746a051ef5a1f265a112fe0d27951a893cd27",
+  ],
+  [
+    "packages/db/migrations/meta/0085_snapshot.json",
+    "e79fdb57dd2dc0fce71109108f804d8d84c9a8ab7c7bca035e1ae34f5390dfdb",
+  ],
+  [
+    "packages/db/migrations/state/0085_manifest.json",
+    "d5516fcab4ea59aebc625855d97af0e43b9974ff35f045122589507d4a3ac4da",
+  ],
+  [
+    "packages/db/migrations/state/0085_sql_objects.json",
+    "2ad27c8f6921bae057a106fb32f441df73cb13c1ace7361f09bdd39af2b6597d",
+  ],
+
   [
     "packages/db/migrations/0084_public_expert_payment_gateway.sql",
     "99dc320d06298e9747156104a4b0dab9c60c349ec43c593dfd85cb235caefbaf",
@@ -2420,7 +2451,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "a3eea07160f3d8ca13e7cc4f4dd93396bd18755e1490540de196934315288031",
+    "b0d18cfa79d43f40aad82d9a4327e09770dea4074105b8ec36bf293384c588fb",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -2500,7 +2531,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "a3eea07160f3d8ca13e7cc4f4dd93396bd18755e1490540de196934315288031",
+    "b0d18cfa79d43f40aad82d9a4327e09770dea4074105b8ec36bf293384c588fb",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -2703,6 +2734,9 @@ const isVersionedGetzillaToolingPath = (path: string): boolean =>
 
 // Exact reviewed deployment and CI discovery inventory.
 const reviewedGatewayProvisionArtifacts = new Set([
+  "tests/integration/resident-native-uuid-migration-state.test.ts",
+  "packages/db/src/repositories/resident-native-uuid-sources.integration.test.ts",
+
   "scripts/experimental/yookassa_gateway/test_public_journey_reader_seam.py",
   "scripts/experimental/yookassa_gateway/test_public_dispatch.py",
   "scripts/experimental/yookassa_gateway/test_public_dispatch_response.py",
@@ -3678,6 +3712,9 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0085_snapshot.json", 1192800],
+    ["packages/db/migrations/state/0085_sql_objects.json", 1876151],
+
     ["packages/db/migrations/meta/0084_snapshot.json", 1192800],
     ["packages/db/migrations/state/0084_sql_objects.json", 1876143],
 
