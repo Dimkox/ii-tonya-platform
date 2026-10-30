@@ -84,7 +84,7 @@ jobs:
       - name: Run bridge and provisioning Node tests
         run: node --test scripts/early-bird-bridge/*.test.mjs deploy/gateway-provision/*.test.mjs
       - name: Verify isolated systemd provisioning sandbox
-        run: sudo -n bash deploy/gateway-provision/test_prepare_systemd_sandbox.sh
+        run: sudo -n bash deploy/gateway-provision/test_prepare_systemd_sandbox.sh "$(command -v node)"
       - name: Install OpenGrep for taint analysis
         shell: bash
         env:

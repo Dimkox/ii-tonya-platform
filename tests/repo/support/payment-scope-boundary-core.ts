@@ -746,6 +746,19 @@ const reviewedDomHarnessHashes = new Map([
 
 const approvedAutomationArtifactHashes = new Map([
   [
+    "deploy/gateway-provision/sandbox-node-resolution.test.mjs",
+    "93824ccd347fd699abf2b07d0047f9c05d91b2ef0cbe8eaf9bd39234ff0adf34",
+  ],
+  [
+    "scripts/early-bird-bridge/migration-tags.mjs",
+    "5b5ffabda2003c0b92f3c56f741dfb39065d9da04fa102bc6ed69c16268e38c9",
+  ],
+  [
+    "scripts/early-bird-bridge/migration-tags.test.mjs",
+    "11c0c1af96d0589a1883d1e91b31e5d31e38be3c8cf23e1214e638702704d20f",
+  ],
+
+  [
     "apps/api/src/early-bird-bound-reconciliation.ts",
     "1dae2c33985c037dd360597502e1876e5732a3a67dbc7ebd531df4c5f4f4276b",
   ],
@@ -780,7 +793,7 @@ const approvedAutomationArtifactHashes = new Map([
 
   [
     "deploy/gateway-provision/test_prepare_systemd_sandbox.sh",
-    "f56f79bbe1d7ff85cc3a48600622635fb781aeab0fd4fe1ba59e6674fd323338",
+    "e255dde28e9f984d86e572148ff44783f8a487b2460fa2054247de710c6a26cf",
   ],
   [
     "deploy/gateway-provision/readme.md",
@@ -865,7 +878,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     ".getzilla/templates/ci/github-actions-verify.yml",
-    "0b8fbb564f0ca94edd10c90106f8a5e27efe5b5abd4725077a06b11d5aac9996",
+    "9031caa9293c59481d7716ba0ef304b5a97e360defbce8430c1a96126b68b6d1",
   ],
   [
     "tests/runtime/test_claw_healthcheck.py",
@@ -899,7 +912,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-early-bird-bridge-release.mjs",
-    "10dbdea609d658ed13b5d3a275805d3de2a16ae9e037d85fa92475f5804bd5e4",
+    "8616ead0ac58ae25da40a8876d277add9756e2debbac998ca411877dd17d44d5",
   ],
   [
     "scripts/early-bird-bridge/bridge.test.mjs",
@@ -1015,7 +1028,7 @@ const approvedAutomationArtifactHashes = new Map([
   // Read-only GitHub Actions gates explicitly authorized for this public repository.
   [
     ".github/workflows/getzilla-verify.yml",
-    "b5f0322f177b0e8fb829999225348c82e25a5d2574da4bb35b236e72a4895f32",
+    "4e13d117cea6ca0ea2e00a49183c694179155a667147eaab9c117438f9981d86",
   ],
   [
     "scripts/assert-ci-db-results.mjs",
@@ -2623,6 +2636,10 @@ const isVersionedGetzillaToolingPath = (path: string): boolean =>
 
 // Exact reviewed deployment and CI discovery inventory.
 const reviewedGatewayProvisionArtifacts = new Set([
+  "deploy/gateway-provision/sandbox-node-resolution.test.mjs",
+  "scripts/early-bird-bridge/migration-tags.mjs",
+  "scripts/early-bird-bridge/migration-tags.test.mjs",
+
   "apps/api/src/early-bird-bound-reconciliation.ts",
   "apps/api/src/early-bird-bound-reconciliation.test.ts",
   "apps/api/src/early-bird-discovery-pool.ts",

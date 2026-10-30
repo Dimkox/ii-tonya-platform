@@ -10,7 +10,10 @@ gates. Production was observed read-only at release
 No deployment or real provider payment has been performed by this increment.
 Full hosted run ONE is consumed: GitHub Actions 40987914970 at source
 1164de8c0b52111b906560f8176918b4b4dc6a9c failed secret scanning before tests.
-Its evidence is retained. Full run TWO has not started; no third full run is
+Its evidence is retained. Full run TWO (41001630079 at
+36d6e2c45857c799b36d4a0932d508f0145c7ebf) is also consumed and FAILED:
+build, native edge and bridge/provision Node tests passed; the isolated systemd
+sandbox exited before Getzilla and PostgreSQL verification. No third full run is
 authorized. The corrected candidate includes committed frozen dependency graph
 49efe200 and Vitest typing fix fe556d10; read Git for its final exact SHA.
 The local pre-push aggregate
@@ -50,6 +53,15 @@ questions about genuine manager access, the future single test-expert price
 identity, and merchant-cabinet webhook configuration remain unanswered. The
 existing 10/20-ruble authorization must not silently affect all experts. No real
 charge, provider mutation, production environment edit or deployment is claimed.
+
+Actual bridge assembly at 36d6e2c4 failed because its validator rejected six
+unchanged historical migration tags containing hyphens. The correction accepts
+safe historical names while enforcing the matching contiguous index; new focused
+tests passed 2/2 and independent source review accepted it. Do not build this
+corrected bridge with the old SOURCE_SHA. The sandbox correction now explicitly
+passes the verified setup-node binary through sudo and records synthetic stage
+failures; its previous silent failure did not establish a specific root cause.
+No CI or exhausted sandbox rerun follows without additional owner authorization.
 
 Current implementation and limitations are tracked in
 `docs/superpowers/implementation-artifacts/early-bird-continuation-2026-10-29.md`.

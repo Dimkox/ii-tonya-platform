@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/../.." && pwd)"
+stage="node_validation"
+trap 'printf "synthetic systemd sandbox failed at stage: %s\n" "$stage" >&2' ERR
+node_bin="${1:-$(command -v node)}"
+[[ "$node_bin" = /* && "$node_bin" =~ ^/[A-Za-z0-9_./-]+$ && -f "$node_bin" && -x "$node_bin" ]]
+node_bin="$(realpath -e -- "$node_bin")"
+[[ "$node_bin" =~ ^/[A-Za-z0-9_./-]+$ ]]
+[[ "$("$node_bin" --version)" =~ ^v24\.[0-9]+\.[0-9]+$ ]]
+sudo -n /usr/sbin/runuser -u nobody -- /usr/bin/test -x "$node_bin"
+stage="fixture_creation"
 task_dir="$(mktemp -d)"
 unit="ii-tonya-prepare-sandbox-$(date +%s)-$$"
 run_dir="/run/$unit"
@@ -43,7 +52,9 @@ if(!/^NoNewPrivs:\s*1$/m.test(status))process.exit(6);
 try {writeFileSync(`${dir}/current/gateway/launcher.py`,'modified');process.exit(3);} catch(e) {if(e.code!=='EACCES' && e.code!=='EROFS')process.exit(4);}
 NODE
 for f in setup select read; do sudo -n install -m 0644 "$task_dir/$f.mjs" "$run_dir/$f.mjs"; done
-sudo -n /usr/bin/node --jitless "$run_dir/setup.mjs" "$run_dir" >/dev/null 2>&1
+stage="fixture_setup"
+sudo -n "$node_bin" --jitless "$run_dir/setup.mjs" "$run_dir" >/dev/null 2>&1
+stage="unit_installation"
 cat > "$task_dir/$unit.service" <<UNIT
 [Unit]
 Description=Isolated synthetic gateway selector proof
@@ -53,8 +64,8 @@ TimeoutStartSec=20s
 User=nobody
 Group=nogroup
 WorkingDirectory=$run_dir/code
-ExecStartPre=+/usr/bin/node --jitless $run_dir/select.mjs $run_dir
-ExecStart=/usr/bin/node --jitless $run_dir/read.mjs $run_dir/code
+ExecStartPre=+$node_bin --jitless $run_dir/select.mjs $run_dir
+ExecStart=$node_bin --jitless $run_dir/read.mjs $run_dir/code
 NoNewPrivileges=yes
 CapabilityBoundingSet=
 AmbientCapabilities=
@@ -79,7 +90,7 @@ TimeoutStartSec=20s
 User=root
 Group=root
 WorkingDirectory=$run_dir/code
-ExecStart=/usr/bin/timeout --kill-after=2s 10s /usr/sbin/runuser -u nobody -- /usr/bin/node --jitless $run_dir/read.mjs $run_dir/code
+ExecStart=/usr/bin/timeout --kill-after=2s 10s /usr/sbin/runuser -u nobody -- $node_bin --jitless $run_dir/read.mjs $run_dir/code
 NoNewPrivileges=yes
 AmbientCapabilities=CAP_SETUID CAP_SETGID
 ProtectSystem=strict
@@ -98,8 +109,10 @@ UNIT
 sudo -n install -m 0644 "$task_dir/$unit.service" "/run/systemd/system/$unit.service"
 sudo -n install -m 0644 "$task_dir/$unit-prepare.service" "/run/systemd/system/$unit-prepare.service"
 sudo -n systemctl daemon-reload
+stage="selector_unit"
 sudo -n timeout -k 2s 25s systemctl start "$unit.service"
 test "$(sudo -n systemctl show "$unit.service" --property=Result --value)" = success
+stage="credential_drop_unit"
 sudo -n timeout -k 2s 25s systemctl start "$unit-prepare.service"
 test "$(sudo -n systemctl show "$unit-prepare.service" --property=Result --value)" = success
 echo 'local systemd sandbox: root selector and runuser credential drop succeeded; unprivileged process could not modify code (DB and provider mocked)'

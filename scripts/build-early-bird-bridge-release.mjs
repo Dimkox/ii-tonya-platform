@@ -13,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { archiveSource, hashFile } from "./early-bird-bridge/archive-hash.mjs";
+import { validateMigrationTag } from "./early-bird-bridge/migration-tags.mjs";
 
 const sourceSha = process.env.SOURCE_SHA;
 const oldArchive = resolve(process.env.OLD_RELEASE_ARCHIVE || "");
@@ -60,12 +61,7 @@ try {
       readFileSync(join(folder, "meta/_journal.json"), "utf8"),
     );
     return journal.entries.map((entry, idx) => {
-      if (
-        entry.idx !== idx ||
-        !/^\d{4}_[a-z0-9_]+$/.test(entry.tag) ||
-        !Number.isSafeInteger(entry.when)
-      )
-        throw Error("invalid journal");
+      if (!validateMigrationTag(entry, idx)) throw Error("invalid journal");
       return {
         hash: hash(readFileSync(join(folder, entry.tag + ".sql"))),
         created_at: String(entry.when),
