@@ -1083,6 +1083,10 @@ const approvedAutomationArtifactHashes = new Map([
     "5ab585ae193f5ee1ae71ea3dc7efeb553564384f109eb108f6031dd05c403053",
   ],
   [
+    "scripts/getzilla_ci_evidence.py",
+    "f2b75687272ae897c79e2f3caed848e061c4454901fa05b1c4be908bd4a4e0dd",
+  ],
+  [
     "scripts/getzilla_verify_ci.py",
     "0f149c73c6322383479533c659d7114664fd3c50033d4aa867b86e39b8e464ff",
   ],
