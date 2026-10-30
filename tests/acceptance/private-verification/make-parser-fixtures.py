@@ -1,10 +1,19 @@
 import io
+import argparse
 from pathlib import Path
 import pymupdf
 from docx import Document
 
-out = Path("/tmp/residency-private-parser-20261026")
-font = pymupdf.Font(fontfile="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+arguments = argparse.ArgumentParser()
+arguments.add_argument("--output-dir", type=Path, default=Path("/tmp/residency-private-parser-20261026"))
+arguments.add_argument("--font", default="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+options = arguments.parse_args()
+out = options.output_dir
+out.mkdir(parents=True, exist_ok=True)
+font = (pymupdf.Font(fontname="cjk") if options.font == "cjk"
+        else pymupdf.Font(fontfile=options.font))
+if not all(font.has_glyph(ord(character)) for character in "ПсихологУниверситетКазань"):
+    raise RuntimeError("fixture_font_missing_cyrillic")
 pdf = pymupdf.open()
 page = pdf.new_page(width=600, height=400)
 writer = pymupdf.TextWriter(page.rect)
@@ -16,6 +25,8 @@ for y, text in [
 ]:
     writer.append((30, y), text, font=font, fontsize=24)
 writer.write_text(page)
+if options.font == "cjk":
+    pdf.subset_fonts()
 out.joinpath("text.pdf").write_bytes(pdf.tobytes())
 pix = page.get_pixmap(dpi=150)
 out.joinpath("scan.png").write_bytes(pix.tobytes("png"))

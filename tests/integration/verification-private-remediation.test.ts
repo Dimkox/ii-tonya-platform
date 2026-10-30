@@ -31,6 +31,7 @@ import { saveExpertOfferProfile } from "../../packages/db/src/repositories/exper
 import { loadEnv } from "../../packages/config/src/env.js";
 import { createExpertApplicantComposition } from "../../apps/api/src/expert-applicant-composition.js";
 import { expertApplicantTelegramRoutes } from "../../apps/api/src/routes/expert-applicant-telegram.js";
+import { startManagedPrivateParserFixture } from "../support/managed-private-parser.js";
 let database: ExpertReferralTestDatabase, tariff: string;
 let update = 1;
 beforeAll(async () => {
@@ -393,61 +394,66 @@ for (const derived of ["specialty301", "oversized", "throws"] as const)
     }
   });
 it("R5 actual isolated mixed PDF without OCR preserves text/custody and yields UNKNOWN", async () => {
-  const f = await fixture(),
-    bytes = await readFile("/tmp/residency-private-parser-20261026/mixed.pdf"),
-    io = await localTransports(bytes);
+  const parserFixture = await startManagedPrivateParserFixture();
   try {
-    const parser = createIsolatedDocumentParser({
-        socketPath: process.env.II_TONYA_PRIVATE_PARSER_TEST_SOCKET!,
-        ocr: false,
-      }),
-      parsed = await parser.parse({
-        type: "pdf",
-        bytes,
-        signal: new AbortController().signal,
+    const f = await fixture(),
+      bytes = parserFixture.mixedPdf,
+      io = await localTransports(bytes);
+    try {
+      const parser = createIsolatedDocumentParser({
+          socketPath: parserFixture.socketPath,
+          ocr: false,
+        }),
+        parsed = await parser.parse({
+          type: "pdf",
+          bytes,
+          signal: new AbortController().signal,
+        });
+      expect(parsed?.coverage).toBe("partial");
+      expect(parsed?.content).toContain("Психолог");
+      await submit(f, {
+        roles: ["EXPERT"],
+        primaryRole: "EXPERT",
+        specialization: "Психолог",
+        methods: "Консультации",
+        experienceYears: 12,
+        averageCheckMinor: "100000",
+        education: [
+          {
+            kind: "document",
+            fileId: "mixed",
+            size: bytes.length,
+            mimeType: "application/pdf",
+          },
+        ],
       });
-    expect(parsed?.coverage).toBe("partial");
-    expect(parsed?.content).toContain("Психолог");
-    await submit(f, {
-      roles: ["EXPERT"],
-      primaryRole: "EXPERT",
-      specialization: "Психолог",
-      methods: "Консультации",
-      experienceYears: 12,
-      averageCheckMinor: "100000",
-      education: [
-        {
-          kind: "document",
-          fileId: "mixed",
-          size: bytes.length,
-          mimeType: "application/pdf",
-        },
-      ],
-    });
-    const runner = createResidentPrivateJobsRunner({
-      repository: f.privateJobs,
-      reader: io.reader,
-      store: io.store,
-      parser,
-    });
-    await runner.runOnce();
-    expect(
-      (
-        await database.db.execute(
-          sql`select state,sha256,observation from resident_private_objects where application_id=${f.form.id}::uuid and purpose='education'`,
-        )
-      ).rows[0],
-    ).toMatchObject({
-      state: "verified",
-      sha256: createHash("sha256").update(bytes).digest("hex"),
-      observation: { result: "UNKNOWN" },
-    });
-    runner.stopAccepting();
+      const runner = createResidentPrivateJobsRunner({
+        repository: f.privateJobs,
+        reader: io.reader,
+        store: io.store,
+        parser,
+      });
+      await runner.runOnce();
+      expect(
+        (
+          await database.db.execute(
+            sql`select state,sha256,observation from resident_private_objects where application_id=${f.form.id}::uuid and purpose='education'`,
+          )
+        ).rows[0],
+      ).toMatchObject({
+        state: "verified",
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        observation: { result: "UNKNOWN" },
+      });
+      runner.stopAccepting();
+    } finally {
+      await io.close();
+      await f.app.close();
+    }
   } finally {
-    await io.close();
-    await f.app.close();
+    await parserFixture.stop();
   }
-});
+}, 180000);
 async function managerSession() {
   const manager = await database.createUser(),
     session =
