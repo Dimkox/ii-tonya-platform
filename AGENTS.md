@@ -126,9 +126,8 @@ evidence. Keep PR #4 Draft until Tasks 10–12 and their final checks are comple
 
 ### Pre-push gate
 
-There is no hosted CI: `.github/workflows` is empty by repository policy
-(`tests/repo/workflow-semantics.test.ts` asserts it) and branch protection is unavailable on
-the current plan, so a push is otherwise entirely unchecked. Install the gate once per clone
+Hosted GitHub Actions CI and Database Gate are available for this public repository.
+The local pre-push gate remains an independent early check. Install the gate once per clone
 — the hook it writes lives outside the worktree and therefore covers every linked worktree:
 
 `pnpm hooks:install`

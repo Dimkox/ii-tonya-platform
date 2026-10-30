@@ -31,6 +31,13 @@ export default defineConfig({
     ],
   },
   test: {
+    ...(process.env.II_TONYA_CI_DB_REPORT === "true"
+      ? {
+          reporters: ["default", "json"],
+          outputFile: { json: "vitest-results.json" },
+          coverage: { enabled: true },
+        }
+      : {}),
     // Serialize aggregate DB suites; focused commands may still override this deterministic default.
     maxWorkers: 1,
     // Eight parallel PostgreSQL schema teardowns exceeded 10s in the full suite; 45s is the measured shared ceiling.

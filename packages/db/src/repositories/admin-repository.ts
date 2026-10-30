@@ -176,6 +176,8 @@ const objectTypes: Readonly<Record<ApprovalAdminAction, string>> = {
   "expert_referral.feature_switch": "expert_referral_feature_control",
   "expert_residency.sandbox_settle": "sandbox_expert_residency_payment",
   "expert_residency.sandbox_refund": "sandbox_expert_residency_payment",
+  "owner_test_pricing.grant": "user",
+  "owner_test_pricing.revoke": "owner_test_pricing_grant",
   "selarti_budget.policy_approve": "selarti_budget_policy",
 };
 

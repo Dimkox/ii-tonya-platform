@@ -1,4 +1,8 @@
 import {
+  wrapEarlyBirdReview,
+  type EarlyBirdReviewPreparation,
+} from "./early-bird-review-prepare.js";
+import {
   createPrivateObjectStore,
   YooKassaOnboardingPaymentVerifier,
   YooKassaOnboardingWebhookCapability,
@@ -94,6 +98,7 @@ export function createExpertVerificationComposition(
   db: DrizzleDb,
   config: RuntimeConfig,
   payment?: ExpertVerificationPaymentCapabilities,
+  earlyBirdPreparation?: EarlyBirdReviewPreparation,
 ): ExpertVerificationCapability | undefined {
   assertExpertVerificationPayments(config, payment);
   const settings = config.expertVerification;
@@ -177,10 +182,14 @@ export function createExpertVerificationComposition(
             },
           }
         : {}),
-      review: new PostgresResidentReviewRepository(db, {
-        providerMode: settings.paymentMode,
-        messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
-      }),
+      review: wrapEarlyBirdReview(
+        new PostgresResidentReviewRepository(db, {
+          providerMode: settings.paymentMode,
+          messagingConsentPolicyVersion: settings.messagingConsentPolicyVersion,
+          earlyBirdReview: earlyBirdPreparation !== undefined,
+        }),
+        earlyBirdPreparation,
+      ),
       enabled: config.features.expertVerification === true,
       repository,
       ...(heldCheckout ? { heldCheckout } : {}),

@@ -1,4 +1,6 @@
 import { bridgeSeparatedSalesForm } from "./expert-separated-sales-repository.js";
+import { bridgeEarlyBirdForm } from "./early-bird-form-bridge.js";
+import { earlyBirdFormEligible } from "./early-bird-form-eligibility.js";
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
 import {
@@ -22,6 +24,7 @@ export interface ResidentSnapshot extends Record<string, unknown> {
   formVersion?: 1 | 2;
   activeRequestId?: string | null;
   checkGeneration?: number;
+  submittedRevision?: number | null;
   informationRequest?: {
     id: string;
     questions: string[];
@@ -67,6 +70,7 @@ export class PostgresResidentVerificationRepository {
       botKey: string;
       messagingConsentPolicyVersion: string;
       fieldPolicy?: ResidentPolicy;
+      earlyBirdForm?: boolean;
     },
   ) {}
   async mutate(raw: ResidentMutation): Promise<ResidentSnapshot> {
@@ -188,6 +192,48 @@ export class PostgresResidentVerificationRepository {
         }))
       )
         fail("resident_identity_unavailable");
+      let waveMode = false;
+      let existingWaveBridge = false;
+      let existingWaveEnrollment = false;
+      if (this.policy.earlyBirdForm === true) {
+        const config = (
+          await tx.execute<{ phase: string }>(
+            sql`select phase from early_bird_launch_configs where active for share`,
+          )
+        ).rows;
+        if (config.length !== 1) fail("resident_wave_unavailable");
+        const waveState = (
+          await tx.execute<{
+            chosen: boolean;
+            bridged: boolean;
+            enrolled: boolean;
+          }>(
+            sql`select exists(select 1 from early_bird_choices c join expert_sales_bases b on b.id=c.base_id and b.user_id=c.user_id where c.user_id=${userId}::uuid and b.bot_id=${input.botId} and b.bot_key=${input.botKey} and b.chat_id=${input.chatId} and c.id=(select id from early_bird_choices where base_id=b.id order by decision_no desc limit 1) and c.positive_choice_id=(select id from expert_sales_choices where base_id=b.id order by revision desc limit 1)) as chosen,exists(select 1 from early_bird_form_bridges where user_id=${userId}::uuid) as bridged,exists(select 1 from early_bird_form_enrollments e join residents_applications f on f.id=e.form_id and f.is_current where e.user_id=${userId}::uuid) as enrolled`,
+          )
+        ).rows[0]!;
+        const currentTime =
+          (
+            await tx.execute<{ valid: boolean }>(
+              sql`select early_bird_wave_active(early_bird_current_time()) as valid`,
+            )
+          ).rows[0]?.valid === true;
+        waveMode =
+          config[0]!.phase === "WAVE_1_EARLY_BIRD" &&
+          currentTime &&
+          waveState.chosen;
+        existingWaveBridge = waveState.bridged;
+        existingWaveEnrollment = waveState.enrolled;
+      }
+      if (
+        waveMode &&
+        !(await earlyBirdFormEligible(tx, {
+          userId,
+          botId: input.botId,
+          botKey: input.botKey,
+          chatId: input.chatId,
+        }))
+      )
+        fail("resident_wave_unavailable");
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`resident-request:${input.botId}:${input.botKey}:${input.requestKey}`},0))`,
       );
@@ -235,6 +281,19 @@ export class PostgresResidentVerificationRepository {
         (input.applicationId !== undefined && row.id !== input.applicationId)
       )
         return fail("resident_application_unavailable");
+      if (waveMode && !existingWaveEnrollment) {
+        if (input.action !== "start" || row.status !== "PENDING_DOCS")
+          fail("resident_wave_unavailable");
+        const legacy = await tx.execute(
+          sql`select 1 from expert_sales_selections where user_id=${userId}::uuid limit 1`,
+        );
+        if (legacy.rows.length) fail("resident_legacy_flow");
+        const enrolled = await tx.execute(
+          sql`insert into early_bird_form_enrollments(form_id,user_id,choice_id) select ${row.id}::uuid,${userId}::uuid,c.id from early_bird_choices c join expert_sales_bases b on b.id=c.base_id and b.user_id=c.user_id where c.user_id=${userId}::uuid and b.bot_id=${input.botId} and b.bot_key=${input.botKey} and b.chat_id=${input.chatId} and c.id=(select id from early_bird_choices where base_id=b.id order by decision_no desc limit 1) and c.positive_choice_id=(select id from expert_sales_choices where base_id=b.id order by revision desc limit 1) returning form_id`,
+        );
+        if (enrolled.rows.length !== 1) fail("resident_wave_unavailable");
+        existingWaveEnrollment = true;
+      }
       if (input.action !== "start") {
         const storedPolicy: ResidentPolicy = {
           version: row.policyVersion!,
@@ -265,6 +324,12 @@ export class PostgresResidentVerificationRepository {
               sql`insert into residents_applications(user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id,attempt_number) select user_id,bot_id,bot_key,channel_identity_id,telegram_user_id,chat_id,attempt_number+1 from residents_applications where id=${row.id}::uuid returning id,form_version as "formVersion",revision,draft,status,progress,policy_version as "policyVersion",education_requirement as "educationRequirement"`,
             )
           ).rows[0]!;
+          if (existingWaveEnrollment) {
+            const enrollment = await tx.execute(
+              sql`insert into early_bird_form_enrollments(form_id,user_id,choice_id) select ${created.id}::uuid,${userId}::uuid,choice_id from early_bird_form_enrollments where form_id=${row.id}::uuid and user_id=${userId}::uuid returning form_id`,
+            );
+            if (enrollment.rows.length !== 1) fail("resident_wave_unavailable");
+          }
           await tx.execute(
             sql`insert into resident_verification_requests(bot_id,bot_key,request_key,user_id,request_digest,operation,result) values(${input.botId},${input.botKey},${input.requestKey},${userId}::uuid,${fingerprint},${input.action},${JSON.stringify(created)}::jsonb)`,
           );
@@ -340,12 +405,34 @@ export class PostgresResidentVerificationRepository {
           await tx.execute(
             sql`insert into resident_verification_check_work(application_id,user_id,submitted_revision) values(${row.id}::uuid,${userId}::uuid,${updated.revision}) on conflict(application_id) do nothing`,
           );
-        if (submitting)
-          await bridgeSeparatedSalesForm(tx, userId, row.id, updated.revision);
+        if (submitting) {
+          const wave =
+            existingWaveEnrollment || existingWaveBridge
+              ? await bridgeEarlyBirdForm(tx, userId, row.id, updated.revision)
+              : null;
+          if (!wave)
+            await bridgeSeparatedSalesForm(
+              tx,
+              userId,
+              row.id,
+              updated.revision,
+            );
+        }
         row = updated;
       }
-      if (input.action === "start" && row.status === "UNDER_REVIEW")
-        await bridgeSeparatedSalesForm(tx, userId, row.id, row.revision);
+      if (input.action === "start" && row.status === "UNDER_REVIEW") {
+        const wave =
+          existingWaveEnrollment || existingWaveBridge
+            ? await bridgeEarlyBirdForm(
+                tx,
+                userId,
+                row.id,
+                row.submittedRevision ?? row.revision,
+              )
+            : null;
+        if (!wave)
+          await bridgeSeparatedSalesForm(tx, userId, row.id, row.revision);
+      }
       const informationRequest = row.activeRequestId
         ? ((
             await tx.execute<{

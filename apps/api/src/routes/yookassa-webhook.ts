@@ -8,7 +8,11 @@ import {
 } from "@ii-tonya/integrations";
 import type { WebhookInbox } from "./selarti-webhook.js";
 
-export type BoundPaymentPurpose = "ONBOARDING_FEE" | "MAIN_SUBSCRIPTION";
+export type BoundPaymentPurpose =
+  | "ONBOARDING_FEE"
+  | "MAIN_SUBSCRIPTION"
+  | "COMBINED_EARLY_BIRD"
+  | "DEFERRED_EARLY_BIRD";
 export interface YooKassaWebhookDependencies {
   /** Production supplies the durable binding lookup; metadata never chooses a product. */
   readonly resolvePurpose?: (
@@ -16,6 +20,16 @@ export interface YooKassaWebhookDependencies {
     event: YooKassaNotification["event"],
   ) => Promise<BoundPaymentPurpose | null>;
   readonly onboarding?: {
+    handle(notification: YooKassaNotification): Promise<boolean>;
+  };
+  /** Handler must verify the provider object and durably settle or reconcile before returning true. */
+  readonly composite?: {
+    handle(notification: YooKassaNotification): Promise<boolean>;
+  };
+  readonly deferredRefund?: {
+    handle(notification: YooKassaNotification): Promise<boolean>;
+  };
+  readonly deferredPayment?: {
     handle(notification: YooKassaNotification): Promise<boolean>;
   };
   readonly effectivePeerAddress: (request: FastifyRequest) => string;
@@ -103,6 +117,22 @@ export async function yookassaWebhookRoutes(
               !(await deps.onboarding.handle(parsed.data))
             )
               throw new Error("yookassa_webhook_onboarding_pending");
+            await deps.inbox.complete(claim.claimId);
+            return reply.send({ accepted: true });
+          }
+          if (purpose === "COMBINED_EARLY_BIRD") {
+            if (!deps.composite || !(await deps.composite.handle(parsed.data)))
+              throw new Error("yookassa_webhook_composite_pending");
+            await deps.inbox.complete(claim.claimId);
+            return reply.send({ accepted: true });
+          }
+          if (purpose === "DEFERRED_EARLY_BIRD") {
+            const handler =
+              parsed.data.event === "refund.succeeded"
+                ? deps.deferredRefund
+                : deps.deferredPayment;
+            if (!handler || !(await handler.handle(parsed.data)))
+              throw new Error("yookassa_webhook_deferred_refund_pending");
             await deps.inbox.complete(claim.claimId);
             return reply.send({ accepted: true });
           }

@@ -61,6 +61,7 @@ export type ResidentFormInput = ExpertApplicantScope & {
   updateId: number;
   text: string;
   callbackData?: string;
+  firstName?: string;
   media?: ResidentDocument;
 };
 const roleLabels = {

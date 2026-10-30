@@ -7,6 +7,35 @@ const read = (path: string) =>
   existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
 
 describe("database-derived migration state baseline", () => {
+  it.each([81, 82, 83])(
+    "records protected private schemas and PUBLIC execution at state %i",
+    (last) => {
+      const tag = String(last).padStart(4, "0");
+      const supplement = read(`${folder}/state/${tag}_sql_objects.json`);
+      expect(supplement.schemas).toEqual([
+        {
+          name: "early_bird_private",
+          public_usage: false,
+          public_create: false,
+        },
+      ]);
+      expect(
+        supplement.functionPrivileges.filter(
+          (entry: { schema: string }) => entry.schema === "early_bird_private",
+        ),
+      ).toHaveLength(7);
+      expect(
+        supplement.functionPrivileges
+          .filter(
+            (entry: { security_definer: boolean }) => entry.security_definer,
+          )
+          .every(
+            (entry: { public_execute: boolean }) =>
+              entry.public_execute === false,
+          ),
+      ).toBe(true);
+    },
+  );
   it("preserves composite FK position, index opclasses and unvalidated constraints", () => {
     const snapshot = read(`${folder}/meta/0039_snapshot.json`);
     expect(
@@ -64,7 +93,10 @@ describe("database-derived migration state baseline", () => {
     ).toEqual(["btree_gist", "pgcrypto"]);
   });
 
-  it.each([39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 70, 71, 72, 73])(
+  it.each([
+    39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 70, 71, 72, 73, 74, 75,
+    76, 77, 78, 79, 80, 81, 82, 83,
+  ])(
     "binds state %i evidence to every SQL input and exact snapshot bytes",
     (last) => {
       const tag = String(last).padStart(4, "0");

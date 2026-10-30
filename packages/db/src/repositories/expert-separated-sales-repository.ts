@@ -29,6 +29,11 @@ export interface SeparatedSalesView {
   submitted?: boolean;
   standardOnly: boolean;
   replay: boolean;
+  waveTestPrice?: {
+    grantId: string;
+    onboardingMinor: string;
+    subscriptionMinor: string;
+  };
   tariffs?: { id: string; name: string }[];
 }
 type Tx = Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0];
@@ -98,6 +103,10 @@ export class PostgresExpertSeparatedSalesRepository {
       action?: "positive" | "promo" | "base" | "month" | "quarter";
       baseId?: string;
       revision?: number;
+      /** Internal wave-only transition; no legacy choice is made after client launch. */
+      waveStartAtMs?: number;
+      waveEnrollmentStartMs?: number;
+      waveExpectedGrantId?: string | null;
     },
   ): Promise<SeparatedSalesView | null> {
     if (
@@ -106,7 +115,22 @@ export class PostgresExpertSeparatedSalesRepository {
       input.chatId !== input.telegramUserId ||
       !/^[1-9][0-9]{0,19}$/u.test(input.chatId) ||
       !/^[0-9a-f]{64}$/u.test(input.requestDigest) ||
-      !/^[A-Za-z0-9._:-]{1,200}$/u.test(input.requestKey)
+      !/^[A-Za-z0-9._:-]{1,200}$/u.test(input.requestKey) ||
+      (input.waveStartAtMs === undefined) !==
+        (input.waveEnrollmentStartMs === undefined) ||
+      (input.waveStartAtMs !== undefined &&
+        ((input.action !== "positive" &&
+          !(input.action === undefined && input.tariffVersionId)) ||
+          !Number.isSafeInteger(input.waveStartAtMs) ||
+          input.waveStartAtMs !== Date.parse("2027-01-11T00:00:00+03:00") ||
+          input.waveEnrollmentStartMs !==
+            Date.parse("2026-11-01T00:00:00+03:00") ||
+          (input.action === "positive" &&
+            input.waveExpectedGrantId === undefined) ||
+          (typeof input.waveExpectedGrantId === "string" &&
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(
+              input.waveExpectedGrantId,
+            ))))
     )
       throw new Error("expert_sales_identity");
     return this.db.transaction(async (tx) => {
@@ -118,6 +142,20 @@ export class PostgresExpertSeparatedSalesRepository {
       if (identities.length !== 1) throw new Error("expert_sales_identity");
       const userId = identities[0]!.id;
       await lockClientConsentSubject(tx, userId);
+      if (input.waveStartAtMs !== undefined) {
+        // Hold the active configuration row until this transaction commits so a
+        // concurrent phase change cannot race a new choice or its replay.
+        const config = await tx.execute(
+          sql`select 1 from early_bird_launch_configs where active and phase='WAVE_1_EARLY_BIRD' and enrollment_start_at=${new Date(input.waveEnrollmentStartMs!).toISOString()}::timestamptz and client_start_at=${new Date(input.waveStartAtMs).toISOString()}::timestamptz and promo_deadline_days=10 and final_call_trigger_at='2026-12-28 07:00:00+00'::timestamptz for share`,
+        );
+        if (config.rows.length !== 1)
+          throw new Error("early_bird_phase_closed");
+        const active = await tx.execute(
+          sql`select 1 where early_bird_wave_active(early_bird_current_time())`,
+        );
+        if (active.rows.length !== 1)
+          throw new Error("early_bird_phase_closed");
+      }
       if (
         (
           await tx.execute(
@@ -136,6 +174,24 @@ export class PostgresExpertSeparatedSalesRepository {
         }))
       )
         throw new Error("expert_sales_identity");
+      const testPrice =
+        input.waveStartAtMs === undefined
+          ? undefined
+          : (
+              await tx.execute<{
+                id: string;
+                onboarding: string;
+                subscription: string;
+              }>(
+                sql`select id, onboarding_minor::text onboarding, subscription_minor::text subscription from owner_test_pricing_grants where user_id=${userId}::uuid and revoked_at is null and provider_mode='live' and policy_version='owner_test_10_20_v1' for share`,
+              )
+            ).rows[0];
+      if (
+        input.waveStartAtMs !== undefined &&
+        input.action === "positive" &&
+        (testPrice?.id ?? null) !== input.waveExpectedGrantId
+      )
+        throw new Error("early_bird_price_changed");
       let b = (
         await tx.execute<{
           id: string;
@@ -236,14 +292,41 @@ export class PostgresExpertSeparatedSalesRepository {
             prior.revision !== input.revision! + 1
           )
             throw new Error("expert_sales_replay_conflict");
+          if (input.waveStartAtMs !== undefined) {
+            if (!c || c.revision !== prior.revision || c.action !== "positive")
+              throw new Error("expert_sales_stale_choice");
+            const saved = await tx.execute(
+              sql`select 1 from early_bird_positive_price_snapshots where positive_choice_id=${c.id}::uuid and user_id=${userId}::uuid and base_id=${b.id}::uuid and grant_id is not distinct from ${input.waveExpectedGrantId}::uuid`,
+            );
+            if (saved.rows.length !== 1)
+              throw new Error("early_bird_price_changed");
+          }
           replay = true;
         } else {
           if ((c?.revision ?? 0) !== input.revision)
             throw new Error("expert_sales_stale_choice");
-          await tx.execute(
-            sql`insert into expert_sales_choices(base_id,user_id,revision,action,request_key,request_digest) values(${b.id}::uuid,${userId}::uuid,${input.revision! + 1},${input.action},${input.requestKey},${input.requestDigest})`,
+          const inserted = await tx.execute(
+            input.waveStartAtMs === undefined
+              ? sql`insert into expert_sales_choices(base_id,user_id,revision,action,request_key,request_digest) values(${b.id}::uuid,${userId}::uuid,${input.revision! + 1},${input.action},${input.requestKey},${input.requestDigest}) returning id`
+              : sql`insert into expert_sales_choices(base_id,user_id,revision,action,request_key,request_digest) select ${b.id}::uuid,${userId}::uuid,${input.revision! + 1},${input.action},${input.requestKey},${input.requestDigest} where early_bird_wave_active(early_bird_current_time()) returning id`,
           );
+          if (inserted.rows.length !== 1)
+            throw new Error("early_bird_phase_closed");
           c = await latest();
+          if (
+            input.waveStartAtMs !== undefined &&
+            input.action === "positive"
+          ) {
+            if (
+              !c ||
+              c.action !== "positive" ||
+              c.revision !== input.revision! + 1
+            )
+              throw new Error("expert_sales_stale_choice");
+            await tx.execute(
+              sql`insert into early_bird_positive_price_snapshots(positive_choice_id,user_id,base_id,grant_id) values(${c.id}::uuid,${userId}::uuid,${b.id}::uuid,${input.waveExpectedGrantId}::uuid)`,
+            );
+          }
           if (input.action === "month" || input.action === "quarter") {
             const promo = (
               await tx.execute<{ yes: boolean }>(
@@ -333,7 +416,25 @@ export class PostgresExpertSeparatedSalesRepository {
             sql`select 1 from expert_sales_form_bridges where user_id=${userId}::uuid and expert_sales_form_valid(application_id,user_id)`,
           )
         ).rows.length > 0;
+      if (input.waveStartAtMs !== undefined) {
+        // The phase may have crossed the launch boundary while resolving consent
+        // or a replay. Roll back any new choice rather than return stale terms.
+        const stillActive = await tx.execute(
+          sql`select 1 where early_bird_wave_active(early_bird_current_time())`,
+        );
+        if (stillActive.rows.length !== 1)
+          throw new Error("early_bird_phase_closed");
+      }
       return {
+        ...(testPrice
+          ? {
+              waveTestPrice: {
+                grantId: testPrice.id,
+                onboardingMinor: testPrice.onboarding,
+                subscriptionMinor: testPrice.subscription,
+              },
+            }
+          : {}),
         ...(invoice
           ? { invoiceId: invoice.id, operationId: invoice.operation }
           : {}),

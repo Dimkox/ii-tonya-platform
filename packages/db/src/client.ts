@@ -13,7 +13,7 @@ export const defaultMigrationsFolder = fileURLToPath(
 
 export type DbConnectionSettings = Pick<
   PoolConfig,
-  "options" | "connectionTimeoutMillis"
+  "options" | "connectionTimeoutMillis" | "max" | "idleTimeoutMillis"
 >;
 
 export function createDb(

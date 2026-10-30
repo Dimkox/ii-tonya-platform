@@ -66,6 +66,47 @@ describe("public legal documents", () => {
     );
   });
 
+  it("defines the early enrollment payment and deferred service period", () => {
+    const offer = legalDocuments.oferta.text;
+    expect(offer).toContain(
+      "этап предварительного набора Резидентов («Первые Птички»)",
+    );
+    expect(offer).toContain("11 января 2027 года");
+    expect(offer).toContain("с даты официального запуска, а не с даты оплаты");
+    expect(offer).toContain("единым платежом, включающим взнос за онбординг");
+    expect(offer).toContain("10 (десяти) календарных дней");
+    expect(offer).toContain(
+      "При оплате только онбординга скидка также аннулируется",
+    );
+    expect(offer).toContain("воздерживаться от публичных анонсов");
+    expect(offer).toContain(
+      "период предварительного набора, предусмотренный пунктами 6.5–6.8",
+    );
+    expect(offer).toContain(
+      "за исключением предварительного набора, регулируемого пунктами 6.5–6.8",
+    );
+  });
+
+  it("preserves prepublication refund rights and limits deferred start to advance payments", () => {
+    const offer = legalDocuments.oferta.text;
+    expect(offer).toContain(
+      "До размещения карточки при отказе Резидента возможен возврат оплаты за вычетом фактически понесённых расходов",
+    );
+    expect(offer).toContain(
+      "включая расходы на онбординг, если проверка компетенции уже проведена",
+    );
+    expect(offer).not.toContain(
+      "исключить Эксперта из базы без возврата оплаты",
+    );
+    expect(offer).toContain("при оплате до официального запуска");
+    expect(offer).toContain(
+      "При оплате после официального запуска оплаченный период начинается с даты оплаты",
+    );
+    expect(offer).toContain(
+      "если иные размеры платежей прямо указаны в персональном предложении Исполнителя",
+    );
+  });
+
   it("states package and coupon terms without claiming default-off coupon issuance is active", () => {
     const oferta = legalDocuments.oferta.text;
     expect(oferta).toContain("60 календарных дней");

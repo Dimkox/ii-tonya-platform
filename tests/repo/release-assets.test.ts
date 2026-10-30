@@ -86,7 +86,9 @@ describe("release assets", () => {
     expect(readme).toContain(
       "Docker and Compose are development and Claw test tools only",
     );
-    expect(readme).toContain("GitHub Actions are not used");
+    expect(readme).toContain(
+      "GitHub Actions provide hosted CI and Database Gate",
+    );
     expect(nativeRunbook).toContain(
       "container imitates the native server contract",
     );

@@ -237,19 +237,44 @@ export class PostgresPayerReceiptContactRepository {
       return null;
     }
   }
-  async redactExpiredBatch(limit: number): Promise<number> {
+  async listExpiredBatch(
+    limit: number,
+  ): Promise<{ id: string; userId: string }[]> {
     if (!Number.isInteger(limit) || limit < 1 || limit > 100)
       throw new PayerReceiptError("PAYER_RECEIPT_INVALID");
+    return this.db.transaction(
+      async (tx) =>
+        (
+          await tx.execute<{ id: string; userId: string }>(
+            sql`select c.id,c.user_id as "userId" from payer_receipt_contacts c where c.redacted_at is null and payer_receipt_redaction_due(c) order by c.expires_at,c.id limit ${limit} for update of c skip locked`,
+          )
+        ).rows,
+    );
+  }
+  /** Call only after revoking every listed subject; newly due rows are never touched. */
+  async redactExpiredSelection(
+    plan: readonly { id: string; userId: string }[],
+  ): Promise<number> {
+    if (
+      plan.length > 100 ||
+      plan.some(
+        (row) =>
+          !(
+            /^[0-9a-f-]{36}$/iu.test(row.id) &&
+            /^[0-9a-f-]{36}$/iu.test(row.userId)
+          ),
+      )
+    )
+      throw new PayerReceiptError("PAYER_RECEIPT_INVALID");
+    if (plan.length === 0) return 0;
     return this.db.transaction(async (tx) => {
-      const rows = (
-        await tx.execute<{ id: string }>(
-          sql`select c.id from payer_receipt_contacts c where c.redacted_at is null and payer_receipt_redaction_due(c) order by c.expires_at,c.id limit ${limit} for update of c skip locked`,
-        )
-      ).rows;
       let count = 0;
-      for (const row of rows) {
+      for (const row of [...plan].sort(
+        (a, b) => a.userId.localeCompare(b.userId) || a.id.localeCompare(b.id),
+      )) {
+        await lockClientConsentSubject(tx, row.userId);
         const changed = await tx.execute(
-          sql`update payer_receipt_contacts c set ciphertext=null,key_id=null,redacted_at=clock_timestamp() where c.id=${row.id}::uuid and c.redacted_at is null and payer_receipt_redaction_due(c) returning id`,
+          sql`update payer_receipt_contacts c set ciphertext=null,key_id=null,redacted_at=clock_timestamp() where c.id=${row.id}::uuid and c.user_id=${row.userId}::uuid and c.redacted_at is null and payer_receipt_redaction_due(c) returning id`,
         );
         count += changed.rows.length;
       }

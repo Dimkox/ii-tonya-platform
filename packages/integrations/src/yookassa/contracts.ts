@@ -111,3 +111,37 @@ export interface YooKassaReceiptInput {
   readonly customer: YooKassaReceiptCustomer;
   readonly item: YooKassaReceiptItem;
 }
+
+/** Explicit split receipt: each amount is in kopecks, summed against the payment. */
+export interface YooKassaCompositeReceiptInput {
+  readonly customer: YooKassaReceiptCustomer;
+  readonly items: readonly [
+    YooKassaReceiptItem & { readonly amountMinor: bigint },
+    YooKassaReceiptItem & { readonly amountMinor: bigint },
+  ];
+}
+
+/** Minimal candidate list; full payment details require a separate verified GET. */
+export const yooKassaPaymentListSchema = z
+  .object({
+    type: z.literal("list"),
+    items: z
+      .array(
+        z
+          .object({
+            id: providerId,
+            created_at: z.iso.datetime({ offset: true }),
+            test: z.boolean(),
+            metadata: z.record(z.string(), z.unknown()).optional(),
+          })
+          .passthrough(),
+      )
+      .max(100),
+    next_cursor: z
+      .string()
+      .min(1)
+      .max(1024)
+      .regex(/^[\x21-\x7e]+$/u)
+      .optional(),
+  })
+  .passthrough();

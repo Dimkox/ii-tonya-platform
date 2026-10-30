@@ -1,0 +1,8 @@
+[Unit]
+Description=Provision ii-Tonya YooKassa gateway identity and private directories
+
+[Service]
+Type=oneshot
+TimeoutStartSec=30s
+ExecStart=/usr/bin/systemd-sysusers /opt/ii-tonya-platform/current/gateway-provision/sysusers.conf
+ExecStart=/usr/bin/systemd-tmpfiles --create /opt/ii-tonya-platform/current/gateway-provision/tmpfiles.conf

@@ -57,3 +57,4 @@ export {
 } from "@ii-tonya/application";
 
 export * from "./resident-private-jobs.js";
+export { createDeferredReviewJob } from "./deferred-review-job.js";

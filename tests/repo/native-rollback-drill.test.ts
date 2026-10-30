@@ -51,6 +51,10 @@ function rollbackDrill(fault: "none" | "missing-previous" | "stale" = "none") {
     for (const part of ["systemd", "scripts", "migrations"])
       mkdirSync(join(release, part), { recursive: true });
     writeFileSync(join(release, "SOURCE_SHA"), sha);
+    writeFileSync(
+      join(release, "provenance.json"),
+      JSON.stringify({ format: "ii-tonya-native-v1", source_sha: sha }),
+    );
     writeFileSync(join(release, "scripts/validate-runtime-env.sh"), "exit 0\n");
     writeFileSync(join(release, "migrations/0050.sql"), "select 1;\n");
     for (const unit of ["api", "worker", "migrate"]) {
@@ -118,6 +122,7 @@ echo "$value"`,
     "systemctl",
     `printf 'systemctl %s\\n' "$*" >> "$ROOT/drill.log"
 command="$1"; shift
+if [[ "$command" == show && "$*" == *ii-tonya-yookassa-gateway.service* && "$*" == *LoadState* ]]; then echo not-found; exit 0; fi
 unit=api
 [[ "$*" != *worker* ]] || unit=worker
 [[ "$*" != *migrate* ]] || unit=migrate

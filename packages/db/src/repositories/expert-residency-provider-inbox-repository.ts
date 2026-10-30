@@ -182,8 +182,66 @@ type OrderRow = {
 const iso = (v: Date | string) =>
   v instanceof Date ? v.toISOString() : new Date(v).toISOString();
 
+/** Coverage writers take the subject lock and epoch before inbox/order locks. */
+async function lockResidencyCoverageAuthority(
+  tx: Pick<DrizzleDb, "execute">,
+  orderId: string,
+  forceWaveCoverage: boolean,
+): Promise<{
+  waveCoverage: boolean;
+  coverageSubject: { userId: string } | undefined;
+}> {
+  // All residency orders can contribute coverage. Serialize them with
+  // deferred wave coverage before taking inbox/order locks, including
+  // campaign and legacy orders that have no main-card order row.
+  // Presence is a database-owned capability: once wave coverage exists,
+  // every production construction of this repository must honor it.
+  // A partially installed capability fails closed rather than silently
+  // omitting paid intervals.
+  const capability = (
+    await tx.execute<{
+      facts: boolean;
+      epoch: boolean;
+      coverage: boolean;
+    }>(sql`
+    select to_regclass('public.early_bird_payment_successes') is not null as facts,
+           to_regprocedure('public.early_bird_touch_coverage_epoch(uuid)') is not null as epoch,
+           to_regprocedure('public.early_bird_active_coverage_end(uuid)') is not null as coverage
+  `)
+  ).rows[0];
+  if (
+    !capability ||
+    capability.facts !== capability.epoch ||
+    capability.facts !== capability.coverage
+  )
+    throw new ExpertResidencySettlementError(
+      "EXPERT_RESIDENCY_WAVE_COVERAGE_UNAVAILABLE",
+    );
+  const waveCoverage = forceWaveCoverage || capability.facts;
+  const coverageSubject = (
+    await tx.execute<{ userId: string }>(
+      sql`select e.user_id as "userId" from expert_residency_orders o join experts e on e.id=o.expert_id where o.id=${orderId}::uuid and e.user_id is not null`,
+    )
+  ).rows[0];
+  if (coverageSubject) {
+    await lockClientConsentSubject(tx, coverageSubject.userId);
+    if (waveCoverage)
+      await tx.execute(
+        sql`select early_bird_touch_coverage_epoch(${coverageSubject.userId}::uuid)`,
+      );
+  } else if (waveCoverage) {
+    throw new ExpertResidencySettlementError(
+      "EXPERT_RESIDENCY_COVERAGE_SUBJECT_REQUIRED",
+    );
+  }
+  return { waveCoverage, coverageSubject };
+}
+
 export class PostgresExpertResidencyProviderInboxRepository {
-  constructor(private readonly db: DrizzleDb) {}
+  constructor(
+    private readonly db: DrizzleDb,
+    private readonly options: { readonly waveCoverage?: boolean } = {},
+  ) {}
   async settle(
     input: VerifiedExpertResidencyPaymentEvent,
   ): Promise<ExpertResidencySettlementResult> {
@@ -199,14 +257,12 @@ export class PostgresExpertResidencyProviderInboxRepository {
         // checkout expert advisory here would invert its control-first order.
         await tx.execute(sql`set transaction isolation level serializable`);
         await tx.execute(sql`set local lock_timeout='250ms'`);
-        // Main checkout takes subject before order. Match that order before
-        // inbox/order locks; the immutable binding is revalidated in prepare.
-        const mainSubject = (
-          await tx.execute<{ userId: string }>(
-            sql`select user_id as "userId" from expert_card_main_orders where order_id=${input.orderId}::uuid and purpose='main_residency'`,
-          )
-        ).rows[0];
-        if (mainSubject) await lockClientConsentSubject(tx, mainSubject.userId);
+        const { waveCoverage, coverageSubject } =
+          await lockResidencyCoverageAuthority(
+            tx,
+            input.orderId,
+            this.options.waveCoverage === true,
+          );
         const digest = input.payloadDigest.slice("sha256:".length);
         await tx.execute(
           sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status) values (${input.provider},${input.eventId},${digest},${input.kind},1,${input.paymentId},${input.orderId}::uuid,${input.amountMinor},${input.currency},${new Date(input.occurredAt)},true,${input.verificationId},${input.verifierKeyVersion},${new Date(input.verifiedAt)},'processing') on conflict (provider,external_event_id) do nothing`,
@@ -463,9 +519,16 @@ export class PostgresExpertResidencyProviderInboxRepository {
               "EXPERT_RESIDENCY_PAYMENT_ATTEMPT_CONFLICT",
             );
         }
-        const current = await tx.execute<{ endAt: Date | string | null }>(
-          sql`select max(residency_ends_at) as "endAt" from expert_residency_orders where expert_id=${order.expertId}::uuid and status='settled'`,
-        );
+        const current = waveCoverage
+          ? await tx.execute<{ endAt: Date | string | null }>(sql`
+              select greatest(
+                (select max(residency_ends_at) from expert_residency_orders where expert_id=${order.expertId}::uuid and status='settled'),
+                early_bird_active_coverage_end(${coverageSubject!.userId}::uuid)
+              ) as "endAt"
+            `)
+          : await tx.execute<{ endAt: Date | string | null }>(
+              sql`select max(residency_ends_at) as "endAt" from expert_residency_orders where expert_id=${order.expertId}::uuid and status='settled'`,
+            );
         const start =
           current.rows[0]?.endAt && new Date(current.rows[0].endAt) > now
             ? new Date(current.rows[0].endAt)
@@ -621,6 +684,12 @@ export class PostgresExpertResidencyProviderInboxRepository {
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
         await tx.execute(sql`set local lock_timeout='250ms'`);
+        const { waveCoverage, coverageSubject } =
+          await lockResidencyCoverageAuthority(
+            tx,
+            input.orderId,
+            this.options.waveCoverage === true,
+          );
         const digest = input.payloadDigest.slice("sha256:".length);
         await tx.execute(
           sql`insert into expert_residency_provider_event_inbox (provider,external_event_id,payload_digest,event_kind,identity_version,payment_id,order_id,amount_minor,currency,occurred_at,authenticated,verification_id,verifier_key_version,verified_at,status) values (${input.provider},${input.eventId},${digest},${input.kind},1,${input.paymentId},${input.orderId}::uuid,${input.amountMinor},${input.currency},${new Date(input.occurredAt)},true,${input.verificationId},${input.verifierKeyVersion},${new Date(input.verifiedAt)},'processing') on conflict (provider,external_event_id) do nothing`,
@@ -849,6 +918,11 @@ export class PostgresExpertResidencyProviderInboxRepository {
           await tx.execute(
             sql`update expert_residency_orders set status=${reversalKind === "charged_back" ? "charged_back" : "refunded"},updated_at=${now} where id=${order.id}::uuid`,
           );
+          if (waveCoverage) {
+            await tx.execute(
+              sql`select early_bird_reflow_after_legacy_refund(${coverageSubject!.userId}::uuid)`,
+            );
+          }
           await suspendReversedMainCard(tx, order.id);
           await tx.execute(
             sql`update expert_residency_payment_attempts set status=${reversalKind === "charged_back" ? "charged_back" : "refunded"},resolved_at=${now},updated_at=${now} where order_id=${order.id}::uuid and provider=${input.provider} and provider_request_id=${input.paymentId}`,

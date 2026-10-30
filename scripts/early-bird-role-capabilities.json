@@ -1,0 +1,211 @@
+{
+  "version": 1,
+  "capabilities": [
+    {
+      "role": "ii_tonya_wave_gateway",
+      "runtimeKeys": ["gateway"],
+      "functions": [
+        "public.early_bird_gateway_revoke(uuid)",
+        "public.early_bird_gateway_claim(uuid,uuid,uuid,uuid,text)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_sender",
+      "runtimeKeys": ["sender"],
+      "functions": [
+        "early_bird_private.owner_send_snapshot(uuid,uuid,uuid)",
+        "early_bird_private.owner_admit_send(uuid,uuid,uuid,text)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_standard_sender",
+      "runtimeKeys": ["standardSender"],
+      "functions": [
+        "early_bird_private.standard_send_snapshot(uuid,uuid,uuid)",
+        "early_bird_private.standard_admit_send(uuid,uuid,uuid,text)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_intent_reader",
+      "runtimeKeys": ["candidateReader"],
+      "functions": ["early_bird_private.find_candidate_intent(uuid)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_verifier",
+      "runtimeKeys": ["bindingWriter"],
+      "functions": [
+        "early_bird_private.bind_verified(uuid,uuid,text,text,jsonb)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_verified_payment_reader",
+      "runtimeKeys": ["knownBindingReader", "compositePaymentReader"],
+      "functions": ["early_bird_private.find_verified_payment(text,text)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_settlement_writer",
+      "runtimeKeys": ["compositePaymentSettlement"],
+      "functions": [
+        "public.early_bird_commit_verified_payment(jsonb,text,timestamp with time zone)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_refund_binding_reader",
+      "runtimeKeys": ["compositeRefundReader"],
+      "functions": ["public.early_bird_read_verified_refund(text)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_refund_binder",
+      "runtimeKeys": ["compositeRefundBinding"],
+      "functions": ["public.early_bird_bind_verified_refund(jsonb)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_wave_refund_writer",
+      "runtimeKeys": ["compositeRefundSettlement"],
+      "functions": [
+        "public.early_bird_commit_verified_refund(jsonb,bigint,text,timestamp with time zone)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_account_writer",
+      "runtimeKeys": ["deferredAccountWriter", "reviewPrepare"],
+      "functions": [
+        "public.early_bird_deferred_prepare(uuid,uuid,uuid,uuid,uuid)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_invoice_writer",
+      "runtimeKeys": ["deferredInvoiceWriter"],
+      "functions": [
+        "public.early_bird_deferred_invoice(uuid,uuid,uuid,uuid,text)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_sender",
+      "runtimeKeys": ["deferredSender"],
+      "functions": ["public.early_bird_deferred_admit_send(uuid,uuid,uuid)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_invoice_reader",
+      "runtimeKeys": ["deferredSnapshotReader"],
+      "functions": ["public.early_bird_deferred_read_invoice(uuid)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_bound_reader",
+      "runtimeKeys": ["deferredBoundReader"],
+      "functions": ["public.early_bird_deferred_read_bound(uuid)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_binding_writer",
+      "runtimeKeys": ["deferredPaymentBinding"],
+      "functions": [
+        "public.early_bird_deferred_bind_verified(uuid,uuid,text,bigint,text)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_settlement_writer",
+      "runtimeKeys": ["deferredPaymentSettlement"],
+      "functions": [
+        "public.early_bird_deferred_commit_verified(uuid,uuid,text,bigint,text,timestamp with time zone)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_refund_reader",
+      "runtimeKeys": ["deferredRefundReader"],
+      "functions": ["public.early_bird_deferred_refund_payment(text)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_refund_binding",
+      "runtimeKeys": ["deferredRefundBinding"],
+      "functions": [
+        "public.early_bird_deferred_bind_refund(uuid,uuid,text,text,bigint,text)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_refund_settlement",
+      "runtimeKeys": ["deferredRefundSettlement"],
+      "functions": [
+        "public.early_bird_deferred_commit_refund(uuid,uuid,text,text,bigint,text)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_refund_cancel",
+      "runtimeKeys": ["deferredRefundCancel"],
+      "functions": [
+        "public.early_bird_deferred_cancel_refund(uuid,uuid,text,text,bigint,text)"
+      ],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_deferred_payment_route_reader",
+      "runtimeKeys": ["deferredPaymentRoute", "deferredPaymentLookup"],
+      "functions": ["public.early_bird_deferred_payment_lookup(text)"],
+      "migration": 81
+    },
+    {
+      "role": "ii_tonya_worker_review_source",
+      "runtimeKeys": ["reviewSource"],
+      "functions": [
+        "public.early_bird_worker_review_list(uuid,integer)",
+        "public.early_bird_worker_review_resolve(uuid,uuid)"
+      ],
+      "migration": 82
+    },
+    {
+      "role": "ii_tonya_worker_wave_retention",
+      "runtimeKeys": ["waveRetention"],
+      "functions": [
+        "public.early_bird_wave_retention_list(integer)",
+        "public.early_bird_wave_retention_expire(uuid,uuid)"
+      ],
+      "migration": 82
+    },
+    {
+      "role": "ii_tonya_worker_deferred_retention",
+      "runtimeKeys": ["deferredRetention"],
+      "functions": [
+        "public.early_bird_deferred_retention_list(integer)",
+        "public.early_bird_deferred_retention_expire(uuid,uuid)"
+      ],
+      "migration": 82
+    },
+    {
+      "role": "ii_tonya_wave_final_call_worker",
+      "runtimeKeys": ["finalCall"],
+      "functions": ["public.early_bird_final_call_worker(text,jsonb)"],
+      "migration": 82
+    },
+    {
+      "role": "ii_tonya_wave_publication_worker",
+      "runtimeKeys": ["publication"],
+      "functions": ["public.early_bird_publication_worker(text,jsonb)"],
+      "migration": 83
+    },
+    {
+      "role": "ii_tonya_wave_launch_kit_worker",
+      "runtimeKeys": ["launchKit"],
+      "functions": ["public.early_bird_launch_kit_worker(text,jsonb)"],
+      "migration": 83
+    }
+  ]
+}

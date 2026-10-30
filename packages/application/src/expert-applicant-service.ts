@@ -121,6 +121,7 @@ export function createExpertApplicantService(deps: {
         updateId: number;
         text: string;
         callbackData?: string;
+        firstName?: string;
         media?: ResidentDocument;
       },
     ): Promise<ExpertApplicantReply> {
@@ -134,7 +135,12 @@ export function createExpertApplicantService(deps: {
         input.chatId !== input.telegramUserId ||
         !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(input.botKey) ||
         typeof input.text !== "string" ||
-        input.text.length > (deps.verificationForm ? 3000 : 256)
+        input.text.length > (deps.verificationForm ? 3000 : 256) ||
+        (input.firstName !== undefined &&
+          (typeof input.firstName !== "string" ||
+            input.firstName.length < 1 ||
+            input.firstName.length > 64 ||
+            /[\p{Cc}\p{Cf}]/u.test(input.firstName)))
       )
         return { status: "rejected" };
       const { botId, botKey, telegramUserId, chatId, updateId } = input;

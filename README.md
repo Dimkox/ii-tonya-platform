@@ -104,8 +104,8 @@ container, which imitates the dedicated server runtime without becoming a produc
 deployment target. The current gate image is pinned to source
 `29993b4fe96facf8c07781833dc7f2d5f560aa7e` and immutable image ID
 `sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63`.
-GitHub Actions are not used. GitHub stores Git history and pull
-requests only; executable evidence is written under `docs/test-evidence/claw/`.
+GitHub Actions provide hosted CI and Database Gate for this public repository.
+Direct Claw evidence is also written under `docs/test-evidence/claw/`.
 Final aggregate verification, independent reviews, and human/release approvals remain
 explicit gates.
 GitHub Free does not expose private-repository branch protection or rulesets. The
@@ -189,8 +189,8 @@ YooMoney; the personal YooMoney Wallet API and the former T-Bank proposal are no
 - [YooKassa operator runbook](docs/runbooks/yookassa-provider.md)
 - [Provider-connected staging evidence](docs/runbooks/provider-staging-evidence.md)
 
-No GitHub Actions are used. Direct Claw gates are the executable CI and Database Gate
-path, and their committed evidence is not merchant-connected evidence. Production
+GitHub Actions provide hosted CI and Database Gate; direct Claw gates remain available.
+Neither hosted nor Claw evidence alone constitutes merchant-connected evidence. Production
 deployment is deferred while hoster maintenance is active; this does not authorize a
 container deployment, credential entry, or feature activation.
 

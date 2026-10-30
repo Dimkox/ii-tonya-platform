@@ -311,6 +311,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     private readonly db: DrizzleDb,
     private readonly options: {
       beforeWithdrawalAudit?: () => Promise<void> | void;
+      beforePrivacyReceiptDisclosure?: (
+        tx: Transaction,
+        userId: string,
+      ) => Promise<unknown | undefined>;
       privacyMutationCapability?: {
         enabled: boolean;
         /** Trusted server configuration, shared with the worker's active policy.
@@ -365,6 +369,22 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}::uuid::text, 0))`,
         );
+        let receiptDisclosureFailure: unknown;
+        if (this.options.beforePrivacyReceiptDisclosure) {
+          await tx.execute(sql`savepoint receipt_disclosure_guard`);
+          try {
+            receiptDisclosureFailure =
+              await this.options.beforePrivacyReceiptDisclosure(
+                tx,
+                command.targetUserId,
+              );
+            await tx.execute(sql`release savepoint receipt_disclosure_guard`);
+          } catch (error) {
+            // A database/capture failure cannot preserve a durable retry ticket.
+            // Roll back the whole mutation; gateway outages are returned values.
+            throw error;
+          }
+        }
         if (command.purpose === "client_messaging") {
           await stopBookingNotificationRecipients(tx, command.targetUserId);
           await tx.execute(
@@ -526,19 +546,31 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           payload: { purpose: command.purpose, consentDecisionId: consent.id },
         });
         return {
-          consentDecisionId: consent.id,
-          optionalFieldsRemoved: profile.rows.reduce(
-            (count, row) =>
-              count +
-              [row.displayName, row.timezone, row.expertNote].filter(
-                (value) => value !== null,
-              ).length,
-            0,
-          ),
-          followUpsCancelled: cancelled.rows.length,
+          receiptDisclosureFailure,
+          receipt: {
+            consentDecisionId: consent.id,
+            optionalFieldsRemoved: profile.rows.reduce(
+              (count, row) =>
+                count +
+                [row.displayName, row.timezone, row.expertNote].filter(
+                  (value) => value !== null,
+                ).length,
+              0,
+            ),
+            followUpsCancelled: cancelled.rows.length,
+          },
         };
       }),
-    );
+    ).then(({ receipt, receiptDisclosureFailure }) => {
+      if (receiptDisclosureFailure !== undefined)
+        throw Object.assign(
+          new Error("receipt_disclosure_cancellation_uncertain", {
+            cause: receiptDisclosureFailure,
+          }),
+          { mutationResult: receipt },
+        );
+      return receipt;
+    });
   }
 
   /**
@@ -850,6 +882,22 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         ).rows[0];
         if (subject === undefined)
           throw new Error("Privacy subject is unavailable");
+        let receiptDisclosureFailure: unknown;
+        if (this.options.beforePrivacyReceiptDisclosure) {
+          await tx.execute(sql`savepoint receipt_disclosure_guard`);
+          try {
+            receiptDisclosureFailure =
+              await this.options.beforePrivacyReceiptDisclosure(
+                tx,
+                command.targetUserId,
+              );
+            await tx.execute(sql`release savepoint receipt_disclosure_guard`);
+          } catch (error) {
+            // A database/capture failure cannot preserve a durable retry ticket.
+            // Roll back the whole mutation; gateway outages are returned values.
+            throw error;
+          }
+        }
         if (command.requestId !== undefined) {
           if (command.idempotencyKey !== `erasure-request:${command.requestId}`)
             throw new Error("Erasure request binding is invalid");
@@ -877,7 +925,14 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       `)
         ).rows[0];
         if (existing !== undefined)
-          return this.erasureReceipt(tx, existing.jobId, existing.status);
+          return {
+            receipt: await this.erasureReceipt(
+              tx,
+              existing.jobId,
+              existing.status,
+            ),
+            receiptDisclosureFailure,
+          };
 
         if (
           manifests.length !== PROCESSORS.length ||
@@ -1143,9 +1198,18 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           await tx.execute(sql`update client_erasure_requests set job_id=${job.id}::uuid
             where id=${command.requestId}::uuid and user_id=${command.targetUserId}::uuid`);
         }
-        return receipt;
+        return { receipt, receiptDisclosureFailure };
       }),
-    );
+    ).then(({ receipt, receiptDisclosureFailure }) => {
+      if (receiptDisclosureFailure !== undefined)
+        throw Object.assign(
+          new Error("receipt_disclosure_cancellation_uncertain", {
+            cause: receiptDisclosureFailure,
+          }),
+          { mutationResult: receipt },
+        );
+      return receipt;
+    });
   }
 
   private async erasureReceipt(

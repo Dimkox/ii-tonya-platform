@@ -362,6 +362,15 @@ const defaultDependencies: TestPostgresDependencies = {
   createDb: (pool) => drizzle(pool as Pool, { schema }) as DrizzleDb,
 };
 
+/** Role-changing tests must never share a PostgreSQL cluster with other work. */
+export async function startDisposableTestPostgres(): Promise<TestDatabase> {
+  return startTestPostgres({
+    ...defaultDependencies,
+    startContainer: async () =>
+      new PostgreSqlContainer("postgres:17.5-bookworm").start(),
+  });
+}
+
 async function stopResources(
   pool: TestPoolHandle,
   container: TestContainerHandle,

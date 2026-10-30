@@ -17,7 +17,7 @@ const config: YooKassaClientConfig = {
   shopId: "test-shop",
   secretKey: "synthetic-unused-key",
 };
-const command: CreateYooKassaPayment = {
+const command = {
   amountMinor: 50_000n,
   idempotencyKey: "d5cab70e-c30f-4baf-9da0-e8f633c475f8",
   description: "Synthetic checkout",
@@ -32,7 +32,7 @@ const command: CreateYooKassaPayment = {
       paymentMode: "full_payment",
     },
   },
-};
+} satisfies CreateYooKassaPayment;
 const payment = {
   id: "synthetic-payment",
   status: "pending",

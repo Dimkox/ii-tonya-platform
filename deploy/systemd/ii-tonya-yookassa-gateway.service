@@ -1,0 +1,34 @@
+[Unit]
+Description=ii-Tonya YooKassa gateway
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+TimeoutStartSec=30s
+User=ii_tonya_gateway
+Group=ii_tonya_gateway
+WorkingDirectory=/opt/ii-tonya-platform/current/gateway
+ExecStart=/usr/bin/python3 -B /opt/ii-tonya-platform/current/gateway/launcher.py --config /etc/ii-tonya-yookassa/config.json
+Environment=PYTHONNOUSERSITE=1
+UnsetEnvironment=PYTHONPATH PYTHONHOME
+Restart=no
+TimeoutStopSec=15s
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+UMask=0077
+ReadWritePaths=/var/lib/ii-tonya-yookassa
+
+# Intentionally no [Install]: activation requires separately reviewed deployment.

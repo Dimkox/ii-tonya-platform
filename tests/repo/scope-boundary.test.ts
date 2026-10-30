@@ -486,8 +486,14 @@ describe("MVP scope boundary", () => {
     ).not.toEqual([]);
   });
 
-  it("rejects GitHub Actions as unapproved executable automation", () => {
-    const path = ".github/workflows/db-gate.yml";
+  it("pins reviewed GitHub Actions and rejects changed executable automation", () => {
+    const path = ".github/workflows/getzilla-verify.yml";
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path,
+        content: readFileSync(path, "utf8"),
+      }),
+    ).toEqual([]);
     const content = "jobs: {}\n";
     expect(classifyApprovedTrackedScopeContent({ path, content })).not.toEqual(
       [],

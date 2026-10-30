@@ -69,6 +69,13 @@ function drill(fault = "", action = "deploy", first = false) {
       join(dir, "SOURCE_SHA"),
       dir === payload ? candidateSha : oldSha,
     );
+    writeFileSync(
+      join(dir, "provenance.json"),
+      JSON.stringify({
+        format: "ii-tonya-native-v1",
+        source_sha: dir === payload ? candidateSha : oldSha,
+      }),
+    );
     for (const unit of ["api", "worker", "migrate"])
       writeFileSync(
         join(dir, "systemd", `ii-tonya-${unit}.service`),
@@ -203,6 +210,7 @@ exec /usr/bin/mv "$@"`,
     `printf 'systemctl %s\\n' "$*" >> "$ROOT/events"
 command="$1"; shift
 args="$*"
+if [[ "$command" == show && "$args" == *ii-tonya-yookassa-gateway.service* && "$args" == *LoadState* ]]; then echo not-found; exit 0; fi
 unit="api"
 [[ "$args" != *worker* ]] || unit="worker"
 [[ "$args" != *migrate* ]] || unit="migrate"

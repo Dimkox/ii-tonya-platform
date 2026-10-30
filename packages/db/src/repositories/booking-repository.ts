@@ -124,6 +124,8 @@ export interface BookingExpertScheduleRecord {
 }
 
 export interface BookingRepositoryOptions {
+  /** Enables reads through the verified wave publication authority. */
+  waveCoverage?: boolean;
   notificationOrigin?: BookingNotificationOrigin;
   maxSerializationAttempts?: number;
   retryDelayMs?: (attempt: number) => number;
@@ -556,7 +558,7 @@ export class PostgresBookingRepository {
       join experts e on e.id = es.expert_id
       where e.active
         and e.verified
-        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})
         and es.active
         and es.code is not null
         and es.language is not null
@@ -1286,7 +1288,7 @@ export class PostgresBookingRepository {
           join experts e on e.id=es.expert_id and e.active=true and e.verified=true
           where c.choice_digest=${command.choiceDigest}
             and cr.user_id=${command.userId}::uuid and cr.state='ready'
-            and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+            and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})
             and s.provider<>'resident_native'
             and c.expires_at>${now} and cr.expires_at>${now}
             and s.starts_at>${new Date(now.getTime() + MINIMUM_LEAD_MS)}
@@ -1318,6 +1320,7 @@ export class PostgresBookingRepository {
         userId: command.userId,
         excludedReservationId: owned.reservationId,
         choiceDigest: command.choiceDigest,
+        waveCoverage: this.options.waveCoverage === true,
       });
       if (!admitted || admitted === "full") return { kind: "conflict" };
       now = admitted.now;
@@ -1494,7 +1497,7 @@ export class PostgresBookingRepository {
         (s.provider='resident_native') as native,
         exists(select 1 from resident_schedule_busy busy where busy.expert_id=e.id and busy.starts_at<s.ends_at and busy.ends_at>s.starts_at) as "scheduleBusy",
         s.capacity,
-        (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})) as "expertActive",
+        (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})) as "expertActive",
         e.verified as "expertVerified",
         es.active as "serviceActive"
       from slots s
@@ -1761,7 +1764,7 @@ export class PostgresBookingRepository {
         (s.provider='resident_native') as native,
         exists(select 1 from resident_schedule_busy busy where busy.expert_id=e.id and busy.starts_at<s.ends_at and busy.ends_at>s.starts_at) as "scheduleBusy",
         s.capacity,
-        (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})) as "expertActive",
+        (e.active and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})) as "expertActive",
         e.verified as "expertVerified",
         es.active as "serviceActive"
       from reservations r
@@ -1824,7 +1827,7 @@ export class PostgresBookingRepository {
             and resident_slot_fresh(s.id,${command.now})
             and e.active = true
             and e.verified = true
-            and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+            and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})
             and es.active = true
           returning r.id as "reservationId", r.status, r.version
         `)

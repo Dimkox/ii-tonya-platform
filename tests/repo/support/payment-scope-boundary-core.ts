@@ -15,6 +15,31 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
 ]);
 
 export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
+  // Early Bird candidate inventory: explicit paths, independently reviewed before release.
+  "packages/integrations/src/yookassa/early-bird-candidate-verifier.ts",
+  "packages/integrations/src/yookassa/early-bird-deferred-checkout-sender.ts",
+  "packages/integrations/src/yookassa/early-bird-deferred-refund-verifier.ts",
+  "packages/integrations/src/yookassa/early-bird-deferred-request.ts",
+  "packages/integrations/src/yookassa/early-bird-deferred-verifier.ts",
+  "packages/integrations/src/yookassa/early-bird-invoice-orchestrator.ts",
+  "packages/integrations/src/yookassa/early-bird-list-recovery.ts",
+  "packages/integrations/src/yookassa/early-bird-owner-checkout-sender.ts",
+  "packages/integrations/src/yookassa/early-bird-owner-prepare-authority.ts",
+  "packages/integrations/src/yookassa/early-bird-refund-discovery.ts",
+  "packages/integrations/src/yookassa/early-bird-refund-verifier.ts",
+  "packages/integrations/src/yookassa/early-bird-request.ts",
+  "packages/integrations/src/yookassa/early-bird-sealed-request.ts",
+  "packages/integrations/src/yookassa/early-bird-snapshot-sealer.ts",
+  "packages/integrations/src/yookassa/early-bird-standard-checkout-sender.ts",
+  "packages/integrations/src/yookassa/early-bird-standard-prepare-authority.ts",
+  "packages/integrations/src/yookassa/early-bird-standard-sealed-request.ts",
+  "packages/integrations/src/yookassa/early-bird-standard-snapshot-sealer.ts",
+  "packages/integrations/src/yookassa/early-bird-verifier.ts",
+  "packages/integrations/src/yookassa/early-bird-webhook-capability.ts",
+  "packages/integrations/src/yookassa/experimental-gateway-ipc.ts",
+  "packages/integrations/src/yookassa/strict-disclosure-adapter.ts",
+  "packages/integrations/src/yookassa/strict-disclosure-gate.ts",
+
   "packages/integrations/src/yookassa/held-onboarding.ts",
   // BlockB purpose-bound onboarding verifier; no residency mint authority.
   "packages/integrations/src/yookassa/onboarding-verifier.ts",
@@ -97,6 +122,40 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0083_early_bird_launch_publication.sql",
+  "packages/db/migrations/meta/0083_snapshot.json",
+  "packages/db/migrations/state/0083_manifest.json",
+  "packages/db/migrations/state/0083_sql_objects.json",
+
+  "packages/db/migrations/0076_owner_test_pricing.sql",
+  "packages/db/migrations/meta/0076_snapshot.json",
+  "packages/db/migrations/state/0076_manifest.json",
+  "packages/db/migrations/state/0076_sql_objects.json",
+  "packages/db/migrations/0077_early_bird_choices.sql",
+  "packages/db/migrations/meta/0077_snapshot.json",
+  "packages/db/migrations/state/0077_manifest.json",
+  "packages/db/migrations/state/0077_sql_objects.json",
+  "packages/db/migrations/0078_early_bird_launch_config.sql",
+  "packages/db/migrations/meta/0078_snapshot.json",
+  "packages/db/migrations/state/0078_manifest.json",
+  "packages/db/migrations/state/0078_sql_objects.json",
+  "packages/db/migrations/0079_early_bird_positive_price_snapshot.sql",
+  "packages/db/migrations/meta/0079_snapshot.json",
+  "packages/db/migrations/state/0079_manifest.json",
+  "packages/db/migrations/state/0079_sql_objects.json",
+  "packages/db/migrations/0080_early_bird_form_bridge.sql",
+  "packages/db/migrations/meta/0080_snapshot.json",
+  "packages/db/migrations/state/0080_manifest.json",
+  "packages/db/migrations/state/0080_sql_objects.json",
+  "packages/db/migrations/0081_early_bird_payment_runtime.sql",
+  "packages/db/migrations/meta/0081_snapshot.json",
+  "packages/db/migrations/state/0081_manifest.json",
+  "packages/db/migrations/state/0081_sql_objects.json",
+  "packages/db/migrations/0082_early_bird_worker_capabilities.sql",
+  "packages/db/migrations/meta/0082_snapshot.json",
+  "packages/db/migrations/state/0082_manifest.json",
+  "packages/db/migrations/state/0082_sql_objects.json",
+
   "packages/db/migrations/0075_resident_lifecycle_completion.sql",
   "packages/db/migrations/0074_resident_native_scheduling.sql",
   "packages/db/migrations/0070_planerka_availability.sql",
@@ -148,6 +207,56 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
+  "early_bird_launch_kit_jobs",
+  // Exact relations introduced by canonical early-bird migrations.
+  "early_bird_admission_candidates",
+  "early_bird_admissions",
+  "early_bird_candidate_observations",
+  "early_bird_choices",
+  "early_bird_composite_intents",
+  "early_bird_composite_requests",
+  "early_bird_coverage_epochs",
+  "early_bird_coverage_reconciliation",
+  "early_bird_coverage_revisions",
+  "early_bird_deferred_accounts",
+  "early_bird_deferred_effective_coverages",
+  "early_bird_deferred_invoices",
+  "early_bird_deferred_onboarded",
+  "early_bird_deferred_receipt_contacts",
+  "early_bird_deferred_receipt_tombstones",
+  "early_bird_deferred_refund_facts",
+  "early_bird_deferred_refund_reconciliation",
+  "early_bird_deferred_refund_resolutions",
+  "early_bird_deferred_requests",
+  "early_bird_deferred_verified_bindings",
+  "early_bird_deferred_verified_refund_bindings",
+  "early_bird_effective_coverages",
+  "early_bird_final_call_engagements",
+  "early_bird_final_call_policy",
+  "early_bird_final_call_queue",
+  "early_bird_form_bridges",
+  "early_bird_form_enrollments",
+  "early_bird_gateway_claims",
+  "early_bird_gateway_contact_state",
+  "early_bird_intent_tombstones",
+  "early_bird_launch_configs",
+  "early_bird_message_dispatch_claims",
+  "early_bird_message_dispatch_consumptions",
+  "early_bird_message_replacements",
+  "early_bird_payment_full_refunds",
+  "early_bird_payment_successes",
+  "early_bird_positive_price_snapshots",
+  "early_bird_receipt_contacts",
+  "early_bird_refund_binding_registry",
+  "early_bird_refund_reconciliation",
+  "early_bird_refund_registry",
+  "early_bird_unknown_recovery",
+  "early_bird_verified_bindings",
+  "early_bird_verified_refund_bindings",
+  "early_bird_wave_one_exclusions",
+  "owner_test_pricing_grants",
+  "receipt_revocation_outbox",
+
   "resident_lifecycle_subjects",
   "resident_lifecycle_cases",
   "resident_work_notices",
@@ -451,7 +560,7 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "adacae9eb0c2ada1e1bdc9a3abf8e142f73af0b2edf4c89a819748b94c70b119",
+    "02640802bf781e8ec5605967a8d923556602ecd8a707c570b7ae8d077a2b9657",
   ],
   [
     "packages/contracts/src/index.ts",
@@ -459,7 +568,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/db/src/schema/index.ts",
-    "5e32828912caf3a71658e0163fa2849daa049d234347401e3b2e41a50979f319",
+    "3ec7000804c76bd46cb148e459dc624acedec53372d0c5c4d4515fc09c46d08c",
   ],
   [
     "apps/api/src/routes/public-client-catalog.ts",
@@ -505,7 +614,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "f7bab87698f4c2e40567eb7c384e74ca160cff281ce66ab13b0174715d2ffc27",
+    "e8ab1ac6f434f3e7ea7f56c469ab18d780709468b238c9f8f9a21aee0c073d3f",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -517,11 +626,11 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/client.ts",
-    "d2f344d4f4598a09babd95453a303a044de1db492a533632a1b95726b99fb8f8",
+    "720a073ab5a70c1db77ec30b8dab256112dd4ce78662047584b66b078e6a6d4d",
   ],
   [
     "packages/integrations/src/yookassa/contracts.ts",
-    "2f2dec6322fb43c669bcc2dcc1b2ba3a85ec39b740120034182b3d1a846556e0",
+    "d3fffa812ea229b60911002a86ccfa0da7bc0a9acac224e9a8c2066f47250a0c",
   ],
   [
     "packages/integrations/src/yookassa/exact-body-recovery.ts",
@@ -636,6 +745,146 @@ const reviewedDomHarnessHashes = new Map([
 ]);
 
 const approvedAutomationArtifactHashes = new Map([
+  [
+    "scripts/build-early-bird-bridge-release.mjs",
+    "369639fb8b2e51011317e1bfd2fbb7f9338352c3d0c0dd27c7c9a58d36ddf58f",
+  ],
+  [
+    "scripts/early-bird-bridge/bridge.test.mjs",
+    "f4caa6c174140c6dce026e93bb50a0915f5362613a58cdd071a0eec70b46a9ad",
+  ],
+  [
+    "scripts/early-bird-bridge/journal-validation.mjs",
+    "e4fed9e9c0b5b1a1d532c6edcca91059024f3ea7be32f4bf462ebba3cefb4174",
+  ],
+  [
+    "scripts/early-bird-bridge/runtime.mjs",
+    "7c8cc2ade3cd2dc74e9b562509740ee8eed695c454715ae9b3729c9e4e20bbae",
+  ],
+
+  // Early Bird transport and isolation experiment inventory.
+  [
+    "scripts/experimental/yookassa_gateway/bound_gateway.py",
+    "d1f35a296200e9d783ac7ee9a9d095fffd001171ff3f21b1b3aea4d8ce8f5c60",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/docker_isolation_probe.py",
+    "78e6f52a58ae4452b8748b044c7bc2ee4825a8f2d8452296b51bc92539eaddcf",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/durable_state.py",
+    "6c0270fa903641329b3acdbdc9c2b0cfd807231e3362b1c6298777e40c926ccb",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/egress_fence.py",
+    "049dbef4ff8c9042ce0339d69ecd1a61ba58d4c1e96ad91793efe1dccc0de740",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/gateway.py",
+    "681b5f87c26dd1fe743d770e16e4aca7ad81ec8b9ddac213610e8c917e75444e",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/ipc.py",
+    "c5134524b705c30b553f1dc00740ba10f72b543a4aa70a8bd691de2cce4a956a",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/launcher.py",
+    "a4e8babb9ae3410b7902ec1139e8c27db26bdb69a77522c2dba45dea6478c8ba",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/nonce_registry.py",
+    "39b72fff3c29a1f335514ff97e5859888007c97a4d7bb2a475398d9257ca6677",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/pg_authority.py",
+    "13c59096046810b5c6ec791551080653676fb9da27d22df2f40fa18f30b2c80e",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/provider_reader.py",
+    "32bbaecc903b2567a95f60696cbc7b01f9b174ed83f2aba121d7e7bae5451a1e",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/revocation.py",
+    "8bd55b9104042f225ae03e9ceaa41913f1ebe68a9757b4a09bca21fe27309b2f",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/subject_tokens.py",
+    "419d3f63c17207a452f40518e56128d239a026b6ecb37c6817534c4a1656e1f9",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_bound_gateway.py",
+    "d3bc654da706e2a7b99d31f8f23d8962879bbf399b5ec6a019ae11bd7bc10fe2",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_durable_state.py",
+    "b1226370f024fdfb7db6f0a459684a873c67bbf27caa1451239971f0c55c9349",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_egress_fence.py",
+    "2fe9fe5b908c106d3373074326b77f7e1837e6aa69151916e42ee6d24e77d687",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_gateway.py",
+    "50f8e6887d71b59c5ee0e592b18c98991e8aaa3fd42d1a401c200f8cff0dfa36",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_ipc.py",
+    "746d768b4c231ea45a5900919abab36bbc35ddf53686939c3a71ee2a8716dc55",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_launcher.py",
+    "c900ebc347aedbf89ea4c3a68f6b0504e668e395eca6bf30dd1f5a6655c3f8fe",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_nonce_registry.py",
+    "f4dd922150857f950fad1aaa38e67a31ace75cb0e13c7948cc83f5766c8ffafe",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_pg_authority_integration.py",
+    "a020af0837d3823ae560e056d8e21f9fe3ce316a5911de355119d7259d75cac1",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_provider_reader.py",
+    "ae86950cf7fab40717f3e869916d0fb38085bee8d3495569dad5f33ae94c7a5f",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_provision_assets.py",
+    "8204574d36cff5b0752945e3bb830d8bae8345fc52f72fdcb47f1fd540ddc5ca",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_revocation.py",
+    "9f675559efca4d8f751d6b80c26732a9beee0a2f410457f5d82900a3e48ca092",
+  ],
+  [
+    "scripts/experimental/yookassa_gateway/test_subject_tokens.py",
+    "53c6a89c237f77ccdedac4fa950740838f0b88b9acd99decf5c3265c9c973b98",
+  ],
+
+  // Read-only GitHub Actions gates explicitly authorized for this public repository.
+  [
+    ".github/workflows/getzilla-verify.yml",
+    "5fce1cae157cb77b27ed9529a0fa35fe2dbe6ba9c6f70b60a31f481c2c77cd5d",
+  ],
+  [
+    "scripts/assert-ci-db-results.mjs",
+    "8601073b27526749c862183739357c5c2b178c07e84bca7ba9ff424be99fe893",
+  ],
+  [
+    "scripts/getzilla_ci_timeout.py",
+    "5ab585ae193f5ee1ae71ea3dc7efeb553564384f109eb108f6031dd05c403053",
+  ],
+  [
+    "scripts/getzilla_verify_ci.py",
+    "848bc326741e29fac53fc9e47b54d777d03329be72e76326b1f9d963e31b5786",
+  ],
+  [
+    "scripts/getzilla_ci.py",
+    "2c80527a78c5efc3e67f7f028116e8481d8c1b942f44f32270a2b4078e620194",
+  ],
+  [
+    "scripts/getzilla_startup_cpu.py",
+    "fada6c2b77d7f759a8a411cf49594b384b1e94be024d149e0d0d8f14bc07afbd",
+  ],
   // Exact reviewed local semantic helper; docs/spec/resident-semantic-tags-guard-registration.md.
   [
     "compose.semantic-tags.yaml",
@@ -729,7 +978,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-native-release.sh",
-    "f8157d9d0c23de1cf813f32664e702f25c06ec4f6cad0b2404808307b2cfd0b5",
+    "bae33e338e21801ee2e5fbf3abd68b0e1bec91839a90766ac6d814e4f4d83b50",
   ],
   [
     // 87f6270 switched the release signature check to `cosign verify-blob --bundle` (the
@@ -737,7 +986,7 @@ const approvedAutomationArtifactHashes = new Map([
     // to the readiness probe, so a cold API start no longer aborts a good deployment.
     // Registering the new normalized-content hash instead of relaxing the rule.
     "scripts/deploy-native-remote.sh",
-    "0a487419596c82cec0f386a85fff90fc6cc2ae228a97b09176a64b736bfb56eb",
+    "24afb2b40e1d3970a865468888950c89ecb984c465eeefe9d46bd280936766ec",
   ],
   [
     "scripts/provision-claw-syft.sh",
@@ -788,13 +1037,10 @@ const approvedAutomationArtifactHashes = new Map([
     "scripts/validate-runtime-env.sh",
     "54bd8f94a80fd551d424266b9b64c4195f1e390bd36e31477c24c1387c10ae25",
   ],
-  // Pre-push gate: this repository has no hosted CI by its own policy
-  // (workflow-semantics requires .github/workflows to be empty) and branch protection is
-  // unavailable on the current plan, so these scripts are the only automatic check between a
-  // commit and a push.
+  // Local pre-push gate remains an additional check before the hosted gates run.
   [
     "scripts/pre-push-gate.sh",
-    "435e4e1c4242f66acf18b22a5465f2e1413406cf1968530445781522ffb29ca6",
+    "23232e1879b62690c75924542baac7fab0b8e5ebae3f7d7c8e75f1f3bb350249",
   ],
   [
     "scripts/install-git-hooks.sh",
@@ -994,6 +1240,137 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.3.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0083_early_bird_launch_publication.sql",
+    "69427ca04b5b16004764d8cc6c20c061e1fad85b89eed60352f56529048918f7",
+  ],
+  [
+    "packages/db/migrations/meta/0083_snapshot.json",
+    "41024b5f86a6459c0cca696fea67ffd230968b23e636e404b2d110d31f34b72b",
+  ],
+  [
+    "packages/db/migrations/state/0083_manifest.json",
+    "9fb5d29a40def4eff9985e23e560f731bce8b2cfc67882eb1d4a4c25915ecfb3",
+  ],
+  [
+    "packages/db/migrations/state/0083_sql_objects.json",
+    "d1590c8692c70f01ec5b63bc7755b64a71ed2ee70005e4c4efc0b8cf1c1ccde9",
+  ],
+
+  // Candidate exact hashes, subject to independent migration-state review.
+  [
+    "packages/db/migrations/0076_owner_test_pricing.sql",
+    "7334ee4171e929cc3c28210a96095c852a98344905491cbb2c517a50a24bdbf7",
+  ],
+  [
+    "packages/db/migrations/meta/0076_snapshot.json",
+    "06b7cebbecd73dc7ae9d668d7b92226e22ca6336576b6c772aa3b9307c0e096b",
+  ],
+  [
+    "packages/db/migrations/state/0076_manifest.json",
+    "ca00fe53cc4994f18d82caba2613d04faac551c25ce1bdaf1f96771c0fddd7a5",
+  ],
+  [
+    "packages/db/migrations/state/0076_sql_objects.json",
+    "88ecf68b10ec3b4ba183031cfea428915b94544b3996467877badec7134357a1",
+  ],
+  [
+    "packages/db/migrations/0077_early_bird_choices.sql",
+    "ec9ac668fd36bc3aa935aca74e12b3c519054f71723aa1b271cc0e257d83bbee",
+  ],
+  [
+    "packages/db/migrations/meta/0077_snapshot.json",
+    "068c685c0a6681a91499f95cc31e33241f60fb1136282c3cf116ef2d83a7656f",
+  ],
+  [
+    "packages/db/migrations/state/0077_manifest.json",
+    "04008b06cd1418cfc797d4ccc3c3c13376fe4d539d4dc94b73df0dcff84a9631",
+  ],
+  [
+    "packages/db/migrations/state/0077_sql_objects.json",
+    "39b9a0e0fedf370e5367e243e6d67d130697cc3608f2ae28ba8f77b04255e7ce",
+  ],
+  [
+    "packages/db/migrations/0078_early_bird_launch_config.sql",
+    "dc23901982dfdf558c514177f183547ef69926106a55ddcedcceefec11daabb6",
+  ],
+  [
+    "packages/db/migrations/meta/0078_snapshot.json",
+    "7b84549711ea7c3633626a8b64689e77afa5afaadb1241e3638934b8ef3bd1c0",
+  ],
+  [
+    "packages/db/migrations/state/0078_manifest.json",
+    "e18bb030d960c7c84205385985eb2ae26037c6e7767a07300fa14afdbfe12e25",
+  ],
+  [
+    "packages/db/migrations/state/0078_sql_objects.json",
+    "da89ab544697c632a897914ec3a6adbaf1126cd21633d7578399a43bebe0fea5",
+  ],
+  [
+    "packages/db/migrations/0079_early_bird_positive_price_snapshot.sql",
+    "e40c283e457187dfa4a66c0f5fc760df4d4ba3bdf97a6b2894f0ef35f82512ba",
+  ],
+  [
+    "packages/db/migrations/meta/0079_snapshot.json",
+    "e28ba9fb19654894d4e32b4d14b27142eae02a6045101b24c29b312d5369527a",
+  ],
+  [
+    "packages/db/migrations/state/0079_manifest.json",
+    "477569ccc8c8fdecabedd5c43a733185f0a95b62cb9ed8a34eb62d98bffa23e9",
+  ],
+  [
+    "packages/db/migrations/state/0079_sql_objects.json",
+    "3f23edde15295ff8218d96b170c846a119b0328ad2738178d334ac44d23dce5a",
+  ],
+  [
+    "packages/db/migrations/0080_early_bird_form_bridge.sql",
+    "357109a656d32d58e3cc1dbe45c202967a71c1c35bdba5a65962ccc20509f81b",
+  ],
+  [
+    "packages/db/migrations/meta/0080_snapshot.json",
+    "f4028553051076f6fef7403581081e10c851988f402bc339158d3f7f11f57933",
+  ],
+  [
+    "packages/db/migrations/state/0080_manifest.json",
+    "43a70a062bd4401f925e6dcf8ec1d10d329f7631ce96a4c78338bef2d7958fa3",
+  ],
+  [
+    "packages/db/migrations/state/0080_sql_objects.json",
+    "46b59c594e2bb9248d6fc7afada3dcbd1d979c4da191af44a57517233769cef8",
+  ],
+  [
+    "packages/db/migrations/0081_early_bird_payment_runtime.sql",
+    "4896c3e2482efc27db1578bbb8ede5098796c404faa75cb5d20ff268657a4353",
+  ],
+  [
+    "packages/db/migrations/meta/0081_snapshot.json",
+    "75f56f98afd07cee87bd45589fb9204587135c0414c231ca2cbaf0c212af7913",
+  ],
+  [
+    "packages/db/migrations/state/0081_manifest.json",
+    "8925caf78fb4fe968a04de3a1dc67aed23353c5ab698386b4264680a1d441de6",
+  ],
+  [
+    "packages/db/migrations/state/0081_sql_objects.json",
+    "526bd86b2aaa402209d4cc9e79ee7ef2964243ee3a2d7d728fdb9a6cc1a1b8aa",
+  ],
+  [
+    "packages/db/migrations/0082_early_bird_worker_capabilities.sql",
+    "9e992d43465b475cd1d2210f0bb3134632504c30bb17402e1dd7dd4e91a9c80d",
+  ],
+  [
+    "packages/db/migrations/meta/0082_snapshot.json",
+    "b39e3227ff5c1d8873892668a19721e63455bf20e94aa7a701a4ad15715834b4",
+  ],
+  [
+    "packages/db/migrations/state/0082_manifest.json",
+    "30158652f23ef434105026a6e541c9d3e8d06639c1dc7948c9ee8eb383221ef4",
+  ],
+  [
+    "packages/db/migrations/state/0082_sql_objects.json",
+    "0206f2249f0eb992dcecdf51cf332479d742b64a05ff2b7046c831df2a4a143f",
+  ],
+
   [
     "packages/db/migrations/0075_resident_lifecycle_completion.sql",
     "3fe2e53365eedb359d2912fe1b26962aeea520008a29d4e810456b67c3ddbda8",
@@ -1811,7 +2188,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "cd945edf6146c9c82545521800c0756947708b1ae4030bb14dda028cff067e21",
+    "b09dbb2decac2323923e8a4bb929c01811c7ea04e440749602d3f7dd9e91b80b",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -1891,7 +2268,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "cd945edf6146c9c82545521800c0756947708b1ae4030bb14dda028cff067e21",
+    "b09dbb2decac2323923e8a4bb929c01811c7ea04e440749602d3f7dd9e91b80b",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -3019,11 +3396,21 @@ export function isApprovedLargeScopeArtifact(
   bytes: number,
   read: () => string,
 ): boolean {
-  if (
-    path !== "packages/db/migrations/state/0075_sql_objects.json" ||
-    bytes !== 1064832
-  )
-    return false;
+  const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/state/0083_sql_objects.json", 1416389],
+    ["packages/db/migrations/meta/0083_snapshot.json", 1166391],
+    ["packages/db/migrations/state/0075_sql_objects.json", 1064832],
+    ["packages/db/migrations/state/0076_sql_objects.json", 1075861],
+    ["packages/db/migrations/state/0077_sql_objects.json", 1083552],
+    ["packages/db/migrations/state/0078_sql_objects.json", 1087803],
+    ["packages/db/migrations/state/0079_sql_objects.json", 1096357],
+    ["packages/db/migrations/state/0080_sql_objects.json", 1108149],
+    ["packages/db/migrations/meta/0081_snapshot.json", 1161986],
+    ["packages/db/migrations/state/0081_sql_objects.json", 1380625],
+    ["packages/db/migrations/meta/0082_snapshot.json", 1161986],
+    ["packages/db/migrations/state/0082_sql_objects.json", 1398938],
+  ]);
+  if (approvedSizes.get(path) !== bytes) return false;
   const content = read();
   return (
     Buffer.byteLength(content, "utf8") === bytes &&

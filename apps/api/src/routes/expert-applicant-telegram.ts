@@ -6,6 +6,9 @@ import type { ExpertApplicantService } from "@ii-tonya/application";
 export interface ExpertApplicantTelegramCapability {
   verificationFormEnabled?: boolean;
   separatedSalesEnabled?: boolean;
+  earlyBirdEnabled?: boolean;
+  /** Opaque authority identity; validated by the composition, never by bot input. */
+  earlyBirdAuthority?: unknown;
   botId: string;
   botKey: string;
   webhookSecret: string;
@@ -25,6 +28,7 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
   const c = deps.capability;
   if (
     !c ||
+    (c.earlyBirdEnabled === true && c.separatedSalesEnabled !== true) ||
     !/^[1-9]\d{0,15}$/u.test(c.botId) ||
     !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(c.botKey) ||
     c.webhookSecret.length < 16
@@ -90,12 +94,13 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
             callback.data.startsWith("rv:") ||
             (c.separatedSalesEnabled === true &&
               callback.data === "st:current") ||
-            (c.separatedSalesEnabled && /^(ss|sb):/u.test(callback.data))
+            (c.separatedSalesEnabled && /^(ss|sb):/u.test(callback.data)) ||
+            (c.earlyBirdEnabled === true && /^(?:eb|ep):/u.test(callback.data))
           )
         )
           return reply.code(400).send({ error: "invalid_update" });
         callbackData = callback.data;
-        if (!c.verificationFormEnabled)
+        if (!c.verificationFormEnabled && callback.data.startsWith("rv:"))
           correction =
             "Форма временно недоступна. Сохранённые ответы не изменены; старую кнопку применять не нужно.";
       } else {
@@ -210,6 +215,14 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           reply_markup: { remove_keyboard: true },
         };
       try {
+        const rawName =
+          typeof from?.first_name === "string" ? from.first_name.trim() : "";
+        const firstName =
+          rawName.length > 0 &&
+          rawName.length <= 64 &&
+          !/[\p{Cc}\p{Cf}]/u.test(rawName)
+            ? rawName
+            : undefined;
         const result = await c.service.handle({
           botId: c.botId,
           botKey: c.botKey,
@@ -218,6 +231,7 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           updateId: body.update_id as number,
           text,
           ...(callbackData === undefined ? {} : { callbackData }),
+          ...(firstName === undefined ? {} : { firstName }),
           ...(media === undefined ? {} : { media }),
         });
         if (result.status === "duplicate")

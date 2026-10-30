@@ -1,0 +1,37 @@
+{
+  "status": "canonical_sql_and_actual_database_state_reconstructed_independently_verified_not_release_approval",
+  "tag": "0083_early_bird_launch_publication",
+  "canonical_sha256": "69427ca04b5b16004764d8cc6c20c061e1fad85b89eed60352f56529048918f7",
+  "independent_review": "publication94d09a and launchkit5656d4 accepted with stated limitations; real PG source proofs by owners",
+  "segments": [
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_publication_worker.sql",
+      "source_sha256": "94d09a64535a147f16f3bf1833f7d00b3b6642de2b9bccefe5566d47928c1187",
+      "selection": "complete",
+      "selected_bytes": 3628,
+      "selected_sha256": "94d09a64535a147f16f3bf1833f7d00b3b6642de2b9bccefe5566d47928c1187"
+    },
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_launch_kit.sql",
+      "source_sha256": "5656d4bd00c54e59e7ed21d9f5fa848461e46feb7a659c3228af66640d942d8d",
+      "selection": "ledger_and_dispatch_schema_prefix",
+      "selected_bytes": 9895,
+      "selected_sha256": "381cb3b7c22b0fa8fa2c2c7c315ca088387cc225be4ecb9a9ab5e0daf56e0d33"
+    },
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_launch_kit.sql",
+      "source_sha256": "5656d4bd00c54e59e7ed21d9f5fa848461e46feb7a659c3228af66640d942d8d",
+      "selection": "privacy_erasure_suffix",
+      "selected_bytes": 487,
+      "selected_sha256": "755d07b1b6531a0c1ac3b439f5707f38c151d24f6a8c93ed492a1626c86d8821"
+    }
+  ],
+  "role_creation_or_grants_included": false,
+  "state_witness": {
+    "path": "tests/integration/early-bird-launch-migration-state.test.ts",
+    "invocation": 1,
+    "result": "1/1 passed",
+    "isolated_capabilities": 28,
+    "postgresql_version": "17.5"
+  }
+}

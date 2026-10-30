@@ -1,3 +1,13 @@
+import { createFinalCallScheduler } from "./early-bird-final-call-scheduler.js";
+import { createGatewayWorkerBootstrap } from "./gateway-worker-bootstrap.js";
+import { PostgresWorkerReceiptRetention } from "@ii-tonya/db";
+import { PostgresReceiptRevocationOutbox } from "@ii-tonya/db";
+import { composeReceiptRevocationRecovery } from "./receipt-revocation-recovery.js";
+import { ExperimentalGatewayIpc } from "@ii-tonya/integrations";
+import {
+  composeReceiptRetention,
+  adaptEarlyBirdReceiptRetention,
+} from "./receipt-disclosure-retention.js";
 import { createResidentLifecycleCompletionWorker } from "./resident-lifecycle-completion-composition.js";
 import { createResidentPrivateJobsLifecycle } from "./resident-private-jobs-composition.js";
 import { createResidentReviewNotificationLifecycle } from "./resident-review-notification-composition.js";
@@ -8,6 +18,7 @@ import {
   type ExpertCardMainCheckout,
 } from "@ii-tonya/worker";
 import {
+  assertWaveWorkspaceCapabilities,
   PostgresExpertPersonalOfferRepository,
   PostgresExpertOnboardingMainPaymentRepository,
 } from "@ii-tonya/db";
@@ -154,6 +165,29 @@ export interface ProductionWorkerRuntimeFactoryDependencies {
   readonly planerkaTransport?: PlanerkaTransport;
   readonly expertHeldOnboarding?: import("./expert-separated-sales-composition.js").HeldSalesCapabilities;
   readonly expertPersonalOfferCheckout?: ExpertCardMainCheckout;
+  /** Explicit trusted composition only; disabled unless injected. */
+  readonly deferredFinalCall?: {
+    run(limit: number, signal: AbortSignal): Promise<unknown>;
+  };
+  readonly deferredReviewPreparation?: {
+    run(limit: number, signal: AbortSignal): Promise<unknown>;
+  };
+  readonly earlyBirdPublication?: {
+    run(limit: number, signal: AbortSignal): Promise<unknown>;
+  };
+  readonly earlyBirdLaunchKit?: {
+    run(limit: number, signal: AbortSignal): Promise<unknown>;
+  };
+  readonly receiptDisclosureGateway?: ExperimentalGatewayIpc;
+  readonly receiptDisclosureKeyVersion?: string;
+  readonly earlyBirdReceiptRetention?: {
+    listExpired(limit: number): Promise<{ id: string; userId: string }[]>;
+    expireSelected(row: { id: string; userId: string }): Promise<boolean>;
+  };
+  readonly deferredReceiptRetention?: {
+    listExpired(limit: number): Promise<{ id: string; userId: string }[]>;
+    expireSelected(row: { id: string; userId: string }): Promise<boolean>;
+  };
   readonly clientTelegramFetch?: typeof globalThis.fetch;
   readonly expertCardMaterialFetch?: typeof globalThis.fetch;
   readonly residentWorkspaceNotifier?: import("@ii-tonya/db").WorkspaceNotifier;
@@ -404,7 +438,7 @@ export function selectExpertResidencyProviderReader(
     }
     return disabledExpertResidencyProviderReader;
   }
-  if (config.yookassa === undefined) {
+  if (config.yookassa === undefined && config.yookassaGateway === undefined) {
     throw new Error("yookassa_worker_capability_unavailable");
   }
   if (yookassaReader !== undefined)
@@ -418,10 +452,33 @@ export function createProductionWorkerRuntimeFactory(
   const logger = deps.logger ?? createLogger();
   return {
     async create(config) {
+      const receiptCheckout =
+        config.expertVerification?.checkoutEnabled === true ||
+        config.expertCard?.mainCheckoutEnabled === true ||
+        config.expertResidencyLifecycle?.renewalCheckoutEnabled === true ||
+        deps.expertPersonalOfferCheckout !== undefined ||
+        deps.earlyBirdReceiptRetention !== undefined ||
+        deps.deferredReceiptRetention !== undefined;
+      if (
+        (receiptCheckout || deps.receiptDisclosureGateway) &&
+        !(deps.receiptDisclosureGateway instanceof ExperimentalGatewayIpc)
+      )
+        throw new Error("receipt disclosure cancellation gateway required");
+      if (
+        deps.receiptDisclosureGateway &&
+        (typeof deps.receiptDisclosureKeyVersion !== "string" ||
+          !/^[A-Za-z0-9_-]{1,64}$/u.test(deps.receiptDisclosureKeyVersion))
+      )
+        throw new Error("receipt_disclosure_key_version_invalid");
       assertExpertResidencyLifecycleWorkerConfig(config);
       assertPersonalOfferNoticeConfig(config);
       assertExpertCardMaterialsWorkerConfig(config);
       validateYooKassaWorkerConfig(config);
+      if (
+        config.yookassaGateway &&
+        !(deps.receiptDisclosureGateway instanceof ExperimentalGatewayIpc)
+      )
+        throw new Error("yookassa_worker_gateway_unavailable");
       const clientEnabled = config.features.b2TelegramDispatch === true;
       const selartiEnabled =
         config.features.clientHybridRouting === true ||
@@ -453,390 +510,510 @@ export function createProductionWorkerRuntimeFactory(
         deps.yookassaReader,
       );
       const db = createDb(config.databaseUrl);
-      const yookassa = createYooKassaWorkerComposition(config, db, {
-        ...(deps.yookassaTransport === undefined
-          ? {}
-          : { transport: deps.yookassaTransport }),
-        ...(deps.yookassaEnv === undefined ? {} : { env: deps.yookassaEnv }),
-        ...(deps.yookassaReader === undefined
-          ? {}
-          : { reader: deps.yookassaReader }),
-        ...(deps.yookassaReaderFactory === undefined
-          ? {}
-          : { readerFactory: deps.yookassaReaderFactory }),
-      });
-      const clientRegistry = clientEnabled
-        ? createClientAsyncOutboxRegistry(
-            db,
-            config.clientTelegramBotKey!,
-            {
-              telegram: telegram!,
-              ...(deps.clientAsyncCapabilities?.selarti === undefined
-                ? {}
-                : { selarti: deps.clientAsyncCapabilities.selarti }),
-            },
-            selartiEnabled,
-          )
-        : undefined;
-      const clientDelivery = composeB2TelegramDelivery(
-        db,
-        clientEnabled,
-        { enabled: config.features.telegramEgressConsentGate === true },
-        clientRegistry,
-      );
-      const workerOutboxRegistry = selectWorkerOutboxRegistry(
-        config,
-        deps.workerOutboxRegistryFactory === undefined
-          ? undefined
-          : () => deps.workerOutboxRegistryFactory!(db, config),
-      );
-      const workerOutbox =
-        workerOutboxRegistry === undefined
-          ? undefined
-          : composeWorkerOutboxDelivery(db, workerOutboxRegistry);
-      const clientCatalogRetention = selectClientCatalogRetention(
-        config,
-        () => {
-          const repository = new PostgresClientCatalogRepository(db);
-          return () =>
-            runClientCatalogRetention(
-              { repository, metrics: { record: recordClientCatalogMetric } },
-              new Date(),
-              100,
-            );
-        },
-      );
-      const clientSessionRetention = selectClientSessionRetention(
-        config,
-        () => {
-          const repository = new PostgresClientSessionRepository(db);
-          return () =>
-            runClientSessionRetention(
-              { repository, metrics: { record: recordClientSessionMetric } },
-              100,
-            );
-        },
-      );
-      if (config.features.expertSession === true && !config.expertSession) {
-        throw new Error("expert_session_capability_unavailable");
-      }
-      const expertSessionRetention =
-        config.features.expertSession === true
-          ? () =>
-              runExpertSessionRetention(
-                {
-                  repository: new PostgresExpertSessionRepository(
-                    db,
-                    config.expertSession!.botKey,
-                  ),
-                },
+      try {
+        if (deps.receiptDisclosureGateway) {
+          await new PostgresReceiptRevocationOutbox(db).assertReady("worker");
+        }
+        if (config.features.waveWorkspace === true) {
+          await assertWaveWorkspaceCapabilities(db);
+        }
+        const yookassa = createYooKassaWorkerComposition(config, db, {
+          ...(deps.receiptDisclosureGateway === undefined
+            ? {}
+            : { gateway: deps.receiptDisclosureGateway }),
+          ...(deps.yookassaTransport === undefined
+            ? {}
+            : { transport: deps.yookassaTransport }),
+          ...(deps.yookassaEnv === undefined ? {} : { env: deps.yookassaEnv }),
+          ...(deps.yookassaReader === undefined
+            ? {}
+            : { reader: deps.yookassaReader }),
+          ...(deps.yookassaReaderFactory === undefined
+            ? {}
+            : { readerFactory: deps.yookassaReaderFactory }),
+        });
+        const clientRegistry = clientEnabled
+          ? createClientAsyncOutboxRegistry(
+              db,
+              config.clientTelegramBotKey!,
+              {
+                telegram: telegram!,
+                ...(deps.clientAsyncCapabilities?.selarti === undefined
+                  ? {}
+                  : { selarti: deps.clientAsyncCapabilities.selarti }),
+              },
+              selartiEnabled,
+            )
+          : undefined;
+        const clientDelivery = composeB2TelegramDelivery(
+          db,
+          clientEnabled,
+          { enabled: config.features.telegramEgressConsentGate === true },
+          clientRegistry,
+        );
+        const workerOutboxRegistry = selectWorkerOutboxRegistry(
+          config,
+          deps.workerOutboxRegistryFactory === undefined
+            ? undefined
+            : () => deps.workerOutboxRegistryFactory!(db, config),
+        );
+        const workerOutbox =
+          workerOutboxRegistry === undefined
+            ? undefined
+            : composeWorkerOutboxDelivery(db, workerOutboxRegistry);
+        const clientCatalogRetention = selectClientCatalogRetention(
+          config,
+          () => {
+            const repository = new PostgresClientCatalogRepository(db);
+            return () =>
+              runClientCatalogRetention(
+                { repository, metrics: { record: recordClientCatalogMetric } },
+                new Date(),
                 100,
-              )
-          : undefined;
-      const clientBookingErasure =
-        config.features.clientBooking === true
-          ? () =>
-              runClientBookingErasureBatch({
-                db,
-                bookings: new PostgresBookingRepository(db),
-                limit: 100,
-              })
-          : undefined;
-      const testExpertReconciliation = selectTestExpertReconciliation(
-        config,
-        () => {
-          const repository = new PostgresTestExpertTelegramRepository(db, {
-            messagingConsentPolicyVersion: "worker-reconciliation-only",
-          });
-          return {
-            repository,
-            authority: {
-              resolve: (providerRequestId: string) =>
-                repository.resolveAuthoritativeOutcome(providerRequestId),
-            },
-            metrics: { record: recordTestExpertReconciliationMetric },
-          };
-        },
-      );
-      const outboxRepository =
-        workerOutbox?.repository ??
-        clientDelivery?.repository ??
-        new PostgresOutboxRepository(db);
-      const planerka =
-        config.planerkaWorkflow === undefined
-          ? undefined
-          : {
-              repository: new PostgresPlanerkaBookingRepository(db),
-              client: createPlanerkaClient(
-                {
-                  apiKey: config.planerkaWorkflow.apiKey,
-                },
-                deps.planerkaTransport,
-              ),
-              accountId: config.planerkaWorkflow.accountId,
-              createEnabled: config.planerkaWorkflow.createEnabled,
+              );
+          },
+        );
+        const clientSessionRetention = selectClientSessionRetention(
+          config,
+          () => {
+            const repository = new PostgresClientSessionRepository(db);
+            return () =>
+              runClientSessionRetention(
+                { repository, metrics: { record: recordClientSessionMetric } },
+                100,
+              );
+          },
+        );
+        if (config.features.expertSession === true && !config.expertSession) {
+          throw new Error("expert_session_capability_unavailable");
+        }
+        const expertSessionRetention =
+          config.features.expertSession === true
+            ? () =>
+                runExpertSessionRetention(
+                  {
+                    repository: new PostgresExpertSessionRepository(
+                      db,
+                      config.expertSession!.botKey,
+                    ),
+                  },
+                  100,
+                )
+            : undefined;
+        const clientBookingErasure =
+          config.features.clientBooking === true
+            ? () =>
+                runClientBookingErasureBatch({
+                  db,
+                  bookings: new PostgresBookingRepository(db, {
+                    waveCoverage: config.features.waveWorkspace === true,
+                  }),
+                  limit: 100,
+                })
+            : undefined;
+        const testExpertReconciliation = selectTestExpertReconciliation(
+          config,
+          () => {
+            const repository = new PostgresTestExpertTelegramRepository(db, {
+              messagingConsentPolicyVersion: "worker-reconciliation-only",
+            });
+            return {
+              repository,
+              authority: {
+                resolve: (providerRequestId: string) =>
+                  repository.resolveAuthoritativeOutcome(providerRequestId),
+              },
+              metrics: { record: recordTestExpertReconciliationMetric },
             };
-      if (planerka) await preflightPlanerkaBooking(planerka);
-      const availability =
-        config.planerkaWorkflow?.availabilityEnabled === true && planerka
-          ? {
-              repository: new PostgresPlanerkaAvailabilityRepository(db),
-              client: createPlanerkaClient(
-                { apiKey: config.planerkaWorkflow.apiKey, timeoutMs: 5000 },
-                deps.planerkaTransport,
-              ),
-              accountId: planerka.accountId,
-              admitRequest: (accountId: number) =>
-                planerka.repository.admitRequest(accountId, {
-                  availability: true,
-                  createEnabled: planerka.createEnabled,
-                }),
-            }
-          : undefined;
-      const bookingNotifications = await createBookingNotificationRuntime(
-        config,
-        db,
-      );
-      const residentPrivateJobs = createResidentPrivateJobsLifecycle(
-        config,
-        db,
-      );
-      const residentReviewNotifications =
-        createResidentReviewNotificationLifecycle(config, db);
-      const residentWorkspaceNotifications =
-        createResidentWorkspaceNotificationLifecycle(
+          },
+        );
+        const outboxRepository =
+          workerOutbox?.repository ??
+          clientDelivery?.repository ??
+          new PostgresOutboxRepository(db);
+        const planerka =
+          config.planerkaWorkflow === undefined
+            ? undefined
+            : {
+                repository: new PostgresPlanerkaBookingRepository(db),
+                client: createPlanerkaClient(
+                  {
+                    apiKey: config.planerkaWorkflow.apiKey,
+                  },
+                  deps.planerkaTransport,
+                ),
+                accountId: config.planerkaWorkflow.accountId,
+                createEnabled: config.planerkaWorkflow.createEnabled,
+              };
+        if (planerka) await preflightPlanerkaBooking(planerka);
+        const availability =
+          config.planerkaWorkflow?.availabilityEnabled === true && planerka
+            ? {
+                repository: new PostgresPlanerkaAvailabilityRepository(db),
+                client: createPlanerkaClient(
+                  { apiKey: config.planerkaWorkflow.apiKey, timeoutMs: 5000 },
+                  deps.planerkaTransport,
+                ),
+                accountId: planerka.accountId,
+                admitRequest: (accountId: number) =>
+                  planerka.repository.admitRequest(accountId, {
+                    availability: true,
+                    createEnabled: planerka.createEnabled,
+                  }),
+              }
+            : undefined;
+        const bookingNotifications = await createBookingNotificationRuntime(
           config,
           db,
-          deps.residentWorkspaceNotifier,
         );
-      const expertCardMaterials = createExpertCardMaterialsLifecycle(config, {
-        createRepository: (materialTransport) =>
-          new PostgresExpertCardRepository(db, {
-            messagingConsentPolicyVersion:
-              config.expertCard!.messagingConsentPolicyVersion,
-            workBotId: config.expertCard!.workBotId,
-            workBotKey: config.expertCard!.workBotKey,
-            materialTransport,
-          }),
-        ...(deps.expertCardMaterialFetch === undefined
-          ? {}
-          : { fetch: deps.expertCardMaterialFetch }),
-      });
-      const expertResidencyLifecycle = createExpertResidencyLifecycleWorker(
-        config,
-        {
-          createRepository: (noticeTransport) =>
-            new PostgresExpertResidencyLifecycleRepository(db, {
+        const residentPrivateJobs = createResidentPrivateJobsLifecycle(
+          config,
+          db,
+        );
+        const residentReviewNotifications =
+          createResidentReviewNotificationLifecycle(config, db);
+        const residentWorkspaceNotifications =
+          createResidentWorkspaceNotificationLifecycle(
+            config,
+            db,
+            deps.residentWorkspaceNotifier,
+          );
+        const expertCardMaterials = createExpertCardMaterialsLifecycle(config, {
+          createRepository: (materialTransport) =>
+            new PostgresExpertCardRepository(db, {
+              waveWorkspace: config.features.waveWorkspace === true,
               messagingConsentPolicyVersion:
                 config.expertCard!.messagingConsentPolicyVersion,
               workBotId: config.expertCard!.workBotId,
               workBotKey: config.expertCard!.workBotKey,
-              ...(noticeTransport === undefined ? {} : { noticeTransport }),
+              materialTransport,
             }),
-          ...(deps.expertResidencyNoticeFetch === undefined
+          ...(deps.expertCardMaterialFetch === undefined
             ? {}
-            : { fetch: deps.expertResidencyNoticeFetch }),
-        },
-      );
-      const residentLifecycleCompletion =
-        createResidentLifecycleCompletionWorker(
+            : { fetch: deps.expertCardMaterialFetch }),
+        });
+        const expertResidencyLifecycle = createExpertResidencyLifecycleWorker(
+          config,
+          {
+            createRepository: (noticeTransport) =>
+              new PostgresExpertResidencyLifecycleRepository(db, {
+                messagingConsentPolicyVersion:
+                  config.expertCard!.messagingConsentPolicyVersion,
+                workBotId: config.expertCard!.workBotId,
+                workBotKey: config.expertCard!.workBotKey,
+                ...(noticeTransport === undefined ? {} : { noticeTransport }),
+              }),
+            ...(deps.expertResidencyNoticeFetch === undefined
+              ? {}
+              : { fetch: deps.expertResidencyNoticeFetch }),
+          },
+        );
+        const residentLifecycleCompletion =
+          createResidentLifecycleCompletionWorker(
+            db,
+            config,
+            deps.residentWorkNoticeFetch,
+          );
+        const expertPersonalOffers =
+          config.features.expertResidencyLifecycle === true
+            ? (() => {
+                const work = config.expertCard!;
+                const repository = new PostgresExpertPersonalOfferRepository(
+                  db,
+                  {
+                    workBotId: work.workBotId,
+                    workBotKey: work.workBotKey,
+                    ...(config.expertApplicant
+                      ? {
+                          promoBotId: config.expertApplicant.botId,
+                          promoBotKey: config.expertApplicant.botKey,
+                          promoConsentPolicyVersion:
+                            config.expertApplicant
+                              .messagingConsentPolicyVersion,
+                        }
+                      : {}),
+                    messagingConsentPolicyVersion:
+                      work.messagingConsentPolicyVersion,
+                    ...(config.features.expertResidencyNoticeDelivery === true
+                      ? {
+                          noticeTransport: createPersonalOfferNoticeTransport(
+                            config,
+                            deps.expertResidencyNoticeFetch,
+                          ),
+                        }
+                      : {}),
+                  },
+                );
+                const financial =
+                  new PostgresExpertOnboardingMainPaymentRepository(db, {
+                    providerMode: work.paymentMode,
+                    messagingConsentPolicyVersion:
+                      work.messagingConsentPolicyVersion,
+                  });
+                const runner = createExpertPersonalOfferRunner({
+                  enabled: true,
+                  repository,
+                  financial,
+                  ...(deps.expertPersonalOfferCheckout
+                    ? { mainCheckout: deps.expertPersonalOfferCheckout }
+                    : {}),
+                });
+                const abort = new AbortController();
+                return {
+                  async runOnce() {
+                    const offers = await runner.runOnce();
+                    let delivered = 0;
+                    if (config.features.expertResidencyNoticeDelivery === true)
+                      for (const n of await repository.listDueNotices(10)) {
+                        if (
+                          (
+                            await repository.deliverNotice(n.noticeId, {
+                              signal: abort.signal,
+                            })
+                          ).kind === "delivered"
+                        )
+                          delivered++;
+                      }
+                    return { offers, delivered };
+                  },
+                  stopAccepting() {
+                    abort.abort();
+                    runner.stopAccepting();
+                  },
+                };
+              })()
+            : undefined;
+        const expertSeparatedSales = createSeparatedSalesRunner(
           db,
           config,
-          deps.residentWorkNoticeFetch,
+          deps.expertResidencyNoticeFetch,
+          deps.expertHeldOnboarding,
         );
-      const expertPersonalOffers =
-        config.features.expertResidencyLifecycle === true
-          ? (() => {
-              const work = config.expertCard!;
-              const repository = new PostgresExpertPersonalOfferRepository(db, {
-                workBotId: work.workBotId,
-                workBotKey: work.workBotKey,
-                ...(config.expertApplicant
-                  ? {
-                      promoBotId: config.expertApplicant.botId,
-                      promoBotKey: config.expertApplicant.botKey,
-                      promoConsentPolicyVersion:
-                        config.expertApplicant.messagingConsentPolicyVersion,
-                    }
-                  : {}),
-                messagingConsentPolicyVersion:
-                  work.messagingConsentPolicyVersion,
-                ...(config.features.expertResidencyNoticeDelivery === true
-                  ? {
-                      noticeTransport: createPersonalOfferNoticeTransport(
-                        config,
-                        deps.expertResidencyNoticeFetch,
-                      ),
-                    }
-                  : {}),
-              });
-              const financial =
-                new PostgresExpertOnboardingMainPaymentRepository(db, {
-                  providerMode: work.paymentMode,
-                  messagingConsentPolicyVersion:
-                    work.messagingConsentPolicyVersion,
-                });
-              const runner = createExpertPersonalOfferRunner({
-                enabled: true,
-                repository,
-                financial,
-                ...(deps.expertPersonalOfferCheckout
-                  ? { mainCheckout: deps.expertPersonalOfferCheckout }
-                  : {}),
-              });
-              const abort = new AbortController();
-              return {
-                async runOnce() {
-                  const offers = await runner.runOnce();
-                  let delivered = 0;
-                  if (config.features.expertResidencyNoticeDelivery === true)
-                    for (const n of await repository.listDueNotices(10)) {
-                      if (
-                        (
-                          await repository.deliverNotice(n.noticeId, {
-                            signal: abort.signal,
-                          })
-                        ).kind === "delivered"
-                      )
-                        delivered++;
-                    }
-                  return { offers, delivered };
-                },
-                stopAccepting() {
-                  abort.abort();
-                  runner.stopAccepting();
-                },
-              };
-            })()
+        const deferredReviewPreparationScheduler =
+          deps.deferredReviewPreparation
+            ? createFinalCallScheduler(deps.deferredReviewPreparation)
+            : undefined;
+        const deferredFinalCallScheduler = deps.deferredFinalCall
+          ? createFinalCallScheduler(deps.deferredFinalCall)
           : undefined;
-      const expertSeparatedSales = createSeparatedSalesRunner(
-        db,
-        config,
-        deps.expertResidencyNoticeFetch,
-        deps.expertHeldOnboarding,
-      );
-      const bookingHandoffRevocations =
-        new PostgresBookingHandoffRevocationRepository(db);
-      const lifecycleSchedulerRepository = config.features.lifecycleReminders
-        ? new PostgresLifecycleSchedulerRepository(
-            db,
-            config.clientMessagingConsentPolicyVersion!,
-            config.clientTelegramBotKey!,
-          )
-        : undefined;
-      const waitlistRepository = config.features.clientWaitlist
-        ? (
-            deps.waitlistRepositoryFactory ??
-            ((waitlistDb, confirmationBufferMs) =>
-              new PostgresWaitlistRepository(waitlistDb, confirmationBufferMs))
-          )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000)
-        : undefined;
-      return createProductionWorkerRuntime({
-        ...(availability === undefined
-          ? {}
-          : {
-              planerkaAvailability: async () => {
-                const result = await runPlanerkaAvailabilityOnce(availability);
-                if (result.processed > 0 || result.reason !== undefined)
-                  logger.info({
-                    event: "planerka_availability",
-                    outcome:
-                      result.reason ??
-                      (result.published > 0 ? "published" : "empty"),
-                    processed: result.processed,
-                    published: result.published,
-                  });
-                return result;
-              },
-            }),
-        ...(expertSeparatedSales ? { expertSeparatedSales } : {}),
-        ...(residentLifecycleCompletion ? { residentLifecycleCompletion } : {}),
-        bookingHandoffRevocations: () =>
-          bookingHandoffRevocations.consumePending(20),
-        ...(bookingNotifications === undefined ? {} : { bookingNotifications }),
-        ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
-        ...(residentPrivateJobs ? { residentPrivateJobs } : {}),
-        ...(residentReviewNotifications ? { residentReviewNotifications } : {}),
-        ...(residentWorkspaceNotifications
-          ? { residentWorkspaceNotifications }
-          : {}),
-        ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
-        ...(expertResidencyLifecycle === undefined
-          ? {}
-          : { expertResidencyLifecycle }),
-        ...(planerka === undefined
-          ? {}
-          : { planerkaBookingRunner: () => runPlanerkaBookingOnce(planerka) }),
-        jobsRepository: new PostgresWorkerJobsRepository(db),
-        expertReferralJobsRepository:
-          new PostgresExpertReferralWorkerRepository(db),
-        expertReferralMaturityWorkerEnabled:
-          config.features.expertReferralMaturityWorker,
-        expertReferralMaturityMetrics: {
-          record: recordExpertReferralMaturityMetric,
-        },
-        expertTelegramCheckoutRepository:
-          new PostgresExpertTelegramResidencyCallbackRepository(db),
-        expertResidencyProviderReader:
-          yookassa?.reader ?? expertResidencyProviderReader,
-        ...(yookassa === undefined ? {} : { yookassaBoundRecovery: yookassa }),
-        outboxRepository,
-        ...(lifecycleSchedulerRepository === undefined
-          ? {}
-          : {
-              lifecycleScheduler: () =>
-                lifecycleSchedulerRepository.runLifecycleBatch({
-                  now: new Date(),
-                  batchSize: 100,
-                }),
-            }),
-        ...(waitlistRepository === undefined
-          ? {}
-          : {
-              waitlistPromotion: () =>
-                waitlistRepository.processPromotionCommandsBatch(100),
-            }),
-        ...(clientDelivery === undefined
-          ? {}
-          : { clientAsyncOutboxRunner: clientDelivery.run }),
-        ...(workerOutbox === undefined
-          ? {}
-          : {
-              workerOutboxRegistry: workerOutbox.registry,
-              workerOutboxRunner: workerOutbox.run,
-            }),
-        ...(clientCatalogRetention === undefined
-          ? {}
-          : { clientCatalogRetention }),
-        ...(clientSessionRetention === undefined
-          ? {}
-          : { clientSessionRetention }),
-        ...(expertSessionRetention === undefined
-          ? {}
-          : { expertSessionRetention }),
-        payerReceiptRetention: () =>
-          new PostgresPayerReceiptContactRepository(db).redactExpiredBatch(100),
-        ...(clientBookingErasure === undefined ? {} : { clientBookingErasure }),
-        ...(testExpertReconciliation === undefined
-          ? {}
-          : {
-              testExpertReconciliation: () =>
-                reconcileTestExpertTrial({
-                  limit: 100,
-                  minimumAgeMs: 60_000,
-                  now: new Date(),
-                  ...testExpertReconciliation,
-                }),
-            }),
-        closeDatabase: async () => db.$client.end(),
-        closeTelemetry: async () => undefined,
-        now: () => new Date(),
-      });
+        const publicationScheduler = deps.earlyBirdPublication
+          ? createFinalCallScheduler(deps.earlyBirdPublication)
+          : undefined;
+        const launchKitScheduler = deps.earlyBirdLaunchKit
+          ? createFinalCallScheduler(deps.earlyBirdLaunchKit)
+          : undefined;
+        const bookingHandoffRevocations =
+          new PostgresBookingHandoffRevocationRepository(db);
+        const lifecycleSchedulerRepository = config.features.lifecycleReminders
+          ? new PostgresLifecycleSchedulerRepository(
+              db,
+              config.clientMessagingConsentPolicyVersion!,
+              config.clientTelegramBotKey!,
+            )
+          : undefined;
+        const waitlistRepository = config.features.clientWaitlist
+          ? (
+              deps.waitlistRepositoryFactory ??
+              ((waitlistDb, confirmationBufferMs) =>
+                new PostgresWaitlistRepository(
+                  waitlistDb,
+                  confirmationBufferMs,
+                  {
+                    waveCoverage: config.features.waveWorkspace === true,
+                  },
+                ))
+            )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000)
+          : undefined;
+        return createProductionWorkerRuntime({
+          ...(availability === undefined
+            ? {}
+            : {
+                planerkaAvailability: async () => {
+                  const result =
+                    await runPlanerkaAvailabilityOnce(availability);
+                  if (result.processed > 0 || result.reason !== undefined)
+                    logger.info({
+                      event: "planerka_availability",
+                      outcome:
+                        result.reason ??
+                        (result.published > 0 ? "published" : "empty"),
+                      processed: result.processed,
+                      published: result.published,
+                    });
+                  return result;
+                },
+              }),
+          ...(expertSeparatedSales ? { expertSeparatedSales } : {}),
+          ...(residentLifecycleCompletion
+            ? { residentLifecycleCompletion }
+            : {}),
+          bookingHandoffRevocations: () =>
+            bookingHandoffRevocations.consumePending(20),
+          ...(bookingNotifications === undefined
+            ? {}
+            : { bookingNotifications }),
+          ...(expertCardMaterials === undefined ? {} : { expertCardMaterials }),
+          ...(residentPrivateJobs ? { residentPrivateJobs } : {}),
+          ...(residentReviewNotifications
+            ? { residentReviewNotifications }
+            : {}),
+          ...(residentWorkspaceNotifications
+            ? { residentWorkspaceNotifications }
+            : {}),
+          ...(deferredReviewPreparationScheduler === undefined
+            ? {}
+            : {
+                deferredReviewPreparation: {
+                  runOnce: () => deferredReviewPreparationScheduler.run(),
+                  stopAccepting: () =>
+                    deferredReviewPreparationScheduler.stop(),
+                },
+              }),
+          ...(deferredFinalCallScheduler === undefined
+            ? {}
+            : {
+                deferredFinalCall: {
+                  runOnce: () => deferredFinalCallScheduler.run(),
+                  stopAccepting: () => deferredFinalCallScheduler.stop(),
+                },
+              }),
+          ...(publicationScheduler === undefined
+            ? {}
+            : {
+                earlyBirdPublication: {
+                  runOnce: () => publicationScheduler.run(),
+                  stopAccepting: () => publicationScheduler.stop(),
+                },
+              }),
+          ...(launchKitScheduler === undefined
+            ? {}
+            : {
+                earlyBirdLaunchKit: {
+                  runOnce: () => launchKitScheduler.run(),
+                  stopAccepting: () => launchKitScheduler.stop(),
+                },
+              }),
+          ...(expertPersonalOffers === undefined
+            ? {}
+            : { expertPersonalOffers }),
+          ...(expertResidencyLifecycle === undefined
+            ? {}
+            : { expertResidencyLifecycle }),
+          ...(planerka === undefined
+            ? {}
+            : {
+                planerkaBookingRunner: () => runPlanerkaBookingOnce(planerka),
+              }),
+          jobsRepository: new PostgresWorkerJobsRepository(db),
+          expertReferralJobsRepository:
+            new PostgresExpertReferralWorkerRepository(db),
+          expertReferralMaturityWorkerEnabled:
+            config.features.expertReferralMaturityWorker,
+          expertReferralMaturityMetrics: {
+            record: recordExpertReferralMaturityMetric,
+          },
+          expertTelegramCheckoutRepository:
+            new PostgresExpertTelegramResidencyCallbackRepository(db),
+          expertResidencyProviderReader:
+            yookassa?.reader ?? expertResidencyProviderReader,
+          ...(yookassa === undefined
+            ? {}
+            : { yookassaBoundRecovery: yookassa }),
+          outboxRepository,
+          ...(lifecycleSchedulerRepository === undefined
+            ? {}
+            : {
+                lifecycleScheduler: () =>
+                  lifecycleSchedulerRepository.runLifecycleBatch({
+                    now: new Date(),
+                    batchSize: 100,
+                  }),
+              }),
+          ...(waitlistRepository === undefined
+            ? {}
+            : {
+                waitlistPromotion: () =>
+                  waitlistRepository.processPromotionCommandsBatch(100),
+              }),
+          ...(clientDelivery === undefined
+            ? {}
+            : { clientAsyncOutboxRunner: clientDelivery.run }),
+          ...(workerOutbox === undefined
+            ? {}
+            : {
+                workerOutboxRegistry: workerOutbox.registry,
+                workerOutboxRunner: workerOutbox.run,
+              }),
+          ...(clientCatalogRetention === undefined
+            ? {}
+            : { clientCatalogRetention }),
+          ...(clientSessionRetention === undefined
+            ? {}
+            : { clientSessionRetention }),
+          ...(expertSessionRetention === undefined
+            ? {}
+            : { expertSessionRetention }),
+          payerReceiptRetention: async () => {
+            const options = {
+              checkoutEnabled:
+                receiptCheckout || deps.receiptDisclosureGateway !== undefined,
+              ...(deps.receiptDisclosureGateway
+                ? { gateway: deps.receiptDisclosureGateway }
+                : {}),
+            };
+            if (deps.receiptDisclosureGateway)
+              await composeReceiptRevocationRecovery(
+                new PostgresReceiptRevocationOutbox(db),
+                deps.receiptDisclosureGateway,
+                deps.receiptDisclosureKeyVersion!,
+              )();
+            const payer = await composeReceiptRetention(
+              new PostgresPayerReceiptContactRepository(db),
+              options,
+            )();
+            const wave = deps.earlyBirdReceiptRetention
+              ? await composeReceiptRetention(
+                  adaptEarlyBirdReceiptRetention(
+                    deps.earlyBirdReceiptRetention,
+                  ),
+                  options,
+                )()
+              : 0;
+            const deferred = deps.deferredReceiptRetention
+              ? await composeReceiptRetention(
+                  adaptEarlyBirdReceiptRetention(deps.deferredReceiptRetention),
+                  options,
+                )()
+              : 0;
+            return payer + wave + deferred;
+          },
+          ...(clientBookingErasure === undefined
+            ? {}
+            : { clientBookingErasure }),
+          ...(testExpertReconciliation === undefined
+            ? {}
+            : {
+                testExpertReconciliation: () =>
+                  reconcileTestExpertTrial({
+                    limit: 100,
+                    minimumAgeMs: 60_000,
+                    now: new Date(),
+                    ...testExpertReconciliation,
+                  }),
+              }),
+          closeDatabase: async () => db.$client.end(),
+          closeTelemetry: async () => undefined,
+          now: () => new Date(),
+        });
+      } catch (error) {
+        await db.$client.end();
+        throw error;
+      }
     },
   };
 }
 
-const productionWorkerOutboxRegistryFactory = (
+export const productionWorkerOutboxRegistryFactory = (
   db: DrizzleDb,
   config: RuntimeConfig,
 ): WorkerOutboxRegistry => {
@@ -844,7 +1021,9 @@ const productionWorkerOutboxRegistryFactory = (
     new PostgresOperatorCaseOutboxRepository(db),
   );
   if (config.features.clientCatalog !== true) return local;
-  const catalog = new PostgresCatalogRepository(db);
+  const catalog = new PostgresCatalogRepository(db, {
+    waveCoverage: config.features.waveWorkspace === true,
+  });
   return createClientCatalogOutboxRegistry({
     local,
     requests: new PostgresClientCatalogRepository(db),
@@ -933,13 +1112,55 @@ export async function main(options: WorkerMainOptions = {}): Promise<void> {
   )
     throw new Error("Invalid worker shutdown grace period");
   const config = loadEnv(env);
-  const runtime = await (
-    options.runtimeFactory ??
-    createProductionWorkerRuntimeFactory({
-      yookassaEnv: env,
-      workerOutboxRegistryFactory: productionWorkerOutboxRegistryFactory,
-    })
-  ).create(config);
+  const bootstrap =
+    !options.runtimeFactory && config.yookassaGateway
+      ? await createGatewayWorkerBootstrap(config)
+      : undefined;
+  let runtime: WorkerRuntime;
+  try {
+    const created = await (
+      options.runtimeFactory ??
+      createProductionWorkerRuntimeFactory({
+        yookassaEnv: env,
+        workerOutboxRegistryFactory: productionWorkerOutboxRegistryFactory,
+        ...(bootstrap
+          ? {
+              receiptDisclosureGateway: bootstrap.gateway,
+              receiptDisclosureKeyVersion: bootstrap.keyVersion,
+              earlyBirdReceiptRetention: new PostgresWorkerReceiptRetention(
+                bootstrap.waveRetentionDb,
+                bootstrap.waveRetentionLogin,
+                "wave",
+              ),
+              deferredReceiptRetention: new PostgresWorkerReceiptRetention(
+                bootstrap.deferredRetentionDb,
+                bootstrap.deferredRetentionLogin,
+                "deferred",
+              ),
+              deferredReviewPreparation: bootstrap.review,
+              deferredFinalCall: bootstrap.finalCall,
+              earlyBirdPublication: bootstrap.publication,
+              earlyBirdLaunchKit: bootstrap.launchKit,
+            }
+          : {}),
+      })
+    ).create(config);
+    runtime = bootstrap
+      ? {
+          runOnce: () => created.runOnce(),
+          close: async () => {
+            try {
+              await created.close();
+            } finally {
+              await bootstrap.close();
+            }
+          },
+        }
+      : created;
+  } catch (error) {
+    await bootstrap?.close();
+    throw error;
+  }
   const controller = new AbortController();
   const hardExit =
     options.hardExit ??

@@ -1,0 +1,1321 @@
+{
+  "status": "canonical_sql_promoted_state_reconstruction_pending",
+  "proposed_migration_tag": "0081_early_bird_payment_runtime",
+  "committed_prefix_head": "0080_early_bird_form_bridge",
+  "observed_baseline_git_head": "1df0d7b9c5c4db1c244c12d4525470bf1275c738",
+  "notes": [
+    "Sources are actively owned and may change. Refresh all hashes and dependency review before aggregation.",
+    "Do not include gateway role creation/GRANT tail in migration; schema-only prefix selected.",
+    "Do not promote obsolete 0078_early_bird_intents.sql or 0077_positive_price_snapshot.sql.",
+    "Insert a statement breakpoint BETWEEN selected segments; retain every internal breakpoint and every exact selected byte.",
+    "No journal entry, SQL aggregate or metadata produced by this manifest.",
+    "Fixture classification hints require source review; no assertion should be deleted or weakened."
+  ],
+  "segments": [
+    {
+      "order": 1,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0081_early_bird_composite.sql",
+      "source_sha256": "7c8e5577cd7ab6d9905c9357953839e79bcb193e3f3e963476eae8c53255d10d",
+      "source_bytes": 25847,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "7c8e5577cd7ab6d9905c9357953839e79bcb193e3f3e963476eae8c53255d10d",
+      "selected_bytes": 25847,
+      "depends_on": [
+        "committed:0080"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 2,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0082_early_bird_settlement.sql",
+      "source_sha256": "a8521aa45c1fcd4639cbd1f7f7161f26b1f5b477f1708e46968593dfc84861fb",
+      "source_bytes": 20171,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "a8521aa45c1fcd4639cbd1f7f7161f26b1f5b477f1708e46968593dfc84861fb",
+      "selected_bytes": 20171,
+      "depends_on": [
+        "0081_early_bird_composite.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 3,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0083_early_bird_verified_settlement.sql",
+      "source_sha256": "982349e2658c008dfa44655cd6a5a5db513e0683552fdeac3ff69ac8fbbb8d6a",
+      "source_bytes": 2407,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "982349e2658c008dfa44655cd6a5a5db513e0683552fdeac3ff69ac8fbbb8d6a",
+      "selected_bytes": 2407,
+      "depends_on": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 4,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0084_early_bird_verified_payment_reader.sql",
+      "source_sha256": "ec9ed072265dd2cfd679f23bdc15fe5e2b9c42ff3c19a6a5992c8a502bd32e8c",
+      "source_bytes": 1618,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "ec9ed072265dd2cfd679f23bdc15fe5e2b9c42ff3c19a6a5992c8a502bd32e8c",
+      "selected_bytes": 1618,
+      "depends_on": [
+        "0081_early_bird_composite.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 5,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0085_early_bird_verified_refund_settlement.sql",
+      "source_sha256": "fb8af1425b016236365ed04fb808f35f05d97a89ba0138c3ae15cc079a7f6710",
+      "source_bytes": 3472,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "fb8af1425b016236365ed04fb808f35f05d97a89ba0138c3ae15cc079a7f6710",
+      "selected_bytes": 3472,
+      "depends_on": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 6,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0086_early_bird_verified_refund_binding.sql",
+      "source_sha256": "0561d7aa84aa4863d98027b89494fea751e2ec31cb5d2d4459ec6bebb9e0ded6",
+      "source_bytes": 3665,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "0561d7aa84aa4863d98027b89494fea751e2ec31cb5d2d4459ec6bebb9e0ded6",
+      "selected_bytes": 3665,
+      "depends_on": [
+        "0085_early_bird_verified_refund_settlement.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 7,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0087_early_bird_receipt_contacts.sql",
+      "source_sha256": "34d9f481d47b0455b0477a26ed79a1077a4498cbcc55555c462f0b7e134c77a9",
+      "source_bytes": 5009,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "34d9f481d47b0455b0477a26ed79a1077a4498cbcc55555c462f0b7e134c77a9",
+      "selected_bytes": 5009,
+      "depends_on": [
+        "0081_early_bird_composite.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 8,
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_owner_send_capability.sql",
+      "source_sha256": "8f6032734666fd8be20e1ec1f96321be2cac85436e535e954dbb7be562d2ff3e",
+      "source_bytes": 3715,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "8f6032734666fd8be20e1ec1f96321be2cac85436e535e954dbb7be562d2ff3e",
+      "selected_bytes": 3715,
+      "depends_on": [
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_standard_send_capability.sql",
+      "selection": {
+        "kind": "entire_file"
+      },
+      "depends_on": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "order": 9,
+      "source_sha256": "4df5042b25de0719b9310d39de8764495d2f2511c72313468ee7bda7cae00f27",
+      "source_bytes": 4018,
+      "selected_sha256": "4df5042b25de0719b9310d39de8764495d2f2511c72313468ee7bda7cae00f27",
+      "selected_bytes": 4018,
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 10,
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_gateway_authority.sql",
+      "source_sha256": "3bfec13ed71e94aa7d452ff68e0f7a63a1634da5201ee0e5966d2828af702ae8",
+      "source_bytes": 6907,
+      "selection": {
+        "kind": "prefix_before_exact_marker",
+        "marker": "-- Provision a distinct NOLOGIN capability",
+        "byte_end_exclusive": 6096
+      },
+      "selected_sha256": "54758d67e38f8de314ce787a754f7ac4959ceae21e788abaebe312042e575579",
+      "selected_bytes": 6096,
+      "depends_on": [
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 11,
+      "source": "docs/superpowers/implementation-artifacts/drafts/receipt_revocation_outbox.sql",
+      "source_sha256": "8a11d1bb4d8c03bf066fb5e4db64c9e1ee276f9d6c5fe68fa269a267f1436506",
+      "source_bytes": 744,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "8a11d1bb4d8c03bf066fb5e4db64c9e1ee276f9d6c5fe68fa269a267f1436506",
+      "selected_bytes": 744,
+      "depends_on": [
+        "committed:0080"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 12,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0088_early_bird_deferred_payments.sql",
+      "source_sha256": "16b3cc6dd09edce7f8b68b0793ffbee6828745f748df05dd379dd3c935d65c4e",
+      "source_bytes": 24791,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "16b3cc6dd09edce7f8b68b0793ffbee6828745f748df05dd379dd3c935d65c4e",
+      "selected_bytes": 24791,
+      "depends_on": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/0089_early_bird_deferred_refunds.sql",
+      "selection": {
+        "kind": "entire_file"
+      },
+      "depends_on": [
+        "0082_early_bird_settlement.sql",
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "order": 13,
+      "source_sha256": "5221e616f85bc272971a7aab089a0ef7c4dfec02af0a5d5421e6dfe3eb834bf8",
+      "source_bytes": 15044,
+      "selected_sha256": "5221e616f85bc272971a7aab089a0ef7c4dfec02af0a5d5421e6dfe3eb834bf8",
+      "selected_bytes": 15044,
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 14,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0077_early_bird_final_call.sql",
+      "source_sha256": "4f8a963763e5776afc56dde6bb39fc73d77c3d784e3a67167d97d143e6bc57dd",
+      "source_bytes": 6796,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "4f8a963763e5776afc56dde6bb39fc73d77c3d784e3a67167d97d143e6bc57dd",
+      "selected_bytes": 6796,
+      "depends_on": [
+        "committed:0078"
+      ],
+      "existing_statement_breakpoints": 8
+    },
+    {
+      "order": 15,
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_final_call_authority.sql",
+      "source_sha256": "e121464c88de9d402242f32e3f67f53979c8c0fecaf59c2bbe44aeff33ba0676",
+      "source_bytes": 15188,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "e121464c88de9d402242f32e3f67f53979c8c0fecaf59c2bbe44aeff33ba0676",
+      "selected_bytes": 15188,
+      "depends_on": [
+        "0088_early_bird_deferred_payments.sql",
+        "0077_early_bird_final_call.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 16,
+      "source": "docs/superpowers/implementation-artifacts/drafts/wave_workspace_gate.sql",
+      "source_sha256": "c8510cab2f3c54a294f325674837f63014a3b1c127eb6d9bb8d8eb5c8286ab27",
+      "source_bytes": 2229,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "c8510cab2f3c54a294f325674837f63014a3b1c127eb6d9bb8d8eb5c8286ab27",
+      "selected_bytes": 2229,
+      "depends_on": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 17,
+      "source": "docs/superpowers/implementation-artifacts/drafts/wave_admission_projection.sql",
+      "source_sha256": "1f030dd55c33a18ee38ec08ec2202cfae80a88638056919205a55cccf2c2ed24",
+      "source_bytes": 31465,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "1f030dd55c33a18ee38ec08ec2202cfae80a88638056919205a55cccf2c2ed24",
+      "selected_bytes": 31465,
+      "depends_on": [
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql"
+      ],
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/deferred_wave_publication.sql",
+      "selection": {
+        "kind": "entire_file"
+      },
+      "depends_on": [
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql",
+        "0088_early_bird_deferred_payments.sql",
+        "0089_early_bird_deferred_refunds.sql",
+        "early_bird_final_call_authority.sql"
+      ],
+      "order": 18,
+      "source_sha256": "006461c338f35a2b8cbd07d274893618a034a04518753c1606abf396a9ad3ff0",
+      "source_bytes": 13863,
+      "selected_sha256": "006461c338f35a2b8cbd07d274893618a034a04518753c1606abf396a9ad3ff0",
+      "selected_bytes": 13863,
+      "existing_statement_breakpoints": 0
+    },
+    {
+      "order": 19,
+      "source": "docs/superpowers/implementation-artifacts/drafts/0083_early_bird_message_replacements.sql",
+      "source_sha256": "27d49a6eceb36acc775d9df22d71d10745a3e43301052742e218e893c59982fd",
+      "source_bytes": 8236,
+      "selection": {
+        "kind": "entire_file"
+      },
+      "selected_sha256": "27d49a6eceb36acc775d9df22d71d10745a3e43301052742e218e893c59982fd",
+      "selected_bytes": 8236,
+      "depends_on": [
+        "committed:0080"
+      ],
+      "existing_statement_breakpoints": 0
+    }
+  ],
+  "test_draft_references": [
+    {
+      "path": "apps/worker/src/receipt-revocation-recovery.integration.test.ts",
+      "draft_names": [
+        "receipt_revocation_outbox.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-card-review.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-client-catalog.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-admission-forgery.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-candidate-reader-principal.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-capability-acl.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-database-create.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/receipt-revocation-outbox.integration.test.ts",
+      "draft_names": [
+        "receipt_revocation_outbox.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-activation-isolation.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-composite-two-db-replay.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-settlement-erasure.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-retention.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-qualification-search-path.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-final-call.integration.test.ts",
+      "draft_names": [
+        "0077_early_bird_final_call.sql",
+        "early_bird_final_call_authority.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-refunds.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql",
+        "0089_early_bird_deferred_refunds.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-capture.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-extra-function.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-verified-operation-reader.integration.test.ts",
+      "draft_names": [
+        "0084_early_bird_verified_payment_reader.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-switched-role.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-real-booking.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-intent-qualification.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-final-call-stale-config.integration.test.ts",
+      "draft_names": [
+        "0077_early_bird_final_call.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-settlement-timezone.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-baseline-function-acl.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-gateway-authority.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql",
+        "early_bird_owner_send_capability.sql",
+        "early_bird_gateway_authority.sql",
+        "receipt_revocation_outbox.sql",
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-settled-legacy-exclusion.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-observation-time.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-message-replacement.integration.test.ts",
+      "draft_names": [
+        "0083_early_bird_message_replacements.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-onboarding-status.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-bound-reader.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-booking-refund.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-verified-payment-reader.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "0084_early_bird_verified_payment_reader.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-native-principal.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-payment-settlement-store.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "0083_early_bird_verified_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-message-dispatch-cutoff.integration.test.ts",
+      "draft_names": [
+        "0083_early_bird_message_replacements.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-receipt-unknown-retention.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-intent-choice-change.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-projection-revoke-guard.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-payments.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-activation-qualification.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-settlement-sql.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-receipt-lifecycle.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-owner-30-binding.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-message-dispatch-capability.integration.test.ts",
+      "draft_names": [
+        "0083_early_bird_message_replacements.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-intent-qualification-archive.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-final-call-expire.integration.test.ts",
+      "draft_names": [
+        "0077_early_bird_final_call.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/privacy-receipt-outbox.integration.test.ts",
+      "draft_names": [
+        "receipt_revocation_outbox.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-standard-receipt-prepare.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-partial-refund.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-reader.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-partial-refund-quarantine.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-wave-coverage.integration.test.ts",
+      "draft_names": [
+        "deferred_wave_publication.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-provider.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-payment-settlement-principal.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "0083_early_bird_verified_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-owner-snapshot-prepare.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-erasure.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/privacy-receipt-capture-failure.integration.test.ts",
+      "draft_names": [
+        "receipt_revocation_outbox.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-reapproval.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-owner-receipt-prepare.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-final-call-same-config-recovery.integration.test.ts",
+      "draft_names": [
+        "0077_early_bird_final_call.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refunded-legacy-choice.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-intent-transition-lock.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-review-reconciliation-timeout.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-discovery.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "0085_early_bird_verified_refund_settlement.sql",
+        "0086_early_bird_verified_refund_binding.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-booking-consent.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-workspace-readiness.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-final-call-cancel-proof.integration.test.ts",
+      "draft_names": [
+        "0077_early_bird_final_call.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-future-legacy-reconciliation.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-isolation.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-intent-abandon-lock.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-publication.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-final-call-real-config-race.integration.test.ts",
+      "draft_names": [
+        "0077_early_bird_final_call.sql"
+      ],
+      "fixture_classification_hint": "explicit_migration_call",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-sensitive-read.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-login-minimal.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-registry.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-deferred-payment-route-reader.integration.test.ts",
+      "draft_names": [
+        "0088_early_bird_deferred_payments.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-verified-binding-repository.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-qualified-helpers.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-snapshot.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-publication-refund.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-review-reconciliation-reader.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-intent-terminal.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-publication-forgery.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-settlement-principal.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "0085_early_bird_verified_refund_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-native-admission.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-card-handoff.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-owner-intent-prepare.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-coverage-principal.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "inspect_fixture",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-receipt-contact.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-legacy-refund-reflow.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-legacy-coverage.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-observations.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-admission-projection.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-capability-role.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-owner-id-rotation.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-discovery-race.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "0085_early_bird_verified_refund_settlement.sql",
+        "0086_early_bird_verified_refund_binding.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-refund-reflow-now.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-no-sensitive-read.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-owner-scope-source.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-owner-runtime-tls.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql",
+        "0083_early_bird_verified_settlement.sql",
+        "0084_early_bird_verified_payment_reader.sql",
+        "0085_early_bird_verified_refund_settlement.sql",
+        "0086_early_bird_verified_refund_binding.sql",
+        "early_bird_owner_send_capability.sql",
+        "early_bird_gateway_authority.sql",
+        "receipt_revocation_outbox.sql",
+        "0088_early_bird_deferred_payments.sql",
+        "0089_early_bird_deferred_refunds.sql"
+      ],
+      "fixture_classification_hint": "inspect_fixture",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-workspace-opt-in.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql",
+        "wave_admission_projection.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-final-call-schema.integration.test.ts",
+      "draft_names": [
+        "0077_early_bird_final_call.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-settlement-full-price.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-coverage-epoch.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-login-privileges.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-final-call-matched-config-race.integration.test.ts",
+      "draft_names": [
+        "0077_early_bird_final_call.sql"
+      ],
+      "fixture_classification_hint": "explicit_migration_call",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-message-replacement-erasure.integration.test.ts",
+      "draft_names": [
+        "0083_early_bird_message_replacements.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-after-legacy.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-coverage-refund.integration.test.ts",
+      "draft_names": [
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "explicit_minimal_or_manual_schema",
+      "manual_synthetic_early_bird_table": true
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-wave-workspace-principal.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql",
+        "wave_workspace_gate.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-binding-arbitrary-write.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-legacy-role-migration-witness.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0082_early_bird_settlement.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    },
+    {
+      "path": "packages/db/src/repositories/early-bird-owner-send-admission.integration.test.ts",
+      "draft_names": [
+        "0081_early_bird_composite.sql",
+        "0087_early_bird_receipt_contacts.sql",
+        "early_bird_owner_send_capability.sql"
+      ],
+      "fixture_classification_hint": "real_committed_chain_helper",
+      "manual_synthetic_early_bird_table": false
+    }
+  ],
+  "observed_candidate_sha256": "4896c3e2482efc27db1578bbb8ede5098796c404faa75cb5d20ff268657a4353",
+  "passed_temporary_replay_sha256": [
+    "51fed6a36fe97d0313124ec62e14daff37070894eb1976a36e9fa7abd293b8d9",
+    "b7dea839f4c6de9c35007acf23c8d23b9322794fc8feb24d98e2b6137d0cc3e0"
+  ],
+  "passed_all_runtime_roles_witness": {
+    "candidate_sha256": "4896c3e2482efc27db1578bbb8ede5098796c404faa75cb5d20ff268657a4353",
+    "capabilities": 22,
+    "selected_segments": 19,
+    "migration_records": 82,
+    "postgresql_version": "17.5",
+    "invocation": 3,
+    "release_approval": false
+  },
+  "canonical_sha256": "4896c3e2482efc27db1578bbb8ede5098796c404faa75cb5d20ff268657a4353"
+}

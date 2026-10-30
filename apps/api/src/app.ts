@@ -78,6 +78,10 @@ import Fastify, {
 } from "fastify";
 import { createWindowedRateLimiter, type RateLimitGate } from "./rate-limit.js";
 import { buildAdminApi } from "./routes/admin.js";
+import {
+  ownerPricingApprovedRoutes,
+  type OwnerPricingApprovedDependencies,
+} from "./routes/owner-pricing-approved.js";
 import { operatorCaseRoutes } from "./routes/operator-cases.js";
 import { buildExpertReferralAdminApi } from "./routes/expert-referral-admin.js";
 import {
@@ -195,6 +199,7 @@ export interface AppDependencies {
     }>;
   };
   adminApprovals?: ApprovalPort;
+  ownerTestPricingWorkflow?: OwnerPricingApprovedDependencies["workflow"];
   operatorCases?: OperatorCaseService;
   expertReferralAdminService?: ExpertReferralAdminService;
   expertApi?: ExpertReferralApiDependencies;
@@ -292,6 +297,12 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  if (
+    deps.config.features.ownerTestPricingAdmin === true &&
+    (deps.adminApprovals === undefined ||
+      deps.ownerTestPricingWorkflow === undefined)
+  )
+    throw new Error("owner_test_pricing_approval_capability_required");
   assertClientBotAccountCapability(deps.config, deps.clientAccountQueries);
   if (
     deps.config.features.clientAccountQueries === true &&
@@ -801,6 +812,15 @@ export async function buildApp(
       requests: deps.expertAiRequests,
     });
   }
+  if (
+    deps.config.features.ownerTestPricingAdmin === true &&
+    deps.adminApprovals !== undefined &&
+    deps.ownerTestPricingWorkflow !== undefined
+  )
+    await app.register(ownerPricingApprovedRoutes, {
+      approvals: deps.adminApprovals,
+      workflow: deps.ownerTestPricingWorkflow,
+    });
   if (deps.adminApprovals !== undefined) {
     const admin = await buildAdminApi({
       approvals: deps.adminApprovals,

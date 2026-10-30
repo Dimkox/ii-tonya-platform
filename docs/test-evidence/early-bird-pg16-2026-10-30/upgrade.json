@@ -1,0 +1,10 @@
+{
+  "format": "ii-tonya-compatibility-probe-v1",
+  "productionPostgresMajor": 16,
+  "baselineSource": "19ecb3456a647743f00584b14d097c2759f0d718",
+  "result": "pass_with_reviewed_bridge_required",
+  "migration": "pass",
+  "oldAfterUpgrade": "fail",
+  "bridgeAfterUpgrade": "api_and_worker_pass",
+  "candidateMigrationCount": 84
+}

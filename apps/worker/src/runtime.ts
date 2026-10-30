@@ -19,6 +19,10 @@ export interface WorkerCycleReport {
   readonly residentLifecycleCompletion?: unknown;
   readonly expertResidencyLifecycle?: unknown;
   readonly expertPersonalOffers?: unknown;
+  readonly deferredFinalCall?: unknown;
+  readonly deferredReviewPreparation?: unknown;
+  readonly earlyBirdPublication?: unknown;
+  readonly earlyBirdLaunchKit?: unknown;
   readonly expertSeparatedSales?: unknown;
   readonly safetyHandoffs: unknown;
   readonly expiredLeaseRecovery: unknown;
@@ -84,6 +88,22 @@ export interface WorkerRuntimeDependencies {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
+  readonly deferredFinalCall?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly deferredReviewPreparation?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly earlyBirdPublication?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly earlyBirdLaunchKit?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
   readonly residentLifecycleCompletion?: {
     drain(deadline: number): Promise<void>;
     runOnce(): Promise<unknown>;
@@ -145,6 +165,22 @@ export interface ProductionWorkerRuntimeDependencies {
     stopAccepting(): void;
   };
   readonly expertPersonalOffers?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly deferredFinalCall?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly deferredReviewPreparation?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly earlyBirdPublication?: {
+    runOnce(): Promise<unknown>;
+    stopAccepting(): void;
+  };
+  readonly earlyBirdLaunchKit?: {
     runOnce(): Promise<unknown>;
     stopAccepting(): void;
   };
@@ -295,6 +331,18 @@ export function createWorkerRuntime(
       const expertPersonalOffers = acceptingClaims
         ? await deps.expertPersonalOffers?.runOnce()
         : undefined;
+      const deferredFinalCall = acceptingClaims
+        ? await deps.deferredFinalCall?.runOnce()
+        : undefined;
+      const deferredReviewPreparation = acceptingClaims
+        ? await deps.deferredReviewPreparation?.runOnce()
+        : undefined;
+      const earlyBirdPublication = acceptingClaims
+        ? await deps.earlyBirdPublication?.runOnce()
+        : undefined;
+      const earlyBirdLaunchKit = acceptingClaims
+        ? await deps.earlyBirdLaunchKit?.runOnce()
+        : undefined;
       const residentLifecycleCompletion = acceptingClaims
         ? await deps.residentLifecycleCompletion?.runOnce()
         : undefined;
@@ -352,6 +400,12 @@ export function createWorkerRuntime(
           : { residentWorkspaceNotifications }),
         ...(expertSeparatedSales === undefined ? {} : { expertSeparatedSales }),
         ...(expertPersonalOffers === undefined ? {} : { expertPersonalOffers }),
+        ...(deferredFinalCall === undefined ? {} : { deferredFinalCall }),
+        ...(deferredReviewPreparation === undefined
+          ? {}
+          : { deferredReviewPreparation }),
+        ...(earlyBirdPublication === undefined ? {} : { earlyBirdPublication }),
+        ...(earlyBirdLaunchKit === undefined ? {} : { earlyBirdLaunchKit }),
         ...(residentLifecycleCompletion === undefined
           ? {}
           : { residentLifecycleCompletion }),
@@ -395,6 +449,10 @@ export function createWorkerRuntime(
     deps.residentWorkspaceNotifications?.stopAccepting();
     deps.expertSeparatedSales?.stopAccepting();
     deps.expertPersonalOffers?.stopAccepting();
+    deps.deferredFinalCall?.stopAccepting();
+    deps.deferredReviewPreparation?.stopAccepting();
+    deps.earlyBirdPublication?.stopAccepting();
+    deps.earlyBirdLaunchKit?.stopAccepting();
     deps.residentLifecycleCompletion?.stopAccepting();
     deps.expertResidencyLifecycle?.stopAccepting();
     const notificationDeadline = Date.now() + shutdownTimeoutMs;
@@ -482,6 +540,18 @@ export function createProductionWorkerRuntime(
     ...(deps.expertPersonalOffers === undefined
       ? {}
       : { expertPersonalOffers: deps.expertPersonalOffers }),
+    ...(deps.deferredFinalCall === undefined
+      ? {}
+      : { deferredFinalCall: deps.deferredFinalCall }),
+    ...(deps.deferredReviewPreparation === undefined
+      ? {}
+      : { deferredReviewPreparation: deps.deferredReviewPreparation }),
+    ...(deps.earlyBirdPublication === undefined
+      ? {}
+      : { earlyBirdPublication: deps.earlyBirdPublication }),
+    ...(deps.earlyBirdLaunchKit === undefined
+      ? {}
+      : { earlyBirdLaunchKit: deps.earlyBirdLaunchKit }),
     ...(deps.residentLifecycleCompletion === undefined
       ? {}
       : { residentLifecycleCompletion: deps.residentLifecycleCompletion }),

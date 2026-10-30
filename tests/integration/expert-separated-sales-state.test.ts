@@ -1132,7 +1132,7 @@ it("review R2 expired original bridge quote retains finite fiscal custody for la
       f.vault,
       30,
     );
-    await receipts.redactExpiredBatch(50);
+    await receipts.redactExpiredSelection(await receipts.listExpiredBatch(50));
     expect(
       (
         await db.db.execute(

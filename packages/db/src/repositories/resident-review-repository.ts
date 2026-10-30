@@ -1,7 +1,9 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { executeOpaqueTokenOperation } from "./early-bird-token-error.js";
 import { sql } from "drizzle-orm";
 import {
   renderResidentReviewMessage,
+  renderWaveResidentReviewMessage,
   type ResidentMessageInput,
   type ResidentDraft,
   type ResidentReviewAction,
@@ -56,6 +58,7 @@ export class PostgresResidentReviewRepository {
       messagingConsentPolicyVersion: string;
       providerMode: "test" | "live";
       notifier?: ResidentReviewTransport;
+      earlyBirdReview?: boolean;
     },
   ) {}
   private async tx<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
@@ -73,14 +76,18 @@ export class PostgresResidentReviewRepository {
     if (!uuid.test(applicationId)) throw Error("resident_review_invalid");
     const initial = (
       await tx.execute<{ userId: string }>(
-        sql`select user_id as "userId" from expert_sales_form_bridges where application_id=${applicationId}::uuid`,
+        this.policy.earlyBirdReview
+          ? sql`select user_id as "userId" from expert_sales_form_bridges where application_id=${applicationId}::uuid union all select user_id as "userId" from early_bird_form_bridges where application_id=${applicationId}::uuid`
+          : sql`select user_id as "userId" from expert_sales_form_bridges where application_id=${applicationId}::uuid`,
       )
     ).rows[0];
     if (!initial) throw Error("resident_review_unavailable");
     await lockClientConsentSubject(tx, initial.userId);
     const f = (
       await tx.execute<Source>(
-        sql`select f.id,f.user_id as "userId",f.revision,f.check_generation as generation,f.submitted_revision as "submittedRevision",f.submitted_draft as draft,f.bot_id as "botId",f.bot_key as "botKey",f.chat_id as "chatId",f.status,f.active_request_id as "activeRequestId",clock_timestamp()::text as now,(clock_timestamp()+interval '48 hours')::text as deadline,(clock_timestamp()+interval '1 month')::text as "reapplyAt" from residents_applications f join expert_sales_form_bridges b on b.form_id=f.id join users u on u.id=f.user_id and u.active where b.application_id=${applicationId}::uuid and (${historicalRecovery} or f.is_current) and f.form_version=2 and f.submitted_at is not null for update of f`,
+        this.policy.earlyBirdReview
+          ? sql`select f.id,f.user_id as "userId",f.revision,f.check_generation as generation,f.submitted_revision as "submittedRevision",f.submitted_draft as draft,f.bot_id as "botId",f.bot_key as "botKey",f.chat_id as "chatId",f.status,f.active_request_id as "activeRequestId",clock_timestamp()::text as now,(clock_timestamp()+interval '48 hours')::text as deadline,(clock_timestamp()+interval '1 month')::text as "reapplyAt" from residents_applications f join users u on u.id=f.user_id and u.active where (exists(select 1 from expert_sales_form_bridges b where b.form_id=f.id and b.application_id=${applicationId}::uuid) or exists(select 1 from early_bird_form_bridges b where b.form_id=f.id and b.application_id=${applicationId}::uuid)) and (${historicalRecovery} or f.is_current) and f.form_version=2 and f.submitted_at is not null for update of f`
+          : sql`select f.id,f.user_id as "userId",f.revision,f.check_generation as generation,f.submitted_revision as "submittedRevision",f.submitted_draft as draft,f.bot_id as "botId",f.bot_key as "botKey",f.chat_id as "chatId",f.status,f.active_request_id as "activeRequestId",clock_timestamp()::text as now,(clock_timestamp()+interval '48 hours')::text as deadline,(clock_timestamp()+interval '1 month')::text as "reapplyAt" from residents_applications f join expert_sales_form_bridges b on b.form_id=f.id join users u on u.id=f.user_id and u.active where b.application_id=${applicationId}::uuid and (${historicalRecovery} or f.is_current) and f.form_version=2 and f.submitted_at is not null for update of f`,
       )
     ).rows[0];
     if (
@@ -95,6 +102,67 @@ export class PostgresResidentReviewRepository {
     )
       throw Error("resident_review_unavailable");
     return f;
+  }
+  private async waveTerms(
+    tx: Tx,
+    f: Pick<Source, "id" | "userId">,
+    applicationId: string,
+  ) {
+    if (!this.policy.earlyBirdReview) return undefined;
+    // source() holds the same subject advisory lock used by grant mutations.
+    const bridge = (
+      await tx.execute(
+        sql`select 1 from early_bird_form_bridges where application_id=${applicationId}::uuid`,
+      )
+    ).rows.length;
+    if (!bridge) return undefined;
+    const row = (
+      await tx.execute<{
+        onboardingMinor: string;
+        grantId: string | null;
+        clientStart: string;
+        prelaunch: boolean;
+        started: boolean;
+      }>(sql`
+      select s.onboarding_minor::text as "onboardingMinor", s.grant_id as "grantId", config.client_start_at::text as "clientStart", (config.phase = 'WAVE_1_EARLY_BIRD' and early_bird_current_time() < config.client_start_at and early_bird_current_time() >= config.enrollment_start_at) as "prelaunch", (early_bird_current_time() >= config.client_start_at) as "started"
+      from early_bird_form_bridges b
+      join early_bird_form_enrollments e on e.form_id=b.form_id and e.user_id=b.user_id and e.choice_id=b.choice_id
+      join early_bird_choices c on c.id=b.choice_id and c.user_id=b.user_id
+      join early_bird_positive_price_snapshots s on s.positive_choice_id=c.positive_choice_id and s.user_id=c.user_id and s.base_id=c.base_id
+      join early_bird_launch_configs config on config.active
+      where b.application_id=${applicationId}::uuid and b.form_id=${f.id}::uuid and b.user_id=${f.userId}::uuid
+      for share of s, config`)
+    ).rows[0];
+    if (!row) throw Error("resident_review_unavailable");
+    const grant = (
+      await tx.execute<{ id: string }>(
+        sql`select id from owner_test_pricing_grants where user_id=${f.userId}::uuid and revoked_at is null and provider_mode='live' for share`,
+      )
+    ).rows[0];
+    if ((grant?.id ?? null) !== row.grantId)
+      throw Error("resident_preview_stale");
+    const phase = (
+      await tx.execute<{ prelaunch: boolean; started: boolean }>(
+        sql`select (phase='WAVE_1_EARLY_BIRD' and early_bird_current_time() >= enrollment_start_at and early_bird_current_time() < client_start_at) as "prelaunch", (early_bird_current_time() >= client_start_at) as "started" from early_bird_launch_configs where active`,
+      )
+    ).rows[0];
+    if (!phase || (!phase.prelaunch && !phase.started))
+      throw Error("resident_review_unavailable");
+    const start = new Date(row.clientStart);
+    if (!Number.isFinite(start.getTime()))
+      throw Error("resident_review_unavailable");
+    return {
+      onboardingMinor: Number(row.onboardingMinor),
+      prelaunch: phase.prelaunch,
+      clientStart: new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Europe/Moscow",
+      })
+        .format(start)
+        .replace(/ г\.$/u, ""),
+    };
   }
   async preview(sessionHash: string, raw: ResidentReviewPreviewInput) {
     const input = structuredClone(raw);
@@ -120,12 +188,19 @@ export class PostgresResidentReviewRepository {
         ...(input.questions ? { questions: input.questions } : {}),
         ...(input.tone ? { tone: input.tone } : {}),
       };
-      const rendered = renderResidentReviewMessage({
+      const messageInput = {
         ...variables,
         ...(input.editedText === undefined
           ? {}
           : { editedText: input.editedText }),
-      });
+      };
+      const wave =
+        input.key === "APPROVED_BASIC" || input.key === "APPROVED_EXCLUSIVE"
+          ? await this.waveTerms(tx, f, input.applicationId)
+          : undefined;
+      const rendered = wave
+        ? renderWaveResidentReviewMessage(messageInput, wave)
+        : renderResidentReviewMessage(messageInput);
       if (
         input.key === "REJECT_INSUFFICIENT_PROOF" &&
         !(
@@ -189,6 +264,16 @@ export class PostgresResidentReviewRepository {
       ).rows[0];
       if (!p || p.hash !== finalHash || f.status !== "UNDER_REVIEW")
         throw Error("resident_preview_stale");
+      if (p.action === "APPROVED_BASIC" || p.action === "APPROVED_EXCLUSIVE") {
+        const terms = await this.waveTerms(tx, f, applicationId);
+        if (
+          terms &&
+          !(terms.prelaunch
+            ? p.text.includes(`Старт для клиентов — ${terms.clientStart} года.`)
+            : p.text.includes("Платформа открыта для клиентов."))
+        )
+          throw Error("resident_preview_stale");
+      }
       await lockExpertManagerAuthority(tx, sessionHash);
       const e = (
         await tx.execute<{ id: string; deadline: string | null }>(
@@ -305,7 +390,7 @@ export class PostgresResidentReviewRepository {
       )
     ).rows;
   }
-  private async deliverySource(tx: Tx, id: string) {
+  private async deliverySource(tx: Tx, id: string, dispatchToken?: string) {
     const initial = (
       await tx.execute<{ userId: string }>(
         sql`select user_id as "userId" from resident_review_messages where event_id=${id}::uuid`,
@@ -322,8 +407,12 @@ export class PostgresResidentReviewRepository {
         text: string;
         status: string;
         consentVersion: string;
+        formId: string;
+        action: "APPROVED_BASIC" | "APPROVED_EXCLUSIVE" | string;
+        finalHash: string;
+        tone: "standard" | "warm" | "brief" | null;
       }>(
-        sql`select m.user_id as "userId",f.bot_id as "botId",f.bot_key as "botKey",f.chat_id as "chatId",m.final_text as text,m.status,m.consent_version as "consentVersion" from resident_review_messages m join residents_applications f on f.id=m.application_id and f.user_id=m.user_id and f.is_current join resident_review_events e on e.id=m.event_id and e.attempt_id=f.id join users u on u.id=f.user_id and u.active where m.event_id=${id}::uuid and m.final_hash=e.final_hash and ((e.action='INFO_REQUESTED' and f.active_request_id=e.id and f.status='INFO_REQUESTED' and e.deadline>clock_timestamp() and exists(select 1 from resident_information_requests r where r.id=e.id and r.status='open')) or (e.action in('REJECT_SOFT','REJECT_HARD') and f.status='REJECTED') or (e.action in('APPROVED_BASIC','APPROVED_EXCLUSIVE') and f.status=e.action)) for update of m for share of f,u`,
+        sql`select f.id as "formId",e.action,m.final_hash as "finalHash",p.variables->>'tone' as tone,m.user_id as "userId",f.bot_id as "botId",f.bot_key as "botKey",f.chat_id as "chatId",m.final_text as text,m.status,m.consent_version as "consentVersion" from resident_review_messages m join residents_applications f on f.id=m.application_id and f.user_id=m.user_id and f.is_current join resident_review_events e on e.id=m.event_id and e.attempt_id=f.id join resident_review_previews p on p.id=e.preview_id join users u on u.id=f.user_id and u.active where m.event_id=${id}::uuid and m.final_hash=e.final_hash and ((e.action='INFO_REQUESTED' and f.active_request_id=e.id and f.status='INFO_REQUESTED' and e.deadline>clock_timestamp() and exists(select 1 from resident_information_requests r where r.id=e.id and r.status='open')) or (e.action in('REJECT_SOFT','REJECT_HARD') and f.status='REJECTED') or (e.action in('APPROVED_BASIC','APPROVED_EXCLUSIVE') and f.status=e.action)) for update of m for share of f,u`,
       )
     ).rows[0];
     if (
@@ -338,6 +427,83 @@ export class PostgresResidentReviewRepository {
       }))
     )
       return null;
+    if (
+      this.policy.earlyBirdReview &&
+      (row.action === "APPROVED_BASIC" || row.action === "APPROVED_EXCLUSIVE")
+    ) {
+      const bridge = (
+        await tx.execute<{ applicationId: string }>(
+          sql`select application_id as "applicationId" from early_bird_form_bridges where form_id=${row.formId}::uuid and user_id=${row.userId}::uuid`,
+        )
+      ).rows[0];
+      if (bridge) {
+        try {
+          const terms = await this.waveTerms(
+            tx,
+            { id: row.formId, userId: row.userId },
+            bridge.applicationId,
+          );
+          if (!terms) return null;
+          if (!terms.prelaunch && row.text.includes("Старт для клиентов — ")) {
+            const replacementText = renderWaveResidentReviewMessage(
+              {
+                key: row.action as "APPROVED_BASIC" | "APPROVED_EXCLUSIVE",
+                ...(row.tone ? { tone: row.tone } : {}),
+              },
+              terms,
+            ).text;
+            let replacement = (
+              await tx.execute<{
+                text: string;
+                hash: string;
+                originalHash: string;
+              }>(
+                sql`select replacement_text as text,replacement_hash as hash,original_hash as "originalHash" from early_bird_message_replacements where event_id=${id}::uuid and user_id=${row.userId}::uuid for share`,
+              )
+            ).rows[0];
+            if (!replacement && row.status === "pending") {
+              await tx.execute(
+                sql`insert into early_bird_message_replacements(event_id,user_id,original_hash,replacement_text,replacement_hash) values(${id}::uuid,${row.userId}::uuid,${row.finalHash},${replacementText},${hash(replacementText)})`,
+              );
+              replacement = {
+                text: replacementText,
+                hash: hash(replacementText),
+                originalHash: row.finalHash,
+              };
+            }
+            if (!replacement && row.status === "dispatched" && dispatchToken) {
+              await executeOpaqueTokenOperation(() =>
+                tx.execute(
+                  sql`select early_bird_replace_dispatched(${id}::uuid,${row.userId}::uuid,${replacementText},${dispatchToken})`,
+                ),
+              );
+              replacement = {
+                text: replacementText,
+                hash: hash(replacementText),
+                originalHash: row.finalHash,
+              };
+            }
+            if (
+              !replacement ||
+              replacement.text !== replacementText ||
+              replacement.hash !== hash(replacementText) ||
+              replacement.originalHash !== row.finalHash
+            )
+              return null;
+            row.text = replacement.text;
+          } else if (
+            !(terms.prelaunch
+              ? row.text.includes(
+                  `Старт для клиентов — ${terms.clientStart} года.`,
+                )
+              : row.text.includes("Платформа открыта для клиентов."))
+          )
+            return null;
+        } catch {
+          return null;
+        }
+      }
+    }
     return row;
   }
   async deliverMaterials(id: string, { signal }: { signal: AbortSignal }) {
@@ -352,15 +518,28 @@ export class PostgresResidentReviewRepository {
         return false;
       }
       if (r.status !== "pending" || signal.aborted) return false;
+      const wave =
+        this.policy.earlyBirdReview &&
+        (r.action === "APPROVED_BASIC" || r.action === "APPROVED_EXCLUSIVE") &&
+        (
+          await tx.execute(
+            sql`select 1 from early_bird_form_bridges where form_id=${r.formId}::uuid and user_id=${r.userId}::uuid`,
+          )
+        ).rows.length > 0;
+      const token = wave ? randomBytes(32).toString("hex") : undefined;
+      if (token)
+        await tx.execute(
+          sql`insert into early_bird_message_dispatch_claims(event_id,user_id,token_hash) values(${id}::uuid,${r.userId}::uuid,${hash(token)})`,
+        );
       await tx.execute(
         sql`update resident_review_messages set status='dispatched',attempts=attempts+1,dispatched_at=clock_timestamp() where event_id=${id}::uuid`,
       );
-      return true;
+      return { token };
     });
     if (!ready) return { kind: "cancelled" as const };
     try {
       return await this.tx(async (tx) => {
-        const r = await this.deliverySource(tx, id);
+        const r = await this.deliverySource(tx, id, ready.token);
         if (!r || signal.aborted) {
           // No provider call has occurred: stale authority is definitely unsent.
           await tx.execute(
@@ -370,6 +549,10 @@ export class PostgresResidentReviewRepository {
         }
         if (r.status !== "dispatched") return { kind: "cancelled" as const };
         try {
+          if (ready.token)
+            await tx.execute(
+              sql`insert into early_bird_message_dispatch_consumptions(event_id,user_id) values(${id}::uuid,${r.userId}::uuid) on conflict(event_id) do nothing`,
+            );
           const receipt = await this.policy.notifier!.send({
             botId: r.botId,
             botKey: r.botKey,

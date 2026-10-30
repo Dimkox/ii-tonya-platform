@@ -1,0 +1,90 @@
+import { randomUUID } from "node:crypto";
+import { ownerPricingApproval } from "../testkit/owner-pricing-approval.js";
+import { afterAll, beforeAll, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
+import {
+  startExpertReferralTestDatabase,
+  type ExpertReferralTestDatabase,
+} from "../testkit/expert-referral.js";
+
+let db: ExpertReferralTestDatabase;
+beforeAll(async () => {
+  db = await startExpertReferralTestDatabase();
+  await db.db.transaction(async (tx) => {
+    await tx.execute(
+      sql`update early_bird_launch_configs set active=false where active`,
+    );
+    await tx.execute(
+      sql`insert into early_bird_launch_configs(phase,enrollment_start_at,client_start_at,promo_deadline_days,final_call_trigger_at) values ('WAVE_1_EARLY_BIRD','2026-11-01T00:00:00+03:00','2027-01-11T00:00:00+03:00',10,'2026-12-28T10:00:00+03:00')`,
+    );
+  });
+  // A disposable DB runs the real phase logic against a deterministic launch-period clock.
+  await db.db.execute(
+    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
+  );
+}, 120_000);
+afterAll(async () => {
+  await db?.stop();
+}, 120_000);
+it("binds positive confirmation to the shown grant and rejects a later price change", async () => {
+  const { seedClientConsent } = await import("../testkit/client-consent.js");
+  const user = await db.createUser();
+  await seedClientConsent(db.db, user, "client_messaging");
+  await db.db.execute(
+    sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id) values (${user}::uuid,'telegram','123456','fixture-bot','123456')`,
+  );
+  await db.db.execute(
+    sql`insert into expert_offer_profiles(user_id,revision,city_code,million_city,service_format,ticket_minor,participant_kind,idempotency_key) values (${user}::uuid,1,'fixture',false,'offline',300000,'expert','fixture-profile')`,
+  );
+  const tariff = await db.createResidencyTariff({
+    tariffKey: "PRO",
+    displayName: "PRO",
+    priceMinor: 1000000,
+    durationSeconds: 2592000,
+  });
+  const base = randomUUID();
+  await db.db.execute(
+    sql`insert into expert_sales_bases(id,user_id,tariff_version_id,profile_revision,base_tariff_amount,participant_kind,bot_id,bot_key,chat_id,consent_version) select ${base}::uuid,${user}::uuid,t.id,1,greatest(500000,t.price_minor),'expert','1','fixture-bot','123456','client-messaging-v1' from expert_residency_tariff_versions t where t.id=${tariff}::uuid`,
+  );
+  const positive = randomUUID();
+  await db.db.execute(
+    sql`insert into expert_sales_choices(id,base_id,user_id,revision,action,request_key,request_digest) values (${positive}::uuid,${base}::uuid,${user}::uuid,1,'positive','positive-1',${"a".repeat(64)})`,
+  );
+  await db.db.execute(
+    sql`insert into early_bird_positive_price_snapshots(positive_choice_id,user_id,base_id,grant_id) values(${positive}::uuid,${user}::uuid,${base}::uuid,null)`,
+  );
+  const snapshot = (
+    await db.db.execute<{
+      grant_id: string | null;
+      onboarding_minor: string;
+      base_monthly_minor: string;
+    }>(
+      sql`select grant_id::text,onboarding_minor::text,base_monthly_minor::text from early_bird_positive_price_snapshots where positive_choice_id=${positive}::uuid`,
+    )
+  ).rows[0];
+  expect(snapshot?.grant_id).toBeNull();
+  expect(snapshot?.onboarding_minor).toBe("300000");
+  await expect(
+    db.db.execute(
+      sql`update early_bird_positive_price_snapshots set onboarding_minor=1 where positive_choice_id=${positive}::uuid`,
+    ),
+  ).rejects.toThrow();
+  const admin = await db.createAdminAudit({
+    action: "fixture",
+    objectId: randomUUID(),
+  });
+  const approval = await ownerPricingApproval(db, {
+    action: "grant",
+    target: user,
+    adminId: admin.adminId,
+    sessionIdHash: admin.sessionIdHash,
+  });
+  await db.db.execute(
+    sql`insert into owner_test_pricing_grants(user_id,granted_by,grant_session_hash,grant_approval_id) values(${user}::uuid,${admin.adminId}::uuid,${admin.sessionIdHash},${approval}::uuid)`,
+  );
+  await expect(
+    db.db.execute(
+      sql`insert into early_bird_choices(user_id,base_id,positive_choice_id,revision,choice,request_key,request_digest) values(${user}::uuid,${base}::uuid,${positive}::uuid,1,'now','stale-price',${"d".repeat(64)})`,
+    ),
+  ).rejects.toThrow();
+}, 120_000);

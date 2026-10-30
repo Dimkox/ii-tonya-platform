@@ -1,4 +1,24 @@
-import { PostgresYooKassaPaymentPurposeRepository } from "@ii-tonya/db";
+import {
+  createEarlyBirdStandardRuntimeComposition,
+  type EarlyBirdStandardRuntimeConfiguration,
+} from "./expert-early-bird-standard-runtime-composition.js";
+import {
+  combineEarlyBirdNowAuthorities,
+  combineEarlyBirdNowReceiptAuthorities,
+} from "./expert-early-bird-now-router.js";
+import {
+  createEarlyBirdOwnerRuntimeComposition,
+  type EarlyBirdOwnerRuntimeConfiguration,
+} from "./expert-early-bird-runtime-composition.js";
+import { loadEarlyBirdGatewayBootstrap } from "./early-bird-gateway-bootstrap.js";
+import type { createPostgresEarlyBirdAuthority } from "./expert-early-bird-authority.js";
+import { PostgresReceiptRevocationOutbox } from "@ii-tonya/db";
+import { ExperimentalGatewayIpc } from "@ii-tonya/integrations";
+import { createReceiptContactFence } from "./receipt-disclosure-contact-fence.js";
+import {
+  PostgresYooKassaPaymentPurposeRepository,
+  assertWaveWorkspaceCapabilities,
+} from "@ii-tonya/db";
 import { createExpertManagerTelegramComposition } from "./expert-manager-telegram-composition.js";
 import { createClientBotAccountComposition } from "./client-bot-account-composition.js";
 import { assertClientAccountQueriesConfig } from "@ii-tonya/config";
@@ -73,6 +93,7 @@ import {
   defaultMigrationsFolder,
   migrateDb,
   PostgresAdminApprovalRepository,
+  PostgresOwnerTestPricingWorkflow,
   PostgresAdminRepository,
   PostgresPrivacyRepository,
   PostgresErasureRequestRepository,
@@ -160,6 +181,16 @@ export const createDefaultLifecycle = (
     >;
     expertVerificationPayments?: ExpertVerificationPaymentCapabilities;
     yookassaWebhook?: Omit<YooKassaWebhookDependencies, "onboarding">;
+    receiptDisclosureGateway?: ExperimentalGatewayIpc;
+    receiptDisclosureKeyVersion?: string;
+    earlyBirdRuntime?: EarlyBirdOwnerRuntimeConfiguration;
+    earlyBirdStandardRuntime?: EarlyBirdStandardRuntimeConfiguration;
+    earlyBirdDeferred?: Parameters<typeof createPostgresEarlyBirdAuthority>[6];
+    /** Explicitly constructed trusted capabilities; absent by default, never enabled from env. */
+    earlyBirdWebhookRouting?: Required<
+      Pick<YooKassaWebhookDependencies, "resolvePurpose" | "composite">
+    > &
+      Pick<YooKassaWebhookDependencies, "deferredRefund" | "deferredPayment">;
     expertCodeSecretResolver?: {
       resolve(input: {
         reference: string;
@@ -204,6 +235,39 @@ export const createDefaultLifecycle = (
   } = {},
 ): ServerLifecycle => ({
   preflight(config) {
+    if (options.earlyBirdWebhookRouting && !options.yookassaWebhook)
+      throw new Error("early_bird_webhook_requires_yookassa");
+    if (config.yookassaGateway && !options.earlyBirdRuntime)
+      throw new Error("early_bird_gateway_bootstrap_required");
+    if (
+      options.earlyBirdRuntime &&
+      (!config.yookassaGateway ||
+        options.receiptDisclosureGateway !== options.earlyBirdRuntime.gateway ||
+        options.receiptDisclosureKeyVersion !==
+          options.earlyBirdRuntime.gatewaySubjectKeyVersion ||
+        !options.yookassaWebhook ||
+        !options.earlyBirdWebhookRouting ||
+        !options.earlyBirdDeferred ||
+        !options.earlyBirdStandardRuntime ||
+        options.earlyBirdStandardRuntime.gateway !==
+          options.earlyBirdRuntime.gateway)
+    )
+      throw new Error("early_bird_gateway_runtime_incomplete");
+    const receiptCheckout =
+      config.expertVerification?.checkoutEnabled === true ||
+      config.expertCard?.mainCheckoutEnabled === true ||
+      config.expertResidencyLifecycle?.renewalCheckoutEnabled === true;
+    if (
+      (receiptCheckout || options.receiptDisclosureGateway) &&
+      !(options.receiptDisclosureGateway instanceof ExperimentalGatewayIpc)
+    )
+      throw new Error("receipt disclosure cancellation gateway required");
+    if (
+      options.receiptDisclosureGateway &&
+      (typeof options.receiptDisclosureKeyVersion !== "string" ||
+        !/^[A-Za-z0-9_-]{1,64}$/u.test(options.receiptDisclosureKeyVersion))
+    )
+      throw new Error("receipt_disclosure_key_version_invalid");
     assertClientAccountQueriesConfig(config);
     assertExpertResidencyLifecycleConfig(config);
     assertExpertResidencyLifecycleCheckout(
@@ -277,6 +341,41 @@ export const createDefaultLifecycle = (
     await migrateDb(db, defaultMigrationsFolder);
   },
   async dependencies(config, db) {
+    if (options.receiptDisclosureGateway)
+      await new PostgresReceiptRevocationOutbox(db).assertReady("privacy");
+    if (options.earlyBirdWebhookRouting && !options.yookassaWebhook)
+      throw new Error("early_bird_webhook_requires_yookassa");
+    if (config.yookassaGateway && !options.earlyBirdRuntime)
+      throw new Error("early_bird_gateway_bootstrap_required");
+    if (
+      options.earlyBirdRuntime &&
+      (!config.yookassaGateway ||
+        options.receiptDisclosureGateway !== options.earlyBirdRuntime.gateway ||
+        options.receiptDisclosureKeyVersion !==
+          options.earlyBirdRuntime.gatewaySubjectKeyVersion ||
+        !options.yookassaWebhook ||
+        !options.earlyBirdWebhookRouting ||
+        !options.earlyBirdDeferred ||
+        !options.earlyBirdStandardRuntime ||
+        options.earlyBirdStandardRuntime.gateway !==
+          options.earlyBirdRuntime.gateway)
+    )
+      throw new Error("early_bird_gateway_runtime_incomplete");
+    const receiptCheckout =
+      config.expertVerification?.checkoutEnabled === true ||
+      config.expertCard?.mainCheckoutEnabled === true ||
+      config.expertResidencyLifecycle?.renewalCheckoutEnabled === true;
+    if (
+      (receiptCheckout || options.receiptDisclosureGateway) &&
+      !(options.receiptDisclosureGateway instanceof ExperimentalGatewayIpc)
+    )
+      throw new Error("receipt disclosure cancellation gateway required");
+    if (
+      options.receiptDisclosureGateway &&
+      (typeof options.receiptDisclosureKeyVersion !== "string" ||
+        !/^[A-Za-z0-9_-]{1,64}$/u.test(options.receiptDisclosureKeyVersion))
+    )
+      throw new Error("receipt_disclosure_key_version_invalid");
     if (
       (config.features.expertResidencyBilling ||
         config.features.expertReferral) &&
@@ -338,7 +437,9 @@ export const createDefaultLifecycle = (
         repository,
         inbox,
         bookings: createBookingService({
-          repository: new PostgresBookingRepository(db),
+          repository: new PostgresBookingRepository(db, {
+            waveCoverage: config.features.waveWorkspace === true,
+          }),
           clock: { now: () => new Date() },
         }),
         acknowledge: createBookingCallbackAck(config.clientTelegramBotToken),
@@ -511,9 +612,9 @@ export const createDefaultLifecycle = (
     const clientBookingService =
       config.features.clientBooking === true
         ? createClientBookingService({
-            repository: new PostgresBookingRepository(
-              db,
-              notificationOrigin
+            repository: new PostgresBookingRepository(db, {
+              waveCoverage: config.features.waveWorkspace === true,
+              ...(notificationOrigin
                 ? {
                     notificationOrigin: {
                       botKey: notificationOrigin.botKey!,
@@ -521,8 +622,8 @@ export const createDefaultLifecycle = (
                         notificationOrigin.messagingPolicyVersion!,
                     },
                   }
-                : {},
-            ),
+                : {}),
+            }),
             confirmationBufferMs:
               config.clientBookingConfirmationBufferMs ?? 3_600_000,
           })
@@ -536,6 +637,7 @@ export const createDefaultLifecycle = (
                 new PostgresWaitlistRepository(
                   waitlistDb,
                   confirmationBufferMs,
+                  { waveCoverage: config.features.waveWorkspace === true },
                 ))
             )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000),
           })
@@ -620,6 +722,8 @@ export const createDefaultLifecycle = (
       config,
       options.expertResidencyLifecycle,
     );
+    if (config.features.waveWorkspace === true)
+      await assertWaveWorkspaceCapabilities(db);
     const expertCard = createExpertCardComposition(
       db,
       config,
@@ -640,10 +744,40 @@ export const createDefaultLifecycle = (
     const applicantReceipt = config.features.expertSeparatedSales
       ? createPayerReceiptComposition(db, config)
       : undefined;
+    const earlyBirdRuntime = options.earlyBirdRuntime
+      ? createEarlyBirdOwnerRuntimeComposition(db, options.earlyBirdRuntime)
+      : undefined;
+    const earlyBirdStandardRuntime = options.earlyBirdStandardRuntime
+      ? createEarlyBirdStandardRuntimeComposition(
+          db,
+          options.earlyBirdStandardRuntime,
+        )
+      : undefined;
+    const earlyBirdWave =
+      earlyBirdRuntime && config.expertApplicant && config.launchPhase
+        ? await earlyBirdRuntime.initializeWaveAuthority(
+            config.expertApplicant,
+            config.launchPhase,
+            options.earlyBirdDeferred,
+            earlyBirdStandardRuntime
+              ? {
+                  prepare: combineEarlyBirdNowAuthorities(
+                    earlyBirdRuntime.prepare,
+                    earlyBirdStandardRuntime.prepare,
+                  ),
+                  receipt: combineEarlyBirdNowReceiptAuthorities(
+                    earlyBirdRuntime.receipt,
+                    earlyBirdStandardRuntime.receipt,
+                  ),
+                }
+              : undefined,
+          )
+        : undefined;
     const originalExpertApplicantTelegram = createExpertApplicantComposition(
       db,
       config,
       {
+        ...(earlyBirdWave ? { wave: earlyBirdWave } : {}),
         ...(applicantReceipt && config.payerReceipt
           ? {
               receipt: {
@@ -722,11 +856,17 @@ export const createDefaultLifecycle = (
         ? {
             yookassaWebhook: {
               ...options.yookassaWebhook,
-              resolvePurpose: (providerObjectId, event) =>
-                new PostgresYooKassaPaymentPurposeRepository(db).resolvePurpose(
-                  providerObjectId,
-                  event,
-                ),
+              ...(options.earlyBirdWebhookRouting ?? {
+                resolvePurpose: (
+                  providerObjectId: string,
+                  event: Parameters<
+                    NonNullable<YooKassaWebhookDependencies["resolvePurpose"]>
+                  >[1],
+                ) =>
+                  new PostgresYooKassaPaymentPurposeRepository(
+                    db,
+                  ).resolvePurpose(providerObjectId, event),
+              }),
               ...(expertVerification?.onboardingWebhook
                 ? { onboarding: expertVerification.onboardingWebhook }
                 : {}),
@@ -746,7 +886,9 @@ export const createDefaultLifecycle = (
           db.transaction(async (tx) => {
             await tx.execute(sql`SET LOCAL lock_timeout = '1s'`);
             await tx.execute(sql`SET LOCAL statement_timeout = '2s'`);
-            return new PostgresCatalogRepository(tx).listPublicServices(input);
+            return new PostgresCatalogRepository(tx, {
+              waveCoverage: config.features.waveWorkspace === true,
+            }).listPublicServices(input);
           }),
       },
       privacyService:
@@ -754,6 +896,14 @@ export const createDefaultLifecycle = (
           ? createPrivacyService({
               repository: new PostgresPrivacyRepository(db, {
                 privacyMutationCapability: { enabled: true },
+                ...(options.receiptDisclosureGateway
+                  ? {
+                      beforePrivacyReceiptDisclosure: createReceiptContactFence(
+                        options.receiptDisclosureGateway,
+                        options.receiptDisclosureKeyVersion!,
+                      ),
+                    }
+                  : {}),
               }),
               // Репозиторий дописывает аудит внутри своей сериализуемой транзакции;
               // этот порт остался в сигнатуре ради совместимости композиции.
@@ -817,6 +967,14 @@ export const createDefaultLifecycle = (
         cases: new PostgresOperatorCaseRepository(db),
       }),
       adminApprovals,
+      ...(config.features.ownerTestPricingAdmin === true
+        ? {
+            ownerTestPricingWorkflow: new PostgresOwnerTestPricingWorkflow(
+              db,
+              adminApprovals,
+            ),
+          }
+        : {}),
       expertReferralAdminService: createExpertReferralAdminService({
         workflows: new PostgresExpertReferralAdminRepository(db, codeCrypto),
       }),
@@ -957,11 +1115,42 @@ export async function listenServer(
   }
 }
 
-export async function main(
-  lifecycle: ServerLifecycle = createDefaultLifecycle(),
-): Promise<void> {
+export async function main(injectedLifecycle?: ServerLifecycle): Promise<void> {
   const config = loadEnv(process.env);
-  const db = createDb(config.databaseUrl);
+  const bootstrap = injectedLifecycle
+    ? undefined
+    : loadEarlyBirdGatewayBootstrap(config);
+  let db: DrizzleDb;
+  try {
+    db = createDb(config.databaseUrl);
+  } catch (error) {
+    await bootstrap?.close();
+    throw error;
+  }
+  let lifecycle: ServerLifecycle;
+  try {
+    const baseLifecycle =
+      injectedLifecycle ?? createDefaultLifecycle(bootstrap?.serverOptions(db));
+    lifecycle = bootstrap
+      ? {
+          ...baseLifecycle,
+          async close(db) {
+            try {
+              await baseLifecycle.close(db);
+            } finally {
+              await bootstrap.close();
+            }
+          },
+        }
+      : baseLifecycle;
+  } catch (error) {
+    try {
+      await closeDb(db);
+    } finally {
+      await bootstrap?.close();
+    }
+    throw error;
+  }
   let app: FastifyInstance;
   try {
     app = await composeServer(lifecycle, db);

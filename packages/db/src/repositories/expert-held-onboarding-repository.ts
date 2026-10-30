@@ -32,7 +32,9 @@ type RequestRow = {
 };
 /** Durable onboarding-specific custody. A dispatched operation is never blindly POSTed again. */
 export class PostgresHeldOnboardingCheckout {
-  readonly strictFirstSendCancellation = true as const;
+  // A Node callback can outlive its database transaction after connection loss.
+  // Do not claim strict cancellation until transport and erasure share a proven fence.
+  readonly strictFirstSendCancellation = false as const;
   private reconciliationCursor: string | null = null;
   constructor(
     private readonly db: DrizzleDb,
@@ -166,6 +168,9 @@ export class PostgresHeldOnboardingCheckout {
     });
   }
   private async dispatch(invoiceId: string, operation: RequestRow) {
+    // Preserve GET reconciliation and capture/cancel of existing payments, but
+    // never disclose a new receipt contact without the cancellation fence.
+    if (operation.kind === "create") return null;
     // Commit the uncertainty marker BEFORE a possible network send. A crash requires GET recovery.
     const claimed =
       (
@@ -174,31 +179,10 @@ export class PostgresHeldOnboardingCheckout {
         )
       ).rows.length === 1;
     if (!claimed) return null;
-    let body = operation.body;
-    if (operation.kind === "create") {
-      if (!operation.encrypted || !operation.keyReference) return null;
-      const opened = await this.deps.decryptor.decrypt({
-        encryptedBody: operation.encrypted,
-        keyReference: operation.keyReference,
-        associatedData: {
-          operationId: operation.id,
-          operationKind: "create_payment",
-          idempotencyKey: operation.key,
-          requestDigest: operation.digest,
-          bodyVersion: 1,
-        },
-      });
-      if (opened.bodyVersion !== 1) throw new Error("held_body_unavailable");
-      body = opened.body;
-    }
+    const body = operation.body;
     if (body === null || hash(body) !== operation.digest)
       throw new Error("held_body_unavailable");
-    // Decryption and provider GET happen outside the disclosure barrier. Deletion
-    // can complete during either wait and the final transaction then cancels send.
-    const observation =
-      operation.kind === "create"
-        ? null
-        : await this.deps.client.inspect(operation.paymentId!);
+    const observation = await this.deps.client.inspect(operation.paymentId!);
     const exactBody = body;
     return this.db.transaction(async (tx) => {
       const frame = await this.frame(tx, invoiceId);
@@ -211,24 +195,6 @@ export class PostgresHeldOnboardingCheckout {
           sql`update expert_sales_provider_requests set status='cancelled',encrypted_body=null,key_reference=null where id=${operation.id}::uuid`,
         );
         return null;
-      }
-      if (operation.kind === "create") {
-        const contact = (
-          await tx.execute(
-            sql`select 1 from payer_receipt_contacts where id=${operation.contactId}::uuid and user_id=${frame.userId}::uuid and quote_id=${frame.quoteId}::uuid and redacted_at is null and ciphertext is not null and expires_at>clock_timestamp() for share`,
-          )
-        ).rows.length;
-        const custody = (
-          await tx.execute(
-            sql`select 1 from expert_sales_provider_requests where id=${operation.id}::uuid and encrypted_body is not null and key_reference is not null and status='dispatched' and body_expires_at>clock_timestamp()`,
-          )
-        ).rows.length;
-        if (!contact || !custody) {
-          await tx.execute(
-            sql`update expert_sales_provider_requests set status='cancelled',encrypted_body=null,key_reference=null where id=${operation.id}::uuid`,
-          );
-          return null;
-        }
       }
       if (observation) {
         this.binding(observation, invoiceId, frame.operationId, frame.userId);
@@ -425,26 +391,30 @@ export class PostgresHeldOnboardingCheckout {
     const frame = await this.db.transaction((tx) =>
       this.frame(tx, input.invoiceId),
     );
-    if (!frame?.current || frame.operationId !== input.operationId)
+    if (
+      !frame?.current ||
+      frame.mode !== this.deps.mode ||
+      frame.operationId !== input.operationId
+    )
       return { kind: "unavailable" };
-    await this.prepare(input.invoiceId);
-    const op = await this.request(input.invoiceId, "create");
-    if (op?.status === "prepared") await this.dispatch(input.invoiceId, op);
-    const current = await this.db.transaction((tx) =>
-      this.frame(tx, input.invoiceId),
-    );
-    if (!current?.current) return { kind: "unavailable" };
-    if (!current.paymentId) return { kind: "pending" };
-    const fact = await this.deps.client.inspect(current.paymentId);
-    this.binding(fact, input.invoiceId, current.operationId, current.userId);
-    if (fact.status !== "pending") {
+    // Existing provider objects can be recovered through authoritative GET;
+    // an unbound invoice must not trigger first disclosure in either mode.
+    if (!frame.paymentId) return { kind: "unavailable" };
+    const existing = await this.deps.client.inspect(frame.paymentId);
+    this.binding(existing, input.invoiceId, frame.operationId, frame.userId);
+    if (existing.status !== "pending") {
       await this.reconcile(input.invoiceId);
       return { kind: "pending" };
     }
-    return fact.confirmation
-      ? { kind: "ready", url: fact.confirmation.url, paymentId: fact.id }
+    return existing.confirmation
+      ? {
+          kind: "ready",
+          url: existing.confirmation.url,
+          paymentId: existing.id,
+        }
       : { kind: "pending" };
   }
+
   async createCheckout(input: { invoiceId: string }) {
     const frame = await this.db.transaction((tx) =>
       this.frame(tx, input.invoiceId),

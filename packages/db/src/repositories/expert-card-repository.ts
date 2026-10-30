@@ -344,15 +344,40 @@ async function originalConsent(
     ? rows[0]!.policyVersion
     : null;
 }
-async function paidApplication(tx: ExpertCardTransaction, userId: string) {
-  return (
-    (
-      await tx.execute<{ applicationId: string }>(
-        sql`select a.id as "applicationId" from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_onboarding_invoices i on i.application_id=a.id and i.user_id=a.user_id and i.purpose='onboarding' and i.status='settled' join expert_onboarding_payment_facts f on f.invoice_id=i.id and f.user_id=a.user_id and f.admission='interview' where a.user_id=${userId}::uuid and a.verification_status='approved' and a.onboarding_stage is not null and a.archived_at is null and a.archive_until_date is null for share of a,u`,
-      )
-    ).rows[0] ?? null
+/** Called by composition before enabling wave workspace on a DB principal. */
+export async function assertWaveWorkspaceCapabilities(
+  db: Pick<DrizzleDb, "execute">,
+): Promise<void> {
+  const result = await db.execute<{ available: boolean }>(
+    sql`select case when to_regprocedure('public.early_bird_paid_workspace(uuid)') is null or to_regprocedure('public.early_bird_refresh_projection(uuid,uuid)') is null or to_regprocedure('public.early_bird_current_publication_valid(uuid)') is null then false else has_function_privilege(current_user,'public.early_bird_paid_workspace(uuid)','EXECUTE') and has_function_privilege(current_user,'public.early_bird_refresh_projection(uuid,uuid)','EXECUTE') and has_function_privilege(current_user,'public.early_bird_current_publication_valid(uuid)','EXECUTE') end as available`,
   );
+  if (result.rows[0]?.available !== true)
+    throw new Error("wave_workspace_capability_unavailable");
 }
+async function paidApplication(tx: ExpertCardTransaction, userId: string) {
+  const legacy = (
+    await tx.execute<{ applicationId: string }>(
+      sql`select a.id as "applicationId" from expert_onboarding_applications a join users u on u.id=a.user_id and u.active=true join expert_onboarding_invoices i on i.application_id=a.id and i.user_id=a.user_id and i.purpose='onboarding' and i.status='settled' join expert_onboarding_payment_facts f on f.invoice_id=i.id and f.user_id=a.user_id and f.admission='interview' where a.user_id=${userId}::uuid and a.verification_status='approved' and a.onboarding_stage is not null and a.archived_at is null and a.archive_until_date is null for share of a,u`,
+    )
+  ).rows[0];
+  if (legacy) return legacy;
+  const enabled = await tx.execute<{ enabled: boolean }>(
+    sql`select coalesce(current_setting('ii_tonya.wave_workspace_enabled',true),'off')='on' as enabled`,
+  );
+  if (!enabled.rows[0]?.enabled) return null;
+  const capability = await tx.execute<{ available: boolean }>(
+    sql`select case when to_regprocedure('public.early_bird_paid_workspace(uuid)') is null then false else has_function_privilege(current_user,'public.early_bird_paid_workspace(uuid)','EXECUTE') end as available`,
+  );
+  if (!capability.rows[0]?.available)
+    throw new Error("wave_workspace_capability_unavailable");
+  const wave = await tx.execute<{ applicationId: string | null }>(
+    sql`select public.early_bird_paid_workspace(${userId}::uuid) as "applicationId"`,
+  );
+  return wave.rows[0]?.applicationId
+    ? { applicationId: wave.rows[0].applicationId }
+    : null;
+}
+
 type PrivateCardOwner = {
   userId: string;
   applicationId: string;
@@ -653,6 +678,7 @@ export class PostgresExpertCardRepository {
     workBotKey: string;
   }>;
   private readonly transport: ExpertCardMaterialTransport | undefined;
+  private readonly waveWorkspace: boolean;
   constructor(
     private readonly db: DrizzleDb,
     options: {
@@ -662,6 +688,7 @@ export class PostgresExpertCardRepository {
       materialTransport?: ExpertCardMaterialTransport;
       semanticHelper?: SemanticHelper;
       richOnboarding?: boolean;
+      waveWorkspace?: boolean;
       photoCustody?: CardPhotoCustody;
       geocode?: (
         address: string,
@@ -677,6 +704,7 @@ export class PostgresExpertCardRepository {
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(options.workBotKey)
     )
       fail("card_invalid_configuration");
+    this.waveWorkspace = options.waveWorkspace === true;
     this.semanticHelper = options.semanticHelper;
     this.richOnboarding = options.richOnboarding ?? false;
     this.photoCustody = options.photoCustody;
@@ -694,7 +722,11 @@ export class PostgresExpertCardRepository {
     work: (tx: ExpertCardTransaction) => Promise<T>,
   ): Promise<T> {
     try {
+      if (this.waveWorkspace) await assertWaveWorkspaceCapabilities(this.db);
       return await this.db.transaction(async (tx) => {
+        await tx.execute(
+          sql`select set_config('ii_tonya.wave_workspace_enabled',${this.waveWorkspace ? "on" : "off"},true)`,
+        );
         await tx.execute(sql`set local statement_timeout='2000ms'`);
         await tx.execute(sql`set local lock_timeout='1000ms'`);
         return work(tx);
@@ -2849,15 +2881,31 @@ export class PostgresExpertCardRepository {
           await tx.execute(
             sql`update expert_card_drafts set status='approved',approved_review_id=${review.id}::uuid,updated_at=clock_timestamp() where id=${draft.id}::uuid`,
           );
+          if (this.waveWorkspace) {
+            await tx.execute(
+              sql`insert into resident_card_versions(review_id,draft_id,revision,profile,public_payload,safety_fields,safety_proof) select r.id,r.draft_id,r.revision,null,r.public_payload,resident_card_effective_fields(r.draft_id),r.safety_proof from expert_card_reviews r join expert_card_drafts d on d.id=r.draft_id where r.id=${review.id}::uuid and not d.rich_mode and public.early_bird_paid_workspace(r.user_id)=d.application_id on conflict do nothing`,
+            );
+          }
           await tx.execute(
-            sql`update experts_published p set review_id=${review.id}::uuid,revision=${draft.revision},public_payload=r.public_payload,public_digest=r.public_digest,updated_at=clock_timestamp() from expert_card_reviews r join resident_card_versions v on v.review_id=r.id where r.id=${review.id}::uuid and p.draft_id=${draft.id}::uuid and p.active and exists(select 1 from expert_residency_current_coverage(p.expert_id) c where c.source_order_id=p.paid_order_id and c.ends_at=p.next_billing_date) and exists(select 1 from experts e where e.id=p.expert_id and e.active and e.verified) and not exists(select 1 from expert_referral_abuse_holds where expert_id=p.expert_id and status='open') and not exists(select 1 from expert_residency_lifecycle where expert_id=p.expert_id and status='paused')`,
+            sql`update experts_published p set review_id=${review.id}::uuid,revision=${draft.revision},public_payload=r.public_payload,public_digest=r.public_digest,updated_at=clock_timestamp() from expert_card_reviews r join resident_card_versions v on v.review_id=r.id where r.id=${review.id}::uuid and p.draft_id=${draft.id}::uuid and p.active ${this.waveWorkspace ? sql`and p.wave_intent_id is null` : sql``} and exists(select 1 from expert_residency_current_coverage(p.expert_id) c where c.source_order_id=p.paid_order_id and c.ends_at=p.next_billing_date) and exists(select 1 from experts e where e.id=p.expert_id and e.active and e.verified) and not exists(select 1 from expert_referral_abuse_holds where expert_id=p.expert_id and status='open') and not exists(select 1 from expert_residency_lifecycle where expert_id=p.expert_id and status='paused')`,
           );
           await tx.execute(
-            sql`update experts_published p set active=false,updated_at=clock_timestamp() where p.draft_id=${draft.id}::uuid and p.active and (not exists(select 1 from expert_residency_current_coverage(p.expert_id)) or exists(select 1 from expert_residency_lifecycle where expert_id=p.expert_id and status='paused') or exists(select 1 from expert_referral_abuse_holds where expert_id=p.expert_id and status='open'))`,
+            sql`update experts_published p set active=false,updated_at=clock_timestamp() where p.draft_id=${draft.id}::uuid and p.active ${this.waveWorkspace ? sql`and p.wave_intent_id is null` : sql``} and (not exists(select 1 from expert_residency_current_coverage(p.expert_id)) or exists(select 1 from expert_residency_lifecycle where expert_id=p.expert_id and status='paused') or exists(select 1 from expert_referral_abuse_holds where expert_id=p.expert_id and status='open'))`,
           );
           await tx.execute(
-            sql`update experts e set active=false,updated_at=clock_timestamp() from experts_published p where p.expert_id=e.id and p.draft_id=${draft.id}::uuid and not p.active and (not exists(select 1 from expert_residency_current_coverage(e.id)) or exists(select 1 from expert_residency_lifecycle where expert_id=e.id and status='paused') or exists(select 1 from expert_referral_abuse_holds where expert_id=e.id and status='open'))`,
+            sql`update experts e set active=false,updated_at=clock_timestamp() from experts_published p where p.expert_id=e.id and p.draft_id=${draft.id}::uuid and not p.active ${this.waveWorkspace ? sql`and p.wave_intent_id is null` : sql``} and (not exists(select 1 from expert_residency_current_coverage(e.id)) or exists(select 1 from expert_residency_lifecycle where expert_id=e.id and status='paused') or exists(select 1 from expert_referral_abuse_holds where expert_id=e.id and status='open'))`,
           );
+          if (this.waveWorkspace) {
+            const hasWave = (
+              await tx.execute<{ present: boolean }>(
+                sql`select exists(select 1 from experts_published where user_id=${draft.userId}::uuid and wave_intent_id is not null) as present`,
+              )
+            ).rows[0]?.present;
+            if (hasWave)
+              await tx.execute(
+                sql`select public.early_bird_refresh_projection(${draft.userId}::uuid,${review.id}::uuid)`,
+              );
+          }
           await tx.execute(
             sql`update experts e set public_display_name=p.public_payload->>'displayName',updated_at=clock_timestamp() from experts_published p where p.expert_id=e.id and p.draft_id=${draft.id}::uuid and p.review_id=${review.id}::uuid and p.active`,
           );
