@@ -169,6 +169,9 @@ export async function createEarlyBirdCanonicalCoverageFixture() {
       bindingSnapshot,
       paymentProof,
       paymentSnapshot,
+      async advanceClock(seconds: number) {
+        await clock.advance(seconds);
+      },
       async recordWaveSuccess() {
         await database.db.transaction(
           async (tx) => {
