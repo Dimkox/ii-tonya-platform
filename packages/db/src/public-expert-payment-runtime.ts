@@ -438,8 +438,8 @@ export function createPublicExpertPaymentRuntime(
               and not exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
                 where left(n.nspname,3)<>'pg_' and n.nspname<>'information_schema' and c.relkind in ('r','p','v','m','f')
                 and (pg_has_role(login.oid,c.relowner,'MEMBER') or pg_has_role(cap.oid,c.relowner,'MEMBER')
-                  or has_table_privilege(login.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
-                  or has_table_privilege(cap.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                  or has_table_privilege(login.oid,c.oid,CASE WHEN current_setting('server_version_num')::integer >= 170000 THEN 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN' ELSE 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER' END)
+                  or has_table_privilege(cap.oid,c.oid,CASE WHEN current_setting('server_version_num')::integer >= 170000 THEN 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN' ELSE 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER' END)
                   or has_any_column_privilege(login.oid,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
                   or has_any_column_privilege(cap.oid,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')))
               and not exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
