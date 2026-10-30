@@ -147,7 +147,10 @@ describe("sanitized hosted Vitest evidence", () => {
           locations: [],
           tests: [
             {
-              name: "payment lifecycle preserves the guarded payment state",
+              ordinal: 1,
+              name_sha256: createHash("sha256")
+                .update("payment lifecycle preserves the guarded payment state")
+                .digest("hex"),
               status,
               errors: ["postgres_duplicate_relation"],
               locations: [
@@ -240,7 +243,7 @@ describe("sanitized hosted Vitest evidence", () => {
     expect(summary.report_status).toBe("source_mismatch");
     expect(summary.files).toEqual([]);
   });
-  it("never follows traversal or URL locations and redacts credential-shaped test names", () => {
+  it("never follows traversal or URL locations and hashes test names", () => {
     const { root, head } = fixture();
     writeFileSync(
       join(root, "vitest-results.json"),
@@ -274,7 +277,12 @@ describe("sanitized hosted Vitest evidence", () => {
       path: "[external]",
       tests: [
         {
-          name: "[redacted] [redacted] [redacted]",
+          ordinal: 1,
+          name_sha256: createHash("sha256")
+            .update(
+              `Bearer ${canary} person@example.invalid https://private.invalid/${canary}`,
+            )
+            .digest("hex"),
           status: "failed",
           errors: ["unclassified_failure"],
           locations: [],

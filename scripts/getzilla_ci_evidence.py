@@ -35,19 +35,6 @@ _ERRORS = (
 )
 
 
-def _safe_name(value: str) -> str:
-    # Titles can contain parameterized fixture values. Retain useful names while
-    # removing common credential/contact forms; never export arbitrary error text.
-    value = re.sub(r'https?://\S+', '[redacted]', value, flags=re.I)
-    value = re.sub(r'\bBearer\s+\S+', '[redacted]', value, flags=re.I)
-    value = re.sub(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', '[redacted]', value)
-    value = re.sub(
-        r'\b(?:password|secret|token|api[_-]?key|authorization)\s*[:=]\s*\S+',
-        '[redacted]', value, flags=re.I,
-    )
-    return ''.join(char if char.isprintable() else ' ' for char in value)
-
-
 def _safe_path(value: str, root: Path, source_paths: set[str]) -> str:
     prefix = root.as_posix() + '/'
     if value.startswith(prefix):
@@ -89,8 +76,9 @@ def retain_vitest_summary(root: Path, output: Path, *, expected_sha: str, run_id
     """Only a fixed synthetic CI report is read; raw JSON/console never leaves CI.
 
     This summary is diagnostic evidence, not a test verdict or release receipt.
-    Arbitrary secrets embedded as ordinary prose in test titles cannot be detected;
-    tests must continue to use synthetic identifiers, including parameterized titles.
+    Titles can contain arbitrary secrets in prose or parameterized values. Export
+    only their digest and ordinal, never any original title fragment. An ordinal,
+    committed source location and error category remain useful without disclosure.
     """
     head = git_head(root)
     summary = {'schema_version': 1, 'source_sha': head, 'run_id': run_id,
@@ -119,10 +107,12 @@ def retain_vitest_summary(root: Path, output: Path, *, expected_sha: str, run_id
                         or not isinstance(record.get('assertionResults'), list)):
                     raise ValueError('invalid report file entry')
                 tests = []
-                for test in record['assertionResults']:
+                for ordinal, test in enumerate(record['assertionResults'], start=1):
                     if not isinstance(test, dict) or not isinstance(test.get('fullName'), str):
                         raise ValueError('invalid report test entry')
-                    tests.append({'name': _safe_name(test['fullName']), 'status': _status(test.get('status')),
+                    tests.append({'ordinal': ordinal,
+                                  'name_sha256': hashlib.sha256(test['fullName'].encode('utf-8')).hexdigest(),
+                                  'status': _status(test.get('status')),
                                   **_diagnostics(_messages(test.get('failureMessages', [])), root, source_paths)})
                 message = record.get('message', '')
                 if not isinstance(message, str):

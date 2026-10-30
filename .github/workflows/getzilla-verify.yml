@@ -130,7 +130,7 @@ jobs:
         if: always()
         env:
           EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        # Retain only sanitized test names/statuses/classifications, never raw assertion or console data.
+        # Retain only hashed test identities/statuses/classifications, never raw titles, assertions or console data.
         run: python scripts/getzilla_ci_evidence.py --output "${{ runner.temp }}/getzilla-evidence" --job getzilla-verify --status "${{ job.status }}" --vitest-summary
       - name: Retain CI evidence for 30 days
         if: always() && steps.export_evidence.outcome == 'success'
