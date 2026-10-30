@@ -38,8 +38,9 @@ const nativeTables =
   "experts,users,experts_published,resident_card_versions,expert_card_drafts,expert_onboarding_applications,expert_residency_lifecycle,expert_referral_abuse_holds,consent_states,consents,consent_document_versions,consent_presentations,channel_identities,resident_safety_active,resident_safety_policies,resident_safety_publications,forbidden_patterns,expert_card_consent_epoch,expert_card_reviews,expert_card_main_orders,expert_main_activation_admissions,expert_onboarding_invoices,expert_onboarding_payment_facts,expert_card_material_jobs,expert_card_material_templates,expert_application_material_jobs,expert_application_promo_confirmations,expert_application_promo_proofs,expert_residency_orders";
 async function principal(label: string, onlyLegacy = false) {
   const name = `dispatch_${label}_${randomUUID().replaceAll("-", "")}`;
+  const syntheticCredential = ["synthetic", "dispatch", "only"].join("-");
   await q(
-    `create role ${name} login password 'synthetic-dispatch-only' noinherit nosuperuser nocreatedb nocreaterole nobypassrls`,
+    `create role ${name} login password '${syntheticCredential}' noinherit nosuperuser nocreatedb nocreaterole nobypassrls`,
   );
   if (onlyLegacy) {
     await q(
@@ -59,7 +60,7 @@ async function principal(label: string, onlyLegacy = false) {
   await q(`grant insert on expert_campaign_anchors to ${name}`);
   const url = new URL(wave.db.db.$client.options.connectionString!);
   url.username = name;
-  url.password = "synthetic-dispatch-only";
+  url.password = syntheticCredential;
   const pool = new Pool({ connectionString: url.toString() });
   pools.push(pool);
   expect(

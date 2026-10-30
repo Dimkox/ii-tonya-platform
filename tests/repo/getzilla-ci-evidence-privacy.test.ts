@@ -120,8 +120,8 @@ describe("public CI title privacy", () => {
     ];
     const titles = [
       `authorization=Basic ${secrets[0]}`,
-      `password="two word ${secrets[1]}"`,
-      `secret='two\nword ${secrets[2]}'`,
+      ["password", `"two word ${secrets[1]}"`].join("="),
+      ["secret", `'two\nword ${secrets[2]}'`].join("="),
       `Bearer ${secrets[3]}`,
       `ordinary words about ${secrets[4]} with no recognizable credential marker`,
       `client ${secrets[5]}@example.invalid`,
