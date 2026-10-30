@@ -54,6 +54,23 @@ class BoundGateway:
 
         if self._authority is None:
             return "cancelled"
+        prefetched_parent = None
+        if claim[5] == "main_refund":
+            # Read-only candidate discovery can block. It must finish before the
+            # final live-authority claim, not while the ACK/write mutex is held.
+            # The body supplies no authority: its candidate is compared with the
+            # PG-returned parent and finance snapshot inside admit below.
+            from pg_authority import strict_json
+
+            try:
+                if provider_reader is None or not isinstance(body, bytes) or not 1 <= len(body) <= 49152:
+                    return "unknown"
+                candidate = strict_json(body)
+                if not isinstance(candidate, dict):
+                    return "unknown"
+                prefetched_parent = provider_reader.inspect_payment(candidate["payment_id"])
+            except (ValueError, TypeError, KeyError, OSError):
+                return "unknown"
         request = bytearray()
         claimed = []
 
@@ -62,9 +79,7 @@ class BoundGateway:
                 row = validate_public_claim(self._authority.claim_public(*claim), claim)
                 serialized = public_request(row, body, merchant_auth)
                 if row["kind"] == "main_refund":
-                    if provider_reader is None:
-                        return False
-                    verify_refund_parent(row, provider_reader.inspect_payment(row["parentPaymentId"]))
+                    verify_refund_parent(row, prefetched_parent)
                 request.extend(serialized)
                 claimed.append(row)
                 return True
