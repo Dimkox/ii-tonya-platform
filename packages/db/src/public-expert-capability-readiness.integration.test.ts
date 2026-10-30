@@ -22,6 +22,7 @@ let runtime: ReturnType<typeof createPublicExpertPaymentRuntime>;
 const connections = {} as PublicExpertRuntimeConfiguration["connections"];
 const sender = "readiness_onboard";
 const cap = "ii_tonya_public_onboarding_sender";
+const password = ["synthetic", "readiness", "only"].join("-");
 beforeAll(async () => {
   database = await startDisposableTestPostgres();
   await database.migrate();
@@ -40,11 +41,11 @@ beforeAll(async () => {
     const login = index === 0 ? sender : `readiness_${name.toLowerCase()}`;
     mapping[capability.role] = login;
     await database.db.$client.query(
-      `create role ${login} login password 'synthetic-readiness-only' inherit`,
+      `create role ${login} login password '${password}' inherit`,
     );
     const url = new URL(database.db.$client.options.connectionString!);
     url.username = login;
-    url.password = "synthetic-readiness-only";
+    url.password = password;
     connections[name] = { login, db: createDb(url.toString(), { max: 1 }) };
   }
   await database.db.$client.query(

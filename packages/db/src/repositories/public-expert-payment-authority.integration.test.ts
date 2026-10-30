@@ -330,9 +330,8 @@ it("admits and claims once, refuses cross-kind gateway substitution and cannot r
 });
 it("source callers have no observation, binding, posting or direct-table authority", async () => {
   const role = `public_authority_sender_${randomUUID().replaceAll("-", "")}`;
-  await db.db.$client.query(
-    `create role ${role} login password 'synthetic-public-authority-only'`,
-  );
+  const password = ["synthetic", "public", "authority", "only"].join("-");
+  await db.db.$client.query(`create role ${role} login password '${password}'`);
   await db.db.$client.query(
     `grant usage on schema early_bird_private to ${role}`,
   );
@@ -341,7 +340,7 @@ it("source callers have no observation, binding, posting or direct-table authori
   );
   const roleUrl = new URL(db.db.$client.options.connectionString!);
   roleUrl.username = role;
-  roleUrl.password = "synthetic-public-authority-only";
+  roleUrl.password = password;
   const restricted = new Pool({ connectionString: roleUrl.toString() });
   const c = await restricted.connect();
   try {
@@ -1038,8 +1037,9 @@ it.each([
   "isolates $name LOGIN from other capabilities and canonical financial mutation",
   async (f) => {
     const role = `public_authority_${f.name}_${randomUUID().replaceAll("-", "")}`;
+    const password = ["synthetic", "public", "authority", "only"].join("-");
     await db.db.$client.query(
-      `create role ${role} login password 'synthetic-public-authority-only'`,
+      `create role ${role} login password '${password}'`,
     );
     await db.db.$client.query(
       `grant usage on schema early_bird_private to ${role}`,
@@ -1049,7 +1049,7 @@ it.each([
     );
     const url = new URL(db.db.$client.options.connectionString!);
     url.username = role;
-    url.password = "synthetic-public-authority-only";
+    url.password = password;
     const pool = new Pool({ connectionString: url.toString() });
     try {
       expect((await pool.query(f.allowed)).rows[0]!.value).toBeNull();

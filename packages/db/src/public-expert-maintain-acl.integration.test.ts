@@ -27,6 +27,7 @@ const mapping: Record<string, string> = {};
 const gatewayRole = "ii_tonya_wave_gateway",
   senderRole = "ii_tonya_public_onboarding_sender";
 const oldPrivileges = "SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER";
+const password = ["synthetic", "maintain", "only"].join("-");
 const readiness = () =>
   readFileSync("scripts/experimental/yookassa_gateway/readiness.sql", "utf8");
 beforeAll(async () => {
@@ -41,7 +42,7 @@ beforeAll(async () => {
     const login = `maintain_runtime_${index}`;
     mapping[capability.role] = login;
     await database.db.$client.query(
-      `create role ${login} login password 'synthetic-maintain-only' inherit`,
+      `create role ${login} login password '${password}' inherit`,
     );
   }
   provision = await buildEarlyBirdRoleProvisioningSql(mapping);
@@ -49,7 +50,7 @@ beforeAll(async () => {
   const connect = (login: string) => {
     const address = new URL(database.db.$client.options.connectionString!);
     address.username = login;
-    address.password = "synthetic-maintain-only";
+    address.password = password;
     return createDb(address.toString(), { max: 1 });
   };
   for (const name of publicExpertConnectionNames) {

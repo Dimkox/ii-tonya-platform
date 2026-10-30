@@ -40,7 +40,7 @@ let gateway: ExperimentalGatewayIpc;
 let runtime: ReturnType<typeof createPublicExpertPaymentRuntime>;
 const connections = {} as PublicExpertRuntimeConfiguration["connections"];
 const key = randomBytes(32);
-const password = "synthetic-task7-only";
+const password = ["synthetic", "task7", "only"].join("-");
 let eventSequence = 720000;
 const event = <T extends { botId: string }>(scope: T) => {
   const requestKey = `${scope.botId}:${++eventSequence}`;

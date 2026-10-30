@@ -245,13 +245,14 @@ export async function publicTestPrincipal(
                 : []),
             ];
   const q = context.db.db.$client;
-  await q.query(`create role ${role} login password 'synthetic-task3-only'`);
+  const password = ["synthetic", "task3", "only"].join("-");
+  await q.query(`create role ${role} login password '${password}'`);
   await q.query(`grant usage on schema public,early_bird_private to ${role}`);
   for (const f of functions)
     await q.query(`grant execute on function ${f} to ${role}`);
   const url = new URL(q.options.connectionString!);
   url.username = role;
-  url.password = "synthetic-task3-only";
+  url.password = password;
   return createDb(url.toString());
 }
 

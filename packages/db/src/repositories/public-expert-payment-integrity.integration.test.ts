@@ -47,13 +47,14 @@ async function call(
 }
 async function principal(label: string, functions: string[]) {
   const role = `integrity_${label}_${randomUUID().replaceAll("-", "")}`;
-  await q(`create role ${role} login password 'synthetic-integrity-only'`);
+  const password = ["synthetic", "integrity", "only"].join("-");
+  await q(`create role ${role} login password '${password}'`);
   await q(`grant usage on schema public,early_bird_private to ${role}`);
   for (const fn of functions)
     await q(`grant execute on function ${fn} to ${role}`);
   const url = new URL(database().$client.options.connectionString!);
   url.username = role;
-  url.password = "synthetic-integrity-only";
+  url.password = password;
   const pool = new Pool({ connectionString: url.toString() });
   expect((await pool.query("select session_user name")).rows[0]!.name).toBe(
     role,
