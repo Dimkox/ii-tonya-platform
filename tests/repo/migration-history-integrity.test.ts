@@ -161,6 +161,7 @@ const HAND_SQL_FUNCTIONS = [
   "early_bird_private.public_refund_source",
   "early_bird_private.public_request_guard",
   "early_bird_private.public_resolution",
+  "early_bird_private.public_restore_wave_projection",
   "early_bird_private.public_snapshot",
   "early_bird_private.public_source_data",
   "early_bird_private.public_source_valid",

@@ -1457,7 +1457,7 @@ const approvedDependencySpecifiers = new Map([
 const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0084_public_expert_payment_gateway.sql",
-    "2ed5fa28d30060a879c32f7e0c019b39bb78aeb0ec5c1e8e6cca29115795258b",
+    "99dc320d06298e9747156104a4b0dab9c60c349ec43c593dfd85cb235caefbaf",
   ],
   [
     "packages/db/migrations/meta/0084_snapshot.json",
@@ -1465,11 +1465,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/state/0084_manifest.json",
-    "236fa2d27d8eee94c12b9c315b16217762f1c7706def77b1d4a29173072cceef",
+    "1e8dcb99c8a4f96cd1f02d214a60ec9aaf80c59049eb9e9ae833960aa6d7bc34",
   ],
   [
     "packages/db/migrations/state/0084_sql_objects.json",
-    "f13398fd4e2d08ce7d3cca6c026aa65c0c7f40ee7b3913bae4d79da3d6442bd1",
+    "8ec0d6ccbfcc2ffc7d371246b5a64a332b7aad09da08e39c18ae7473eb02bbc2",
   ],
 
   [
@@ -3679,7 +3679,7 @@ export function isApprovedLargeScopeArtifact(
 ): boolean {
   const approvedSizes = new Map<string, number>([
     ["packages/db/migrations/meta/0084_snapshot.json", 1192800],
-    ["packages/db/migrations/state/0084_sql_objects.json", 1873576],
+    ["packages/db/migrations/state/0084_sql_objects.json", 1876143],
 
     ["packages/db/migrations/state/0083_sql_objects.json", 1416389],
     ["packages/db/migrations/meta/0083_snapshot.json", 1166391],

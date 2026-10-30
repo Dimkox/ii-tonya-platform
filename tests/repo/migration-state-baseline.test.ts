@@ -23,7 +23,7 @@ describe("database-derived migration state baseline", () => {
         supplement.functionPrivileges.filter(
           (entry: { schema: string }) => entry.schema === "early_bird_private",
         ),
-      ).toHaveLength(last === 84 ? 54 : 7);
+      ).toHaveLength(last === 84 ? 55 : 7);
       expect(
         supplement.functionPrivileges
           .filter(
@@ -44,7 +44,7 @@ describe("database-derived migration state baseline", () => {
     expect(
       read(`${folder}/state/0084_manifest.json`).migrations.slice(0, 84),
     ).toEqual(read(`${folder}/state/0083_manifest.json`).migrations);
-    expect(state.functions).toHaveLength(324);
+    expect(state.functions).toHaveLength(325);
     expect(state.triggers).toHaveLength(293);
     expect(state.constraints).toHaveLength(1922);
     expect(state.indexes).toHaveLength(672);

@@ -172,7 +172,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
   actual.prevId = expected.prevId;
   expect(actual).toEqual(expected);
   expect(Object.keys(actual.tables)).toHaveLength(280);
-  expect(state.functions).toHaveLength(324);
+  expect(state.functions).toHaveLength(325);
   expect(state.triggers).toHaveLength(293);
   expect(state.constraints).toHaveLength(1922);
   if (!("sequences" in state)) throw Error("sequence_evidence_missing");
@@ -197,7 +197,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
     state.functions.filter((row) =>
       String(row.definition).includes("FUNCTION early_bird_private."),
     ),
-  ).toHaveLength(54);
+  ).toHaveLength(55);
   if (!("schemas" in state) || !("functionPrivileges" in state))
     throw new Error("private_state_evidence_missing");
   expect(state.schemas).toEqual([
@@ -416,7 +416,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
           "select count(*)::integer n from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='early_bird_private' and has_function_privilege(current_user,p.oid,'EXECUTE')",
         )
       ).rows[0]?.n,
-    ).toBe(6);
+    ).toBe(7);
     expect(
       (
         await primary.query(
