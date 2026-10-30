@@ -33,7 +33,9 @@ CREATE TABLE public_expert_payment_requests (
 CREATE UNIQUE INDEX public_expert_parent_mutation_inflight ON public_expert_payment_requests(parent_payment_id)
  WHERE kind IN('onboarding_capture','onboarding_cancel') AND state IN('admitted','uncertain','bound');
 CREATE TABLE public_expert_payment_observations (
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(), request_id uuid NOT NULL REFERENCES public_expert_payment_requests(id),
+ -- Provider timestamps can tie; this sequence captures verified insertion order under the subject lock.
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), observation_sequence bigint GENERATED ALWAYS AS IDENTITY UNIQUE,
+ request_id uuid NOT NULL REFERENCES public_expert_payment_requests(id),
  provider_object_id text NOT NULL, parent_payment_id text, status text NOT NULL CHECK(status IN('pending','waiting_for_capture','succeeded','canceled')),
  paid boolean, amount_minor bigint NOT NULL, currency text NOT NULL CHECK(currency='RUB'), mode text NOT NULL CHECK(mode IN('test','live')),
  provider_created_at timestamptz NOT NULL, provider_captured_at timestamptz, payment_method_type text,
@@ -197,7 +199,7 @@ BEGIN
   ELSIF NOT current_frame THEN RETURN false; END IF;
   IF r.kind IN('onboarding_capture','onboarding_cancel') THEN
    SELECT obs.* INTO parent_fact FROM public.public_expert_payment_observations obs JOIN public.public_expert_payment_requests req ON req.id=obs.request_id
-    WHERE req.invoice_id=r.invoice_id AND req.legacy_operation_id=r.legacy_operation_id AND obs.provider_object_id=r.parent_payment_id ORDER BY obs.observed_at DESC,obs.id DESC LIMIT 1;
+    WHERE req.invoice_id=r.invoice_id AND req.legacy_operation_id=r.legacy_operation_id AND obs.provider_object_id=r.parent_payment_id ORDER BY obs.observation_sequence DESC LIMIT 1;
    IF NOT FOUND OR parent_fact.status<>'waiting_for_capture' OR parent_fact.payment_method_type IS DISTINCT FROM 'bank_card'
     OR parent_fact.observed_at<public.early_bird_current_time()-interval '30 seconds' THEN RETURN false; END IF;
    IF EXISTS(SELECT 1 FROM public.public_expert_payment_requests other WHERE other.parent_payment_id=r.parent_payment_id AND other.id<>r.id AND other.kind IN('onboarding_capture','onboarding_cancel') AND other.state IN('admitted','uncertain','bound')) THEN RETURN false; END IF;

@@ -297,7 +297,6 @@ class PublicCheckoutExecution {
           });
       if (protectedBody && protectedBody.bodyVersion !== 1)
         throw Error("public_envelope_invalid");
-      let prepareError: unknown;
       try {
         existing =
           (await this.deps.source.prepare(
@@ -318,10 +317,8 @@ class PublicCheckoutExecution {
               bodyExpiresAt: protectedBody?.expiresAt ?? null,
             },
           )) ?? undefined;
-      } catch (error) {
-        // A concurrent winner may have prepared this canonical source. Never send this loser's bytes.
-        // Suppress the error only when read-back proves that a winner committed.
-        prepareError = error;
+      } catch {
+        // A concurrent winner may have prepared this same canonical source. Never send this loser's bytes.
         existing = undefined;
       }
       if (!existing) {
@@ -332,7 +329,6 @@ class PublicCheckoutExecution {
         );
         existing = current?.requests.find((r) => r.kind === kind);
         exactBody = undefined;
-        if (!existing && prepareError !== undefined) throw prepareError;
       }
     }
     if (!existing) return { kind: "unavailable" };
