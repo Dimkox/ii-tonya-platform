@@ -9,5 +9,5 @@ export function loadEarlyBirdRoleCapabilities(
 ): Promise<EarlyBirdRoleCapability[]>;
 export function buildEarlyBirdRoleProvisioningSql(
   mapping: Record<string, string>,
-  options?: { financialLogin?: string },
+  options?: { financialLogin?: string; throughMigration?: number },
 ): Promise<string>;

@@ -309,6 +309,24 @@ test("historical provisioning preserves the83-entry contract", async () => {
   assert.equal(catalogue.length, 28);
   assert.equal(catalogue[0].functions.length, 2);
   assert.ok(catalogue.every((entry) => entry.migration <= 83));
+  const generated = await buildEarlyBirdRoleProvisioningSql(
+    { ii_tonya_wave_gateway: "historical_gateway" },
+    { throughMigration: 83 },
+  );
+  const entries = JSON.parse(
+    generated.match(
+      /set_config\('ii_tonya.runtime_role_provision','([^']+)'/u,
+    )[1],
+  );
+  assert.deepEqual(entries[0].functions, catalogue[0].functions);
+  assert.equal(entries[0].functions.length, 2);
+  await assert.rejects(
+    buildEarlyBirdRoleProvisioningSql(
+      { ii_tonya_public_main_sender: "historical_main" },
+      { throughMigration: 83 },
+    ),
+    /early_bird_role_mapping_invalid/,
+  );
 });
 
 test("existing primary financial login is explicit and cannot alias an isolated sender", async () => {

@@ -1,5 +1,10 @@
 # Preliminary public payment recovery artifact
 
+**Source superseded:** these builds precede the Task 6 review corrections to
+historical provisioning and exact startup privilege checks. Retain them as local
+assembly history; rebuild the final recovery/release pair from the accepted
+corrected source in Task 7. They are not a rollback pair for the corrected source.
+
 This is local composition evidence for migration0084, not a release or deployment approval.
 The bridge was built from committed source `12d538a3d8b7cadd4ffd977e87579236849ebc92`
 using the unchanged production76-entry archive, SHA256

@@ -34,7 +34,34 @@ export async function buildEarlyBirdRoleProvisioningSql(mapping, options = {}) {
     Object.keys(mapping).length === 0
   )
     throw new Error("early_bird_role_mapping_invalid");
-  const capabilities = await loadEarlyBirdRoleCapabilities();
+  if (
+    !options ||
+    typeof options !== "object" ||
+    Array.isArray(options) ||
+    Object.keys(options).some(
+      (key) => !["financialLogin", "throughMigration"].includes(key),
+    ) ||
+    (options.throughMigration !== undefined &&
+      (!Number.isSafeInteger(options.throughMigration) ||
+        options.throughMigration < 0))
+  )
+    throw new Error("early_bird_role_horizon_invalid");
+  const latest = await loadEarlyBirdRoleCapabilities();
+  if (
+    options.throughMigration !== undefined &&
+    options.throughMigration >
+      Math.max(...latest.map((entry) => entry.migration))
+  )
+    throw new Error("early_bird_role_horizon_invalid");
+  if (
+    options.financialLogin !== undefined &&
+    options.throughMigration !== undefined &&
+    options.throughMigration < 84
+  )
+    throw new Error("early_bird_financial_horizon_invalid");
+  const capabilities = await loadEarlyBirdRoleCapabilities(
+    options.throughMigration,
+  );
   const logins = new Set();
   const entries = [];
   for (const [role, login] of Object.entries(mapping)) {
@@ -54,7 +81,9 @@ export async function buildEarlyBirdRoleProvisioningSql(mapping, options = {}) {
     !options ||
     typeof options !== "object" ||
     Array.isArray(options) ||
-    Object.keys(options).some((key) => key !== "financialLogin") ||
+    Object.keys(options).some(
+      (key) => !["financialLogin", "throughMigration"].includes(key),
+    ) ||
     (options.financialLogin !== undefined &&
       (typeof options.financialLogin !== "string" ||
         !/^[a-z][a-z0-9_]{0,62}$/u.test(options.financialLogin) ||

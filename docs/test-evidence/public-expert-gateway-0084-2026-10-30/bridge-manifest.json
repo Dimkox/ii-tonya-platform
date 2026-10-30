@@ -1,5 +1,5 @@
 {
-  "status": "preliminary_local_review_only",
+  "status": "historical_preliminary_source_superseded",
   "bridge": {
     "provenance": {
       "source_sha": "12d538a3d8b7cadd4ffd977e87579236849ebc92",
@@ -683,5 +683,6 @@
     "Original financial waveA last5/6 remains unrerun",
     "Full exact-SHA CI budget pending",
     "Final normal release and final recovery pair require Task7 exact-source review and release authorization"
-  ]
+  ],
+  "supersededReason": "Task6 independent review required historical-horizon and exact runtime capability readiness corrections after these builds. Retain as historical local assembly evidence; rebuild final exact-source recovery/release pair in Task7."
 }

@@ -33,7 +33,9 @@ connection. Do not place database credentials in command arguments, this JSON,
 repository files or shell output. Run:
 
 ```sh
-node scripts/provision-early-bird-runtime-roles.mjs --mapping /protected/runtime-role-logins.json
+node scripts/provision-early-bird-runtime-roles.mjs \
+  --mapping /protected/runtime-role-logins.json \
+  --financial-login ACTUAL_EXISTING_PRIMARY_LOGIN
 ```
 
 The command creates missing NOLOGIN capabilities idempotently, checks existing
@@ -55,9 +57,30 @@ administration process without dumping environment variables or secrets.
 
 The existing legacy settlement login is a separate trust model with existing
 financial table permissions. Do not include it in this isolated capability map.
-Its narrowly scoped coverage-helper grant remains
-`scripts/sql/provision-early-bird-legacy-coverage.sql` and must be reviewed alongside
-the legacy settlement witness.
+Pass that actual existing primary financial LOGIN explicitly with
+`--financial-login`; replace the placeholder above with the independently verified
+primary database principal used by API/worker canonical posting. The command does
+not create a financial LOGIN, infer its name, or change its pre-existing table
+privileges. It grants schema USAGE and exactly these six private EXECUTEs:
+
+- `early_bird_private.public_payment_apply_guard(uuid,uuid,uuid)`
+- `early_bird_private.public_payment_complete(uuid,uuid)`
+- `early_bird_private.public_time(timestamp with time zone)`
+- `early_bird_private.public_order_expiry_allowed(uuid)`
+- `early_bird_private.public_wave_application(uuid)`
+- `early_bird_private.public_current_wave_end(uuid)`
+
+The first five are called directly by canonical repositories; the last is called
+through invoker-mode `expert_residency_current_coverage`. These grants are required
+even when public checkout is disabled because expiry and coverage reads share
+those canonical paths. Definer-only identity, never-sent and credit-reversal
+helpers receive no grants. The primary retains its legacy financial trust model;
+it is separate from the five public function-only LOGINs and gets no capability
+membership, merchant credential or new table/sequence permission. Omitting the
+option provisions only the isolated map and does not prepare a nonowner primary
+for the new canonical calls. The older narrowly scoped coverage-helper grant in
+`scripts/sql/provision-early-bird-legacy-coverage.sql` remains separately required
+where applicable; review it alongside the legacy settlement witness.
 
 At preparation time the catalogue has source-derived metadata tests. A final
 canonical-schema PostgreSQL witness must execute the real generated SQL, exercise
@@ -91,3 +114,26 @@ migration so historical prefix witnesses retain their exact older role sets.
 example mapping consistent with both API and worker examples. Replace names with
 the actual independently provisioned logins; never add passwords or connection
 URLs to that file.
+
+Migration 0084 adds five public capabilities, bringing the total to **33**:
+`onboardingSender`, `mainSender`, `refundSender`, `binder` and `observations` in
+API/worker `publicDatabases`. Their LOGINs must differ from each other, every
+legacy isolated capability and the existing primary. The gateway capability also
+receives the exact new `public.public_expert_gateway_claim` signature. Use the
+complete updated role-map and protected API/worker examples after the reviewed
+85-entry migration chain is installed. No credentials belong in these examples.
+
+Actual API/worker startup rechecks exact required signatures, safe function
+ownership/search path/PUBLIC revocation, capability membership and all effective
+user-schema table/column/sequence/CREATE and privileged-function rights. Missing
+sender snapshots, binder bound reads or fact-writer expiry execution block startup;
+extra financial-helper execution or unrelated table/sequence access does too.
+Investigate drift through the protected operator process; do not weaken startup
+checks, automatically revoke existing production privileges or share credentials.
+
+Historical fixtures select `throughMigration: 83` in the SQL-builder API as well
+as the catalogue loader. That horizon selects only fixed reviewed signatures and
+never accepts caller-chosen functions. The operator CLI defaults to the latest
+catalogue and requires the current schema. The explicit primary helper option
+requires migration 0084. Local witnesses and preliminary artifacts do not establish
+actual production role configuration, provider readiness or release permission.

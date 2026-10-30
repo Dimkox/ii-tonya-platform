@@ -338,57 +338,133 @@ export function createPublicExpertPaymentRuntime(
     main,
     recovery,
     async assertReady() {
-      const signatures = {
-        onboardingSender: [
-          "public_onboarding_source(uuid,uuid)",
-          "public_onboarding_invoice(uuid)",
-          "public_onboarding_pending(integer,uuid)",
-          "public_onboarding_prepare(uuid,uuid,uuid,jsonb)",
-          "public_onboarding_admit(uuid,uuid,text)",
-        ],
-        mainSender: [
-          "public_main_source(uuid,uuid)",
-          "public_main_prepare(uuid,uuid,uuid,jsonb)",
-          "public_main_admit(uuid,uuid,text)",
-        ],
-        refundSender: [
-          "public_refund_source(uuid,uuid)",
-          "public_refund_prepare(uuid,uuid,uuid,jsonb)",
-          "public_refund_admit(uuid,uuid,text)",
-          "public_refund_pending(integer,uuid)",
-        ],
-        binder: [
-          "public_payment_candidate(uuid)",
-          "public_payment_bind(uuid,text,jsonb)",
-          "public_payment_pending(integer,uuid)",
-          "public_payment_hint(text,uuid,boolean)",
-        ],
-        observations: [
-          "public_payment_observe(uuid,text,jsonb)",
-          "public_payment_resolve(uuid,uuid)",
-          "public_payment_complete(uuid,uuid)",
-        ],
+      const capabilities = {
+        onboardingSender: {
+          role: "ii_tonya_public_onboarding_sender",
+          functions: [
+            "public_onboarding_source(uuid,uuid)",
+            "public_onboarding_prepare(uuid,uuid,uuid,jsonb)",
+            "public_onboarding_snapshot(uuid,uuid)",
+            "public_onboarding_admit(uuid,uuid,text)",
+            "public_onboarding_invoice(uuid)",
+            "public_onboarding_pending(integer,uuid)",
+          ],
+        },
+        mainSender: {
+          role: "ii_tonya_public_main_sender",
+          functions: [
+            "public_main_source(uuid,uuid)",
+            "public_main_prepare(uuid,uuid,uuid,jsonb)",
+            "public_main_snapshot(uuid,uuid)",
+            "public_main_admit(uuid,uuid,text)",
+          ],
+        },
+        refundSender: {
+          role: "ii_tonya_public_refund_sender",
+          functions: [
+            "public_refund_source(uuid,uuid)",
+            "public_refund_prepare(uuid,uuid,uuid,jsonb)",
+            "public_refund_snapshot(uuid,uuid)",
+            "public_refund_admit(uuid,uuid,text)",
+            "public_refund_pending(integer,uuid)",
+          ],
+        },
+        binder: {
+          role: "ii_tonya_public_payment_binder",
+          functions: [
+            "public_payment_candidate(uuid)",
+            "public_payment_bound(uuid)",
+            "public_payment_bind(uuid,text,jsonb)",
+            "public_payment_pending(integer,uuid)",
+            "public_payment_hint(text,uuid,boolean)",
+          ],
+        },
+        observations: {
+          role: "ii_tonya_public_payment_fact_writer",
+          functions: [
+            "public_payment_observe(uuid,text,jsonb)",
+            "public_payment_resolve(uuid,uuid)",
+            "public_payment_expire(uuid,uuid)",
+            "public_payment_complete(uuid,uuid)",
+          ],
+        },
       };
+      const primary = (
+        await db.$client.query<{ login: string }>(
+          "select session_user as login",
+        )
+      ).rows[0]?.login;
+      if (
+        !primary ||
+        publicExpertConnectionNames.some(
+          (name) => config.connections[name].login === primary,
+        )
+      )
+        throw Error("public_expert_role_invalid");
       for (const name of publicExpertConnectionNames) {
-        const role = config.connections[name];
-        const row = (
-          await role.db.$client.query<{ login: string; unsafe: boolean }>(
-            "select session_user as login,(rolsuper or rolbypassrls or rolcreatedb or rolcreaterole) as unsafe from pg_roles where rolname=session_user",
-          )
-        ).rows[0];
-        if (row?.login !== role.login || row.unsafe !== false)
-          throw Error("public_expert_role_invalid");
-        const privilege = (
-          await role.db.$client.query<{ capable: boolean; tables: boolean }>(
-            "select (select bool_and(has_function_privilege(session_user,signature,'EXECUTE')) from unnest($1::text[]) signature) capable, (select bool_or(has_table_privilege(session_user,table_name,'SELECT,INSERT,UPDATE,DELETE')) from unnest(array['public.expert_residency_orders','public.expert_referral_ledger_entries','public.payer_receipt_contacts','public.public_expert_payment_requests']) table_name) tables",
-            [
-              signatures[name].map(
-                (signature) => "early_bird_private." + signature,
-              ),
-            ],
-          )
-        ).rows[0];
-        if (privilege?.capable !== true || privilege.tables !== false)
+        const connection = config.connections[name],
+          capability = capabilities[name];
+        // Re-check effective rights at every real API/worker startup. Provisioning
+        // is an operator action and cannot prevent later catalogue/ACL drift.
+        const result = await connection.db.$client.query<{ safe: boolean }>(
+          `
+          select exists (
+            select 1 from pg_roles login, pg_roles cap
+            where login.rolname=session_user and current_user=session_user and session_user=$3
+              and cap.rolname=$1 and login.rolcanlogin and login.rolinherit
+              and not login.rolsuper and not login.rolcreatedb and not login.rolcreaterole
+              and not login.rolreplication and not login.rolbypassrls
+              and not cap.rolcanlogin and not cap.rolinherit and not cap.rolsuper
+              and not cap.rolcreatedb and not cap.rolcreaterole and not cap.rolreplication and not cap.rolbypassrls
+              and exists (select 1 from pg_auth_members m where m.member=login.oid and m.roleid=cap.oid and not m.admin_option)
+              and not exists (select 1 from pg_auth_members m where (m.member=login.oid and (m.roleid<>cap.oid or m.admin_option)) or m.member=cap.oid or (m.roleid=cap.oid and m.member<>login.oid))
+              and has_schema_privilege(login.oid,'early_bird_private','USAGE')
+              and has_schema_privilege(cap.oid,'early_bird_private','USAGE')
+              and not has_schema_privilege('public','early_bird_private','USAGE')
+              and not has_schema_privilege('public','early_bird_private','CREATE')
+              and not exists (
+                select 1 from unnest($2::text[]) expected(signature)
+                left join pg_proc p on p.oid=to_regprocedure(expected.signature)
+                where p.oid is null or not p.prosecdef
+                  or replace(array_to_string(p.proconfig,';'),' ','') is distinct from 'search_path=pg_catalog,public,pg_temp'
+                  or has_function_privilege('public',p.oid,'EXECUTE')
+                  or not has_function_privilege(login.oid,p.oid,'EXECUTE')
+                  or not has_function_privilege(cap.oid,p.oid,'EXECUTE')
+                  or pg_has_role(login.oid,p.proowner,'MEMBER') or pg_has_role(cap.oid,p.proowner,'MEMBER'))
+              and not has_database_privilege(login.oid,current_database(),'CREATE')
+              and not has_database_privilege(cap.oid,current_database(),'CREATE')
+              and not exists (select 1 from pg_namespace n where left(n.nspname,3)<>'pg_' and n.nspname<>'information_schema'
+                and (has_schema_privilege(login.oid,n.oid,'CREATE') or has_schema_privilege(cap.oid,n.oid,'CREATE')))
+              and not exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
+                where left(n.nspname,3)<>'pg_' and n.nspname<>'information_schema' and c.relkind in ('r','p','v','m','f')
+                and (pg_has_role(login.oid,c.relowner,'MEMBER') or pg_has_role(cap.oid,c.relowner,'MEMBER')
+                  or has_table_privilege(login.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                  or has_table_privilege(cap.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+                  or has_any_column_privilege(login.oid,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')
+                  or has_any_column_privilege(cap.oid,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')))
+              and not exists (select 1 from pg_class c join pg_namespace n on n.oid=c.relnamespace
+                where left(n.nspname,3)<>'pg_' and n.nspname<>'information_schema' and c.relkind='S'
+                and (pg_has_role(login.oid,c.relowner,'MEMBER') or pg_has_role(cap.oid,c.relowner,'MEMBER')
+                  or has_sequence_privilege(login.oid,c.oid,'SELECT,USAGE,UPDATE')
+                  or has_sequence_privilege(cap.oid,c.oid,'SELECT,USAGE,UPDATE')))
+              and not exists (select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_language lang on lang.oid=p.prolang
+                where left(n.nspname,3)<>'pg_' and n.nspname<>'information_schema'
+                  and (p.prosecdef or (not lang.lanpltrusted and not exists (
+                    select 1 from pg_depend dep join pg_extension ext on ext.oid=dep.refobjid
+                    where dep.classid='pg_proc'::regclass and dep.objid=p.oid and dep.refclassid='pg_extension'::regclass
+                      and dep.deptype='e' and ext.extname in ('pgcrypto','btree_gist'))))
+                  and not exists (select 1 from unnest($2::text[]) expected(signature) where to_regprocedure(expected.signature)=p.oid)
+                  and (has_function_privilege(login.oid,p.oid,'EXECUTE') or has_function_privilege(cap.oid,p.oid,'EXECUTE')))
+          ) safe`,
+          [
+            capability.role,
+            capability.functions.map(
+              (signature) => "early_bird_private." + signature,
+            ),
+            connection.login,
+          ],
+        );
+        if (result.rows[0]?.safe !== true)
           throw Error("public_expert_capability_grants_invalid");
       }
     },

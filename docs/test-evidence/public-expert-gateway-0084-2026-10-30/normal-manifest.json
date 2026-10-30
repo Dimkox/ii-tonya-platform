@@ -1,5 +1,5 @@
 {
-  "status": "preliminary_local_review_only",
+  "status": "historical_preliminary_source_superseded",
   "source_sha": "879c03990a204166bff2fa1ccb9d105d9e4e5787",
   "bridge_source_sha": "12d538a3d8b7cadd4ffd977e87579236849ebc92",
   "provenance": {
@@ -22,5 +22,6 @@
     "Normal source SHA differs from bridge source SHA"
   ],
   "localDirectory": "/tmp/public-expert-0084-task6-normal",
-  "releaseEvidence": false
+  "releaseEvidence": false,
+  "supersededReason": "Task6 independent review required historical-horizon and exact runtime capability readiness corrections after these builds. Retain as historical local assembly evidence; rebuild final exact-source recovery/release pair in Task7."
 }

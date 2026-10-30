@@ -177,7 +177,9 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
         `create role ${login} login password 'synthetic-only' inherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
       ),
     );
-  const provisioning = await buildEarlyBirdRoleProvisioningSql(mapping);
+  const provisioning = await buildEarlyBirdRoleProvisioningSql(mapping, {
+    throughMigration: latest,
+  });
   const operator = await database.db.$client.connect();
   try {
     await operator.query(provisioning);
