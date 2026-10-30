@@ -773,6 +773,10 @@ const reviewedDomHarnessHashes = new Map([
 
 const approvedAutomationArtifactHashes = new Map([
   [
+    "scripts/experimental/yookassa_gateway/test_public_journey_reader_seam.py",
+    "a7493e386749d328290a61caf3a05abddea62832aa44f4606e0dd723911c4ea6",
+  ],
+  [
     "scripts/experimental/yookassa_gateway/test_public_dispatch.py",
     "eb4a8367068457864657a40edbebae150e6b7a87f8d6178b57666ccd871dc688",
   ],
@@ -1447,7 +1451,7 @@ const approvedDependencySpecifiers = new Map([
 const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/0084_public_expert_payment_gateway.sql",
-    "2ac46f25b7ebc02c82c1fadfa4400399f15d896c8f7dbc8c0b465ac011ceeb09",
+    "02a07402c41e4d664730b16f887d770107623bb24bfb681c7dcd7c6c05dbf38e",
   ],
   [
     "packages/db/migrations/meta/0084_snapshot.json",
@@ -1455,11 +1459,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/state/0084_manifest.json",
-    "bfae65b72dd6d87aa4fae44692bb264131b867fcd7abc0561105a592f28490af",
+    "893eb41855c7e88a634e6a0e899ffb9d6972f4b573f0cd438a31449efaeee23f",
   ],
   [
     "packages/db/migrations/state/0084_sql_objects.json",
-    "a30cf5ef5f8fdf9c1e21a252c65fba347d68013c6154a412e0adedba86c941f5",
+    "090b270d8beb5eae96bf25a9c196537935a8a8af94b8cd2230fe928788a47753",
   ],
 
   [
@@ -2693,6 +2697,7 @@ const isVersionedGetzillaToolingPath = (path: string): boolean =>
 
 // Exact reviewed deployment and CI discovery inventory.
 const reviewedGatewayProvisionArtifacts = new Set([
+  "scripts/experimental/yookassa_gateway/test_public_journey_reader_seam.py",
   "scripts/experimental/yookassa_gateway/test_public_dispatch.py",
   "scripts/experimental/yookassa_gateway/test_public_dispatch_response.py",
   "scripts/experimental/yookassa_gateway/test_public_provider_projection.py",
@@ -3668,7 +3673,7 @@ export function isApprovedLargeScopeArtifact(
 ): boolean {
   const approvedSizes = new Map<string, number>([
     ["packages/db/migrations/meta/0084_snapshot.json", 1192800],
-    ["packages/db/migrations/state/0084_sql_objects.json", 1866855],
+    ["packages/db/migrations/state/0084_sql_objects.json", 1871148],
 
     ["packages/db/migrations/state/0083_sql_objects.json", 1416389],
     ["packages/db/migrations/meta/0083_snapshot.json", 1166391],
