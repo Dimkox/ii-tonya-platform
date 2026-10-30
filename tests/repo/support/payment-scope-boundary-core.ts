@@ -695,9 +695,10 @@ const approvedPackageManifestHashes = new Map([
     "apps/sandbox-api/package.json",
     "e274bb47edb371e673dc86fb806aa1e9c90973b73a87a02e82add2c72d161fe5",
   ],
+  // API directly imports the existing workspace version of drizzle-orm.
   [
     "apps/api/package.json",
-    "4db1262b33e3a14268dca723019c129b4a1c253b53956f47b6bc84baa42e3318",
+    "02e467d1e765312a6e3ab9473d428a2962539cf4bf1f26c2f5e21b35d7e79e8a",
   ],
   [
     "apps/web/package.json",
@@ -1322,6 +1323,7 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
       "@ii-tonya/db",
       "@ii-tonya/integrations",
       "@ii-tonya/observability",
+      "drizzle-orm",
       "fastify",
     ]),
   ],
