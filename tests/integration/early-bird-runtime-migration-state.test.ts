@@ -156,7 +156,7 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
       String(row.definition).includes("FUNCTION early_bird_private."),
     ),
   ).toBe(false);
-  const capabilities = (await loadEarlyBirdRoleCapabilities()).filter(
+  const capabilities = (await loadEarlyBirdRoleCapabilities(latest)).filter(
     (capability) => capability.migration <= latest,
   );
   expect(capabilities).toHaveLength(26);
@@ -172,7 +172,9 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
         `create role ${login} login password 'synthetic-only' inherit nosuperuser nocreatedb nocreaterole noreplication nobypassrls`,
       ),
     );
-  const provisioning = await buildEarlyBirdRoleProvisioningSql(mapping);
+  const provisioning = await buildEarlyBirdRoleProvisioningSql(mapping, {
+    throughMigration: latest,
+  });
   const operator = await database.db.$client.connect();
   try {
     await operator.query(provisioning);
@@ -224,9 +226,12 @@ it(`reproduces canonical ${tag} state and private capability ACLs from an indepe
       .name as string;
     await expect(
       operator.query(
-        await buildEarlyBirdRoleProvisioningSql({
-          [capabilities[0]!.role]: owner,
-        }),
+        await buildEarlyBirdRoleProvisioningSql(
+          {
+            [capabilities[0]!.role]: owner,
+          },
+          { throughMigration: latest },
+        ),
       ),
     ).rejects.toMatchObject({ message: "early_bird_role_login_unsafe" });
     await operator.query("ROLLBACK");
