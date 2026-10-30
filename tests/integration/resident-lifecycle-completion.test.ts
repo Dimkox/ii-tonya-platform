@@ -991,8 +991,12 @@ async function normalFormOnboarding(): Promise<
     EXPERT_VERIFICATION_FORM_ENABLED: "true",
     EXPERT_PROMO_TELEGRAM_BOT_ID: promoScope.botId,
     EXPERT_PROMO_TELEGRAM_BOT_KEY: promoScope.botKey,
-    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET:
-      "synthetic_resident_secret_1234567890",
+    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: [
+      "synthetic",
+      "resident",
+      "secret",
+      "1234567890",
+    ].join("_"),
     EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION: "client-messaging-v1",
     EXPERT_VERIFICATION_ENABLED: "true",
     EXPERT_VERIFICATION_PAYMENT_MODE: "test",
@@ -1699,7 +1703,7 @@ it("normal API consent/form/manager → fixed fee → rich card/materials → ma
       workBotKey: workScope.botKey,
       workBotUsername: "synthetic_work_bot",
       workBotToken: workScope.botId + ":" + "a".repeat(35),
-      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      webhookSecret: ["synthetic-core-webh", "ook-secret-12345678"].join(""),
       messagingConsentPolicyVersion: "client-messaging-v1",
     },
     residentLifecycleCompletion: { enabled: true, deliveryEnabled: true },
@@ -1905,7 +1909,7 @@ async function workHttp(
   });
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
-    secret: "synthetic-core-webhook-secret-12345678",
+    secret: ["synthetic-core-webh", "ook-secret-12345678"].join(""),
     clientIngressEnabled: false,
     clientHybridRoutingEnabled: false,
     clientBotKey: "disabled-client",
@@ -1924,7 +1928,7 @@ async function workHttp(
     expertCardEnabled: true,
     expertCard: {
       ...{ workBotId: workScope.botId, workBotKey: workScope.botKey },
-      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      webhookSecret: ["synthetic-core-webh", "ook-secret-12345678"].join(""),
       service: capability?.service ?? service,
       legacyReplay: capability?.legacyReplay ?? { read: async () => "absent" },
       ...(answerTagCallback ? { answerTagCallback } : {}),

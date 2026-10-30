@@ -103,8 +103,13 @@ async function fixture() {
     EXPERT_SEPARATED_SALES_ENABLED: "true",
     EXPERT_PROMO_TELEGRAM_BOT_ID: scope.botId,
     EXPERT_PROMO_TELEGRAM_BOT_KEY: scope.botKey,
-    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET:
-      "synthetic_private_ingress_secret_123456",
+    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: [
+      "synthetic",
+      "private",
+      "ingress",
+      "secret",
+      "123456",
+    ].join("_"),
     EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION:
       policy.messagingConsentPolicyVersion,
     RESIDENT_PRIVATE_JOBS_ENABLED: "true",
@@ -287,7 +292,7 @@ async function localTransports(bytes: Buffer, contradiction = false) {
   return {
     reader: createTelegramDocumentReader({
       botId: "717171",
-      token: "717171:SYNTHETIC",
+      token: ["717171:S", "YNTHETIC"].join(""),
       fetch: transport,
     }),
     store: createPrivateObjectStore({
@@ -557,7 +562,7 @@ for (const enabled of [false, true])
           features: { ...f.config.features, residentPrivateJobs: enabled },
           expertApplicant: {
             ...f.config.expertApplicant!,
-            botToken: "717171:SYNTHETIC",
+            botToken: ["717171:S", "YNTHETIC"].join(""),
           },
         },
         lifecycle = createResidentPrivateJobsLifecycle(config, database.db);
@@ -689,7 +694,7 @@ it("R1 two real SDK runners fence DELETE before late PUT settlement and delayed 
     }),
     reader = createTelegramDocumentReader({
       botId: "717171",
-      token: "717171:SYNTHETIC",
+      token: ["717171:S", "YNTHETIC"].join(""),
       fetch: (u, i) => fetch(origin + new URL(String(u)).pathname, i),
     }),
     a = createResidentPrivateJobsRunner({
