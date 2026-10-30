@@ -1,94 +1,97 @@
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
 import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { closeDb, createDb } from "../../packages/db/src/client.js";
+import type { DrizzleDb } from "../../packages/db/src/client.js";
+import {
+  createYooKassaClient,
+  YooKassaPaymentVerifier,
+} from "@ii-tonya/integrations";
+import {
+  startExpertReferralTestDatabase,
+  type ExpertReferralTestDatabase,
+} from "../../packages/db/src/testkit/expert-referral.js";
+import { PostgresExpertResidencyRepository } from "../../packages/db/src/repositories/expert-residency-repository.js";
+import { PostgresExpertResidencyProviderInboxRepository } from "../../packages/db/src/repositories/expert-residency-provider-inbox-repository.js";
 import { PostgresYooKassaOperationRepository } from "../../packages/db/src/repositories/yookassa-operation-repository.js";
 
-const schema = "yookassa_task2_test";
-const connectionString = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
-if (!connectionString) throw new Error("test_database_unavailable");
-
-const isolatedUrl = new URL(connectionString);
-isolatedUrl.searchParams.set("options", `-c search_path=${schema},public`);
-const db = createDb(isolatedUrl.toString());
-const repository = new PostgresYooKassaOperationRepository(db);
-
-const orderId = "00000000-0000-4000-8000-000000000301";
-const commandId = "00000000-0000-4000-8000-000000000303";
 const requestDigest = `sha256:${"c".repeat(64)}`;
+let fixture: ExpertReferralTestDatabase;
+let db: DrizzleDb;
+let repository: PostgresYooKassaOperationRepository;
+let tariffId: string;
+let orderId: string;
+let commandId: string;
 
-describe("YooKassa operation concurrency on the shared Claw test database", () => {
+async function settleCapturedPayment(operationId: string, paymentId: string) {
+  const operation = await repository.bindProviderObject(operationId, paymentId);
+  const capturedAt = (
+    await db.execute<{ at: Date }>(sql`select clock_timestamp() as at`)
+  ).rows[0]!.at.toISOString();
+  const client = createYooKassaClient(
+    { mode: "test", shopId: "test-shop", secretKey: "synthetic-fixture-only" },
+    async (url, init) => {
+      if (
+        init.method !== "GET" ||
+        new URL(url).pathname !== `/v3/payments/${paymentId}`
+      )
+        throw Error("unexpected_fixture_provider_request");
+      return new Response(
+        JSON.stringify({
+          id: paymentId,
+          status: "succeeded",
+          paid: true,
+          test: true,
+          refundable: true,
+          amount: { value: "500.00", currency: "RUB" },
+          created_at: capturedAt,
+          captured_at: capturedAt,
+          metadata: { order_id: orderId },
+        }),
+        { status: 200 },
+      );
+    },
+  );
+  const proof = await new YooKassaPaymentVerifier(
+    client,
+    repository,
+  ).verifyPayment(operation);
+  expect(proof).not.toBeNull();
+  await new PostgresExpertResidencyProviderInboxRepository(db).settle(proof!);
+}
+
+describe("YooKassa operation concurrency on an isolated canonical database", () => {
   beforeAll(async () => {
-    await db.execute(
-      sql`drop table if exists expert_residency_provider_operations, expert_residency_payment_attempts, expert_residency_orders cascade`,
-    );
-    await db.execute(
-      sql.raw(`
-      create table expert_residency_orders (
-        id uuid primary key,
-        cash_minor bigint not null,
-        currency text not null,
-        status text not null
-      );
-      create table expert_residency_payment_attempts (
-        id uuid primary key default gen_random_uuid(),
-        order_id uuid not null references expert_residency_orders(id),
-        provider text not null,
-        provider_request_id text not null,
-        expected_amount_minor bigint not null,
-        currency text not null,
-        status text not null default 'created',
-        idempotency_key text not null,
-        resolved_at timestamptz,
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now(),
-        unique (provider, provider_request_id),
-        unique (idempotency_key),
-        unique (id, order_id)
-      );
-    `),
-    );
-    const migration = await readFile(
-      "packages/db/migrations/0023_yookassa_provider_operations.sql",
-      "utf8",
-    );
-    await db.execute(sql.raw(migration));
-    const recoveryMigration = await readFile(
-      "packages/db/migrations/0024_yookassa_encrypted_recovery.sql",
-      "utf8",
-    );
-    for (const statement of recoveryMigration
-      .split("--> statement-breakpoint")
-      .map((value) => value.trim())
-      .filter(
-        (value) =>
-          value.startsWith(
-            'ALTER TABLE "expert_residency_provider_operations"',
-          ) ||
-          value.startsWith(
-            'CREATE INDEX "expert_provider_operations_unbound_recovery_idx"',
-          ),
-      )) {
-      await db.execute(sql.raw(statement));
-    }
-  });
+    fixture = await startExpertReferralTestDatabase(undefined, {
+      forceDisposableCluster: true,
+    });
+    db = fixture.db;
+    repository = new PostgresYooKassaOperationRepository(db);
+    await fixture.enableExpertReferralCommands();
+    tariffId = await fixture.createResidencyTariff({
+      tariffKey: "concurrency",
+      displayName: "Concurrency fixture",
+      priceMinor: 50000,
+      durationSeconds: 2592000,
+    });
+  }, 120_000);
 
   beforeEach(async () => {
-    await db.execute(
-      sql`truncate expert_residency_provider_operations, expert_residency_payment_attempts, expert_residency_orders`,
-    );
-    await db.execute(
-      sql`insert into expert_residency_orders (id,cash_minor,currency,status) values (${orderId}::uuid,50000,'RUB','payment_pending')`,
-    );
+    const expert = await fixture.createExpertIdentity();
+    const order = await new PostgresExpertResidencyRepository(
+      db,
+    ).createCheckoutOrder({
+      expertId: expert.expertId,
+      tariffVersionId: tariffId,
+      providerDeadline: new Date(Date.now() + 3600000),
+      idempotencyKey: randomUUID(),
+    });
+    orderId = order.id;
+    commandId = randomUUID();
   });
 
   afterAll(async () => {
-    await db.execute(
-      sql`drop table if exists expert_residency_provider_operations, expert_residency_payment_attempts, expert_residency_orders cascade`,
-    );
-    await closeDb(db);
-  });
+    await fixture?.stop();
+  }, 120_000);
 
   it("returns one durable claim under eight concurrent identical commands", async () => {
     const command = {
@@ -109,7 +112,7 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       new Set(claims.map(({ idempotencyKey }) => idempotencyKey)),
     ).toHaveLength(1);
     const rows = await db.execute<{ count: number }>(
-      sql`select count(*)::int as count from expert_residency_provider_operations`,
+      sql`select count(*)::int as count from expert_residency_provider_operations where order_id=${orderId}::uuid`,
     );
     expect(rows.rows[0]?.count).toBe(1);
     expect(
@@ -180,10 +183,7 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       requestDigest,
     });
     const paymentId = randomUUID();
-    await repository.bindProviderObject(payment.id, paymentId);
-    await db.execute(
-      sql`update expert_residency_payment_attempts set status='settled',resolved_at=now() where id=${payment.paymentAttemptId}::uuid`,
-    );
+    await settleCapturedPayment(payment.id, paymentId);
 
     const firstRefundCommand = {
       commandId: "00000000-0000-4000-8000-000000000304",
@@ -240,10 +240,7 @@ describe("YooKassa operation concurrency on the shared Claw test database", () =
       requestDigest,
     });
     const paymentId = randomUUID();
-    await repository.bindProviderObject(payment.id, paymentId);
-    await db.execute(
-      sql`update expert_residency_payment_attempts set status='settled',resolved_at=now() where id=${payment.paymentAttemptId}::uuid`,
-    );
+    await settleCapturedPayment(payment.id, paymentId);
 
     await expect(
       repository.claim({
