@@ -69,6 +69,13 @@ function drill(fault = "", action = "deploy", first = false) {
       join(dir, "SOURCE_SHA"),
       dir === payload ? candidateSha : oldSha,
     );
+    writeFileSync(
+      join(dir, "provenance.json"),
+      JSON.stringify({
+        format: "ii-tonya-native-v1",
+        source_sha: dir === payload ? candidateSha : oldSha,
+      }),
+    );
     for (const unit of ["api", "worker", "migrate"])
       writeFileSync(
         join(dir, "systemd", `ii-tonya-${unit}.service`),
@@ -138,13 +145,24 @@ function drill(fault = "", action = "deploy", first = false) {
     payload,
     ".",
   ]);
-  const digest = createHash("sha256")
-    .update(readFileSync(join(incoming, "native-release.tar.gz")))
-    .digest("hex");
-  put(
-    "incoming/unique-upload/native-release.sha256",
-    `${digest}  native-release.tar.gz\n`,
+  writeFileSync(
+    join(incoming, "native-release.provenance.json"),
+    readFileSync(join(payload, "provenance.json")),
   );
+  put("incoming/unique-upload/native-release.spdx.json", "{}\n");
+  const checksums = [
+    "native-release.tar.gz",
+    "native-release.spdx.json",
+    "native-release.provenance.json",
+  ]
+    .map((name) => {
+      const digest = createHash("sha256")
+        .update(readFileSync(join(incoming, name)))
+        .digest("hex");
+      return `${digest}  ${name}\n`;
+    })
+    .join("");
+  put("incoming/unique-upload/native-release.sha256", checksums);
   const checksumDigest = createHash("sha256")
     .update(readFileSync(join(incoming, "native-release.sha256")))
     .digest("hex");
@@ -203,6 +221,7 @@ exec /usr/bin/mv "$@"`,
     `printf 'systemctl %s\\n' "$*" >> "$ROOT/events"
 command="$1"; shift
 args="$*"
+if [[ "$command" == show && "$args" == *ii-tonya-yookassa-gateway.service* && "$args" == *LoadState* ]]; then echo not-found; exit 0; fi
 unit="api"
 [[ "$args" != *worker* ]] || unit="worker"
 [[ "$args" != *migrate* ]] || unit="migrate"

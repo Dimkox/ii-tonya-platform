@@ -16,9 +16,15 @@ import {
   startTestPostgres,
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
-import { runOutboxBatch } from "../../packages/worker/src/outbox-runner.js";
+import {
+  runOutboxBatch,
+  type OutboxRunnerDeps,
+} from "../../packages/worker/src/outbox-runner.js";
 import { LOCAL_OPERATOR_CASE_OUTBOX_TOPICS } from "../../packages/worker/src/local-operator-case-outbox.js";
 import { randomUUID } from "node:crypto";
+
+const SYNTHETIC_PROVIDER_DISPATCH_CLAIM = "provider-dispatch-token";
+const SYNTHETIC_PROVIDER_RECONCILIATION_CLAIM = "provider-reconciliation-token";
 import { CLIENT_ASYNC_OUTBOX_TOPICS } from "../../packages/contracts/src/client-consent-authority.js";
 import {
   seedClientConsent,
@@ -286,7 +292,7 @@ describe("review regressions for client outbox operational boundaries", () => {
         ...runnerDeps(
           repository,
           vi.fn(),
-          vi.fn(async () => "still_unknown"),
+          vi.fn(async () => "still_unknown" as const),
         ),
         metrics: { record: () => undefined },
         dispatcher: {
@@ -396,7 +402,7 @@ describe("review regressions for client outbox operational boundaries", () => {
           ...runnerDeps(
             repository,
             vi.fn(),
-            vi.fn(async () => "still_unknown"),
+            vi.fn(async () => "still_unknown" as const),
           ),
           maxAttempts: 1,
           ...(metrics
@@ -588,7 +594,7 @@ describe("review regressions for client outbox operational boundaries", () => {
           ...runnerDeps(
             repository,
             vi.fn(),
-            vi.fn(async () => "still_unknown"),
+            vi.fn(async () => "still_unknown" as const),
           ),
           batchSize: 1,
           maxAttempts: 1,
@@ -1170,8 +1176,8 @@ afterAll(async () => testDb?.stop(), 120_000);
 
 const runnerDeps = (
   repository: PostgresOutboxRepository,
-  dispatch: ReturnType<typeof vi.fn>,
-  reconcile: ReturnType<typeof vi.fn>,
+  dispatch: OutboxRunnerDeps["dispatcher"]["dispatch"],
+  reconcile: OutboxRunnerDeps["reconciler"]["reconcile"],
   now = new Date(),
 ) => ({
   repository,
@@ -1256,14 +1262,14 @@ describe("PostgreSQL unknown-outcome lifecycle", () => {
     await testDb.db.execute(sql`
       update integration_outbox set
         status='processing',attempt=1,dispatch_owner_id='provider-worker',
-        dispatch_claim_token='provider-dispatch-token',
+        dispatch_claim_token=${SYNTHETIC_PROVIDER_DISPATCH_CLAIM},
         lease_until=clock_timestamp()-interval '1 second'
       where id=${providerProcessing}::uuid
     `);
     await testDb.db.execute(sql`
       update integration_outbox set
         status='reconciling',reconciliation_owner_id='provider-worker',
-        reconciliation_claim_token='provider-reconciliation-token',
+        reconciliation_claim_token=${SYNTHETIC_PROVIDER_RECONCILIATION_CLAIM},
         reconciliation_lease_until=clock_timestamp()-interval '1 second'
       where id=${providerReconciling}::uuid
     `);

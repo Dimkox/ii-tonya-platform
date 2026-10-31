@@ -15,7 +15,9 @@ describe("native dedicated-server production release", () => {
     expect(readme).toContain(
       "Docker and Compose are development and Claw test tools only",
     );
-    expect(readme).toContain("GitHub Actions are not used");
+    expect(readme).toContain(
+      "GitHub Actions provide hosted CI and Database Gate",
+    );
     expect(environment).toContain("## Direct Claw and native release tooling");
     expect(environment).toContain("`ii_tonya_native_smoke`");
     expect(environment).not.toContain(
@@ -221,14 +223,14 @@ describe("native dedicated-server production release", () => {
     }
   });
 
-  it("publishes native provenance through direct Claw verification, never Actions", () => {
+  it("retains direct Claw native provenance alongside hosted verification", () => {
     const workflows = existsSync(".github/workflows")
       ? readdirSync(".github/workflows").filter((name) =>
           /\.ya?ml$/u.test(name),
         )
       : [];
     const claw = read("scripts/run-claw-ci.sh");
-    expect(workflows).toEqual([]);
+    expect(workflows.sort()).toEqual(["getzilla-verify.yml"]);
     expect(claw).toContain("scripts/build-native-release.sh");
     expect(claw).toContain("native-release.tar.gz");
     expect(claw).not.toMatch(

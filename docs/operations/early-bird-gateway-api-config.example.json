@@ -1,0 +1,134 @@
+{
+  "version": 1,
+  "ipc": {
+    "address": "@ii-tonya-yookassa",
+    "subjectKeyFile": "/run/credentials/ii-tonya-api.service/gateway-subject-key",
+    "authKeyFile": "/run/credentials/ii-tonya-api.service/gateway-auth-key",
+    "subjectKeyVersion": "contact-v1"
+  },
+  "identityKeyFile": "/run/credentials/ii-tonya-api.service/early-bird-identity-key",
+  "requestKeys": {
+    "activeReference": "request:v1",
+    "files": {
+      "request:v1": "/run/credentials/ii-tonya-api.service/early-bird-request-key"
+    }
+  },
+  "receiptKeys": {
+    "activeKeyId": "receipt-v1",
+    "files": {
+      "receipt-v1": "/run/credentials/ii-tonya-api.service/early-bird-receipt-key"
+    }
+  },
+  "databases": {
+    "sender": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/sender-db",
+      "login": "wave_sender_v1"
+    },
+    "candidateReader": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/candidateReader-db",
+      "login": "wave_intent_reader_v1"
+    },
+    "bindingWriter": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/bindingWriter-db",
+      "login": "wave_verifier_v1"
+    },
+    "knownBindingReader": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/knownBindingReader-db",
+      "login": "wave_verified_payment_reader_v1"
+    },
+    "standardSender": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/standardSender-db",
+      "login": "wave_standard_sender_v1"
+    }
+  },
+  "webhookDatabases": {
+    "compositePaymentSettlement": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/compositePaymentSettlement-db",
+      "login": "wave_settlement_writer_v1"
+    },
+    "compositeRefundReader": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/compositeRefundReader-db",
+      "login": "wave_refund_binding_reader_v1"
+    },
+    "compositeRefundBinding": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/compositeRefundBinding-db",
+      "login": "wave_refund_binder_v1"
+    },
+    "compositeRefundSettlement": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/compositeRefundSettlement-db",
+      "login": "wave_refund_writer_v1"
+    },
+    "deferredPaymentLookup": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredPaymentRoute-db",
+      "login": "wave_deferred_payment_route_reader_v1"
+    },
+    "deferredSnapshotReader": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredSnapshotReader-db",
+      "login": "wave_deferred_invoice_reader_v1"
+    },
+    "deferredPaymentBinding": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredPaymentBinding-db",
+      "login": "wave_deferred_binding_writer_v1"
+    },
+    "deferredPaymentSettlement": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredPaymentSettlement-db",
+      "login": "wave_deferred_settlement_writer_v1"
+    },
+    "deferredRefundReader": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredRefundReader-db",
+      "login": "wave_deferred_refund_reader_v1"
+    },
+    "deferredRefundBinding": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredRefundBinding-db",
+      "login": "wave_deferred_refund_binding_v1"
+    },
+    "deferredRefundSettlement": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredRefundSettlement-db",
+      "login": "wave_deferred_refund_settlement_v1"
+    },
+    "deferredRefundCancel": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredRefundCancel-db",
+      "login": "wave_deferred_refund_cancel_v1"
+    }
+  },
+  "deferredDatabases": {
+    "prepare": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredAccountWriter-db",
+      "login": "wave_deferred_account_writer_v1"
+    },
+    "invoice": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredInvoiceWriter-db",
+      "login": "wave_deferred_invoice_writer_v1"
+    },
+    "send": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredSender-db",
+      "login": "wave_deferred_sender_v1"
+    },
+    "bound": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/deferredBoundReader-db",
+      "login": "wave_deferred_bound_reader_v1"
+    }
+  },
+  "publicDatabases": {
+    "onboardingSender": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-onboardingSender-db",
+      "login": "public_onboarding_sender_v1"
+    },
+    "mainSender": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-mainSender-db",
+      "login": "public_main_sender_v1"
+    },
+    "refundSender": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-refundSender-db",
+      "login": "public_refund_sender_v1"
+    },
+    "binder": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-binder-db",
+      "login": "public_payment_binder_v1"
+    },
+    "observations": {
+      "urlFile": "/run/credentials/ii-tonya-api.service/public-observations-db",
+      "login": "public_payment_fact_writer_v1"
+    }
+  }
+}

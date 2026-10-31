@@ -1,3 +1,5 @@
+import { createEarlyBirdReadOnlyStatus } from "./expert-early-bird-readonly-status.js";
+import { isInitializedEarlyBirdGatewayService } from "./expert-early-bird-runtime-composition.js";
 import type { PayerReceiptVault } from "@ii-tonya/integrations";
 import {
   createResidentVerificationService,
@@ -9,6 +11,7 @@ import {
   type RuntimeConfig,
 } from "@ii-tonya/config";
 import {
+  PostgresEarlyBirdPaidStatus,
   PostgresExpertPromoRepository,
   PostgresExpertSeparatedSalesRepository,
   PostgresResidentVerificationRepository,
@@ -20,8 +23,22 @@ import type { ExpertApplicantTelegramCapability } from "./routes/expert-applican
 export function assertExpertApplicantCapability(
   config: RuntimeConfig,
   capability: ExpertApplicantTelegramCapability | undefined,
+  nowMs: number = Date.now(),
 ): void {
   assertExpertApplicantConfig(config);
+  // Only a concrete gateway-backed authority that completed authenticated startup
+  // readiness permits wave routing; an arbitrary feature boolean is insufficient.
+  if (
+    config.launchPhase?.configuredPhase === "WAVE_1_EARLY_BIRD" &&
+    (!Number.isSafeInteger(nowMs) ||
+      !Number.isSafeInteger(config.launchPhase.clientStartMs) ||
+      nowMs < config.launchPhase.clientStartMs) &&
+    !(
+      capability?.earlyBirdEnabled === true &&
+      isInitializedEarlyBirdGatewayService(capability.earlyBirdAuthority)
+    )
+  )
+    throw new Error("early_bird_capability_required");
   if (
     capability &&
     (capability.separatedSalesEnabled === true) !==
@@ -54,6 +71,7 @@ export function createExpertApplicantComposition(
     checkout?: Parameters<
       typeof createExpertSeparatedSalesService
     >[0]["checkout"];
+    wave?: Parameters<typeof createExpertSeparatedSalesService>[0]["wave"];
   },
 ): ExpertApplicantTelegramCapability | undefined {
   assertExpertApplicantConfig(config);
@@ -65,6 +83,12 @@ export function createExpertApplicantComposition(
     : undefined;
   return {
     separatedSalesEnabled: config.features.expertSeparatedSales === true,
+    earlyBirdEnabled:
+      config.features.expertSeparatedSales === true &&
+      capabilities?.wave !== undefined,
+    ...(isInitializedEarlyBirdGatewayService(capabilities?.wave)
+      ? { earlyBirdAuthority: capabilities!.wave }
+      : {}),
     verificationFormEnabled: config.features.expertVerificationForm === true,
     botId: scope.botId,
     botKey: scope.botKey,
@@ -75,6 +99,24 @@ export function createExpertApplicantComposition(
         ? {
             separatedSales: createExpertSeparatedSalesService({
               repository: sales,
+              paidStatus: createEarlyBirdReadOnlyStatus(
+                new PostgresEarlyBirdPaidStatus(db, scope),
+              ),
+              ...(capabilities?.wave
+                ? {
+                    wave: capabilities.wave,
+                    waveForm: createResidentVerificationService({
+                      ...(privateDocuments ? { privateDocuments } : {}),
+                      enabled: true,
+                      salesFirst: true,
+                      wavePaymentFlow: true,
+                      repository: new PostgresResidentVerificationRepository(
+                        db,
+                        { ...scope, earlyBirdForm: true },
+                      ),
+                    }),
+                  }
+                : {}),
               ...(capabilities?.receipt
                 ? {
                     captureReceipt: (input) =>

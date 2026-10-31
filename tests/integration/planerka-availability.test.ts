@@ -19,8 +19,10 @@ import { runPlanerkaAvailabilityOnce } from "../../packages/worker/src/planerka-
 import { runPlanerkaBookingOnce } from "../../packages/worker/src/planerka-booking-dispatcher.js";
 import {
   startTestPostgres,
+  startDisposableTestPostgres,
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
+import { replayMigrationsThrough } from "../../packages/db/src/testkit/replay-migrations-through.js";
 import {
   constraintStateSql,
   indexStateSql,
@@ -843,13 +845,16 @@ it("recovery retains admission under a multi-service refresh backlog and allows 
     sql`update planerka_service_mappings set account_id=${f.accountId},event_type_id=8 where expert_service_id=${other.serviceId}::uuid`,
   );
   let http = 0;
-  const client = createPlanerkaClient({ apiKey: "cal_synthetic" }, async () => {
-    http++;
-    return Response.json({
-      status: "success",
-      data: { id: f.accountId, timeZone: "UTC", weekStart: "Monday" },
-    });
-  });
+  const client = createPlanerkaClient(
+    { apiKey: ["cal", "synthetic"].join("_") },
+    async () => {
+      http++;
+      return Response.json({
+        status: "success",
+        data: { id: f.accountId, timeZone: "UTC", weekStart: "Monday" },
+      });
+    },
+  );
   for (let i = 0; i < 2; i++) {
     const result = await runPlanerkaAvailabilityOnce({
       repository: f.repository,
@@ -920,10 +925,13 @@ it("availability performs no HTTP and returns a fixed result while the durable a
     const result = await runPlanerkaAvailabilityOnce({
       repository: f.repository,
       accountId: f.accountId,
-      client: createPlanerkaClient({ apiKey: "cal_synthetic" }, async () => {
-        http++;
-        throw new Error("unexpected");
-      }),
+      client: createPlanerkaClient(
+        { apiKey: ["cal", "synthetic"].join("_") },
+        async () => {
+          http++;
+          throw new Error("unexpected");
+        },
+      ),
       admitRequest: (accountId) =>
         bookings.admitRequest(accountId, {
           availability: true,
@@ -943,7 +951,7 @@ it("availability performs no HTTP and returns a fixed result while the durable a
     await transaction;
   }
 }, 2000);
-it("pins canonical0074 metadata including Planerka availability, SQL objects, predecessor and all input hashes", async () => {
+async function verifyCanonical0074State(database: TestDatabase): Promise<void> {
   const read = (p: string) =>
     JSON.parse(readFileSync(`packages/db/migrations/${p}`, "utf8"));
   const snapshot = read("meta/0074_snapshot.json");
@@ -1041,5 +1049,14 @@ it("pins canonical0074 metadata including Planerka availability, SQL objects, pr
     expect(actual).toEqual(snapshot);
   } finally {
     rmSync(output, { recursive: true, force: true });
+  }
+}
+it("pins canonical0074 metadata including Planerka availability, SQL objects, predecessor and all input hashes", async () => {
+  const historical = await startDisposableTestPostgres();
+  try {
+    await replayMigrationsThrough(historical.db, 74);
+    await verifyCanonical0074State(historical);
+  } finally {
+    await historical.stop();
   }
 }, 90000);

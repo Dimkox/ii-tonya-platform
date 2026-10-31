@@ -1,0 +1,27 @@
+{
+  "status": "historical_preliminary_source_superseded",
+  "source_sha": "879c03990a204166bff2fa1ccb9d105d9e4e5787",
+  "bridge_source_sha": "12d538a3d8b7cadd4ffd977e87579236849ebc92",
+  "provenance": {
+    "source_sha": "879c03990a204166bff2fa1ccb9d105d9e4e5787",
+    "source_archive_sha256": "2a8f0e997acb8646d0e32151de2f55a0de5bdd0ab9d5fb3f9e3e9fd119383468",
+    "format": "ii-tonya-native-v1"
+  },
+  "migrationEntries": 85,
+  "capabilityRoles": 33,
+  "financialFunctions": 6,
+  "artifacts": {
+    "native-release.provenance.json": "246ec0293f014d6aaec63f77ded9e0296f3ce1f43436b1b22fef14c61c228fd5",
+    "native-release.spdx.json": "720bfd375cf001ae5d00851660ca91986680bf1d1b2946357028a3d6a3f545d4",
+    "native-release.tar.gz": "9460c2880ddf5d09749d9253e81c1172e16a5e4ead0ed2339a32fa37a17be4d4"
+  },
+  "verifiedArchiveContents": [
+    "All85 migration SQL byte hashes match committed source",
+    "33-role catalogue and six explicit primary helper functions present",
+    "Operator financial-login CLI and public gateway readiness claim present",
+    "Normal source SHA differs from bridge source SHA"
+  ],
+  "localDirectory": "/tmp/public-expert-0084-task6-normal",
+  "releaseEvidence": false,
+  "supersededReason": "Task6 independent review required historical-horizon and exact runtime capability readiness corrections after these builds. Retain as historical local assembly evidence; rebuild final exact-source recovery/release pair in Task7."
+}

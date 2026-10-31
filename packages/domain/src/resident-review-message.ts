@@ -48,6 +48,26 @@ export function residentQuestions(value: unknown): string[] {
  * and editable question details instead of accepting claims in an unrestricted suffix.
  */
 export function renderResidentReviewMessage(input: ResidentMessageInput) {
+  return renderMessage(input);
+}
+
+/** Wave terms must come from the immutable price snapshot, never manager input. */
+export function renderWaveResidentReviewMessage(
+  input: ResidentMessageInput,
+  terms: { onboardingMinor: number; clientStart: string; prelaunch: boolean },
+) {
+  if (
+    ![1000, 300000].includes(terms.onboardingMinor) ||
+    !/^\d{1,2} [а-я]+ \d{4}$/u.test(terms.clientStart)
+  )
+    throw Error("resident_message_invalid");
+  return renderMessage(input, terms);
+}
+
+function renderMessage(
+  input: ResidentMessageInput,
+  terms?: { onboardingMinor: number; clientStart: string; prelaunch: boolean },
+) {
   if (input.key === "REJECT_POST_PAYMENT_REFUND")
     throw Error("resident_refund_policy_unavailable");
   if (input.name && (input.name.length > 120 || unsafe.test(input.name)))
@@ -58,7 +78,12 @@ export function renderResidentReviewMessage(input: ResidentMessageInput) {
   let body: string, action: ResidentReviewAction;
   if (input.key === "APPROVED_BASIC" || input.key === "APPROVED_EXCLUSIVE") {
     action = input.key;
-    body = `Анкета одобрена. Категория: ${input.key === "APPROVED_BASIC" ? "Базовая" : "Эксклюзивная"}. Взнос за онбординг — 3000 ₽. Выбранные условия доступны в /my_tariff. Постоянная цена и доступ к интервью открываются только после подтверждённой оплаты в срок.`;
+    body =
+      terms && !terms.prelaunch
+        ? `Анкета одобрена. Категория: ${input.key === "APPROVED_BASIC" ? "Базовая" : "Эксклюзивная"}. Платформа открыта для клиентов. Актуальные условия участия доступны в /my_tariff.`
+        : terms
+          ? `Анкета одобрена. Категория: ${input.key === "APPROVED_BASIC" ? "Базовая" : "Эксклюзивная"}. Взнос за онбординг — ${terms.onboardingMinor / 100} ₽. Старт для клиентов — ${terms.clientStart} года. Вы можете оплатить онбординг и тариф одним платежом или оплатить только онбординг, а тариф по базовой цене — до старта. Выбранные условия доступны в /my_tariff. Постоянная цена и доступ к интервью открываются только после подтверждённой оплаты в срок.`
+          : `Анкета одобрена. Категория: ${input.key === "APPROVED_BASIC" ? "Базовая" : "Эксклюзивная"}. Взнос за онбординг — 3000 ₽. Выбранные условия доступны в /my_tariff. Постоянная цена и доступ к интервью открываются только после подтверждённой оплаты в срок.`;
   } else {
     body = residentTemplateBodies[input.key].replace(
       /^\{NAME\},[^\n]*\n+/u,

@@ -46,9 +46,20 @@ describe("B1 schema/migration parity", () => {
         breakpoints: true,
       },
     ]);
-    expect(journal.entries.at(-1)).toMatchObject({
-      idx: 75,
-      tag: "0075_resident_lifecycle_completion",
+    expect(journal.entries.filter((entry) => entry.idx === 75)).toEqual([
+      {
+        idx: 75,
+        version: "7",
+        when: 1793152800006,
+        tag: "0075_resident_lifecycle_completion",
+        breakpoints: true,
+      },
+    ]);
+    expect(journal.entries.at(-1)).toEqual({
+      idx: 84,
+      version: "7",
+      when: 1793152800015,
+      tag: "0084_public_expert_payment_gateway",
       breakpoints: true,
     });
   });

@@ -16,7 +16,7 @@ const config: YooKassaClientConfig = {
   secretKey: "test-secret-not-live",
 };
 
-const command: CreateYooKassaPayment = {
+const command = {
   amountMinor: 50_000n,
   idempotencyKey: "d5cab70e-c30f-4baf-9da0-e8f633c475f8",
   description: "Expert residency",
@@ -31,7 +31,7 @@ const command: CreateYooKassaPayment = {
       paymentMode: "full_payment",
     },
   },
-};
+} satisfies CreateYooKassaPayment;
 
 const payment = {
   id: "2f4b6d0d-000f-5000-9000-000000000001",
@@ -154,4 +154,133 @@ describe("YooKassaClient", () => {
       "yookassa_mode_mismatch",
     );
   });
+});
+
+it("serializes a single 30-ruble payment with distinct 10 and 20 ruble receipt items", () => {
+  const request = {
+    ...command,
+    amountMinor: 3000n,
+    receipt: {
+      customer: { email: "fixture@example.invalid" },
+      items: [
+        {
+          ...command.receipt.item,
+          description: "Онбординг",
+          amountMinor: 1000n,
+        },
+        { ...command.receipt.item, description: "Тариф", amountMinor: 2000n },
+      ],
+    },
+  } satisfies CreateYooKassaPayment;
+  const body = JSON.parse(serializeYooKassaPaymentRequest(request));
+  expect(body.amount).toEqual({ value: "30.00", currency: "RUB" });
+  expect(body.receipt.items).toMatchObject([
+    { description: "Онбординг", amount: { value: "10.00", currency: "RUB" } },
+    { description: "Тариф", amount: { value: "20.00", currency: "RUB" } },
+  ]);
+});
+
+it("rejects a composite receipt that does not add up to the charged amount", () => {
+  const request = {
+    ...command,
+    amountMinor: 3000n,
+    receipt: {
+      customer: { email: "fixture@example.invalid" },
+      items: [
+        { ...command.receipt.item, amountMinor: 1000n },
+        { ...command.receipt.item, amountMinor: 1999n },
+      ],
+    },
+  } satisfies CreateYooKassaPayment;
+  expect(() => serializeYooKassaPaymentRequest(request)).toThrow(
+    "yookassa_receipt_amount_invalid",
+  );
+});
+
+it("rejects a malformed composite receipt before any provider request", async () => {
+  const transport = vi.fn<YooKassaTransport>();
+  const client = createYooKassaClient(config, transport);
+  const request = {
+    ...command,
+    amountMinor: 3000n,
+    receipt: {
+      customer: { email: "fixture@example.invalid" },
+      items: [
+        { ...command.receipt.item, description: "", amountMinor: 1000n },
+        { ...command.receipt.item, amountMinor: 2000n },
+      ],
+    },
+  } satisfies CreateYooKassaPayment;
+  await expect(client.createPayment(request)).rejects.toThrow(
+    "yookassa_receipt_item_invalid",
+  );
+  expect(transport).not.toHaveBeenCalled();
+});
+
+it("rejects a sparse composite receipt before any provider request", async () => {
+  const transport = vi.fn<YooKassaTransport>();
+  const items = new Array(2);
+  items[0] = { ...command.receipt.item, amountMinor: 3000n };
+  const request = {
+    ...command,
+    amountMinor: 3000n,
+    receipt: { customer: { email: "fixture@example.invalid" }, items },
+  } as unknown as CreateYooKassaPayment;
+  await expect(
+    createYooKassaClient(config, transport).createPayment(request),
+  ).rejects.toThrow("yookassa_receipt_amount_invalid");
+  expect(transport).not.toHaveBeenCalled();
+});
+
+it("serializes the same composite amounts that were validated", () => {
+  let reads = 0;
+  const request = {
+    ...command,
+    amountMinor: 3000n,
+    receipt: {
+      customer: { email: "fixture@example.invalid" },
+      items: [
+        {
+          ...command.receipt.item,
+          get amountMinor() {
+            return ++reads === 1 ? 1000n : 2000n;
+          },
+        },
+        { ...command.receipt.item, amountMinor: 2000n },
+      ],
+    },
+  } satisfies CreateYooKassaPayment;
+  const body = JSON.parse(serializeYooKassaPaymentRequest(request));
+  expect(
+    body.receipt.items.map(
+      (item: { amount: { value: string } }) => item.amount.value,
+    ),
+  ).toEqual(["10.00", "20.00"]);
+});
+
+it("charges and verifies the same payment amount even when input has an accessor", async () => {
+  let reads = 0;
+  const request = {
+    ...command,
+    get amountMinor() {
+      return ++reads === 1 ? 3000n : 50000n;
+    },
+    receipt: {
+      customer: { email: "fixture@example.invalid" },
+      items: [
+        { ...command.receipt.item, amountMinor: 1000n },
+        { ...command.receipt.item, amountMinor: 2000n },
+      ],
+    },
+  } satisfies CreateYooKassaPayment;
+  const transport = vi.fn<YooKassaTransport>(async (_url, init) => {
+    expect(JSON.parse(String(init.body)).amount.value).toBe("30.00");
+    return jsonResponse(200, {
+      ...payment,
+      amount: { value: "30.00", currency: "RUB" },
+    });
+  });
+  await expect(
+    createYooKassaClient(config, transport).createPayment(request),
+  ).resolves.toBeDefined();
 });

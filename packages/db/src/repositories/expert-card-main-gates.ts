@@ -9,6 +9,7 @@ import {
 import { sql } from "drizzle-orm";
 import {
   assertVerifiedExpertResidencyPaymentEvent,
+  publicExpertApplyActionSchema,
   type VerifiedExpertResidencyPaymentEvent,
 } from "@ii-tonya/integrations";
 import {
@@ -180,10 +181,35 @@ const admissions = new WeakMap<
  * activation callback or caller-supplied predicate is accepted. */
 export async function prepareMainCardSettlement(
   tx: ExpertCardTransaction,
-  input: VerifiedExpertResidencyPaymentEvent,
+  input: Pick<
+    VerifiedExpertResidencyPaymentEvent,
+    Extract<keyof VerifiedExpertResidencyPaymentEvent, string>
+  >,
   order: { id: string; expertId: string },
+  publicIds?: {
+    requestId: string;
+    observationId: string;
+    applyAttemptId: string;
+  },
 ): Promise<MainCardAdmission | null> {
-  assertVerifiedExpertResidencyPaymentEvent(input);
+  if (publicIds) {
+    const raw = (
+      await tx.execute<{ value: unknown }>(
+        sql`select early_bird_private.public_payment_apply_guard(${publicIds.requestId}::uuid,${publicIds.observationId}::uuid,${publicIds.applyAttemptId}::uuid) value`,
+      )
+    ).rows[0]?.value;
+    const guarded = publicExpertApplyActionSchema.parse(raw);
+    if (
+      guarded.kind !== "ready_to_apply" ||
+      guarded.action !== "main_settle" ||
+      guarded.legacySourceId !== input.orderId ||
+      guarded.evidence?.legacyEventId !== input.eventId ||
+      guarded.evidence.observation.providerObjectId !== input.paymentId ||
+      guarded.evidence.observation.providerCapturedAt !== input.occurredAt ||
+      guarded.evidence.observation.evidenceDigest !== input.payloadDigest
+    )
+      fail("card_main_payment_binding_mismatch");
+  } else assertVerifiedExpertResidencyPaymentEvent(input);
   if (input.orderId !== order.id || input.kind !== "settled")
     fail("card_main_payment_binding_mismatch");
   input = Object.freeze({ ...input });
@@ -212,7 +238,7 @@ export async function prepareMainCardSettlement(
     return fail("card_main_payment_binding_mismatch");
   const canonical = (
     await tx.execute<{ id: string }>(
-      sql`select id from expert_residency_provider_event_inbox where provider=${input.provider} and external_event_id=${input.eventId} and order_id=${order.id}::uuid and payment_id=${input.paymentId} and amount_minor=${input.amountMinor}::bigint and currency=${input.currency} and event_kind='settled' and authenticated=true and identity_version=1 and verification_id=${input.verificationId} and verifier_key_version=${input.verifierKeyVersion} and verified_at=${new Date(input.verifiedAt)} and status='processing' for update nowait`,
+      sql`select id from expert_residency_provider_event_inbox where provider=${input.provider} and external_event_id=${input.eventId} and order_id=${order.id}::uuid and payment_id=${input.paymentId} and amount_minor=${input.amountMinor}::bigint and currency=${input.currency} and event_kind='settled' and authenticated=true and identity_version=1 and verification_id=${input.verificationId} and verifier_key_version=${input.verifierKeyVersion} and verified_at=${input.verifiedAt}::timestamptz and status='processing' for update nowait`,
     )
   ).rows[0];
   if (!canonical) fail("card_main_payment_binding_mismatch");
@@ -226,7 +252,7 @@ export async function prepareMainCardSettlement(
   const blocked = async () => {
     const expired = (
       await tx.execute<{ expired: boolean }>(
-        sql`select clock_timestamp()>=payment_deadline as expired from expert_residency_orders where id=${order.id}::uuid`,
+        sql`select ${publicIds ? sql`${input.occurredAt}::timestamptz > payment_deadline` : sql`clock_timestamp()>=payment_deadline`} as expired from expert_residency_orders where id=${order.id}::uuid`,
       )
     ).rows[0]?.expired;
     return Object.freeze({
@@ -298,7 +324,7 @@ export async function prepareMainCardSettlement(
   if (held) return blocked();
   const expired = (
     await tx.execute<{ expired: boolean }>(
-      sql`select clock_timestamp()>=payment_deadline as expired from expert_residency_orders where id=${order.id}::uuid`,
+      sql`select ${publicIds ? sql`${input.occurredAt}::timestamptz > payment_deadline` : sql`clock_timestamp()>=payment_deadline`} as expired from expert_residency_orders where id=${order.id}::uuid`,
     )
   ).rows[0]?.expired;
   if (expired !== false)

@@ -44,6 +44,7 @@ export async function admitExternalSlot(
     userId: string;
     excludedReservationId?: string;
     choiceDigest?: string;
+    waveCoverage?: boolean;
   },
 ): Promise<
   | { now: Date; startsAt: Date; expertId: string; serviceId: string }
@@ -79,7 +80,7 @@ export async function admitExternalSlot(
     join experts e on e.id=es.expert_id cross join current_clock c
     where s.id=${input.slotId}::uuid and s.provider<>'resident_native'
       and s.ends_at>s.starts_at and s.capacity>0 and es.active and e.active and e.verified
-      and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+      and (${currentExpertResidencyVisibleSql(sql`e.user_id`, input.waveCoverage === true)})
       and exists(select 1 from users u where u.id=${input.userId}::uuid and u.active)
       and resident_slot_fresh(s.id,c.at) and s.starts_at>c.at+interval '24 hours'
       and (s.provider<>'planerka' or exists(select 1 from planerka_service_mappings m

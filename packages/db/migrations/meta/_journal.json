@@ -533,6 +533,76 @@
       "when": 1793152800006,
       "tag": "0075_resident_lifecycle_completion",
       "breakpoints": true
+    },
+    {
+      "idx": 76,
+      "version": "7",
+      "when": 1793152800007,
+      "tag": "0076_owner_test_pricing",
+      "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1793152800008,
+      "tag": "0077_early_bird_choices",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793152800009,
+      "tag": "0078_early_bird_launch_config",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1793152800010,
+      "tag": "0079_early_bird_positive_price_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1793152800011,
+      "tag": "0080_early_bird_form_bridge",
+      "breakpoints": true
+    },
+    {
+      "idx": 81,
+      "version": "7",
+      "when": 1793152800012,
+      "tag": "0081_early_bird_payment_runtime",
+      "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1793152800013,
+      "tag": "0082_early_bird_worker_capabilities",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1793152800014,
+      "tag": "0083_early_bird_launch_publication",
+      "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1793152800015,
+      "tag": "0084_public_expert_payment_gateway",
+      "breakpoints": true
+    },
+    {
+      "idx": 85,
+      "version": "7",
+      "when": 1793152800016,
+      "tag": "0085_resident_native_uuid_sources",
+      "breakpoints": true
     }
   ]
 }

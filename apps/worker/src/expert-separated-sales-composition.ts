@@ -15,6 +15,18 @@ export function createSeparatedSalesRunner(
   config: RuntimeConfig,
   fetcher: typeof fetch = fetch,
   payment?: HeldSalesCapabilities,
+  publicHeld?: {
+    readonly strictFirstSendCancellation: true;
+    recoverCheckout(input: {
+      invoiceId: string;
+      operationId: string;
+    }): Promise<
+      | { kind: "pending" | "unavailable" }
+      | { kind: "ready"; url: string; paymentId: string }
+    >;
+    reconcileKnown(limit?: number): Promise<unknown>;
+  },
+  publicReconciliationOwner: "runner" | "runtime" = "runner",
 ) {
   if (config.features.expertSeparatedSales !== true) return undefined;
   const scope = config.expertApplicant!;
@@ -112,25 +124,29 @@ export function createSeparatedSalesRunner(
   }
   const settings = config.expertVerification;
   const held =
-    config.features.expertHeldOnboarding === true && payment && settings
-      ? new PostgresHeldOnboardingCheckout(db, {
-          ...payment,
-          enabled: true,
-          mode: settings.paymentMode,
-          repository: new PostgresExpertVerificationRepository(db, {
-            providerMode: settings.paymentMode,
-            messagingConsentPolicyVersion:
-              settings.messagingConsentPolicyVersion,
-          }),
-        })
-      : undefined;
+    config.features.expertHeldOnboarding === true &&
+    publicHeld?.strictFirstSendCancellation === true
+      ? publicHeld
+      : config.features.expertHeldOnboarding === true && payment && settings
+        ? new PostgresHeldOnboardingCheckout(db, {
+            ...payment,
+            enabled: true,
+            mode: settings.paymentMode,
+            repository: new PostgresExpertVerificationRepository(db, {
+              providerMode: settings.paymentMode,
+              messagingConsentPolicyVersion:
+                settings.messagingConsentPolicyVersion,
+            }),
+          })
+        : undefined;
   if (config.features.expertHeldOnboarding === true && !held)
     throw new Error("held_onboarding_worker_capability_required");
   const scheduler = new PostgresExpertSalesScheduler(db, transport, held);
   return {
     async runOnce() {
       if (abort.signal.aborted) return { stopped: true };
-      await held?.reconcileKnown();
+      if (!publicHeld || publicReconciliationOwner === "runner")
+        await held?.reconcileKnown();
       return {
         ...(await scheduler.refresh()),
         ...(await scheduler.deliver(abort.signal)),

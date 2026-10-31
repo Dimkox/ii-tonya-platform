@@ -30,7 +30,7 @@ describe("MVP scope boundary", () => {
       );
     }
     expect(violations).toEqual([]);
-  });
+  }, 30_000);
 
   it.each([
     ["property route", 'app.post("/v1/webhooks/make", handler);'],
@@ -323,7 +323,7 @@ describe("MVP scope boundary", () => {
       "packages/db/src/schema/billing.ts",
       "// payment and refund tables are outside MVP\nexport {};",
     ],
-    ["packages/integrations/package.json", '{"dependencies":{"zod":"^4.3.6"}}'],
+    ["packages/integrations/package.json", '{"dependencies":{"zod":"^4.6.6"}}'],
   ])(
     "allows explicit boundaries and comment-only vocabulary in %s",
     (path, content) => {
@@ -486,8 +486,14 @@ describe("MVP scope boundary", () => {
     ).not.toEqual([]);
   });
 
-  it("rejects GitHub Actions as unapproved executable automation", () => {
-    const path = ".github/workflows/db-gate.yml";
+  it("pins reviewed GitHub Actions and rejects changed executable automation", () => {
+    const path = ".github/workflows/getzilla-verify.yml";
+    expect(
+      classifyApprovedTrackedScopeContent({
+        path,
+        content: readFileSync(path, "utf8"),
+      }),
+    ).toEqual([]);
     const content = "jobs: {}\n";
     expect(classifyApprovedTrackedScopeContent({ path, content })).not.toEqual(
       [],

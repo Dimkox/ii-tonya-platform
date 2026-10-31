@@ -1,0 +1,14 @@
+# Getzilla selects its real pytest runner using this project marker. Coverage
+# is measured by pytest-cov under the existing full .coveragerc, including its
+# 74% threshold; Getzilla labels its separate unittest-only coverage step skip.
+# Parser and semantic-model tests need their separately locked native/model
+# dependencies and are outside this shared Python gate until provisioned.
+[tool.pytest.ini_options]
+testpaths = [
+  "scripts/experimental/yookassa_gateway",
+  "scripts/test_getzilla_reviewed_opengrep.py",
+  "tests/runtime",
+  "deploy/gateway-provision",
+]
+pythonpath = ["scripts", "scripts/experimental/yookassa_gateway", "deploy/gateway-provision"]
+addopts = "--cov --cov-config=.coveragerc --cov-branch --cov-report=term --cov-fail-under=74"

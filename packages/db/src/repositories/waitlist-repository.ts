@@ -70,6 +70,7 @@ export class PostgresWaitlistRepository {
   constructor(
     private readonly db: DrizzleDb,
     private readonly confirmationBufferMs = 60 * 60 * 1_000,
+    private readonly options: { readonly waveCoverage?: boolean } = {},
   ) {
     if (
       !Number.isSafeInteger(confirmationBufferMs) ||
@@ -142,7 +143,7 @@ export class PostgresWaitlistRepository {
             join experts e on e.id=es.expert_id and e.active=true and e.verified=true
             where c.choice_digest=${command.choiceDigest}
               and cr.user_id=${command.userId}::uuid and cr.state='ready'
-              and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+              and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})
               and c.expires_at>clock_timestamp() and cr.expires_at>clock_timestamp()
               and s.provider<>'resident_native'
               and s.starts_at>clock_timestamp()+interval '24 hours'
@@ -350,7 +351,7 @@ export class PostgresWaitlistRepository {
           from slots s join expert_services es on es.id=s.expert_service_id
           join experts e on e.id=es.expert_id
           where s.id=${command.slotId}::uuid and es.active and e.active and e.verified
-            and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+            and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})
             and s.provider<>'resident_native'
             and s.starts_at>${command.now}::timestamptz+interval '24 hours'
             and s.observed_at>=${command.now}::timestamptz-interval '15 minutes'
@@ -384,6 +385,7 @@ export class PostgresWaitlistRepository {
     const admitted = await admitExternalSlot(tx, {
       slotId: command.slotId,
       userId: entry.userId,
+      waveCoverage: this.options.waveCoverage === true,
     });
     if (!admitted) return { kind: "stale_slot" };
     if (admitted === "full") return { kind: "slot_full" };

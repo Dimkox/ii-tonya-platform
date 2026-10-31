@@ -39,9 +39,21 @@ it("reconstructs lifecycle75 from SQL with owned deferred delivery authority and
       true,
     );
   const journal = read(`${base}/meta/_journal.json`).entries;
-  expect(journal.at(-1)).toMatchObject({
-    idx: 75,
-    when: 1793152800006,
+  expect(journal.filter((entry: { idx: number }) => entry.idx === 75)).toEqual([
+    {
+      idx: 75,
+      version: "7",
+      when: 1793152800006,
+      tag: "0075_resident_lifecycle_completion",
+      breakpoints: true,
+    },
+  ]);
+  expect(journal[75].when).toBeGreaterThan(journal[74].when);
+  expect(journal.at(-1)).toEqual({
+    idx: 84,
+    version: "7",
+    when: 1793152800015,
+    tag: "0084_public_expert_payment_gateway",
     breakpoints: true,
   });
   expect(journal.at(-1).when).toBeGreaterThan(journal.at(-2).when);

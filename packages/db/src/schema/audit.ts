@@ -32,6 +32,16 @@ export const auditEvents = pgTable(
     createdAt,
   },
   (table) => [
+    uniqueIndex("owner_test_pricing_approval_audit_identity")
+      .on(table.correlationId)
+      .where(
+        sql`${table.objectType}='owner_test_pricing_grant' and ${table.action} in ('OWNER_TEST_PRICE_GRANTED','OWNER_TEST_PRICE_REVOKED')`,
+      ),
+    uniqueIndex("owner_test_pricing_grant_audit_identity")
+      .on(table.objectId)
+      .where(
+        sql`${table.objectType}='owner_test_pricing_grant' and ${table.action}='OWNER_TEST_PRICE_GRANTED'`,
+      ),
     uniqueIndex("expert_workspace_activation_audit_once")
       .on(table.objectId, table.action)
       .where(sql`${table.action}='ACCESS_ACTIVATED'`),

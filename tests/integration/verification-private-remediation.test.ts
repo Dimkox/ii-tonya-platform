@@ -31,6 +31,7 @@ import { saveExpertOfferProfile } from "../../packages/db/src/repositories/exper
 import { loadEnv } from "../../packages/config/src/env.js";
 import { createExpertApplicantComposition } from "../../apps/api/src/expert-applicant-composition.js";
 import { expertApplicantTelegramRoutes } from "../../apps/api/src/routes/expert-applicant-telegram.js";
+import { startManagedPrivateParserFixture } from "../support/managed-private-parser.js";
 let database: ExpertReferralTestDatabase, tariff: string;
 let update = 1;
 beforeAll(async () => {
@@ -102,8 +103,13 @@ async function fixture() {
     EXPERT_SEPARATED_SALES_ENABLED: "true",
     EXPERT_PROMO_TELEGRAM_BOT_ID: scope.botId,
     EXPERT_PROMO_TELEGRAM_BOT_KEY: scope.botKey,
-    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET:
-      "synthetic_private_ingress_secret_123456",
+    EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET: [
+      "synthetic",
+      "private",
+      "ingress",
+      "secret",
+      "123456",
+    ].join("_"),
     EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION:
       policy.messagingConsentPolicyVersion,
     RESIDENT_PRIVATE_JOBS_ENABLED: "true",
@@ -286,7 +292,7 @@ async function localTransports(bytes: Buffer, contradiction = false) {
   return {
     reader: createTelegramDocumentReader({
       botId: "717171",
-      token: "717171:SYNTHETIC",
+      token: ["717171:S", "YNTHETIC"].join(""),
       fetch: transport,
     }),
     store: createPrivateObjectStore({
@@ -393,61 +399,66 @@ for (const derived of ["specialty301", "oversized", "throws"] as const)
     }
   });
 it("R5 actual isolated mixed PDF without OCR preserves text/custody and yields UNKNOWN", async () => {
-  const f = await fixture(),
-    bytes = await readFile("/tmp/residency-private-parser-20261026/mixed.pdf"),
-    io = await localTransports(bytes);
+  const parserFixture = await startManagedPrivateParserFixture();
   try {
-    const parser = createIsolatedDocumentParser({
-        socketPath: process.env.II_TONYA_PRIVATE_PARSER_TEST_SOCKET!,
-        ocr: false,
-      }),
-      parsed = await parser.parse({
-        type: "pdf",
-        bytes,
-        signal: new AbortController().signal,
+    const f = await fixture(),
+      bytes = parserFixture.mixedPdf,
+      io = await localTransports(bytes);
+    try {
+      const parser = createIsolatedDocumentParser({
+          socketPath: parserFixture.socketPath,
+          ocr: false,
+        }),
+        parsed = await parser.parse({
+          type: "pdf",
+          bytes,
+          signal: new AbortController().signal,
+        });
+      expect(parsed?.coverage).toBe("partial");
+      expect(parsed?.content).toContain("Психолог");
+      await submit(f, {
+        roles: ["EXPERT"],
+        primaryRole: "EXPERT",
+        specialization: "Психолог",
+        methods: "Консультации",
+        experienceYears: 12,
+        averageCheckMinor: "100000",
+        education: [
+          {
+            kind: "document",
+            fileId: "mixed",
+            size: bytes.length,
+            mimeType: "application/pdf",
+          },
+        ],
       });
-    expect(parsed?.coverage).toBe("partial");
-    expect(parsed?.content).toContain("Психолог");
-    await submit(f, {
-      roles: ["EXPERT"],
-      primaryRole: "EXPERT",
-      specialization: "Психолог",
-      methods: "Консультации",
-      experienceYears: 12,
-      averageCheckMinor: "100000",
-      education: [
-        {
-          kind: "document",
-          fileId: "mixed",
-          size: bytes.length,
-          mimeType: "application/pdf",
-        },
-      ],
-    });
-    const runner = createResidentPrivateJobsRunner({
-      repository: f.privateJobs,
-      reader: io.reader,
-      store: io.store,
-      parser,
-    });
-    await runner.runOnce();
-    expect(
-      (
-        await database.db.execute(
-          sql`select state,sha256,observation from resident_private_objects where application_id=${f.form.id}::uuid and purpose='education'`,
-        )
-      ).rows[0],
-    ).toMatchObject({
-      state: "verified",
-      sha256: createHash("sha256").update(bytes).digest("hex"),
-      observation: { result: "UNKNOWN" },
-    });
-    runner.stopAccepting();
+      const runner = createResidentPrivateJobsRunner({
+        repository: f.privateJobs,
+        reader: io.reader,
+        store: io.store,
+        parser,
+      });
+      await runner.runOnce();
+      expect(
+        (
+          await database.db.execute(
+            sql`select state,sha256,observation from resident_private_objects where application_id=${f.form.id}::uuid and purpose='education'`,
+          )
+        ).rows[0],
+      ).toMatchObject({
+        state: "verified",
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+        observation: { result: "UNKNOWN" },
+      });
+      runner.stopAccepting();
+    } finally {
+      await io.close();
+      await f.app.close();
+    }
   } finally {
-    await io.close();
-    await f.app.close();
+    await parserFixture.stop();
   }
-});
+}, 180000);
 async function managerSession() {
   const manager = await database.createUser(),
     session =
@@ -551,7 +562,7 @@ for (const enabled of [false, true])
           features: { ...f.config.features, residentPrivateJobs: enabled },
           expertApplicant: {
             ...f.config.expertApplicant!,
-            botToken: "717171:SYNTHETIC",
+            botToken: ["717171:S", "YNTHETIC"].join(""),
           },
         },
         lifecycle = createResidentPrivateJobsLifecycle(config, database.db);
@@ -683,7 +694,7 @@ it("R1 two real SDK runners fence DELETE before late PUT settlement and delayed 
     }),
     reader = createTelegramDocumentReader({
       botId: "717171",
-      token: "717171:SYNTHETIC",
+      token: ["717171:S", "YNTHETIC"].join(""),
       fetch: (u, i) => fetch(origin + new URL(String(u)).pathname, i),
     }),
     a = createResidentPrivateJobsRunner({

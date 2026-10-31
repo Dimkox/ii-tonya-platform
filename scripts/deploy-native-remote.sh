@@ -108,10 +108,86 @@ stop_unit() {
   done
   fail "Service did not stop within deadline."
 }
+gateway_required() {
+  # Parse with Node's environment-file semantics; never execute the file as shell
+  # and never print credentials. Only exit status identifies the provider mode.
+  local selected_provenance=""
+  if [[ -n "${deploy_root:-}" ]]; then selected_provenance="$deploy_root/current/provenance.json"; fi
+  timeout -k 2s 5s env -u PAYMENT_PROVIDER node --env-file="${1:-/etc/ii-tonya/runtime.env}" \
+    --input-type=module - "$selected_provenance" <<'PROFILE'
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+try {
+  const path = process.argv[2];
+  if (path) {
+    const p = JSON.parse(readFileSync(path, 'utf8'));
+    const source = readFileSync(join(dirname(path), 'SOURCE_SHA'), 'utf8').trim();
+    if (p.format !== 'ii-tonya-native-v1' || !/^[0-9a-f]{40}$/.test(source) || p.source_sha !== source) throw new Error();
+    if (p.profile === 'early-bird-compatibility-bridge-v1') {
+      if (!/^[0-9a-f]{40}$/.test(p.runtime_source_sha)) throw new Error();
+      process.exit(43);
+    }
+    if (p.profile !== undefined) throw new Error();
+  }
+  process.exit(process.env.PAYMENT_PROVIDER === 'yookassa_gateway' ? 0 : 42);
+  } catch { process.exit(1); }
+PROFILE
+}
+start_gateway() {
+  local deadline=$(( SECONDS + 30 )) state pid
+  # Type=notify is required: active means the gateway has checked its database
+  # authority and started IPC, rather than merely exec'ing the Python interpreter.
+  [[ "$(property ii-tonya-yookassa-gateway.service Type)" == notify ]] || return 1
+  ctl start ii-tonya-yookassa-gateway.service --no-block || return 1
+  while (( SECONDS < deadline )); do
+    state="$(property ii-tonya-yookassa-gateway.service ActiveState)" || return 1
+    case "$state" in
+      active)
+        pid="$(property ii-tonya-yookassa-gateway.service MainPID)" || return 1
+        [[ "$pid" =~ ^[1-9][0-9]*$ ]]
+        return ;;
+      inactive|activating) sleep 1 ;;
+      *) return 1 ;;
+    esac
+  done
+  return 1
+}
+stop_gateway_if_installed() {
+  local state status=0
+  state="$(ctl show ii-tonya-yookassa-gateway.service --property=LoadState --value)" || status=$?
+  # Older releases have no gateway unit; an unknown control failure is different.
+  [[ "$state" != not-found ]] || return 0
+  (( status == 0 )) || return 1
+  [[ "$state" == loaded || "$state" == masked ]] || return 1
+  stop_unit ii-tonya-yookassa-gateway.service
+}
+gateway_health() {
+  local status=0 pid
+  gateway_required || status=$?
+  case "$status" in
+    42) return 0 ;;
+    43) gateway_stopped_if_installed; return ;;
+    0) ;;
+    *) return 1 ;;
+  esac
+  [[ "$(property ii-tonya-yookassa-gateway.service Type)" == notify ]] || return 1
+  [[ "$(property ii-tonya-yookassa-gateway.service ActiveState)" == active ]] || return 1
+  pid="$(property ii-tonya-yookassa-gateway.service MainPID)" || return 1
+  [[ "$pid" =~ ^[1-9][0-9]*$ ]]
+}
+gateway_stopped_if_installed() {
+  local state status=0
+  state="$(ctl show ii-tonya-yookassa-gateway.service --property=LoadState --value)" || status=$?
+  [[ "$state" != not-found ]] || return 0
+  (( status == 0 )) || return 1
+  [[ "$state" == loaded || "$state" == masked ]] || return 1
+  stopped ii-tonya-yookassa-gateway.service
+}
 stop_apps() {
   local failed=0
   stop_unit ii-tonya-api.service || failed=1
   stop_unit ii-tonya-worker.service || failed=1
+  stop_gateway_if_installed || failed=1
   return "$failed"
 }
 install_release_units() {
@@ -119,6 +195,9 @@ install_release_units() {
   for unit in api worker migrate; do
     timeout -k 2s 10s sudo -n install -m 0644 "$unit_release_dir/systemd/ii-tonya-$unit.service" /etc/systemd/system/ || return 1
   done
+  if [[ -f "$unit_release_dir/systemd/ii-tonya-yookassa-gateway.service" ]]; then
+    timeout -k 2s 10s sudo -n install -m 0644 "$unit_release_dir/systemd/ii-tonya-yookassa-gateway.service" /etc/systemd/system/ || return 1
+  fi
   ctl daemon-reload
 }
 select_release() {
@@ -132,6 +211,7 @@ health() {
   local deadline pid identity start sample current_pid current_identity
   local baseline="" baseline_pid="" baseline_identity=""
   local service_deadline=$(( SECONDS + 60 )) curl_budget remaining
+  gateway_health || return 1
   deadline=$(( $(date +%s) + 60 ))
   while :; do
     remaining=$(( service_deadline - SECONDS ))
@@ -158,6 +238,7 @@ health() {
     if [[ "$pid" == "$current_pid" && "$identity" == "$current_identity" && "$sample" =~ ^[0-9]+$ ]] && (( sample > start )); then
       if [[ -n "$baseline" && "$baseline_pid" == "$pid" && "$baseline_identity" == "$identity" ]] && (( sample > baseline )); then
         [[ "$(property ii-tonya-api.service ActiveState)" == active && "$(property ii-tonya-worker.service ActiveState)" == active ]] || return 1
+        gateway_health || return 1
         (( SECONDS < service_deadline )) || return 1
         return 0
       fi
@@ -176,7 +257,14 @@ health() {
   fail "Worker readiness deadline expired."
 }
 start_apps() {
-  local failed=0
+  local failed=0 gateway_status=0
+  gateway_required || gateway_status=$?
+  case "$gateway_status" in
+    0) start_gateway || return 1 ;;
+    42) ;;
+    43) gateway_stopped_if_installed || return 1 ;;
+    *) return 1 ;;
+  esac
   ctl start ii-tonya-api.service --no-block || failed=1
   ctl start ii-tonya-worker.service --no-block || failed=1
   (( failed == 0 )) || return 1

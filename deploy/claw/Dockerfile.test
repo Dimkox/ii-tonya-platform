@@ -32,4 +32,5 @@ RUN --mount=type=cache,id=ii-tonya-claw-pnpm-store,target=/pnpm/store,sharing=lo
     printf '%s\n' "$II_TONYA_SOURCE_SHA" > /seed/.source-sha && \
     chmod 0555 /seed/scripts/run-claw-container-tests.sh
 USER node
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD ["node", "-e", "process.exit(process.versions.node.split('.')[0] === '24' ? 0 : 1)"]
 ENTRYPOINT ["/seed/scripts/run-claw-container-tests.sh"]

@@ -307,7 +307,7 @@ export class PostgresExpertResidencyLifecycleRepository {
       return null;
     const expert = (
       await tx.execute<{ expertId: string }>(
-        sql`select id as "expertId" from experts where user_id=${userId}::uuid and exists(select 1 from expert_residency_orders o where o.expert_id=experts.id and o.status in('settled','refunded','charged_back')) for update`,
+        sql`select id as "expertId" from experts where user_id=${userId}::uuid and (exists(select 1 from expert_residency_orders o where o.expert_id=experts.id and o.status in('settled','refunded','charged_back')) or exists(select 1 from experts_published p where p.expert_id=experts.id and p.user_id=experts.user_id and p.wave_intent_id is not null and p.paid_order_id is null)) for update`,
       )
     ).rows[0];
     if (!expert) return null;
@@ -325,10 +325,46 @@ export class PostgresExpertResidencyLifecycleRepository {
       sql`select user_id from expert_residency_lifecycle where user_id=${userId}::uuid for update`,
     );
   }
+  private async waveCapability(tx: ExpertCardTransaction, signature: string) {
+    // Resolve private OIDs only after USAGE is independently established.
+    const schema = (
+      await tx.execute<{ allowed: boolean }>(
+        sql`select has_schema_privilege(current_user,'early_bird_private','USAGE') as allowed`,
+      )
+    ).rows[0]?.allowed;
+    if (schema !== true) return false;
+    return (
+      (
+        await tx.execute<{ allowed: boolean }>(
+          sql`select coalesce(has_function_privilege(current_user,to_regprocedure(${signature}),'EXECUTE'),false) as allowed`,
+        )
+      ).rows[0]?.allowed === true
+    );
+  }
+  private async currentWaveCoverageEnd(
+    tx: ExpertCardTransaction,
+    expertId: string,
+  ) {
+    if (
+      !(await this.waveCapability(
+        tx,
+        "early_bird_private.public_current_wave_end(uuid)",
+      ))
+    )
+      return null;
+    const row = (
+      await tx.execute<{ endsAt: string | Date | null }>(
+        sql`select early_bird_private.public_current_wave_end(${expertId}::uuid) as "endsAt"`,
+      )
+    ).rows[0];
+    return row?.endsAt ? iso(row.endsAt) : null;
+  }
   private async snapshot(
     tx: ExpertCardTransaction,
     userId: string,
+    expertId: string,
   ): Promise<ResidencyLifecycle> {
+    const waveEnd = await this.currentWaveCoverageEnd(tx, expertId);
     const row = (
       await tx.execute<{
         status: ResidencyLifecycle["status"];
@@ -336,7 +372,7 @@ export class PostgresExpertResidencyLifecycleRepository {
         paidUntil: string | Date | null;
         revision: number;
       }>(
-        sql`select l.status,l.paused_until::text as "pausedUntil",coalesce((select ends_at from expert_residency_current_coverage(l.expert_id)),(select max(o.residency_ends_at) from expert_residency_orders o where o.expert_id=l.expert_id and o.status='settled' and o.residency_ends_at<=clock_timestamp())) as "paidUntil",coalesce((select r.revision from expert_card_drafts d join expert_card_reviews r on r.id=coalesce((select v.review_id from resident_card_versions v where v.draft_id=d.id order by v.revision desc limit 1),d.approved_review_id) where d.user_id=l.user_id),(select revision from expert_card_drafts where user_id=l.user_id),0) as revision from expert_residency_lifecycle l where l.user_id=${userId}::uuid`,
+        sql`select l.status,l.paused_until::text as "pausedUntil",coalesce((select ends_at from expert_residency_current_coverage(l.expert_id)),${waveEnd}::timestamptz,(select max(o.residency_ends_at) from expert_residency_orders o where o.expert_id=l.expert_id and o.status='settled' and o.residency_ends_at<=clock_timestamp())) as "paidUntil",coalesce((select r.revision from expert_card_drafts d join expert_card_reviews r on r.id=coalesce((select v.review_id from resident_card_versions v where v.draft_id=d.id order by v.revision desc limit 1),d.approved_review_id) where d.user_id=l.user_id),(select revision from expert_card_drafts where user_id=l.user_id),0) as revision from expert_residency_lifecycle l where l.user_id=${userId}::uuid`,
       )
     ).rows[0];
     if (!row) return fail("residency_unavailable");
@@ -346,7 +382,7 @@ export class PostgresExpertResidencyLifecycleRepository {
           cycleEnd: string | Date;
         }
       >(
-        sql`select id,cycle_end as "cycleEnd",tariff_version_id as "tariffVersionId",term_months as "termMonths",quote_id as "quoteId",acceptance_id as "acceptanceId",(select a.order_id from expert_residency_renewal_attempts a where a.bill_id=expert_residency_renewal_bills.id order by a.sequence desc limit 1) as "orderId" from expert_residency_renewal_bills where user_id=${userId}::uuid and cycle_end=coalesce((select ends_at from expert_residency_current_coverage(expert_residency_renewal_bills.expert_id)),(select max(residency_ends_at) from expert_residency_orders where expert_id=expert_residency_renewal_bills.expert_id and status='settled' and residency_ends_at<=clock_timestamp() and not exists(select 1 from expert_residency_orders future where future.expert_id=expert_residency_renewal_bills.expert_id and future.status='settled' and future.residency_starts_at>clock_timestamp()))) order by created_at desc limit 1`,
+        sql`select id,cycle_end as "cycleEnd",tariff_version_id as "tariffVersionId",term_months as "termMonths",quote_id as "quoteId",acceptance_id as "acceptanceId",(select a.order_id from expert_residency_renewal_attempts a where a.bill_id=expert_residency_renewal_bills.id order by a.sequence desc limit 1) as "orderId" from expert_residency_renewal_bills where user_id=${userId}::uuid and cycle_end=coalesce((select ends_at from expert_residency_current_coverage(expert_residency_renewal_bills.expert_id)),${waveEnd}::timestamptz,(select max(residency_ends_at) from expert_residency_orders where expert_id=expert_residency_renewal_bills.expert_id and status='settled' and residency_ends_at<=clock_timestamp() and not exists(select 1 from expert_residency_orders future where future.expert_id=expert_residency_renewal_bills.expert_id and future.status='settled' and future.residency_starts_at>clock_timestamp()))) order by created_at desc limit 1`,
       )
     ).rows[0];
     const quote = bill?.quoteId
@@ -436,12 +472,28 @@ export class PostgresExpertResidencyLifecycleRepository {
       consent.length === 1 &&
       consent[0]!.policyVersion === this.policy.messagingConsentPolicyVersion
     ) {
-      if (main)
+      // A historical main order must not shadow the current Wave entitlement.
+      // Dispatch the optional capability only after a separate privilege probe;
+      // ordinary legacy principals retain their existing fallback without grants.
+      if (
+        await this.waveCapability(
+          tx,
+          "early_bird_private.public_restore_wave_projection(uuid,uuid)",
+        )
+      ) {
+        eligible =
+          (
+            await tx.execute<{ eligible: boolean }>(
+              sql`select early_bird_private.public_restore_wave_projection(${userId}::uuid,${expertId}::uuid) as eligible`,
+            )
+          ).rows[0]?.eligible === true;
+      }
+      if (!eligible && main)
         eligible = await restoreSettledMainCardProjection(tx, {
           userId,
           expertId,
         });
-      else {
+      else if (!eligible) {
         await tx.execute(
           sql`select id from experts where id=${expertId}::uuid for update`,
         );
@@ -491,7 +543,7 @@ export class PostgresExpertResidencyLifecycleRepository {
       const owner = await this.authorized(tx, scope);
       if (!owner) return null;
       await this.reconcile(tx, owner.userId, owner.expertId);
-      return this.snapshot(tx, owner.userId);
+      return this.snapshot(tx, owner.userId, owner.expertId);
     });
   }
   async requestPause(
@@ -526,7 +578,7 @@ export class PostgresExpertResidencyLifecycleRepository {
         await finishCardRequest(tx, request);
       }
       return {
-        ...(await this.snapshot(tx, owner.userId)),
+        ...(await this.snapshot(tx, owner.userId, owner.expertId)),
         replay: request.replay,
       };
     });
@@ -552,7 +604,7 @@ export class PostgresExpertResidencyLifecycleRepository {
         await finishCardRequest(tx, request);
       }
       return {
-        ...(await this.snapshot(tx, owner.userId)),
+        ...(await this.snapshot(tx, owner.userId, owner.expertId)),
         replay: request.replay,
       };
     });
@@ -567,7 +619,7 @@ export class PostgresExpertResidencyLifecycleRepository {
         userId: string;
         expertId: string;
       }>(
-        sql`select e.user_id as "userId",e.id as "expertId" from experts e join users u on u.id=e.user_id and u.active where exists(select 1 from expert_residency_orders o where o.expert_id=e.id and o.status in('settled','refunded','charged_back')) order by coalesce((select updated_at from expert_residency_lifecycle where user_id=e.user_id),'epoch'::timestamptz),e.id limit ${limit}`,
+        sql`select e.user_id as "userId",e.id as "expertId" from experts e join users u on u.id=e.user_id and u.active where (exists(select 1 from expert_residency_orders o where o.expert_id=e.id and o.status in('settled','refunded','charged_back')) or exists(select 1 from experts_published p where p.expert_id=e.id and p.user_id=e.user_id and p.wave_intent_id is not null and p.paid_order_id is null)) order by coalesce((select updated_at from expert_residency_lifecycle where user_id=e.user_id),'epoch'::timestamptz),e.id limit ${limit}`,
       ),
     );
     const result = {
@@ -595,6 +647,10 @@ export class PostgresExpertResidencyLifecycleRepository {
           candidate.userId,
           candidate.expertId,
         );
+        const waveEnd = await this.currentWaveCoverageEnd(
+          tx,
+          candidate.expertId,
+        );
         const cycle = (
           await tx.execute<{
             sourceOrderId: string;
@@ -604,7 +660,7 @@ export class PostgresExpertResidencyLifecycleRepository {
             billDue: boolean;
             stage: string;
           }>(
-            sql`select o.id as "sourceOrderId",o.residency_ends_at as "cycleEnd",o.tariff_version_id as "tariffVersionId",coalesce(q.term_months,1) as "termMonths",clock_timestamp()>=o.residency_ends_at-interval '7 days' as "billDue",case when clock_timestamp()>=o.residency_ends_at+interval '7 days' then 'archive_offer' when clock_timestamp()>=o.residency_ends_at then 'overdue' when clock_timestamp()>=o.residency_ends_at-interval '1 day' then 'one_day' else 'seven_days' end as stage from expert_residency_orders o left join expert_campaign_quotes q on q.id=o.campaign_quote_id where o.expert_id=${candidate.expertId}::uuid and o.status='settled' and (o.id=(select source_order_id from expert_residency_current_coverage(o.expert_id)) or (not exists(select 1 from expert_residency_current_coverage(o.expert_id)) and o.residency_ends_at<=clock_timestamp() and not exists(select 1 from expert_residency_orders future where future.expert_id=o.expert_id and future.status='settled' and future.residency_starts_at>clock_timestamp()))) order by o.residency_ends_at desc,o.id limit 1 for share of o`,
+            sql`select o.id as "sourceOrderId",o.residency_ends_at as "cycleEnd",o.tariff_version_id as "tariffVersionId",coalesce(q.term_months,1) as "termMonths",clock_timestamp()>=o.residency_ends_at-interval '7 days' as "billDue",case when clock_timestamp()>=o.residency_ends_at+interval '7 days' then 'archive_offer' when clock_timestamp()>=o.residency_ends_at then 'overdue' when clock_timestamp()>=o.residency_ends_at-interval '1 day' then 'one_day' else 'seven_days' end as stage from expert_residency_orders o left join expert_campaign_quotes q on q.id=o.campaign_quote_id where o.expert_id=${candidate.expertId}::uuid and o.status='settled' and (o.id=(select source_order_id from expert_residency_current_coverage(o.expert_id)) or (${waveEnd}::timestamptz is null and not exists(select 1 from expert_residency_current_coverage(o.expert_id)) and o.residency_ends_at<=clock_timestamp() and not exists(select 1 from expert_residency_orders future where future.expert_id=o.expert_id and future.status='settled' and future.residency_starts_at>clock_timestamp()))) order by o.residency_ends_at desc,o.id limit 1 for share of o`,
           )
         ).rows[0];
         let billsCreated = 0,

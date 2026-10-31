@@ -326,7 +326,9 @@ it("replays a receipt-bound nonzero-credit reservation without rewriting any fin
     { grantId: f.grantId, amountMinor: "100000" },
   ]);
   await expireContact(f);
-  await f.repository.redactExpiredBatch(100);
+  await f.repository.redactExpiredSelection(
+    await f.repository.listExpiredBatch(100),
+  );
   const payment = paymentFixture(f, order);
   const noVault = new PostgresPayerReceiptContactRepository(database.db);
   await expect(
@@ -373,7 +375,9 @@ it("expires an overdue receipt-bound order and releases its original credit exac
     }).createCheckout(payment.command),
   ).rejects.toThrow("yookassa_unknown_outcome");
   await expireContact(f);
-  await f.repository.redactExpiredBatch(100);
+  await f.repository.redactExpiredSelection(
+    await f.repository.listExpiredBatch(100),
+  );
   // Bounded historical clock fixture in this child database only. Preserve
   // created_at < payment_deadline <= provider_deadline; product clocks stay real.
   const shifted = await database.db.transaction(async (tx) => {
@@ -636,7 +640,7 @@ it("retains exact opaque metadata after expiry and redaction with no vault acces
   await expireContact(f);
   expect(await f.repository.receiptContactForOrder(order.id)).toBeNull();
   expect(await metadataFor(noVault, order.id)).toEqual(expected);
-  await noVault.redactExpiredBatch(100);
+  await noVault.redactExpiredSelection(await noVault.listExpiredBatch(100));
   expect(
     (
       await database.db.execute(
@@ -660,7 +664,10 @@ it.each(["missing key", "expired", "redacted"])(
     });
     expect(BigInt(order.cashMinor)).toBeGreaterThan(0n);
     if (state !== "missing key") await expireContact(f);
-    if (state === "redacted") await f.repository.redactExpiredBatch(100);
+    if (state === "redacted")
+      await f.repository.redactExpiredSelection(
+        await f.repository.listExpiredBatch(100),
+      );
     const before = await financialState(f.owner.expertId);
     const open = vi.fn((): never => {
       throw new Error("must not decrypt on replay");
@@ -733,7 +740,9 @@ it("retains the real admitted operation across redaction and GET-verifies withou
   );
   expect(operation?.status).toBe("pending");
   await expireContact(f);
-  await f.repository.redactExpiredBatch(100);
+  await f.repository.redactExpiredSelection(
+    await f.repository.listExpiredBatch(100),
+  );
   const before = await financialState(f.owner.expertId);
   const noVault = new PostgresPayerReceiptContactRepository(database.db);
   const plaintext = vi.spyOn(noVault, "receiptContactForOrder");
@@ -766,7 +775,9 @@ it("rejects alternate selection, quote and user even after the bound contact is 
   const f = await fixture();
   await f.orders.createCheckoutOrderWithReceipt(f.command);
   await expireContact(f);
-  await f.repository.redactExpiredBatch(100);
+  await f.repository.redactExpiredSelection(
+    await f.repository.listExpiredBatch(100),
+  );
   const before = await financialState(f.owner.expertId);
   const replay = new PostgresExpertCampaignOrderRepository(database.db);
   await expect(
@@ -859,7 +870,10 @@ it.each(["missing key", "expired", "redacted", "wrong key"])(
   async (state) => {
     const f = await fixture();
     if (state === "expired" || state === "redacted") await expireContact(f);
-    if (state === "redacted") await f.repository.redactExpiredBatch(100);
+    if (state === "redacted")
+      await f.repository.redactExpiredSelection(
+        await f.repository.listExpiredBatch(100),
+      );
     const vault: PayerReceiptVault | undefined =
       state === "missing key"
         ? undefined

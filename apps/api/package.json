@@ -26,6 +26,7 @@
     "@ii-tonya/db": "workspace:*",
     "@ii-tonya/integrations": "workspace:*",
     "@ii-tonya/observability": "workspace:*",
-    "fastify": "^5.12.5"
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.12.6"
   }
 }

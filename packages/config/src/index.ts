@@ -20,3 +20,9 @@ export type { ExpertResidencyLifecycleConfig } from "./expert-residency-lifecycl
 export * from "./client-account-queries-config.js";
 
 export * from "./resident-lifecycle-completion-config.js";
+
+export {
+  readLaunchPhaseConfig,
+  resolveLaunchPhase,
+} from "./launch-phase-config.js";
+export type { LaunchPhase, LaunchPhaseConfig } from "./launch-phase-config.js";

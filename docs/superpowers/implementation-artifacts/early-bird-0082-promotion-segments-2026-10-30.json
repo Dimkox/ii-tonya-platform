@@ -1,0 +1,44 @@
+{
+  "status": "canonical_sql_and_actual_database_state_reconstructed_independently_verified_not_release_approval",
+  "tag": "0082_early_bird_worker_capabilities",
+  "canonical_sha256": "9e992d43465b475cd1d2210f0bb3134632504c30bb17402e1dd7dd4e91a9c80d",
+  "sources_frozen_by_implementers": true,
+  "segments": [
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/worker_review_capabilities.sql",
+      "source_sha256": "d3253f30b3418048f0ee5b571ef6852d4e2c1319f74c702c7c924af36bf30e33",
+      "selection": "complete",
+      "selected_bytes": 4283,
+      "selected_sha256": "d3253f30b3418048f0ee5b571ef6852d4e2c1319f74c702c7c924af36bf30e33"
+    },
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/worker_receipt_retention_capabilities.sql",
+      "source_sha256": "b0481de124fc041c1aab5bcd36d8311d04a652f5bbce440ade8226c0e74c86f5",
+      "selection": "complete",
+      "selected_bytes": 2961,
+      "selected_sha256": "b0481de124fc041c1aab5bcd36d8311d04a652f5bbce440ade8226c0e74c86f5"
+    },
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_final_call_worker_capability.sql",
+      "source_sha256": "871a87332c382e4a81323d9620d0cafd16ba1321cd93793228b2fa0470e460fe",
+      "selection": "dispatcher_schema_prefix",
+      "selected_bytes": 8801,
+      "selected_sha256": "1977904a168a3869eaa49d25db7674859a983b18880f170210055a2d003e4013"
+    },
+    {
+      "source": "docs/superpowers/implementation-artifacts/drafts/early_bird_final_call_worker_capability.sql",
+      "source_sha256": "871a87332c382e4a81323d9620d0cafd16ba1321cd93793228b2fa0470e460fe",
+      "selection": "api_engagement_suffix",
+      "selected_bytes": 926,
+      "selected_sha256": "df229be600c52c3e6f91cc21b6e311d706123b38d58fcbcf743b74a1e2f8faaf"
+    }
+  ],
+  "role_creation_or_grants_included": false,
+  "state_witness": {
+    "path": "tests/integration/early-bird-runtime-migration-state.test.ts",
+    "invocation": 3,
+    "result": "1/1 passed",
+    "isolated_capabilities": 26,
+    "postgresql_version": "17.5"
+  }
+}

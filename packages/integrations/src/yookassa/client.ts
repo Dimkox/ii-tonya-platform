@@ -2,15 +2,18 @@ import { isUint8Array } from "node:util/types";
 import { setImmediate as yieldEventLoop } from "node:timers/promises";
 import {
   yooKassaPaymentSchema,
+  yooKassaPaymentListSchema,
   yooKassaRefundSchema,
   type YooKassaMode,
   type YooKassaPayment,
   type YooKassaReceiptInput,
+  type YooKassaCompositeReceiptInput,
   type YooKassaRefund,
 } from "./contracts.js";
 
 const ORIGIN = "https://api.yookassa.ru";
 const MAX_RESPONSE_BYTES = 256 * 1024;
+const MAX_LIST_RESPONSE_BYTES = 2 * 1024 * 1024;
 const PROVIDER_ID = /^[A-Za-z0-9_-]{1,64}$/u;
 const IDEMPOTENCY_KEY =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -32,7 +35,7 @@ export interface CreateYooKassaPayment {
   readonly description: string;
   readonly returnUrl: string;
   readonly metadata: Readonly<Record<string, string>>;
-  readonly receipt: YooKassaReceiptInput;
+  readonly receipt: YooKassaReceiptInput | YooKassaCompositeReceiptInput;
 }
 
 export interface CreateYooKassaPaymentOptions {
@@ -48,6 +51,23 @@ export interface CreateYooKassaRefund {
   readonly idempotencyKey: string;
   readonly description: string;
   readonly receipt: YooKassaReceiptInput;
+}
+
+export interface YooKassaPaymentListClient {
+  listPayments(input: {
+    createdFrom: string;
+    createdTo: string;
+    limit: number;
+    cursor?: string;
+  }): Promise<{
+    items: readonly {
+      id: string;
+      createdAt: string;
+      test: boolean;
+      metadata: { operation_id?: string; order_id?: string };
+    }[];
+    nextCursor?: string;
+  }>;
 }
 
 export interface YooKassaClient {
@@ -105,9 +125,10 @@ const discardBody = (response: Response): void => {
 const readJson = async (
   response: Response,
   signal: AbortSignal,
+  maxBytes = MAX_RESPONSE_BYTES,
 ): Promise<unknown> => {
   const declared = response.headers.get("content-length");
-  if (declared !== null && Number(declared) > MAX_RESPONSE_BYTES) {
+  if (declared !== null && Number(declared) > maxBytes) {
     discardBody(response);
     throw new YooKassaTerminalError("yookassa_response_invalid");
   }
@@ -124,7 +145,7 @@ const readJson = async (
     void reader.cancel().catch(() => {});
   };
   signal.addEventListener("abort", cancel, { once: true });
-  const storage = new Uint8Array(MAX_RESPONSE_BYTES);
+  const storage = new Uint8Array(maxBytes);
   let bytes = 0;
   let reads = 0;
   try {
@@ -142,7 +163,7 @@ const readJson = async (
       if (!isUint8Array(chunk.value)) {
         throw new YooKassaUnknownOutcomeError();
       }
-      if (bytes + chunk.value.byteLength > MAX_RESPONSE_BYTES) {
+      if (bytes + chunk.value.byteLength > maxBytes) {
         throw new YooKassaTerminalError("yookassa_response_invalid");
       }
       // Own the consumed bytes: transports can reuse mutable backing buffers.
@@ -168,58 +189,113 @@ const readJson = async (
   }
 };
 
-const receiptBody = (receipt: YooKassaReceiptInput, amount: string) => {
+const receiptBody = (
+  receipt: YooKassaReceiptInput | YooKassaCompositeReceiptInput,
+  amountMinor: bigint,
+) => {
   if (
     (receipt.customer.email === undefined) ===
     (receipt.customer.phone === undefined)
   ) {
     throw new YooKassaTerminalError("yookassa_receipt_contact_invalid");
   }
+  let items: readonly (YooKassaReceiptInput["item"] & {
+    readonly amountMinor: bigint;
+  })[];
+  if ("items" in receipt) {
+    const source = receipt.items;
+    if (
+      !Array.isArray(source) ||
+      source.length !== 2 ||
+      "item" in receipt ||
+      !Object.hasOwn(source, 0) ||
+      !Object.hasOwn(source, 1)
+    )
+      throw new YooKassaTerminalError("yookassa_receipt_amount_invalid");
+    const snapshot = [source[0], source[1]].map((item) => {
+      if (!item || typeof item !== "object")
+        throw new YooKassaTerminalError("yookassa_receipt_amount_invalid");
+      return {
+        amountMinor: item.amountMinor,
+        description: item.description,
+        vatCode: item.vatCode,
+        paymentSubject: item.paymentSubject,
+        paymentMode: item.paymentMode,
+      };
+    });
+    if (
+      snapshot.some(
+        (item) =>
+          typeof item.amountMinor !== "bigint" || item.amountMinor <= 0n,
+      ) ||
+      snapshot[0]!.amountMinor + snapshot[1]!.amountMinor !== amountMinor
+    )
+      throw new YooKassaTerminalError("yookassa_receipt_amount_invalid");
+    if (
+      snapshot.some(
+        (item) =>
+          typeof item.description !== "string" ||
+          item.description.trim().length === 0 ||
+          item.description.length > 128 ||
+          !Number.isInteger(item.vatCode) ||
+          item.vatCode < 1 ||
+          item.vatCode > 12 ||
+          typeof item.paymentSubject !== "string" ||
+          item.paymentSubject.length === 0 ||
+          typeof item.paymentMode !== "string" ||
+          item.paymentMode.length === 0,
+      )
+    )
+      throw new YooKassaTerminalError("yookassa_receipt_item_invalid");
+    items = snapshot;
+  } else {
+    items = [{ ...receipt.item, amountMinor }];
+  }
   return {
     customer: receipt.customer,
-    items: [
-      {
-        description: receipt.item.description,
-        quantity: "1.00",
-        amount: { value: amount, currency: "RUB" },
-        vat_code: receipt.item.vatCode,
-        payment_subject: receipt.item.paymentSubject,
-        payment_mode: receipt.item.paymentMode,
-      },
-    ],
+    items: items.map((item) => ({
+      description: item.description,
+      quantity: "1.00",
+      amount: { value: formatRubMinor(item.amountMinor), currency: "RUB" },
+      vat_code: item.vatCode,
+      payment_subject: item.paymentSubject,
+      payment_mode: item.paymentMode,
+    })),
   };
 };
 
 export const serializeYooKassaPaymentRequest = (
   command: CreateYooKassaPayment,
 ): string => {
-  const amount = formatRubMinor(command.amountMinor);
+  const amountMinor = command.amountMinor;
+  const amount = formatRubMinor(amountMinor);
   return JSON.stringify({
     amount: { value: amount, currency: "RUB" },
     capture: true,
     confirmation: { type: "redirect", return_url: command.returnUrl },
     description: command.description,
     metadata: command.metadata,
-    receipt: receiptBody(command.receipt, amount),
+    receipt: receiptBody(command.receipt, amountMinor),
   });
 };
 
 export const serializeYooKassaRefundRequest = (
   command: CreateYooKassaRefund,
 ): string => {
-  const amount = formatRubMinor(command.amountMinor);
+  const amountMinor = command.amountMinor;
+  const amount = formatRubMinor(amountMinor);
   return JSON.stringify({
     payment_id: assertProviderId(command.paymentId),
     amount: { value: amount, currency: "RUB" },
     description: command.description,
-    receipt: receiptBody(command.receipt, amount),
+    receipt: receiptBody(command.receipt, amountMinor),
   });
 };
 
 export const createYooKassaClient = (
   config: YooKassaClientConfig,
   transport: YooKassaTransport = (url, init) => fetch(url, init),
-): YooKassaClient => {
+): YooKassaClient & YooKassaPaymentListClient => {
   if (!/^\d{1,32}$/u.test(config.shopId) && config.shopId !== "test-shop") {
     throw new YooKassaTerminalError("yookassa_configuration_invalid");
   }
@@ -228,7 +304,11 @@ export const createYooKassaClient = (
   }
   const authorization = `Basic ${Buffer.from(`${config.shopId}:${config.secretKey}`, "utf8").toString("base64")}`;
 
-  const request = async (path: string, init: RequestInit): Promise<unknown> => {
+  const request = async (
+    path: string,
+    init: RequestInit,
+    maxBytes = MAX_RESPONSE_BYTES,
+  ): Promise<unknown> => {
     const ceiling = AbortSignal.timeout(15_000);
     const signal = init.signal
       ? AbortSignal.any([init.signal, ceiling])
@@ -263,7 +343,7 @@ export const createYooKassaClient = (
       discardBody(response);
       throw new YooKassaTerminalError(`yookassa_http_${response.status}`);
     }
-    const body = await readJson(response, signal);
+    const body = await readJson(response, signal, maxBytes);
     if (signal.aborted) throw new YooKassaUnknownOutcomeError();
     return body;
   };
@@ -287,14 +367,22 @@ export const createYooKassaClient = (
 
   return {
     async createPayment(command, options) {
-      const amount = formatRubMinor(command.amountMinor);
+      const amountMinor = command.amountMinor;
+      const amount = formatRubMinor(amountMinor);
       const result = parsePayment(
         await request("/v3/payments", {
           method: "POST",
           headers: {
             "Idempotence-Key": assertIdempotencyKey(command.idempotencyKey),
           },
-          body: serializeYooKassaPaymentRequest(command),
+          body: serializeYooKassaPaymentRequest({
+            amountMinor,
+            idempotencyKey: command.idempotencyKey,
+            description: command.description,
+            returnUrl: command.returnUrl,
+            metadata: command.metadata,
+            receipt: command.receipt,
+          }),
           ...(options?.signal === undefined ? {} : { signal: options.signal }),
         }),
       );
@@ -302,6 +390,73 @@ export const createYooKassaClient = (
         throw new YooKassaTerminalError("yookassa_amount_mismatch");
       }
       return result;
+    },
+    async listPayments(input) {
+      const start = Date.parse(input.createdFrom),
+        end = Date.parse(input.createdTo);
+      if (
+        !Number.isInteger(input.limit) ||
+        input.limit < 1 ||
+        input.limit > 100 ||
+        !Number.isFinite(start) ||
+        !Number.isFinite(end) ||
+        start > end ||
+        end - start > 31 * 24 * 60 * 60 * 1000 ||
+        !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/u.test(
+          input.createdFrom,
+        ) ||
+        !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/u.test(
+          input.createdTo,
+        ) ||
+        (input.cursor !== undefined &&
+          !/^[\x21-\x7e]{1,1024}$/u.test(input.cursor))
+      )
+        throw new YooKassaTerminalError("yookassa_list_invalid");
+      const query = new URLSearchParams({
+        "created_at.gte": input.createdFrom,
+        "created_at.lte": input.createdTo,
+        limit: String(input.limit),
+      });
+      if (input.cursor !== undefined) query.set("cursor", input.cursor);
+      const parsed = yooKassaPaymentListSchema.safeParse(
+        await request(
+          `/v3/payments?${query.toString()}`,
+          { method: "GET" },
+          MAX_LIST_RESPONSE_BYTES,
+        ),
+      );
+      if (
+        !parsed.success ||
+        parsed.data.items.length > input.limit ||
+        parsed.data.items.some(
+          (item) =>
+            Date.parse(item.created_at) < start ||
+            Date.parse(item.created_at) > end,
+        )
+      )
+        throw new YooKassaTerminalError("yookassa_response_invalid");
+      return {
+        items: parsed.data.items.map((item) => ({
+          id: item.id,
+          createdAt: item.created_at,
+          test: item.test,
+          metadata: {
+            ...(typeof item.metadata?.operation_id === "string" &&
+            item.metadata.operation_id.length > 0 &&
+            item.metadata.operation_id.length <= 128
+              ? { operation_id: item.metadata.operation_id }
+              : {}),
+            ...(typeof item.metadata?.order_id === "string" &&
+            item.metadata.order_id.length > 0 &&
+            item.metadata.order_id.length <= 128
+              ? { order_id: item.metadata.order_id }
+              : {}),
+          },
+        })),
+        ...(parsed.data.next_cursor === undefined
+          ? {}
+          : { nextCursor: parsed.data.next_cursor }),
+      };
     },
     async getPayment(paymentId) {
       return parsePayment(

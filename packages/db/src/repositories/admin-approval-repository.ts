@@ -32,6 +32,8 @@ export type ApprovalAdminAction =
   | "expert_referral.feature_switch"
   | "expert_residency.sandbox_settle"
   | "expert_residency.sandbox_refund"
+  | "owner_test_pricing.grant"
+  | "owner_test_pricing.revoke"
   | "selarti_budget.policy_approve";
 
 type JsonScalar = string | number | boolean | null;
@@ -105,6 +107,8 @@ const actionRoles: Readonly<Record<ApprovalAdminAction, AdminRole>> = {
   "expert_referral.feature_switch": "security_admin",
   "expert_residency.sandbox_settle": "entitlement_admin",
   "expert_residency.sandbox_refund": "entitlement_admin",
+  "owner_test_pricing.grant": "security_admin",
+  "owner_test_pricing.revoke": "security_admin",
   "selarti_budget.policy_approve": "security_admin",
 };
 

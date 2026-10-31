@@ -4,13 +4,39 @@ import { describe, expect, it } from "vitest";
 const read = (path: string): string => readFileSync(path, "utf8");
 
 describe("direct Claw verification semantics", () => {
-  it("does not ship GitHub Actions workflows", () => {
+  it("runs CI and Database Gate from one suite result", () => {
     const workflows = existsSync(".github/workflows")
       ? readdirSync(".github/workflows").filter((name) =>
           /\.ya?ml$/u.test(name),
         )
       : [];
-    expect(workflows).toEqual([]);
+    expect(workflows.sort()).toEqual(["getzilla-verify.yml"]);
+    for (const file of workflows) {
+      const workflow = read(`.github/workflows/${file}`);
+      expect(workflow).toContain("contents: read");
+      expect(workflow).not.toMatch(
+        /pull_request_target|secrets\.|id-token:\s*write|contents:\s*write/u,
+      );
+      expect(workflow).not.toMatch(/drizzle-kit generate|test:repeat/u);
+      expect(workflow).toContain(
+        "github.event.pull_request.head.sha || github.sha",
+      );
+      expect(workflow).toContain("pnpm install --frozen-lockfile");
+      expect(workflow).toContain("postgres:17.5-bookworm");
+      expect(workflow).toContain("II_TONYA_TEST_POSTGRES_ADMIN_URL");
+    }
+    const ci = read(".github/workflows/getzilla-verify.yml");
+    expect(ci.match(/python scripts\/getzilla_verify_ci.py/gu)).toHaveLength(1);
+    expect(ci).toContain("needs: getzilla-verify");
+    expect(ci).toContain("assert-ci-db-results.mjs vitest-results.json");
+    expect(ci).toContain("needs.getzilla-verify.outputs.source_sha");
+    expect(ci).toContain('test "$VERIFIED_SHA" = "$EXPECTED_SHA"');
+    expect(read(".github/workflows/getzilla-verify.yml")).toEqual(
+      read(".getzilla/templates/ci/github-actions-verify.yml").replace(
+        "__GETZILLA_DEFAULT_BRANCH__",
+        "main",
+      ),
+    );
   });
 
   it("runs CI and database gates directly on Claw without Actions context", () => {

@@ -31,6 +31,9 @@ export const yooKassaPaymentSchema = z
     test: z.boolean(),
     created_at: z.iso.datetime({ offset: true }),
     captured_at: z.iso.datetime({ offset: true }).optional(),
+    payment_method: z
+      .object({ type: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/u) })
+      .optional(),
     metadata,
     confirmation: confirmation.optional(),
     refundable: z.boolean(),
@@ -47,6 +50,9 @@ export const yooKassaPaymentSchema = z
       ? {}
       : { capturedAt: value.captured_at }),
     metadata: value.metadata,
+    ...(value.payment_method === undefined
+      ? {}
+      : { paymentMethodType: value.payment_method.type }),
     ...(value.confirmation === undefined
       ? {}
       : {
@@ -58,6 +64,20 @@ export const yooKassaPaymentSchema = z
     refundable: value.refundable,
   }));
 
+export const publicRefundMetadataSchema = z.strictObject({
+  purpose: z.literal("public_main_refund"),
+  operation_id: z.uuid(),
+  order_id: z.uuid(),
+  user_id: z.uuid(),
+});
+const refundMetadata = metadata.superRefine((value, ctx) => {
+  if (
+    value.purpose === "public_main_refund" &&
+    !publicRefundMetadataSchema.safeParse(value).success
+  )
+    ctx.addIssue({ code: "custom", message: "public_refund_identity_invalid" });
+});
+
 export const yooKassaRefundSchema = z
   .object({
     id: providerId,
@@ -65,6 +85,7 @@ export const yooKassaRefundSchema = z
     status: z.enum(["pending", "succeeded", "canceled"]),
     amount,
     created_at: z.iso.datetime({ offset: true }),
+    metadata: refundMetadata.optional(),
   })
   .passthrough()
   .transform((value) => ({
@@ -73,6 +94,7 @@ export const yooKassaRefundSchema = z
     status: value.status,
     amount: { value: value.amount.value, currency: value.amount.currency },
     createdAt: value.created_at,
+    ...(value.metadata === undefined ? {} : { metadata: value.metadata }),
   }));
 
 export const yooKassaNotificationSchema = z
@@ -111,3 +133,37 @@ export interface YooKassaReceiptInput {
   readonly customer: YooKassaReceiptCustomer;
   readonly item: YooKassaReceiptItem;
 }
+
+/** Explicit split receipt: each amount is in kopecks, summed against the payment. */
+export interface YooKassaCompositeReceiptInput {
+  readonly customer: YooKassaReceiptCustomer;
+  readonly items: readonly [
+    YooKassaReceiptItem & { readonly amountMinor: bigint },
+    YooKassaReceiptItem & { readonly amountMinor: bigint },
+  ];
+}
+
+/** Minimal candidate list; full payment details require a separate verified GET. */
+export const yooKassaPaymentListSchema = z
+  .object({
+    type: z.literal("list"),
+    items: z
+      .array(
+        z
+          .object({
+            id: providerId,
+            created_at: z.iso.datetime({ offset: true }),
+            test: z.boolean(),
+            metadata: z.record(z.string(), z.unknown()).optional(),
+          })
+          .passthrough(),
+      )
+      .max(100),
+    next_cursor: z
+      .string()
+      .min(1)
+      .max(1024)
+      .regex(/^[\x21-\x7e]+$/u)
+      .optional(),
+  })
+  .passthrough();

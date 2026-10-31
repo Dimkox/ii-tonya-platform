@@ -36,6 +36,8 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await db!.execute(sql`drop schema public cascade`);
+  // Public CASCADE removes dependencies, but leaves this application schema itself.
+  await db!.execute(sql`drop schema if exists early_bird_private cascade`);
   await db!.execute(sql`drop schema if exists drizzle cascade`);
   await db!.execute(sql`create schema public`);
   await migrateDb(db!, "packages/db/migrations");

@@ -1,0 +1,36 @@
+{
+  "format": "early-bird-old-runtime-pg16-business-v1",
+  "oldSource": "19ecb3456a647743f00584b14d097c2759f0d718",
+  "archiveSha256": "b8492c38c81b74eeeb72c956aac9b10d3889bdea0c814cbcb7ed7d07a906061a",
+  "oldDbModuleSha256": "3cdb943254b7c0ffe2686875b49ac3a4285d3cebff1688c9d9d3220af04c622d",
+  "oldIntegrationModuleSha256": "c6949bc573d6de675294ecae164e282e86b0a83ce0c99788752c8b9712c04de3",
+  "steps": {
+    "fixture_and_legacy_role": {
+      "ok": true
+    },
+    "old_tariff_checkout": {
+      "ok": true
+    },
+    "old_verified_settlement_and_replay": {
+      "ok": true
+    },
+    "restricted_coverage_authority": {
+      "ok": true
+    },
+    "old_card_gate_rejects_unqualified": {
+      "ok": true
+    },
+    "old_booking_search_and_reservation_replay": {
+      "ok": true
+    },
+    "old_verified_refund_and_replay": {
+      "ok": true
+    }
+  },
+  "postgresVersionNum": 160015,
+  "migrationCount": 84,
+  "databaseLatestMigrationHash": "69427ca04b5b16004764d8cc6c20c061e1fad85b89eed60352f56529048918f7",
+  "cardDenialCode": "card_forbidden",
+  "result": "pass",
+  "probeSha256": "4e7c04d8e939863dd34fd89372afd8c6b3bd863b6750f5dbce76c896f0198925"
+}

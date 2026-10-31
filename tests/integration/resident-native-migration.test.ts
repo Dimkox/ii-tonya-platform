@@ -67,7 +67,20 @@ it("R1 normal migrateDb applies 0074 to a populated main0073 database exactly on
         )
       ).rows[0]?.n,
     ).toBe(74);
-    await migrateDb(database.db, source);
+    const native = journal.entries[74];
+    expect(native).toMatchObject({
+      idx: 74,
+      tag: "0074_resident_native_scheduling",
+    });
+    await copyFile(
+      join(source, native.tag + ".sql"),
+      join(folder, native.tag + ".sql"),
+    );
+    await writeFile(
+      join(folder, "meta/_journal.json"),
+      JSON.stringify({ ...journal, entries: [...previous, native] }),
+    );
+    await migrateDb(database.db, folder);
     expect(
       (
         await database.db.execute(
@@ -82,8 +95,8 @@ it("R1 normal migrateDb applies 0074 to a populated main0073 database exactly on
           sql`select count(*)::int as n,max(created_at)::text as latest from drizzle.__drizzle_migrations`,
         )
       ).rows[0],
-    ).toEqual({ n: 75, latest: String(journal.entries.at(-1).when) });
-    await migrateDb(database.db, source);
+    ).toEqual({ n: 75, latest: String(native.when) });
+    await migrateDb(database.db, folder);
     expect(
       (
         await database.db.execute(

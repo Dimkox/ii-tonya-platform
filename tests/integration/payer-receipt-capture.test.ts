@@ -1,6 +1,9 @@
-import { randomUUID, createHash } from "node:crypto";
+import { randomBytes, randomUUID, createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createProductionWorkerRuntime } from "../../apps/worker/src/runtime.js";
+import { composeReceiptRetention } from "../../apps/worker/src/receipt-disclosure-retention.js";
+import { buildEarlyBirdRoleProvisioningSql } from "../../scripts/provision-early-bird-runtime-roles.mjs";
+import { startPublicExpertGatewayProvider } from "../support/public-expert-gateway-provider.mjs";
 import {
   constraintStateSql,
   indexStateSql,
@@ -17,48 +20,21 @@ import {
   type ExpertReferralTestDatabase,
 } from "../../packages/db/src/testkit/expert-referral.js";
 import { startTestPostgres } from "../../packages/db/src/testkit/postgres.js";
-type Contact = { receiptContactId: string; quoteId: string; expiresAt: string };
-type Vault = {
-  seal(
-    email: string,
-    binding: Record<string, unknown>,
-  ): { keyId: string; ciphertext: string };
-  open(
-    envelope: { keyId: string; ciphertext: string },
-    binding: Record<string, unknown>,
-  ): string;
-};
-type Repo = {
-  capture(input: {
-    userId: string;
-    quoteId: string;
-    email: string;
-    idempotencyKey: string;
-  }): Promise<Contact>;
-  receiptContactForOrder(
-    orderId: string,
-  ): Promise<{ email: string; authorityReference: string } | null>;
-  redactExpiredBatch(limit: number): Promise<number>;
-};
-const exports = databaseExports as unknown as {
-  PostgresPayerReceiptContactRepository: new (
-    db: ExpertReferralTestDatabase["db"],
-    vault?: Vault,
-    retentionDays?: number,
-  ) => Repo;
-};
-const crypto = integrationExports as unknown as {
-  createPayerReceiptVault(options: {
-    activeKeyId: string;
-    keys: Map<string, Uint8Array>;
-  }): Vault;
-};
+const exports = databaseExports;
+const crypto = integrationExports;
 let database: ExpertReferralTestDatabase;
 let tariffVersionId: string;
+let provider: Awaited<ReturnType<typeof startPublicExpertGatewayProvider>>;
+let gateway: integrationExports.ExperimentalGatewayIpc;
+let gatewayLogin: string | undefined;
 beforeAll(async () => {
   if (!process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL)
     throw Error("isolated_pg17_required");
-  database = await startExpertReferralTestDatabase();
+  // Canonical capabilities have exactly one LOGIN member per cluster. Keep this
+  // gateway isolated from other files using the shared external admin cluster.
+  database = await startExpertReferralTestDatabase(undefined, {
+    forceDisposableCluster: true,
+  });
   expect(
     (await database.db.execute(sql`show server_version_num`)).rows[0],
   ).toEqual({ server_version_num: "170005" });
@@ -69,10 +45,79 @@ beforeAll(async () => {
     priceMinor: 999000,
     durationSeconds: 2592000,
   });
+  const login = "receipt_gateway_" + randomUUID().replaceAll("-", "");
+  const password = randomBytes(24).toString("hex");
+  const provision = await buildEarlyBirdRoleProvisioningSql({
+    ii_tonya_wave_gateway: login,
+  });
+  const admin = await database.db.$client.connect();
+  try {
+    await admin.query(
+      `create role ${login} login inherit password '${password}'`,
+    );
+    gatewayLogin = login;
+    await admin.query(provision);
+  } catch (error) {
+    await admin.query("rollback");
+    throw error;
+  } finally {
+    admin.release();
+  }
+  // The existing fixture starts BoundGateway with actual PgAuthority readiness,
+  // authenticated IPC and durable contact cancellation, never a synthetic ACK.
+  provider = await startPublicExpertGatewayProvider(
+    database.db.$client.options.connectionString!,
+    login,
+    password,
+    0,
+  );
+  gateway = new integrationExports.ExperimentalGatewayIpc({
+    address: provider.address,
+    key: Buffer.alloc(32, "k"),
+    authKey: Buffer.alloc(32, "a"),
+    timeoutMs: 10000,
+  });
 }, 120000);
 afterAll(async () => {
-  await database?.stop();
-});
+  // Stop the gateway before removing its generated LOGIN or its database.
+  // Keep shared capability roles and their canonical ACLs intact.
+  try {
+    await provider?.close();
+  } finally {
+    try {
+      if (gatewayLogin) {
+        await database.db.$client.query(`drop owned by ${gatewayLogin}`);
+        await database.db.$client.query(`drop role ${gatewayLogin}`);
+      }
+    } finally {
+      await database?.stop();
+    }
+  }
+}, 120000);
+function retention(
+  repository: databaseExports.PostgresPayerReceiptContactRepository,
+) {
+  return composeReceiptRetention(
+    {
+      listExpiredBatch: (limit) => repository.listExpiredBatch(limit),
+      redactExpiredSelection: async (plan) => {
+        // Assert the real gateway's SQL revoke committed before any envelope is
+        // erased. An IPC failure must never be replaced by a locally made ACK.
+        for (const { id } of plan)
+          expect(
+            (
+              await database.db.$client.query(
+                "select revoked_at is not null as revoked from early_bird_gateway_contact_state where contact_id=$1",
+                [id],
+              )
+            ).rows,
+          ).toEqual([{ revoked: true }]);
+        return repository.redactExpiredSelection(plan);
+      },
+    },
+    { checkoutEnabled: true, gateway },
+  );
+}
 async function setup() {
   expect(exports.PostgresPayerReceiptContactRepository).toBeTypeOf("function");
   const owner = await database.createExpertIdentity();
@@ -118,7 +163,7 @@ async function resealFixtureExpiry(
     )
   ).rows[0]!;
   const expiresAt = new Date(clock.expiresAt).toISOString();
-  const metadata = {
+  const metadata: integrationExports.PayerReceiptBinding = {
     id: contactId,
     quoteId: s.quote.id,
     userId: s.owner.userId,
@@ -255,7 +300,7 @@ it("cleanup redacts unselected contact after quote consumption while preserving 
   );
   const empty = async () => ({});
   const runtime = createProductionWorkerRuntime({
-    payerReceiptRetention: () => cleanup.redactExpiredBatch(100),
+    payerReceiptRetention: retention(cleanup),
     jobsRepository: {
       processDueBatch: empty,
       expireDueBatch: empty,
@@ -298,6 +343,14 @@ it("cleanup redacts unselected contact after quote consumption while preserving 
     "email",
     "payer@example.test",
   );
+  expect(
+    (
+      await database.db.$client.query(
+        "select contact_id from early_bird_gateway_contact_state where contact_id=$1 and revoked_at is not null",
+        [selected.receiptContactId],
+      )
+    ).rows,
+  ).toEqual([]);
 });
 it("legacy order replay cannot acquire a receipt binding", async () => {
   const s = await setup(),
@@ -396,7 +449,7 @@ it("bound selection crosses expiry while locked; cleanup skips the held row and 
         )
       ).rows[0].due,
     ).toBe(true);
-    await s.repository.redactExpiredBatch(100);
+    await retention(s.repository)();
     expect(
       (
         await held.query(
@@ -420,7 +473,7 @@ it("bound selection crosses expiry while locked; cleanup skips the held row and 
   await expect(
     s.orders.createCheckoutOrderWithReceipt(command),
   ).resolves.toEqual(order);
-  await s.repository.redactExpiredBatch(100);
+  await retention(s.repository)();
   expect(
     (
       await database.db.execute(
@@ -492,7 +545,7 @@ it("expired unbound capture cannot win a cleanup/checkout race", async () => {
     contact = await s.repository.capture(s.command);
   await resealFixtureExpiry(s, contact.receiptContactId, -1000);
   const results = await Promise.allSettled([
-    s.repository.redactExpiredBatch(100),
+    retention(s.repository)(),
     s.orders.createCheckoutOrderWithReceipt({
       userId: s.owner.userId,
       expertId: s.owner.expertId,
@@ -504,7 +557,7 @@ it("expired unbound capture cannot win a cleanup/checkout race", async () => {
   expect(results[0]!.status).toBe("fulfilled");
   expect(results[1]!.status).toBe("rejected");
   // SKIP LOCKED can leave the row for the next bounded cycle when checkout won its lock.
-  await s.repository.redactExpiredBatch(100);
+  await retention(s.repository)();
   expect(
     (
       await database.db.execute(

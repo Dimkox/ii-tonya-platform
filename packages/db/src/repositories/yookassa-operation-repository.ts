@@ -44,6 +44,9 @@ export const canonicalYooKassaRequestDigest = (
         command.currency,
         command.requestDigest,
         command.parentPaymentId ?? null,
+        ...(command.deliveryOperationId === undefined
+          ? []
+          : [command.deliveryOperationId]),
       ]),
       "utf8",
     )
@@ -99,6 +102,8 @@ const validateClaim = (command: ClaimYooKassaOperationCommand): void => {
     : 0n;
   if (
     !UUID.test(command.commandId) ||
+    (command.deliveryOperationId !== undefined &&
+      !UUID.test(command.deliveryOperationId)) ||
     !UUID.test(command.orderId) ||
     (command.paymentAttemptId !== undefined &&
       !UUID.test(command.paymentAttemptId)) ||
@@ -216,7 +221,11 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
             paymentAttemptId:
               command.paymentAttemptId ?? replay.paymentAttemptId,
           });
-          if (replay.claimDigest !== replayDigest) {
+          if (
+            replay.claimDigest !== replayDigest ||
+            (command.deliveryOperationId !== undefined &&
+              replay.id !== command.deliveryOperationId)
+          ) {
             throw new YooKassaOperationError("YOOKASSA_IDEMPOTENCY_CONFLICT");
           }
           return { kind: "existing" as const, operation: toOperation(replay) };
@@ -370,17 +379,27 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
             throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
           }
         }
+        if (command.deliveryOperationId !== undefined) {
+          const collision = await tx.execute(sql`select 1 where
+            exists(select 1 from expert_residency_provider_operations where id=${command.deliveryOperationId}::uuid)
+            or exists(select 1 from expert_onboarding_payment_operations where id=${command.deliveryOperationId}::uuid)
+            or exists(select 1 from public_expert_payment_requests where id=${command.deliveryOperationId}::uuid or legacy_operation_id=${command.deliveryOperationId}::uuid)
+            or exists(select 1 from early_bird_composite_intents where id=${command.deliveryOperationId}::uuid or invoice_id=${command.deliveryOperationId}::uuid)
+            or exists(select 1 from early_bird_deferred_invoices where id=${command.deliveryOperationId}::uuid)`);
+          if (collision.rows.length)
+            throw new YooKassaOperationError("YOOKASSA_IDEMPOTENCY_CONFLICT");
+        }
         const resolvedCommand = { ...command, paymentAttemptId };
         const claimDigest = canonicalYooKassaRequestDigest(resolvedCommand);
         const inserted = await tx.execute<{ id: string }>(sql`
           insert into expert_residency_provider_operations (
-            command_id, order_id, payment_attempt_id, operation_kind,
+            id, command_id, order_id, payment_attempt_id, operation_kind,
             provider, environment_mode, parent_payment_id, amount_minor,
             currency, request_digest, claim_digest, replay_ciphertext,
             replay_key_reference, replay_body_version, recovery_expires_at,
             recovery_next_at, status
           ) values (
-            ${command.commandId}::uuid, ${command.orderId}::uuid,
+            coalesce(${command.deliveryOperationId ?? null}::uuid,gen_random_uuid()), ${command.commandId}::uuid, ${command.orderId}::uuid,
             ${paymentAttemptId}::uuid, ${command.kind}, 'yookassa',
             ${command.mode}, ${command.parentPaymentId ?? null},
             ${command.amountMinor}::bigint, 'RUB', ${command.requestDigest},
@@ -636,7 +655,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         set manual_review_at = transaction_timestamp(),
             recovery_lease_token = null, recovery_lease_until = null,
             updated_at = transaction_timestamp()
-        where provider_object_id is null and status = 'unknown_outcome'
+        where not exists(select 1 from public_expert_payment_requests public_request where public_request.legacy_operation_id=expert_residency_provider_operations.id) and provider_object_id is null and status = 'unknown_outcome'
           and replay_ciphertext is not null and manual_review_at is null
           and (recovery_expires_at <= transaction_timestamp()
             or recovery_attempt >= ${input.maxAttempts})
@@ -657,7 +676,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
       }>(sql`
         with candidates as (
           select id from expert_residency_provider_operations
-          where provider_object_id is null and status = 'unknown_outcome'
+          where not exists(select 1 from public_expert_payment_requests public_request where public_request.legacy_operation_id=expert_residency_provider_operations.id) and provider_object_id is null and status = 'unknown_outcome'
             and replay_ciphertext is not null and manual_review_at is null
             and recovery_expires_at > transaction_timestamp()
             and recovery_attempt < ${input.maxAttempts}
@@ -687,6 +706,23 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
     });
   }
 
+  /** Final admission for legacy uncertain POST recovery. Public operations are permanently excluded. */
+  async admitUnboundRecovery(
+    operationId: string,
+    leaseToken: string,
+  ): Promise<boolean> {
+    if (!UUID.test(operationId) || !UUID.test(leaseToken))
+      throw new YooKassaOperationError("YOOKASSA_OPERATION_INVALID");
+    const result = await this.db.execute<{ id: string }>(sql`
+      select id from expert_residency_provider_operations operation
+      where operation.id=${operationId}::uuid and operation.status='unknown_outcome'
+        and operation.provider_object_id is null and operation.recovery_lease_token=${leaseToken}::uuid
+        and operation.recovery_lease_until>clock_timestamp()
+        and not exists(select 1 from public_expert_payment_requests public_request where public_request.legacy_operation_id=operation.id)
+    `);
+    return result.rows.length === 1;
+  }
+
   async bindRecoveredProviderObject(
     operationId: string,
     leaseToken: string,
@@ -708,7 +744,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
         set provider_object_id=${providerObjectId}, status='pending',
             recovery_lease_token=null, recovery_lease_until=null,
             recovery_next_at=null, updated_at=transaction_timestamp()
-        where id=${operationId}::uuid and status='unknown_outcome'
+        where id=${operationId}::uuid and not exists(select 1 from public_expert_payment_requests public_request where public_request.legacy_operation_id=expert_residency_provider_operations.id) and status='unknown_outcome'
           and provider_object_id is null
           and recovery_lease_token=${leaseToken}::uuid
           and recovery_lease_until > transaction_timestamp()
@@ -770,7 +806,7 @@ export class PostgresYooKassaOperationRepository implements YooKassaOperationPor
       update expert_residency_provider_operations
       set ${disposition}, recovery_lease_token=null, recovery_lease_until=null,
           updated_at=transaction_timestamp()
-      where id=${operationId}::uuid and status='unknown_outcome'
+      where id=${operationId}::uuid and not exists(select 1 from public_expert_payment_requests public_request where public_request.legacy_operation_id=expert_residency_provider_operations.id) and status='unknown_outcome'
         and provider_object_id is null
         and recovery_lease_token=${leaseToken}::uuid
         and recovery_lease_until > transaction_timestamp()

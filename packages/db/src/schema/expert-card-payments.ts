@@ -229,7 +229,8 @@ export const expertsPublished = pgTable(
       }>()
       .notNull(),
     publicDigest: text("public_digest").notNull(),
-    paidOrderId: uuid("paid_order_id").notNull(),
+    paidOrderId: uuid("paid_order_id"),
+    waveIntentId: uuid("wave_intent_id"),
     nextBillingDate: timestamp("next_billing_date", {
       withTimezone: true,
     }).notNull(),
@@ -253,6 +254,10 @@ export const expertsPublished = pgTable(
         expertResidencyOrders.expertId,
       ],
     }),
+    check(
+      "expert_published_exact_payment_source",
+      sql`(paid_order_id is null) <> (wave_intent_id is null)`,
+    ),
     check("experts_published_revision_check", sql`revision>0`),
     check(
       "experts_published_public_digest_check",

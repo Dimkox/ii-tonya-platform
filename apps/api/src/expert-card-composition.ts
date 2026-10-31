@@ -132,6 +132,7 @@ export function createExpertCardComposition(
         }
       : undefined);
   const repository = new PostgresExpertCardRepository(db, {
+    waveWorkspace: config.features.waveWorkspace === true,
     richOnboarding: true,
     ...(config.residentSemanticSocket
       ? {

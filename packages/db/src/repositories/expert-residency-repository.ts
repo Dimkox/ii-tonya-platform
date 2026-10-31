@@ -329,6 +329,12 @@ export async function expireLockedExpertResidencyOrder(
   order: { id: string; expertId: string },
   deadlineClock: SQL,
 ): Promise<boolean> {
+  const allowed = (
+    await tx.execute<{ allowed: boolean }>(
+      sql`select early_bird_private.public_order_expiry_allowed(${order.id}::uuid) allowed`,
+    )
+  ).rows[0]?.allowed;
+  if (allowed !== true) return false;
   const changed = await tx.execute<{ id: string }>(
     sql`update expert_residency_orders set status='expired',updated_at=${deadlineClock} where id=${order.id}::uuid and expert_id=${order.expertId}::uuid and status='payment_pending' and ${deadlineClock} >= payment_deadline returning id`,
   );
@@ -587,7 +593,7 @@ export class PostgresExpertResidencyRepository {
       );
     return this.db.transaction(async (tx) => {
       const orders = await tx.execute<{ id: string; expertId: string }>(
-        sql`select id,expert_id as "expertId" from expert_residency_orders where status='payment_pending' and transaction_timestamp() >= payment_deadline order by payment_deadline,id limit ${limit} for update skip locked`,
+        sql`select id,expert_id as "expertId" from expert_residency_orders where status='payment_pending' and transaction_timestamp() >= payment_deadline and early_bird_private.public_order_expiry_allowed(id) order by payment_deadline,id limit ${limit} for update skip locked`,
       );
       let released = 0;
       for (const order of orders.rows) {

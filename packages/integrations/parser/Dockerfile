@@ -8,3 +8,4 @@ RUN echo 'e16e5e036cce1d9ec2b00063cf8b54472625b9e14d893a169e2b0dedeb4df225  /mod
 USER 1000:1000
 WORKDIR /app
 ENTRYPOINT ["python", "-I", "/app/socket_server.py", "/run/private-parser/parser.sock", "1000"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD ["python", "-I", "-c", "import socket;s=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM);s.settimeout(3);s.connect('/run/private-parser/parser.sock');s.close()"]

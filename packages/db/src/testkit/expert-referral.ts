@@ -19,6 +19,7 @@ import {
 import {
   resetWithImmutableExpertReferralAdminResults,
   startTestPostgres,
+  startDisposableTestPostgres,
   type TestDatabase,
 } from "./postgres.js";
 
@@ -100,8 +101,11 @@ function requiredId(
 
 export async function startExpertReferralTestDatabase(
   replay?: (db: TestDatabase["db"]) => Promise<void>,
+  options?: { forceDisposableCluster?: boolean },
 ): Promise<ExpertReferralTestDatabase> {
-  const base = await startTestPostgres();
+  const base = options?.forceDisposableCluster
+    ? await startDisposableTestPostgres()
+    : await startTestPostgres();
   if (replay) await replay(base.db);
   else await base.migrate();
 

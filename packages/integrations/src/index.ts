@@ -163,6 +163,7 @@ export type {
   CreateYooKassaPaymentOptions,
   CreateYooKassaRefund,
   YooKassaClient,
+  YooKassaPaymentListClient,
   YooKassaClientConfig,
   YooKassaTransport,
 } from "./yookassa/client.js";
@@ -176,6 +177,7 @@ export type {
   YooKassaNotification,
   YooKassaPayment,
   YooKassaReceiptInput,
+  YooKassaCompositeReceiptInput,
   YooKassaRefund,
   YooKassaVatCode,
 } from "./yookassa/contracts.js";
@@ -213,10 +215,12 @@ export { recoverExactYooKassaOperation } from "./yookassa/exact-body-recovery.js
 export type {
   YooKassaExactRecoveryClaim,
   YooKassaExactRecoveryCompletion,
+  YooKassaExactRecoveryAdmission,
   YooKassaExactRecoveryOperationKind,
   YooKassaExactRecoveryTransport,
   YooKassaReplayDecryptor,
   YooKassaReplayProtector,
+  YooKassaReplayAssociatedData,
 } from "./yookassa/exact-body-recovery.js";
 export {
   createExpertCommandProcessor,
@@ -343,3 +347,86 @@ export * from "./documents/isolated-document-parser.js";
 
 export * from "./documents/resident-geocode.js";
 export * from "./documents/isolated-semantic-tags.js";
+
+export {
+  YooKassaEarlyBirdVerifier,
+  assertVerifiedEarlyBirdPayment,
+  parseEarlyBirdPaymentBinding,
+  type EarlyBirdPaymentBinding,
+  type VerifiedEarlyBirdPayment,
+} from "./yookassa/early-bird-verifier.js";
+export { YooKassaEarlyBirdWebhookCapability } from "./yookassa/early-bird-webhook-capability.js";
+export { YooKassaEarlyBirdRefundDiscovery } from "./yookassa/early-bird-refund-discovery.js";
+export {
+  YooKassaEarlyBirdRefundVerifier,
+  assertVerifiedEarlyBirdRefund,
+  parseEarlyBirdRefundBinding,
+  type VerifiedEarlyBirdRefund,
+  type EarlyBirdRefundBinding,
+} from "./yookassa/early-bird-refund-verifier.js";
+export {
+  YooKassaEarlyBirdCandidateVerifier,
+  assertVerifiedEarlyBirdCandidate,
+  type EarlyBirdCandidateIntent,
+  type VerifiedEarlyBirdCandidate,
+} from "./yookassa/early-bird-candidate-verifier.js";
+export {
+  buildEarlyBirdOwnerRequest,
+  buildEarlyBirdStandardRequest,
+} from "./yookassa/early-bird-request.js";
+export {
+  ExperimentalGatewayIpc,
+  gatewayUserToken,
+  gatewayContactToken,
+} from "./yookassa/experimental-gateway-ipc.js";
+export { createEarlyBirdOwnerPrepareAuthority } from "./yookassa/early-bird-owner-prepare-authority.js";
+
+export {
+  YooKassaDeferredVerifier,
+  assertVerifiedDeferredPayment,
+  parseDeferredSnapshot,
+  type DeferredSnapshot,
+  type VerifiedDeferredPayment,
+} from "./yookassa/early-bird-deferred-verifier.js";
+export {
+  EarlyBirdOwnerCheckoutSender,
+  type EarlyBirdOwnerCheckoutResult,
+  type EarlyBirdOwnerSenderDiagnostic,
+} from "./yookassa/early-bird-owner-checkout-sender.js";
+export {
+  buildDeferredRequest,
+  sealDeferredRequest,
+  openDeferredRequest,
+  type DeferredRequestSource,
+  type DeferredSealedRequest,
+} from "./yookassa/early-bird-deferred-request.js";
+export {
+  EarlyBirdDeferredCheckoutSender,
+  type DeferredAdmission,
+} from "./yookassa/early-bird-deferred-checkout-sender.js";
+export {
+  YooKassaDeferredRefundVerifier,
+  assertVerifiedDeferredRefund,
+  type VerifiedDeferredRefund,
+} from "./yookassa/early-bird-deferred-refund-verifier.js";
+export { createEarlyBirdStandardPrepareAuthority } from "./yookassa/early-bird-standard-prepare-authority.js";
+export {
+  EarlyBirdStandardCheckoutSender,
+  type EarlyBirdStandardSenderDiagnostic,
+} from "./yookassa/early-bird-standard-checkout-sender.js";
+
+export * from "./yookassa/public-expert-gateway-contracts.js";
+export * from "./yookassa/public-expert-gateway.js";
+export {
+  PublicExpertRecovery,
+  assertPublicExpertFreshObservation,
+} from "./yookassa/public-expert-recovery.js";
+export type {
+  PublicExpertFreshObservation,
+  PublicExpertRecoveryBinder,
+  PublicExpertObservationWriter,
+  PublicExpertRecoveryTransport,
+  PublicExpertRecoveryResult,
+} from "./yookassa/public-expert-recovery.js";
+export { publicExpertPaymentSourceSchema } from "./yookassa/public-expert-gateway-contracts.js";
+export type { PublicExpertPaymentSourceData } from "./yookassa/public-expert-gateway-contracts.js";

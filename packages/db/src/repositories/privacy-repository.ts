@@ -311,6 +311,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
     private readonly db: DrizzleDb,
     private readonly options: {
       beforeWithdrawalAudit?: () => Promise<void> | void;
+      beforePrivacyReceiptDisclosure?: (
+        tx: Transaction,
+        userId: string,
+      ) => Promise<unknown | undefined>;
       privacyMutationCapability?: {
         enabled: boolean;
         /** Trusted server configuration, shared with the worker's active policy.
@@ -365,6 +369,22 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.targetUserId}::uuid::text, 0))`,
         );
+        let receiptDisclosureFailure: unknown;
+        if (this.options.beforePrivacyReceiptDisclosure) {
+          await tx.execute(sql`savepoint receipt_disclosure_guard`);
+          try {
+            receiptDisclosureFailure =
+              await this.options.beforePrivacyReceiptDisclosure(
+                tx,
+                command.targetUserId,
+              );
+            await tx.execute(sql`release savepoint receipt_disclosure_guard`);
+          } catch (error) {
+            // A database/capture failure cannot preserve a durable retry ticket.
+            // Roll back the whole mutation; gateway outages are returned values.
+            throw error;
+          }
+        }
         if (command.purpose === "client_messaging") {
           await stopBookingNotificationRecipients(tx, command.targetUserId);
           await tx.execute(
@@ -387,10 +407,12 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
             sql`update expert_verification_work set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
           );
           await tx.execute(
-            sql`update expert_onboarding_invoices set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+            // Public provider uncertainty survives local privacy invalidation.
+            // Revoked consent denies capture; only fresh GET may prove cancellation.
+            sql`update expert_onboarding_invoices i set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending' and not exists(select 1 from public_expert_payment_requests r where r.invoice_id=i.id and r.state<>'abandoned')`,
           );
           await tx.execute(
-            sql`update expert_onboarding_payment_operations set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome')`,
+            sql`update expert_onboarding_payment_operations op set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome') and not exists(select 1 from public_expert_payment_requests r where r.legacy_operation_id=op.id and r.state<>'abandoned')`,
           );
         }
         // RIGHTS-08 + EVID-01: отзыв PreviouslyGranted != первоначальный отказ.
@@ -526,19 +548,31 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           payload: { purpose: command.purpose, consentDecisionId: consent.id },
         });
         return {
-          consentDecisionId: consent.id,
-          optionalFieldsRemoved: profile.rows.reduce(
-            (count, row) =>
-              count +
-              [row.displayName, row.timezone, row.expertNote].filter(
-                (value) => value !== null,
-              ).length,
-            0,
-          ),
-          followUpsCancelled: cancelled.rows.length,
+          receiptDisclosureFailure,
+          receipt: {
+            consentDecisionId: consent.id,
+            optionalFieldsRemoved: profile.rows.reduce(
+              (count, row) =>
+                count +
+                [row.displayName, row.timezone, row.expertNote].filter(
+                  (value) => value !== null,
+                ).length,
+              0,
+            ),
+            followUpsCancelled: cancelled.rows.length,
+          },
         };
       }),
-    );
+    ).then(({ receipt, receiptDisclosureFailure }) => {
+      if (receiptDisclosureFailure !== undefined)
+        throw Object.assign(
+          new Error("receipt_disclosure_cancellation_uncertain", {
+            cause: receiptDisclosureFailure,
+          }),
+          { mutationResult: receipt },
+        );
+      return receipt;
+    });
   }
 
   /**
@@ -850,6 +884,22 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
         ).rows[0];
         if (subject === undefined)
           throw new Error("Privacy subject is unavailable");
+        let receiptDisclosureFailure: unknown;
+        if (this.options.beforePrivacyReceiptDisclosure) {
+          await tx.execute(sql`savepoint receipt_disclosure_guard`);
+          try {
+            receiptDisclosureFailure =
+              await this.options.beforePrivacyReceiptDisclosure(
+                tx,
+                command.targetUserId,
+              );
+            await tx.execute(sql`release savepoint receipt_disclosure_guard`);
+          } catch (error) {
+            // A database/capture failure cannot preserve a durable retry ticket.
+            // Roll back the whole mutation; gateway outages are returned values.
+            throw error;
+          }
+        }
         if (command.requestId !== undefined) {
           if (command.idempotencyKey !== `erasure-request:${command.requestId}`)
             throw new Error("Erasure request binding is invalid");
@@ -877,7 +927,14 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
       `)
         ).rows[0];
         if (existing !== undefined)
-          return this.erasureReceipt(tx, existing.jobId, existing.status);
+          return {
+            receipt: await this.erasureReceipt(
+              tx,
+              existing.jobId,
+              existing.status,
+            ),
+            receiptDisclosureFailure,
+          };
 
         if (
           manifests.length !== PROCESSORS.length ||
@@ -1027,10 +1084,10 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           sql`delete from expert_verification_work where user_id=${command.targetUserId}::uuid`,
         );
         await tx.execute(
-          sql`update expert_onboarding_invoices set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending'`,
+          sql`update expert_onboarding_invoices i set status='cancelled' where user_id=${command.targetUserId}::uuid and status='pending' and not exists(select 1 from public_expert_payment_requests r where r.invoice_id=i.id and r.state<>'abandoned')`,
         );
         await tx.execute(
-          sql`update expert_onboarding_payment_operations set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome')`,
+          sql`update expert_onboarding_payment_operations op set status='cancelled' where user_id=${command.targetUserId}::uuid and status in ('created','pending','unknown_outcome') and not exists(select 1 from public_expert_payment_requests r where r.legacy_operation_id=op.id and r.state<>'abandoned')`,
         );
         // Promo acquisition has no financial retention authority. Remove queued
         // sends, pending enrollment and direct identity digests; keep only inactive
@@ -1143,9 +1200,18 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           await tx.execute(sql`update client_erasure_requests set job_id=${job.id}::uuid
             where id=${command.requestId}::uuid and user_id=${command.targetUserId}::uuid`);
         }
-        return receipt;
+        return { receipt, receiptDisclosureFailure };
       }),
-    );
+    ).then(({ receipt, receiptDisclosureFailure }) => {
+      if (receiptDisclosureFailure !== undefined)
+        throw Object.assign(
+          new Error("receipt_disclosure_cancellation_uncertain", {
+            cause: receiptDisclosureFailure,
+          }),
+          { mutationResult: receipt },
+        );
+      return receipt;
+    });
   }
 
   private async erasureReceipt(

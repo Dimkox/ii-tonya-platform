@@ -28,8 +28,18 @@ pnpm --offline --frozen-lockfile --trust-lockfile --filter @ii-tonya/app-worker 
 cp scripts/migrate-native.mjs "$work_dir/release/api/migrate-native.mjs"
 mkdir -p "$work_dir/release/scripts"
 cp scripts/validate-runtime-env.sh "$work_dir/release/scripts/validate-runtime-env.sh"
+mkdir -p "$work_dir/release/scripts/sql"
+cp scripts/provision-early-bird-runtime-roles.mjs \
+  scripts/early-bird-role-capabilities.json "$work_dir/release/scripts/"
+cp scripts/sql/provision-early-bird-runtime-roles.sql \
+  scripts/sql/provision-early-bird-legacy-coverage.sql "$work_dir/release/scripts/sql/"
 cp -R packages/db/migrations "$work_dir/release/migrations"
+mkdir -p "$work_dir/release/gateway"
+for gateway_file in launcher.py bound_gateway.py durable_state.py gateway.py ipc.py nonce_registry.py pg_authority.py provider_reader.py subject_tokens.py readiness.sql; do
+  cp "scripts/experimental/yookassa_gateway/$gateway_file" "$work_dir/release/gateway/$gateway_file"
+done
 cp -R deploy/systemd "$work_dir/release/systemd"
+cp -R deploy/gateway-provision "$work_dir/release/gateway-provision"
 printf '%s\n' "$source_sha" > "$work_dir/release/SOURCE_SHA"
 printf '{"source_sha":"%s","source_archive_sha256":"%s","format":"ii-tonya-native-v1"}\n' \
   "$source_sha" "$source_archive_sha" \

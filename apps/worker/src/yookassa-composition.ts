@@ -11,6 +11,7 @@ import {
   type YooKassaTransport,
   type YooKassaClient,
   type YooKassaMode,
+  ExperimentalGatewayIpc,
 } from "@ii-tonya/integrations";
 import {
   runYooKassaBoundReconciliation,
@@ -26,13 +27,18 @@ export type YooKassaAuditReaderFactory = (
 ) => ExpertResidencyProviderReader;
 export function validateYooKassaWorkerConfig(config: Config): void {
   const enabled = config.features.yookassa === true;
+  const direct = config.yookassa !== undefined;
+  const gateway = config.yookassaGateway !== undefined;
   if (
-    enabled !== (config.yookassa !== undefined) ||
+    enabled !== (direct || gateway) ||
+    (direct && gateway) ||
     enabled !== config.integrations.payments ||
-    (enabled &&
-      (!config.yookassa ||
-        !["test", "live"].includes(config.yookassa.mode) ||
-        config.yookassa.secretReference !== "env://YOOKASSA_SECRET_KEY"))
+    (direct &&
+      (!["test", "live"].includes(config.yookassa!.mode) ||
+        config.yookassa!.secretReference !== "env://YOOKASSA_SECRET_KEY")) ||
+    (gateway &&
+      (!["test", "live"].includes(config.yookassaGateway!.mode) ||
+        !config.yookassaGateway!.workerConfigFile?.startsWith("/")))
   )
     throw new Error("yookassa_worker_configuration_invalid");
 }
@@ -45,10 +51,11 @@ export function createYooKassaWorkerComposition(
     readonly env?: NodeJS.ProcessEnv;
     readonly reader?: ExpertResidencyProviderReader;
     readonly readerFactory?: YooKassaAuditReaderFactory;
+    readonly gateway?: ExperimentalGatewayIpc;
   } = {},
 ) {
   validateYooKassaWorkerConfig(config);
-  if (!config.features.yookassa || !config.yookassa) return undefined;
+  if (!config.features.yookassa) return undefined;
   if (options.reader !== undefined)
     throw new Error("yookassa_unguarded_reader_rejected");
   const control: YooKassaBoundControl = {
@@ -57,35 +64,75 @@ export function createYooKassaWorkerComposition(
   };
   const stopping = new AbortController();
   const credentialsRevoked = new AbortController();
-  const mode = config.yookassa.mode;
+  const mode = (config.yookassa ?? config.yookassaGateway)!.mode;
   // Resolve only the approved reference. Never load a file or retain the env object.
-  const secretKey = (options.env ?? process.env).YOOKASSA_SECRET_KEY;
-  if (!secretKey || secretKey.length < 8 || secretKey.length > 256)
+  const secretKey = config.yookassa
+    ? (options.env ?? process.env).YOOKASSA_SECRET_KEY
+    : undefined;
+  if (
+    config.yookassa &&
+    (!secretKey || secretKey.length < 8 || secretKey.length > 256)
+  )
     throw new Error("yookassa_worker_credentials_unavailable");
+  if (
+    config.yookassaGateway &&
+    !(options.gateway instanceof ExperimentalGatewayIpc)
+  )
+    throw new Error("yookassa_worker_gateway_unavailable");
   const transport = options.transport ?? ((url, init) => fetch(url, init));
-  const client = createYooKassaClient(
-    { mode, shopId: config.yookassa.shopId, secretKey },
-    async (url, init) => {
-      if (!control.accepting || control.credentialsUnavailable)
-        throw new Error("yookassa_worker_unavailable");
-      const remaining = (control.deadline ?? 0) - Date.now();
-      if (remaining <= 0) throw new Error("yookassa_recovery_budget_exhausted");
-      const response = await transport(url, {
-        ...init,
-        signal: AbortSignal.any([
-          ...(init.signal ? [init.signal] : []),
-          stopping.signal,
-          credentialsRevoked.signal,
-          AbortSignal.timeout(remaining),
-        ]),
-      });
-      if (response.status === 401 || response.status === 403) {
-        control.credentialsUnavailable = true;
-        credentialsRevoked.abort();
-      }
-      return response;
-    },
-  );
+  const client = config.yookassa
+    ? createYooKassaClient(
+        { mode, shopId: config.yookassa.shopId, secretKey: secretKey! },
+        async (url, init) => {
+          if (!control.accepting || control.credentialsUnavailable)
+            throw new Error("yookassa_worker_unavailable");
+          const remaining = (control.deadline ?? 0) - Date.now();
+          if (remaining <= 0)
+            throw new Error("yookassa_recovery_budget_exhausted");
+          const response = await transport(url, {
+            ...init,
+            signal: AbortSignal.any([
+              ...(init.signal ? [init.signal] : []),
+              stopping.signal,
+              credentialsRevoked.signal,
+              AbortSignal.timeout(remaining),
+            ]),
+          });
+          if (response.status === 401 || response.status === 403) {
+            control.credentialsUnavailable = true;
+            credentialsRevoked.abort();
+          }
+          return response;
+        },
+      )
+    : {
+        getPayment: (id: string) => {
+          if (!control.accepting || (control.deadline ?? 0) <= Date.now())
+            throw new Error("yookassa_worker_unavailable");
+          return options.gateway!.getPayment(
+            id,
+            AbortSignal.any([
+              stopping.signal,
+              AbortSignal.timeout(
+                Math.max(1, (control.deadline ?? 0) - Date.now()),
+              ),
+            ]),
+          );
+        },
+        getRefund: (id: string) => {
+          if (!control.accepting || (control.deadline ?? 0) <= Date.now())
+            throw new Error("yookassa_worker_unavailable");
+          return options.gateway!.getRefund(
+            id,
+            AbortSignal.any([
+              stopping.signal,
+              AbortSignal.timeout(
+                Math.max(1, (control.deadline ?? 0) - Date.now()),
+              ),
+            ]),
+          );
+        },
+      };
   const operations = new PostgresYooKassaOperationRepository(db);
   const verifier = new YooKassaPaymentVerifier(client, operations);
   const inbox = new PostgresExpertResidencyProviderInboxRepository(db);

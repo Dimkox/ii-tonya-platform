@@ -24,6 +24,6 @@
     "@ii-tonya/db": "workspace:*",
     "@ii-tonya/integrations": "workspace:*",
     "drizzle-orm": "^0.45.2",
-    "zod": "^4.3.6"
+    "zod": "^4.6.6"
   }
 }

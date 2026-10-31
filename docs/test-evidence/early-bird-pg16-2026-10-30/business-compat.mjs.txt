@@ -1,0 +1,101 @@
+import { execFileSync } from 'node:child_process';
+import { createHash, randomUUID } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import assert from 'node:assert/strict';
+const SYNTHETIC_FIXTURE_VALUE_1 = 'synthetic-only';
+
+
+const root='/home/pall/projects/ii-tonya-base/work/ii-tonya-platform/.getzilla/runtime/early-bird-rebase-20261029/worktree';
+const bundle='/tmp/early-bird-production-old-20261030/release';
+const req=createRequire(root+'/packages/db/package.json');
+const { Client }=req('pg');
+const inspect=JSON.parse(execFileSync('docker',['inspect','early-bird-compat16-20261030'],{encoding:'utf8'}))[0];
+if(inspect.State.Status!=='running'||inspect.Config.Image!=='postgres:16.15-bookworm')throw new Error('unexpected_fixture');
+const vars=Object.fromEntries(inspect.Config.Env.map(x=>{const i=x.indexOf('=');return [x.slice(0,i),x.slice(i+1)];}));
+const port=inspect.NetworkSettings.Ports['5432/tcp']?.[0];
+if(!port || port.HostIp!=='127.0.0.1' || !vars.POSTGRES_PASSWORD)throw new Error('unsafe_fixture');
+const url=new URL('postgresql://127.0.0.1/early_bird_release_compatibility');url.port=port.HostPort;url.username=vars.POSTGRES_USER || 'postgres';url.password=vars.POSTGRES_PASSWORD;
+const owner=new Client({connectionString:url.toString(),connectionTimeoutMillis:5000,statement_timeout:15000});
+const old=await import(pathToFileURL(bundle+'/api/node_modules/@ii-tonya/db/dist/index.js'));
+const integr=await import(pathToFileURL(bundle+'/api/node_modules/@ii-tonya/integrations/dist/index.js'));
+const source=readFileSync(bundle+'/SOURCE_SHA','utf8').trim();
+const sha=(p)=>createHash('sha256').update(readFileSync(p)).digest('hex');
+const report={format:'early-bird-old-runtime-pg16-business-v1',oldSource:source,archiveSha256:sha('/tmp/early-bird-production-old-20261030/release.tar.gz'),oldDbModuleSha256:sha(bundle+'/api/node_modules/@ii-tonya/db/dist/index.js'),oldIntegrationModuleSha256:sha(bundle+'/api/node_modules/@ii-tonya/integrations/dist/index.js'),steps:{}};
+if(source!=='19ecb3456a647743f00584b14d097c2759f0d718'||report.archiveSha256!=='b8492c38c81b74eeeb72c956aac9b10d3889bdea0c814cbcb7ed7d07a906061a')throw new Error('bundle_identity_mismatch');
+let adminDb,limitedDb;let role;let state={};
+const failInfo=(e)=>({ok:false,code:typeof e?.code==='string'?e.code:typeof e?.cause?.code==='string'?e.cause.code:'assertion_or_runtime',name:e?.constructor?.name??'Error',...(typeof e?.message==='string' && /^[a-z][a-z-]+$/.test(e.message)?{detail:e.message}:{})});
+const step=async(name,run)=>{try{await run();report.steps[name]={ok:true};}catch(e){report.steps[name]=failInfo(e);}};
+async function one(q,p=[]){return (await owner.query(q,p)).rows[0];}
+async function user(){return (await one('insert into users default values returning id')).id;}
+async function audit(action,objectId,objectType='expert_referral',payload={},consumed=false){
+ const a=await user(),b=await user(),sa='compat-session-'+randomUUID(),sb='compat-session-'+randomUUID();
+ const mfa=new Date(Date.now()-180000),approved=new Date(Date.now()-60000),created=new Date(Date.now()-120000),expires=new Date(Date.now()+300000);
+ for(const [id,session] of [[a,sa],[b,sb]]){await owner.query("insert into admin_role_assignments(admin_id,role) values($1,'security_admin')",[id]);await owner.query("insert into admin_sessions(session_id_hash,admin_id,mfa_verified_at,expires_at) values($1,$2,$3,transaction_timestamp()+interval '1 hour')",[session,id,mfa]);}
+ const row=await one(`insert into admin_approvals(action,object_type,object_id,requester_id,approver_id,requester_session_id_hash,approver_session_id_hash,payload_hash,required_role,requester_mfa_verified_at,approver_mfa_verified_at,approved_at,expires_at,nonce,consumed_at,created_at) values($1,$2,$3,$4,$5,$6,$7,$8,'security_admin',$9,$9,$10,$11,$12,$13,$14) returning id`,[action,objectType,objectId,a,b,sa,sb,old.canonicalAdminPayloadHash(payload),mfa,approved,expires,randomUUID(),consumed?new Date():null,created]);
+ return {approvalId:row.id,sessionIdHash:sa};
+}
+const makeProof=(kind,orderId,paymentId,digest)=>integr.createCanonicalExpertResidencyPaymentEventVerifier().verifyCanonical({kind,provider:'sandbox',eventId:`compat_${randomUUID()}`,paymentId,orderId,amountMinor:'50000',currency:'RUB',occurredAt:new Date().toISOString(),payloadDigest:`sha256:${digest.repeat(64)}`},{verificationId:`verify_${randomUUID()}`,verifierKeyVersion:'test-v1',verifiedAt:new Date().toISOString()});
+try {
+ await owner.connect();
+ const info=await one("select current_database() as db,current_setting('server_version_num')::int as version,(select count(*)::int from drizzle.__drizzle_migrations) as migrations");
+ if(info.db!=='early_bird_release_compatibility'||info.version<160000||info.version>=170000||info.migrations!==84)throw new Error('fixture_identity_mismatch');
+ report.postgresVersionNum=info.version;report.migrationCount=info.migrations;
+ const latest=await one('select hash from drizzle.__drizzle_migrations order by created_at desc limit 1');report.databaseLatestMigrationHash=latest.hash;
+ adminDb=old.createDb(url.toString(),{connectionTimeoutMillis:5000,options:'-c statement_timeout=15000 -c lock_timeout=5000'});
+ await step('fixture_and_legacy_role',async()=>{
+  const control=await one("select version from expert_referral_feature_controls where control_key='expert_referrals'");
+  if(!control){const cmd={expectedVersion:0,newCommandsEnabled:true,rewardGrantsEnabled:false};const a=await audit(old.EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_ACTION,old.EXPERT_REFERRAL_FEATURE_CONTROL_ID,old.EXPERT_REFERRAL_FEATURE_CONTROL_APPROVAL_OBJECT_TYPE,old.expertReferralFeatureControlApprovalPayload(cmd),true);await owner.query("insert into expert_referral_feature_controls(control_key,version,new_commands_enabled,reward_grants_enabled,updated_approval_id,updated_admin_session_id_hash) values('expert_referrals',1,true,false,$1,$2)",[a.approvalId,a.sessionIdHash]);}
+  else {const x=await one("select new_commands_enabled from expert_referral_feature_controls where control_key='expert_referrals'");if(!x.new_commands_enabled)throw new Error('fixture_control_disabled');}
+  state.user=await user(); state.client=await user();
+  state.expert=(await one('insert into experts(user_id,active,verified) values($1,true,true) returning id',[state.user])).id;
+  state.telegram='7'+String(Date.now())+String(Math.floor(Math.random()*1000)).padStart(3,'0');
+  await owner.query("insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id,status) values($1,'telegram',$2,'compat-bot',$2,'active')",[state.user,state.telegram]);
+  role='compat_old_'+randomUUID().replaceAll('-','').slice(0,16);
+  await owner.query(`create role ${role} login password 'synthetic-only' noinherit nosuperuser nocreatedb nocreaterole nobypassrls`);
+  await owner.query(`grant usage on schema public to ${role}; grant select on users, experts, channel_identities, expert_referrals, expert_referral_abuse_holds, expert_referral_feature_controls, expert_card_main_orders, expert_residency_tariff_versions, expert_referral_reward_grants, expert_referral_ledger_allocations, expert_referral_ledger_entries to ${role}; grant select, update on experts, expert_referrals, expert_referral_abuse_holds, expert_referral_feature_controls, expert_card_main_orders, expert_referral_reward_grants, expert_referral_ledger_allocations, expert_referral_ledger_entries to ${role}; grant select, insert, update on expert_residency_orders, expert_residency_provider_event_inbox, expert_residency_payment_attempts, expert_first_residency_settlements to ${role}; grant select, insert, update on expert_referral_reward_maturities, expert_referral_ledger_entries, expert_referral_ledger_allocations to ${role}; grant select on expert_referral_balances to ${role}; grant insert on audit_events, integration_outbox to ${role}; grant select(idempotency_key) on integration_outbox to ${role}; grant update on consent_document_versions to ${role}; grant usage on sequence expert_first_residency_settlements_settlement_sequence_seq to ${role}`);
+  await owner.query('begin');await owner.query("select set_config('ii_tonya.legacy_settlement_role',$1,true)",[role]);await owner.query(readFileSync(root+'/scripts/sql/provision-early-bird-legacy-coverage.sql','utf8'));await owner.query('commit');
+  const limitedUrl=new URL(url);limitedUrl.username=role;limitedUrl.password=SYNTHETIC_FIXTURE_VALUE_1;limitedDb=old.createDb(limitedUrl.toString(),{connectionTimeoutMillis:5000,options:'-c statement_timeout=15000 -c lock_timeout=5000'});
+ });
+ await step('old_tariff_checkout',async()=>{
+  assert(state.expert); const repo=new old.PostgresExpertResidencyRepository(adminDb);const a=await audit('expert_residency.tariff_create',randomUUID());
+  state.tariff=await repo.createTariffVersion({tariffKey:`compat-${randomUUID()}`,displayName:'Compatibility',priceMinor:50000n,durationSeconds:86400,activeFrom:new Date(Date.now()-1000),activeTo:new Date(Date.now()+86400000),approvalId:a.approvalId,adminSessionIdHash:a.sessionIdHash});
+  const key=randomUUID(),deadline=new Date(Date.now()+3600000),request={expertId:state.expert,tariffVersionId:state.tariff.id,providerDeadline:deadline,idempotencyKey:key};
+  state.order=await repo.createCheckoutOrder(request);const again=await repo.createCheckoutOrder(request);assert.equal(again.id,state.order.id);
+ });
+ await step('old_verified_settlement_and_replay',async()=>{
+  assert(state.order&&limitedDb); state.paymentId=`pay_${randomUUID()}`;state.payment=makeProof('settled',state.order.id,state.paymentId,'a');
+  const inbox=new old.PostgresExpertResidencyProviderInboxRepository(limitedDb);const a=await inbox.settle(state.payment);const b=await inbox.settle(state.payment);assert.equal(a.kind,'settled');assert.equal(b.kind,'settled');assert.equal(a.paymentId,state.paymentId);assert.equal(b.paymentId,state.paymentId);
+  const attempts=await one("select count(*)::int n from expert_residency_payment_attempts where order_id=$1 and status='settled'",[state.order.id]);assert.equal(attempts.n,1);
+  const success=await one("select count(*)::int n from early_bird_payment_successes where user_id=$1",[state.user]);assert.equal(success.n,0);
+ });
+ await step('restricted_coverage_authority',async()=>{
+  assert(limitedDb&&role);const p=new Client({connectionString:(()=>{const u=new URL(url);u.username=role;u.password=SYNTHETIC_FIXTURE_VALUE_1;return u.toString();})(),connectionTimeoutMillis:5000});await p.connect();try{const x=await p.query('select early_bird_active_coverage_end($1)',[state.user]);assert.equal(x.rows.length,1);let denied=false;try{await p.query('select * from early_bird_payment_successes');}catch(e){denied=e.code==='42501';}assert.equal(denied,true);}finally{await p.end();}
+ });
+ await step('old_card_gate_rejects_unqualified',async()=>{
+  assert(state.tariff);const card=new old.PostgresExpertOnboardingMainPaymentRepository(adminDb,{messagingConsentPolicyVersion:'client-messaging-v1',providerMode:'test'});
+  let rejected=false;try{await card.quoteMain({botId:'1',botKey:'compat-bot',telegramUserId:state.telegram,chatId:state.telegram,requestKey:'1:123456',requestDigest:'c'.repeat(64),tariffVersionId:state.tariff.id,termMonths:1,revision:1});}catch(e){state.cardCode=typeof e?.code==='string'?e.code:'unknown';rejected=['card_forbidden','card_main_forbidden'].includes(e?.code);}assert.equal(rejected,true,'card-unqualified-rejected');
+ });
+ report.cardDenialCode=state.cardCode??'no_error';
+ await step('old_booking_search_and_reservation_replay',async()=>{
+  assert(state.expert&&state.client);const code='compat_'+randomUUID().replaceAll('-',''); const now=new Date();const start=new Date(now.getTime()+48*3600000),end=new Date(start.getTime()+3600000);
+  const service=await one("insert into expert_services(expert_id,name,active,duration_minutes,code,language) values($1,'Compatibility consultation',true,60,$2,'ru') returning id",[state.expert,code]);
+  const slot=await one("insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,observed_at,capacity) values($1,'test',$2,$3,$4,$5,1) returning id",[service.id,`slot-${randomUUID()}`,start,end,now]);
+  const booking=new old.PostgresBookingRepository(adminDb);const query={serviceCode:code,language:'ru',from:now,to:new Date(start.getTime()+3600000),now,minimumLeadMs:86400000};
+  const found=await booking.searchSlots(query);assert.equal(found.some(x=>x.slotId===slot.id),true,'booking-search-visible');
+  const command={idempotencyKey:`reserve-${randomUUID()}`,userId:state.client,slotId:slot.id,now,minimumLeadMs:86400000,confirmationBufferMs:3600000,correlationId:`compat-${randomUUID()}`};
+  const first=await booking.reserve(command);const replay=await booking.reserve(command);assert.equal(first.kind,'reserved','booking-first-kind');assert.equal(replay.kind,'duplicate','booking-replay-kind');assert.equal(first.reservationId,replay.reservationId,'booking-replay-identity');
+  const after=await booking.searchSlots(query);assert.equal(after.some(x=>x.slotId===slot.id),false,'booking-capacity-exclusion');const n=await one('select count(*)::int n from reservations where slot_id=$1',[slot.id]);assert.equal(n.n,1,'booking-single-reservation');
+ });
+ await step('old_verified_refund_and_replay',async()=>{
+  assert(state.order&&state.paymentId&&limitedDb);const refund=makeProof('refunded',state.order.id,state.paymentId,'b');const inbox=new old.PostgresExpertResidencyProviderInboxRepository(limitedDb);const a=await inbox.reverse(refund);const b=await inbox.reverse(refund);assert.equal(a.kind,'refunded');assert.equal(b.kind,'refunded');assert.equal(a.paymentId,state.paymentId);assert.equal(b.paymentId,state.paymentId);const rows=await one("select status from expert_residency_orders where id=$1",[state.order.id]);assert.equal(rows.status,'refunded');
+ });
+ report.result=Object.values(report.steps).every(x=>x.ok)?'pass':'fail';
+}catch(e){report.result='fail';report.fatal=failInfo(e);}finally{
+ try{if(limitedDb)await old.closeDb(limitedDb);}catch{}try{if(adminDb)await old.closeDb(adminDb);}catch{}try{await owner.end();}catch{}
+ report.probeSha256=sha('/tmp/early-bird-production-old-20261030/business-compat.mjs');
+ writeFileSync('/tmp/early-bird-production-old-20261030/business-compat.json',JSON.stringify(report,null,2)+'\n');
+ console.log(JSON.stringify(report));
+ if(report.result!=='pass')process.exitCode=1;
+}

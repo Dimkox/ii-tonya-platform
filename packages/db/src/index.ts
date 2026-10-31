@@ -8,6 +8,7 @@ export {
 } from "./client.js";
 export { sql } from "drizzle-orm";
 export { PostgresWaitlistRepository } from "./repositories/waitlist-repository.js";
+export { PostgresOwnerTestPricingWorkflow } from "./repositories/owner-test-pricing-workflow.js";
 export {
   PostgresLifecycleSchedulerRepository,
   type LifecycleJobType,
@@ -398,3 +399,88 @@ export * from "./repositories/resident-private-jobs-repository.js";
 export * from "./repositories/resident-native-logistics.js";
 
 export * from "./repositories/resident-lifecycle-completion-repository.js";
+
+export {
+  PostgresEarlyBirdChoiceRepository,
+  type EarlyBirdChoiceCommand,
+} from "./repositories/early-bird-choice-repository.js";
+export { PostgresEarlyBirdLegacyRouting } from "./repositories/early-bird-legacy-routing.js";
+export { PostgresEarlyBirdOwnerScopeSource } from "./repositories/early-bird-owner-scope-source.js";
+export { PostgresEarlyBirdReceiptContact } from "./repositories/early-bird-receipt-contact.js";
+export { PostgresEarlyBirdOwnerSnapshotPrepare } from "./repositories/early-bird-owner-snapshot-prepare.js";
+export { PostgresEarlyBirdReviewReconciliationReader } from "./repositories/early-bird-review-reconciliation-reader.js";
+export { PostgresEarlyBirdOwnerSendAdmission } from "./repositories/early-bird-owner-send-admission.js";
+export { PostgresEarlyBirdCandidateIntentReader } from "./repositories/early-bird-candidate-intent-reader.js";
+export { PostgresEarlyBirdVerifiedBindingRepository } from "./repositories/early-bird-verified-binding-repository.js";
+export { PostgresEarlyBirdRecoveryFingerprintRepository } from "./repositories/early-bird-recovery-fingerprint-repository.js";
+export { PostgresReceiptRevocationOutbox } from "./repositories/receipt-revocation-outbox.js";
+export { PostgresDeferredScopeSource } from "./repositories/early-bird-deferred-scope-source.js";
+export {
+  PostgresDeferredReceiptContact,
+  type DeferredReceiptScope,
+} from "./repositories/early-bird-deferred-receipt-contact.js";
+export { PostgresDeferredRequestStore } from "./repositories/early-bird-deferred-request-store.js";
+export { PostgresDeferredSendAdmission } from "./repositories/early-bird-deferred-send-admission.js";
+export { deferredRequestAuthenticator } from "./repositories/early-bird-deferred-request-authenticator.js";
+export { PostgresDeferredSnapshotReader } from "./repositories/early-bird-deferred-snapshot-reader.js";
+export { PostgresDeferredVerifiedStore } from "./repositories/early-bird-deferred-verified-store.js";
+export { PostgresDeferredBoundReader } from "./repositories/early-bird-deferred-bound-reader.js";
+export { PostgresDeferredOnboardingStatus } from "./repositories/early-bird-deferred-onboarding-status.js";
+
+export { PostgresEarlyBirdVerifiedPaymentReader } from "./repositories/early-bird-verified-payment-reader.js";
+export { PostgresEarlyBirdDeferredPayments } from "./repositories/early-bird-deferred-payments.js";
+export {
+  PostgresDeferredFinalCallCampaign,
+  PostgresFinalCallEngagement,
+  type FinalCallResume,
+} from "./repositories/early-bird-deferred-final-call.js";
+export { PostgresDeferredRefundReader } from "./repositories/early-bird-deferred-refund-reader.js";
+export { PostgresDeferredRefundStore } from "./repositories/early-bird-deferred-refund-store.js";
+export { PostgresDeferredReviewReconciliationReader } from "./repositories/early-bird-deferred-review-reader.js";
+export { PostgresDeferredReviewSource } from "./repositories/early-bird-deferred-review-source.js";
+export { PostgresEarlyBirdStandardScopeSource } from "./repositories/early-bird-standard-scope-source.js";
+export { PostgresEarlyBirdStandardSnapshotPrepare } from "./repositories/early-bird-standard-snapshot-prepare.js";
+export { PostgresEarlyBirdStandardSendAdmission } from "./repositories/early-bird-standard-send-admission.js";
+export { PostgresYooKassaPaymentPurposeRepository } from "./repositories/yookassa-payment-purpose-repository.js";
+export { PostgresYooKassaRefundParentBinding } from "./repositories/yookassa-refund-parent-binding.js";
+export { PostgresEarlyBirdPaymentSettlementStore } from "./repositories/early-bird-payment-settlement-store.js";
+export { PostgresEarlyBirdRefundBindingReader } from "./repositories/early-bird-refund-binding-reader.js";
+export { PostgresEarlyBirdRefundBindingStore } from "./repositories/early-bird-refund-binding-store.js";
+export { PostgresEarlyBirdRefundSettlementStore } from "./repositories/early-bird-refund-settlement-store.js";
+export { PostgresDeferredPaymentRouteReader } from "./repositories/early-bird-deferred-payment-route-reader.js";
+export { deferredId } from "./repositories/early-bird-deferred-id.js";
+export { EarlyBirdDeferredReviewPreparation } from "./repositories/early-bird-deferred-review-preparation.js";
+export { PostgresDeferredAccountWriter } from "./repositories/early-bird-deferred-account-writer.js";
+export { PostgresDeferredReceiptRetention } from "./repositories/early-bird-deferred-receipt-retention.js";
+export { PostgresEarlyBirdReceiptRetention } from "./repositories/early-bird-receipt-retention.js";
+export { PostgresWorkerReviewSource } from "./repositories/early-bird-worker-review-source.js";
+export { requireWorkerPrincipal } from "./repositories/early-bird-worker-principal.js";
+export { PostgresWorkerReceiptRetention } from "./repositories/early-bird-worker-receipt-retention.js";
+export {
+  PostgresEarlyBirdPaidStatus,
+  type EarlyBirdPaidStatus,
+} from "./repositories/early-bird-paid-status.js";
+export { PostgresEarlyBirdPublicationWorker } from "./repositories/early-bird-publication-worker.js";
+export {
+  PostgresEarlyBirdLaunchKit,
+  type LaunchKitClaim,
+} from "./repositories/early-bird-launch-kit.js";
+export {
+  PostgresPublicExpertPaymentSource,
+  PostgresPublicExpertPaymentBinder,
+  PostgresPublicExpertPaymentObservations,
+  PostgresPublicExpertPaymentPosting,
+  PublicHeldOnboardingCheckout,
+  PublicMainResidencyCheckout,
+  buildPublicExpertPaymentRequest,
+} from "./repositories/public-expert-payment-gateway.js";
+export type {
+  PublicExpertCheckoutDependencies,
+  PublicMainCheckoutBinding,
+} from "./repositories/public-expert-payment-gateway.js";
+export {
+  createPublicExpertPaymentRuntime,
+  publicExpertConnectionNames,
+  type PublicExpertRuntimeConfiguration,
+  type PublicExpertPaymentRuntime,
+} from "./public-expert-payment-runtime.js";

@@ -40,6 +40,23 @@ const rub = (value: string) =>
   `${BigInt(value) / 100n}${BigInt(value) % 100n ? "," + (BigInt(value) % 100n).toString().padStart(2, "0") : ""} ₽`;
 export function createExpertSeparatedSalesService(deps: {
   repository: SeparatedSalesRepository;
+  /** Read-only verified paid-status projection; it cannot create a payment. */
+  paidStatus?: {
+    handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
+  };
+  /** Authority-backed wave handler; absent until the payment path is ready. */
+  wave?: {
+    isActive(): boolean | Promise<boolean>;
+    handle(
+      input: ResidentFormInput,
+    ): Promise<
+      | ExpertApplicantReply
+      | { status: "wave_form"; start: boolean }
+      | { status: "wave_legacy" }
+      | null
+    >;
+    continueForm?(input: ResidentFormInput): Promise<boolean>;
+  };
   captureReceipt?: (
     input: Parameters<SeparatedSalesRepository["transition"]>[0] & {
       email: string;
@@ -57,12 +74,78 @@ export function createExpertSeparatedSalesService(deps: {
   form: {
     handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
   };
+  waveForm?: {
+    handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
+  };
 }) {
   return {
     async handle(
       input: ResidentFormInput,
     ): Promise<ExpertApplicantReply | null> {
       if (/^\/(?:profile|consent)(?: |$)/u.test(input.text)) return null;
+      const statusRequest =
+        input.text === "/my_tariff" ||
+        input.text === "Мой актуальный тариф" ||
+        input.callbackData === "st:current";
+      if (statusRequest && deps.paidStatus) {
+        try {
+          const status = await deps.paidStatus.handle(input);
+          if (status) return status;
+        } catch {
+          return { status: "unavailable" };
+        }
+      }
+      const waveActive = deps.wave ? await deps.wave.isActive() : false;
+      let waveLegacy = false;
+      if (
+        deps.wave &&
+        !waveActive &&
+        deps.wave.continueForm &&
+        !/^(?:eb|ep|ss|sb):/u.test(input.callbackData ?? "") &&
+        input.callbackData !== "st:current" &&
+        !/^\/(?:start|receipt|my_tariff)(?: |$)/u.test(input.text) &&
+        input.text !== "Мой актуальный тариф"
+      ) {
+        if (await deps.wave.continueForm(input))
+          return (
+            (await deps.waveForm?.handle(input)) ?? { status: "unavailable" }
+          );
+      }
+      const waveStatusRequest =
+        input.text === "/my_tariff" ||
+        input.text === "Мой актуальный тариф" ||
+        input.callbackData === "st:current";
+      if (deps.wave && (waveActive || waveStatusRequest)) {
+        const waveReply = await deps.wave.handle(input);
+        if (waveReply?.status === "wave_form") {
+          const formInput = { ...input };
+          if (waveReply.start) {
+            formInput.text = "/verification";
+            delete formInput.callbackData;
+            delete formInput.media;
+          }
+          return (
+            (await deps.waveForm?.handle(formInput)) ?? {
+              status: "unavailable",
+            }
+          );
+        }
+        if (waveReply?.status === "wave_legacy") waveLegacy = true;
+        else if (waveReply !== null) return waveReply;
+        if (waveActive && !waveLegacy) {
+          // Unknown users never fall through to legacy prices or payment.
+          if (/^(?:eb|ep):/u.test(input.callbackData ?? ""))
+            return { status: "rejected" };
+          if (
+            !/^sb:/u.test(input.callbackData ?? "") &&
+            input.text !== "/start"
+          )
+            return { status: "unavailable" };
+        }
+      }
+      // Never route a wave callback into the separate 3000 RUB onboarding path.
+      if (/^(?:eb|ep):/u.test(input.callbackData ?? ""))
+        return { status: "rejected" };
       const tariff = /^sb:([0-9a-f-]{36})$/u.exec(input.callbackData ?? "");
       const choice =
         /^ss:([0-9a-f-]{36}):(\d{1,6}):(positive|promo|base|month|quarter)$/u.exec(
@@ -100,6 +183,13 @@ export function createExpertSeparatedSalesService(deps: {
       };
       const snapshot = await deps.repository.transition(command);
       if (!snapshot) return null;
+      if (
+        waveActive &&
+        !waveLegacy &&
+        input.text === "/start" &&
+        snapshot.state !== "qualification"
+      )
+        return { status: "unavailable" };
       if (snapshot.replay) return { status: "duplicate" };
       const button = (text: string, action: string) => ({
         text,

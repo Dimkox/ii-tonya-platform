@@ -3,6 +3,10 @@ import {
   type ResidentLifecycleCompletionConfig,
 } from "./resident-lifecycle-completion-config.js";
 import {
+  readLaunchPhaseConfig,
+  type LaunchPhaseConfig,
+} from "./launch-phase-config.js";
+import {
   readClientAccountQueriesConfig,
   type ClientAccountQueriesConfig,
 } from "./client-account-queries-config.js";
@@ -93,6 +97,10 @@ const schema = z
     GOOGLE_SHEETS_PROJECTION_ENABLED: z.literal("false").default("false"),
     INTENT_MODEL_ENABLED: z.literal("false").default("false"),
     PAYMENTS_ENABLED: z.enum(["true", "false"]).default("false"),
+    OWNER_TEST_PRICING_ADMIN_ENABLED: z
+      .enum(["true", "false"])
+      .default("false"),
+    WAVE_WORKSPACE_ENABLED: z.enum(["true", "false"]).default("false"),
     EXPERT_REFERRAL_ENABLED: z.enum(["true", "false"]).default("false"),
     EXPERT_REFERRAL_MATURITY_WORKER_ENABLED: z
       .enum(["true", "false"])
@@ -208,7 +216,12 @@ const schema = z
       }, "booking confirmation buffer must be between 1 and 4320 minutes"),
     EXPERT_REFERRAL_HMAC_KEY_VERSION: z.string().optional(),
     EXPERT_REFERRAL_HMAC_KEY_REF: z.string().optional(),
-    PAYMENT_PROVIDER: z.enum(["disabled", "yookassa"]).default("disabled"),
+    PAYMENT_PROVIDER: z
+      .enum(["disabled", "yookassa", "yookassa_gateway"])
+      .default("disabled"),
+    YOOKASSA_GATEWAY_CONFIG_FILE: optionalNonEmptyString,
+    YOOKASSA_GATEWAY_WORKER_CONFIG_FILE: optionalNonEmptyString,
+    PUBLIC_EXPERT_GATEWAY_ENABLED: z.enum(["true", "false"]).default("false"),
     YOOKASSA_ENABLED: z.enum(["true", "false"]).default("false"),
     YOOKASSA_MODE: z.preprocess(
       (value) => (value === "" ? undefined : value),
@@ -361,7 +374,36 @@ const schema = z
     const activationRequested =
       value.YOOKASSA_ENABLED === "true" ||
       value.PAYMENTS_ENABLED === "true" ||
-      value.PAYMENT_PROVIDER === "yookassa";
+      value.PAYMENT_PROVIDER === "yookassa" ||
+      value.PAYMENT_PROVIDER === "yookassa_gateway";
+    const gatewayMode = value.PAYMENT_PROVIDER === "yookassa_gateway";
+    if (value.PUBLIC_EXPERT_GATEWAY_ENABLED === "true" && !gatewayMode)
+      context.addIssue({
+        code: "custom",
+        path: ["PUBLIC_EXPERT_GATEWAY_ENABLED"],
+        message: "public_expert_gateway_required",
+      });
+    if (value.YOOKASSA_GATEWAY_CONFIG_FILE !== undefined && !gatewayMode)
+      context.addIssue({
+        code: "custom",
+        path: ["YOOKASSA_GATEWAY_CONFIG_FILE"],
+        message: "yookassa_gateway_configuration_orphan",
+      });
+    if (
+      value.YOOKASSA_GATEWAY_WORKER_CONFIG_FILE !== undefined &&
+      (!gatewayMode ||
+        !/^\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+$/u.test(
+          value.YOOKASSA_GATEWAY_WORKER_CONFIG_FILE,
+        ) ||
+        value.YOOKASSA_GATEWAY_WORKER_CONFIG_FILE.split("/").some(
+          (part) => part === "." || part === "..",
+        ))
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["YOOKASSA_GATEWAY_WORKER_CONFIG_FILE"],
+        message: "yookassa_gateway_worker_configuration_invalid",
+      });
     if (activationRequested) {
       let returnUrlValid = false;
       try {
@@ -376,11 +418,23 @@ const schema = z
       if (
         value.YOOKASSA_ENABLED !== "true" ||
         value.PAYMENTS_ENABLED !== "true" ||
-        value.PAYMENT_PROVIDER !== "yookassa" ||
+        !(value.PAYMENT_PROVIDER === "yookassa" || gatewayMode) ||
         value.YOOKASSA_MODE === undefined ||
         !/^\d{1,32}$/u.test(value.YOOKASSA_SHOP_ID ?? "") ||
-        (value.YOOKASSA_SECRET_KEY?.length ?? 0) < 8 ||
-        value.YOOKASSA_SECRET_REF !== "env://YOOKASSA_SECRET_KEY" ||
+        (gatewayMode
+          ? value.YOOKASSA_SECRET_KEY !== undefined ||
+            value.YOOKASSA_SECRET_REF !== undefined ||
+            (!value.YOOKASSA_GATEWAY_CONFIG_FILE &&
+              !value.YOOKASSA_GATEWAY_WORKER_CONFIG_FILE) ||
+            (value.YOOKASSA_GATEWAY_CONFIG_FILE !== undefined &&
+              (!/^\/(?:[A-Za-z0-9_.-]+\/)*[A-Za-z0-9_.-]+$/u.test(
+                value.YOOKASSA_GATEWAY_CONFIG_FILE,
+              ) ||
+                value.YOOKASSA_GATEWAY_CONFIG_FILE.split("/").some(
+                  (part) => part === "." || part === "..",
+                )))
+          : (value.YOOKASSA_SECRET_KEY?.length ?? 0) < 8 ||
+            value.YOOKASSA_SECRET_REF !== "env://YOOKASSA_SECRET_KEY") ||
         !returnUrlValid ||
         !Number.isInteger(vatCode) ||
         vatCode < 1 ||
@@ -425,6 +479,7 @@ const schema = z
   });
 
 export type RuntimeConfig = {
+  launchPhase?: LaunchPhaseConfig;
   clientAccountQueries?: ClientAccountQueriesConfig;
   payerReceipt?: PayerReceiptConfig;
   expertApplicant?: ExpertApplicantConfig;
@@ -491,6 +546,7 @@ export type RuntimeConfig = {
   telegramWebhookSecret?: string;
   selartiResponseSharedSecret?: string;
   features: {
+    ownerTestPricingAdmin?: boolean;
     clientAccountQueries?: boolean;
     expertApplicant?: boolean;
     expertVerificationForm?: boolean;
@@ -498,6 +554,7 @@ export type RuntimeConfig = {
     expertHeldOnboarding?: boolean;
     expertVerification?: boolean;
     expertCard?: boolean;
+    waveWorkspace?: boolean;
     expertCardMaterialDelivery?: boolean;
     expertDraftTags?: boolean;
     residentWorkspaceNotifications?: boolean;
@@ -560,6 +617,15 @@ export type RuntimeConfig = {
       paymentSubject: string;
       paymentMode: string;
     };
+  };
+  yookassaGateway?: {
+    publicExpertEnabled?: boolean;
+    mode: "test" | "live";
+    shopId: string;
+    configurationFile?: string;
+    workerConfigFile?: string;
+    returnUrl: string;
+    receipt: NonNullable<RuntimeConfig["yookassa"]>["receipt"];
   };
   yookassaRecovery:
     | { enabled: false }
@@ -813,6 +879,11 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     throw new Error("booking_notifications_configuration_invalid");
   const value = schema.parse(source);
   if (
+    value.WAVE_WORKSPACE_ENABLED === "true" &&
+    source.EXPERT_CARD_ENABLED !== "true"
+  )
+    throw new Error("wave_workspace_configuration_incomplete");
+  if (
     value.CLIENT_WAITLIST_ENABLED === "true" &&
     (value.CLIENT_BOOKING_ENABLED !== "true" ||
       value.CLIENT_CATALOG_ENABLED !== "true" ||
@@ -900,6 +971,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
   }
 
   const config: RuntimeConfig = {
+    launchPhase: readLaunchPhaseConfig(source),
     ...(clientAccountQueries ? { clientAccountQueries } : {}),
     ...(payerReceipt ? { payerReceipt } : {}),
     ...(expertApplicant ? { expertApplicant } : {}),
@@ -988,6 +1060,12 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
         }
       : {}),
     features: {
+      ...(value.WAVE_WORKSPACE_ENABLED === "true"
+        ? { waveWorkspace: true }
+        : {}),
+      ...(value.OWNER_TEST_PRICING_ADMIN_ENABLED === "true"
+        ? { ownerTestPricingAdmin: true }
+        : {}),
       ...(separatedSalesFlag === "true" ? { expertSeparatedSales: true } : {}),
       ...(heldFlag === "true" ? { expertHeldOnboarding: true } : {}),
       ...(clientAccountQueries ? { clientAccountQueries: true } : {}),
@@ -1094,7 +1172,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
           },
         }
       : {}),
-    ...(value.YOOKASSA_ENABLED === "true"
+    ...(value.YOOKASSA_ENABLED === "true" &&
+    value.PAYMENT_PROVIDER === "yookassa"
       ? {
           yookassa: {
             mode: value.YOOKASSA_MODE!,
@@ -1105,6 +1184,29 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
             receipt: {
               vatCode: Number(value.YOOKASSA_RECEIPT_VAT_CODE) as
                 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12,
+              paymentSubject: value.YOOKASSA_RECEIPT_PAYMENT_SUBJECT!,
+              paymentMode: value.YOOKASSA_RECEIPT_PAYMENT_MODE!,
+            },
+          },
+        }
+      : {}),
+    ...(value.PAYMENT_PROVIDER === "yookassa_gateway"
+      ? {
+          yookassaGateway: {
+            publicExpertEnabled: value.PUBLIC_EXPERT_GATEWAY_ENABLED === "true",
+            mode: value.YOOKASSA_MODE!,
+            shopId: value.YOOKASSA_SHOP_ID!,
+            ...(value.YOOKASSA_GATEWAY_CONFIG_FILE
+              ? { configurationFile: value.YOOKASSA_GATEWAY_CONFIG_FILE }
+              : {}),
+            ...(value.YOOKASSA_GATEWAY_WORKER_CONFIG_FILE
+              ? { workerConfigFile: value.YOOKASSA_GATEWAY_WORKER_CONFIG_FILE }
+              : {}),
+            returnUrl: value.YOOKASSA_RETURN_URL!,
+            receipt: {
+              vatCode: Number(value.YOOKASSA_RECEIPT_VAT_CODE) as NonNullable<
+                RuntimeConfig["yookassa"]
+              >["receipt"]["vatCode"],
               paymentSubject: value.YOOKASSA_RECEIPT_PAYMENT_SUBJECT!,
               paymentMode: value.YOOKASSA_RECEIPT_PAYMENT_MODE!,
             },

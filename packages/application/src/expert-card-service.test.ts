@@ -438,6 +438,7 @@ it("automatically returns a configured main provider link only after stored owne
     expect.objectContaining({ requestKey: "11:10", revision: 2 }),
     id,
     "payment-synthetic",
+    "https://yoomoney.ru/checkout/synthetic",
   );
   expect(r).toMatchObject({
     status: "handled",

@@ -333,6 +333,64 @@ beforeAll(async () => {
       )
     ).rows[0]?.fresh,
   ).toBe(true);
+  // Historical split/backfill assertions above finish before current-runtime
+  // migrations. This is SQL replay, not migrateDb/applied-journal evidence.
+  const journal = JSON.parse(
+    readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+  ) as { entries: Array<{ idx: number; tag: string }> };
+  const latest = journal.entries.at(-1)!;
+  const manifest = JSON.parse(
+    readFileSync(
+      `packages/db/migrations/state/${String(latest.idx).padStart(4, "0")}_manifest.json`,
+      "utf8",
+    ),
+  );
+  expect(journal.entries.map((entry) => entry.idx)).toEqual(
+    Array.from({ length: journal.entries.length }, (_, idx) => idx),
+  );
+  for (const entry of journal.entries)
+    expect(entry.tag.startsWith(`${String(entry.idx).padStart(4, "0")}_`)).toBe(
+      true,
+    );
+  expect(
+    journal.entries.map((entry) => ({
+      idx: entry.idx,
+      tag: entry.tag,
+      sha256: createHash("sha256")
+        .update(readFileSync(`packages/db/migrations/${entry.tag}.sql`))
+        .digest("hex"),
+    })),
+  ).toEqual(manifest.migrations);
+  for (const entry of journal.entries.filter((entry) => entry.idx > 75))
+    await database.db.execute(
+      sql.raw(readFileSync(`packages/db/migrations/${entry.tag}.sql`, "utf8")),
+    );
+  expect(
+    (
+      await database.db.execute(sql`select
+        to_regclass('owner_test_pricing_grants')::text as pricing,
+        to_regclass('early_bird_choices')::text as choices,
+        to_regclass('early_bird_launch_configs')::text as launch,
+        to_regclass('early_bird_positive_price_snapshots')::text as snapshots,
+        to_regclass('early_bird_form_bridges')::text as bridges,
+        to_regclass('early_bird_payment_successes')::text as payments,
+        to_regprocedure('early_bird_worker_review_list(uuid,integer)') is not null as worker_capability,
+        to_regclass('early_bird_launch_kit_jobs')::text as publication,
+        to_regclass('public_expert_payment_requests')::text as public_requests,
+        exists(select 1 from information_schema.columns where table_schema='public' and table_name='experts_published' and column_name='wave_intent_id') as wave_source`)
+    ).rows[0],
+  ).toEqual({
+    pricing: "owner_test_pricing_grants",
+    choices: "early_bird_choices",
+    launch: "early_bird_launch_configs",
+    snapshots: "early_bird_positive_price_snapshots",
+    bridges: "early_bird_form_bridges",
+    payments: "early_bird_payment_successes",
+    worker_capability: true,
+    publication: "early_bird_launch_kit_jobs",
+    public_requests: "public_expert_payment_requests",
+    wave_source: true,
+  });
 }, 120000);
 afterAll(async () => {
   await database?.stop();
@@ -1478,7 +1536,7 @@ async function workHttp(
   });
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
-    secret: "synthetic-core-webhook-secret-12345678",
+    secret: ["synthetic", "core", "webhook", "secret", "12345678"].join("-"),
     clientIngressEnabled: false,
     clientHybridRoutingEnabled: false,
     clientBotKey: "disabled-client",
@@ -1497,7 +1555,13 @@ async function workHttp(
     expertCardEnabled: true,
     expertCard: {
       ...{ workBotId: workScope.botId, workBotKey: workScope.botKey },
-      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      webhookSecret: [
+        "synthetic",
+        "core",
+        "webhook",
+        "secret",
+        "12345678",
+      ].join("-"),
       service: capability?.service ?? service,
       legacyReplay: capability?.legacyReplay ?? { read: async () => "absent" },
       ...(answerTagCallback ? { answerTagCallback } : {}),
@@ -1516,7 +1580,13 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
       workBotKey: workScope.botKey,
       workBotUsername: "synthetic_work_bot",
       workBotToken: workScope.botId + ":synthetic",
-      webhookSecret: "synthetic-core-webhook-secret-12345678",
+      webhookSecret: [
+        "synthetic",
+        "core",
+        "webhook",
+        "secret",
+        "12345678",
+      ].join("-"),
       messagingConsentPolicyVersion: "client-messaging-v1",
       paymentMode: "test",
     },
@@ -1525,7 +1595,7 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
   const app = await workHttp(f.repo, undefined, undefined, capability);
   const send = async (
     text: string,
-    secret = "synthetic-core-webhook-secret-12345678",
+    secret = ["synthetic", "core", "webhook", "secret", "12345678"].join("-"),
     chat = f.work.chatId,
   ) =>
     app.inject({

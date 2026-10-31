@@ -3,10 +3,8 @@ set -Eeuo pipefail
 
 # Pre-push gate for this repository.
 #
-# Why it exists: `.github/workflows` is empty by repository policy
-# (tests/repo/workflow-semantics.test.ts asserts that), and branch protection is unavailable on
-# the current plan, so nothing between a local commit and `git push` ever re-ran the pins kept
-# in tests/repo. Not hypothetical: 87f6270 changed scripts/deploy-native-remote.sh without
+# Why it exists: local verification catches failures before pushing, independently of hosted CI.
+# Not hypothetical: 87f6270 changed scripts/deploy-native-remote.sh without
 # re-registering its automation hash and left main red until PR #79.
 #
 # Usage

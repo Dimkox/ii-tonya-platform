@@ -1,0 +1,105 @@
+import { randomUUID } from "node:crypto";
+import { afterAll, beforeAll, expect, it } from "vitest";
+import { sql } from "drizzle-orm";
+import {
+  startExpertReferralTestDatabase,
+  type ExpertReferralTestDatabase,
+} from "../testkit/expert-referral.js";
+
+let db: ExpertReferralTestDatabase;
+beforeAll(async () => {
+  db = await startExpertReferralTestDatabase();
+  await db.db.transaction(async (tx) => {
+    await tx.execute(
+      sql`update early_bird_launch_configs set active=false where active`,
+    );
+    await tx.execute(
+      sql`insert into early_bird_launch_configs(phase,enrollment_start_at,client_start_at,promo_deadline_days,final_call_trigger_at) values ('WAVE_1_EARLY_BIRD','2026-11-01T00:00:00+03:00','2027-01-11T00:00:00+03:00',10,'2026-12-28T10:00:00+03:00')`,
+    );
+  });
+  // A disposable DB runs the real phase logic against a deterministic launch-period clock.
+  await db.db.execute(
+    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
+  );
+}, 120_000);
+afterAll(async () => {
+  await db?.stop();
+}, 120_000);
+it("keeps a nonfinancial wave choice separate from later legacy sales and rejects stale callbacks", async () => {
+  const { seedClientConsent } = await import("../testkit/client-consent.js");
+  const user = await db.createUser();
+  await seedClientConsent(db.db, user, "client_messaging");
+  await db.db.execute(
+    sql`insert into channel_identities(user_id,provider,external_id,bot_key,external_chat_id) values (${user}::uuid,'telegram','123456','fixture-bot','123456')`,
+  );
+  await db.db.execute(
+    sql`insert into expert_offer_profiles(user_id,revision,city_code,million_city,service_format,ticket_minor,participant_kind,idempotency_key) values (${user}::uuid,1,'fixture',false,'offline',300000,'expert','fixture-profile')`,
+  );
+  const tariff = await db.createResidencyTariff({
+    tariffKey: "PRO",
+    displayName: "PRO",
+    priceMinor: 1000000,
+    durationSeconds: 2592000,
+  });
+  const base = randomUUID();
+  await db.db.execute(
+    sql`insert into expert_sales_bases(id,user_id,tariff_version_id,profile_revision,base_tariff_amount,participant_kind,bot_id,bot_key,chat_id,consent_version) select ${base}::uuid,${user}::uuid,t.id,1,greatest(500000,t.price_minor),'expert','1','fixture-bot','123456','client-messaging-v1' from expert_residency_tariff_versions t where t.id=${tariff}::uuid`,
+  );
+  const positive = randomUUID();
+  await db.db.execute(
+    sql`insert into expert_sales_choices(id,base_id,user_id,revision,action,request_key,request_digest) values (${positive}::uuid,${base}::uuid,${user}::uuid,1,'positive','positive-1',${"a".repeat(64)})`,
+  );
+  await db.db.execute(
+    sql`insert into early_bird_positive_price_snapshots(positive_choice_id,user_id,base_id) values(${positive}::uuid,${user}::uuid,${base}::uuid)`,
+  );
+  const choice = randomUUID();
+  const insert = () =>
+    db.db.execute(
+      sql`insert into early_bird_choices(id,user_id,base_id,positive_choice_id,revision,choice,request_key,request_digest) values (${choice}::uuid,${user}::uuid,${base}::uuid,${positive}::uuid,1,'now','wave-1',${"b".repeat(64)})`,
+    );
+  await expect(insert()).resolves.toBeDefined();
+  await expect(insert()).rejects.toThrow();
+  await expect(
+    db.db.execute(
+      sql`update early_bird_choices set choice='later' where id=${choice}::uuid`,
+    ),
+  ).rejects.toThrow();
+  await expect(
+    db.db.execute(
+      sql`insert into early_bird_choices(user_id,base_id,positive_choice_id,revision,choice,request_key,request_digest) values (${user}::uuid,${base}::uuid,${positive}::uuid,1,'later','later-choice',${"f".repeat(64)})`,
+    ),
+  ).resolves.toBeDefined();
+  const history = await db.db.execute<{ decision_no: number; choice: string }>(
+    sql`select decision_no,choice from early_bird_choices where user_id=${user}::uuid order by decision_no`,
+  );
+  expect(history.rows).toEqual([
+    { decision_no: 1, choice: "now" },
+    { decision_no: 2, choice: "later" },
+  ]);
+  await expect(
+    db.db.execute(
+      sql`insert into expert_sales_choices(base_id,user_id,revision,action,request_key,request_digest) values (${base}::uuid,${user}::uuid,2,'promo','legacy',${"e".repeat(64)})`,
+    ),
+  ).resolves.toBeDefined();
+  await expect(
+    db.db.execute(
+      sql`insert into early_bird_choices(user_id,base_id,positive_choice_id,revision,choice,request_key,request_digest) values (${user}::uuid,${base}::uuid,${positive}::uuid,1,'later','stale-wave',${"d".repeat(64)})`,
+    ),
+  ).rejects.toThrow();
+  const other = await db.createUser();
+  await expect(
+    db.db.execute(
+      sql`insert into early_bird_choices(id,user_id,base_id,positive_choice_id,revision,choice,request_key,request_digest) values (${randomUUID()}::uuid,${other}::uuid,${base}::uuid,${positive}::uuid,1,'now','wave-2',${"c".repeat(64)})`,
+    ),
+  ).rejects.toThrow();
+  await db.db.execute(
+    sql`update users set active=false where id=${user}::uuid`,
+  );
+  expect(
+    (
+      await db.db.execute(
+        sql`select 1 from early_bird_choices where user_id=${user}::uuid`,
+      )
+    ).rows,
+  ).toHaveLength(0);
+}, 120_000);

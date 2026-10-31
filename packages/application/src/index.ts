@@ -62,3 +62,8 @@ export * from "./resident-workspace-service.js";
 export { createExpertSeparatedSalesService } from "./expert-separated-sales-service.js";
 
 export type { ResidentLifecycleStaffRepository } from "@ii-tonya/contracts";
+export {
+  createReceiptDisclosureBoundary,
+  CancellationUncertain,
+  type ReceiptDisclosureCancellation,
+} from "./receipt-disclosure-boundary.js";

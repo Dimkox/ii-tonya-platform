@@ -69,7 +69,10 @@ const finiteDate = (value: Date): boolean =>
   value instanceof Date && Number.isFinite(value.getTime());
 
 /** Current archive/pause authority is checked on every read, before worker projection. */
-export const currentExpertResidencyVisibleSql = (userId: SQL): SQL => sql`
+export const currentExpertResidencyVisibleSql = (
+  userId: SQL,
+  waveCoverage = false,
+): SQL => sql`
   not exists (
     select 1 from expert_onboarding_applications archive
     where archive.user_id=${userId}
@@ -77,11 +80,21 @@ export const currentExpertResidencyVisibleSql = (userId: SQL): SQL => sql`
   ) and not exists (
     select 1 from expert_residency_lifecycle lifecycle
     where lifecycle.user_id=${userId} and lifecycle.status='paused'
-  ) and (not exists(select 1 from expert_onboarding_applications a where a.user_id=${userId}) or exists(select 1 from experts_published resident_publication join experts resident_expert on resident_expert.id=resident_publication.expert_id where resident_publication.user_id=${userId} and resident_publication.active and expert_card_activation_gate_valid(resident_publication.user_id,resident_publication.review_id) and exists(select 1 from expert_residency_current_coverage(resident_expert.id))))
+  ) and (not exists(select 1 from expert_onboarding_applications a where a.user_id=${userId}) or exists(
+    select 1 from experts_published resident_publication
+    join experts resident_expert on resident_expert.id=resident_publication.expert_id
+    where resident_publication.user_id=${userId} and resident_publication.active
+      and ((expert_card_activation_gate_valid(resident_publication.user_id,resident_publication.review_id)
+        and exists(select 1 from expert_residency_current_coverage(resident_expert.id)))
+        ${waveCoverage ? sql`or public.early_bird_current_publication_valid(resident_expert.id)` : sql``})
+  ))
 `;
 
 export class PostgresCatalogRepository {
-  constructor(private readonly db: Pick<DrizzleDb, "execute">) {}
+  constructor(
+    private readonly db: Pick<DrizzleDb, "execute">,
+    private readonly options: { readonly waveCoverage?: boolean } = {},
+  ) {}
 
   async listPublicServices(input: {
     serviceCode?: string;
@@ -108,7 +121,7 @@ export class PostgresCatalogRepository {
       join experts e on e.id = es.expert_id
       where e.active = true
         and e.verified = true
-        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})
         and es.active = true
         and es.code is not null
         and es.language is not null
@@ -163,7 +176,7 @@ export class PostgresCatalogRepository {
       join experts e on e.id = es.expert_id
       where e.active = true
         and e.verified = true
-        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})
         and es.active = true
         and es.code is not null
         and es.language is not null
@@ -235,7 +248,7 @@ export class PostgresCatalogRepository {
         and ${providerEligible}
         and ${noExpertOverlap(input.databaseNow)}
         and not exists(select 1 from resident_schedule_busy b where b.expert_id=e.id and b.starts_at<s.ends_at and b.ends_at>s.starts_at)
-        and (${currentExpertResidencyVisibleSql(sql`e.user_id`)})
+        and (${currentExpertResidencyVisibleSql(sql`e.user_id`, this.options.waveCoverage === true)})
       group by s.id,s.starts_at,s.observed_at,s.capacity
       having s.capacity>count(r.id)
       order by s.starts_at,s.id

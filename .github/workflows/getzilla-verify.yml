@@ -1,0 +1,179 @@
+# Getzilla CI gate for a public repository.
+#
+# The CI/merge gate follows repository visibility (owner decision 2026-10-06):
+# a public repository is gated by GitHub Actions with this workflow; a private
+# repository is gated by the self-hosted Trust CI GitHub App instead and gets
+# no workflow. `python3 scripts/getzilla_ci.py --write` renders this template
+# into .github/workflows/getzilla-verify.yml; change it afterwards only through
+# a reviewed pull request.
+name: getzilla-verify
+
+on:
+  pull_request:
+  push:
+    branches:
+      - "main"
+
+permissions:
+  contents: read
+
+env:
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  getzilla-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: postgres:17.5-bookworm
+        env:
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      II_TONYA_TEST_POSTGRES_ADMIN_URL: postgresql://postgres:ci-only-password@127.0.0.1:5432/postgres
+      II_TONYA_CI_DB_REPORT: "true"
+    outputs:
+      source_sha: ${{ steps.manifest.outputs.source_sha }}
+      db_verified: ${{ steps.manifest.outputs.db_verified }}
+    steps:
+      - name: Check out the exact commit with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify checked-out SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 11.9.0
+          run_install: false
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm format:check
+      - name: Verify native deployment script syntax
+        run: |
+          for clawScript in scripts/run-claw-ci.sh scripts/build-native-release.sh scripts/deploy-native-remote.sh scripts/validate-runtime-env.sh; do
+            bash -n "$clawScript"
+          done
+      - name: Verify native edge contracts
+        run: pnpm test:edge:native
+      - name: Set up Python 3.13
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - name: Install test requirements
+        shell: bash
+        run: |
+          if [ -f .getzilla/config/python-test-requirements.txt ]; then
+            python -m pip install --disable-pip-version-check -r .getzilla/config/python-test-requirements.txt
+          fi
+          python -m pip install --disable-pip-version-check -r .getzilla/config/python-quality-requirements.txt
+      - name: Run bridge and provisioning Node tests
+        run: node --test scripts/early-bird-bridge/*.test.mjs deploy/gateway-provision/*.test.mjs
+      - name: Verify isolated systemd provisioning sandbox
+        run: sudo -n bash deploy/gateway-provision/test_prepare_systemd_sandbox.sh "$(command -v node)"
+      - name: Install OpenGrep for taint analysis
+        shell: bash
+        env:
+          OPENGREP_VERSION: "1.30.1"
+          OPENGREP_SHA256: "d3195b9d8d5ae93179f6aa5f5daaba6a920a5a09d38c5d5ae5e60924050210c4"
+        run: |
+          mkdir -p "$RUNNER_TEMP/opengrep"
+          curl -fsSL -o "$RUNNER_TEMP/opengrep/opengrep" "https://github.com/opengrep/opengrep/releases/download/v${OPENGREP_VERSION}/opengrep_manylinux_x86"
+          echo "${OPENGREP_SHA256}  $RUNNER_TEMP/opengrep/opengrep" | sha256sum -c -
+          chmod 0755 "$RUNNER_TEMP/opengrep/opengrep"
+          echo "$RUNNER_TEMP/opengrep" >> "$GITHUB_PATH"
+      - name: Install pinned Trivy
+        shell: bash
+        env:
+          TRIVY_VERSION: "0.76.1"
+          TRIVY_SHA256: "c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0"
+        run: |
+          mkdir -p "$RUNNER_TEMP/trivy"
+          curl -fsSL -o "$RUNNER_TEMP/trivy/trivy.tar.gz" "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  $RUNNER_TEMP/trivy/trivy.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/trivy/trivy.tar.gz" -C "$RUNNER_TEMP/trivy" trivy
+          test "$("$RUNNER_TEMP/trivy/trivy" --version | head -n 1)" = "Version: ${TRIVY_VERSION}"
+          echo "$RUNNER_TEMP/trivy" >> "$GITHUB_PATH"
+      - name: Record startup capacity
+        run: python scripts/getzilla_startup_cpu.py --no-probe
+      - name: Getzilla verification
+        env:
+          GETZILLA_OSV_ONLINE: "1"
+        run: python scripts/getzilla_verify_ci.py
+      - name: Verify full-suite manifest and SHA
+        id: manifest
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          git diff --quiet --
+          git diff --cached --quiet --
+          node scripts/assert-ci-db-results.mjs vitest-results.json
+          printf 'source_sha=%s\n' "$EXPECTED_SHA" >> "$GITHUB_OUTPUT"
+          printf 'db_verified=true\n' >> "$GITHUB_OUTPUT"
+      - name: Export CI evidence
+        id: export_evidence
+        if: always()
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        # Retain only hashed test identities/statuses/classifications, never raw titles, assertions or console data.
+        run: python scripts/getzilla_ci_evidence.py --output "${{ runner.temp }}/getzilla-evidence" --job getzilla-verify --status "${{ job.status }}" --vitest-summary
+      - name: Retain CI evidence for 30 days
+        if: always() && steps.export_evidence.outcome == 'success'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: getzilla-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/getzilla-evidence/
+          retention-days: 30
+          if-no-files-found: error
+
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: getzilla-verify
+    if: always()
+    steps:
+      - name: Require successful full suite at exact SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          VERIFIED_SHA: ${{ needs.getzilla-verify.outputs.source_sha }}
+          DB_VERIFIED: ${{ needs.getzilla-verify.outputs.db_verified }}
+          VERIFY_RESULT: ${{ needs.getzilla-verify.result }}
+        run: |
+          test "$VERIFY_RESULT" = success
+          test "$DB_VERIFIED" = true
+          test -n "$VERIFIED_SHA"
+          test "$VERIFIED_SHA" = "$EXPECTED_SHA"
+  database:
+    name: Database Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: getzilla-verify
+    if: always()
+    steps:
+      - name: Require complete database manifest at exact SHA
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          VERIFIED_SHA: ${{ needs.getzilla-verify.outputs.source_sha }}
+          DB_VERIFIED: ${{ needs.getzilla-verify.outputs.db_verified }}
+          VERIFY_RESULT: ${{ needs.getzilla-verify.result }}
+        run: |
+          test "$VERIFY_RESULT" = success
+          test "$DB_VERIFIED" = true
+          test -n "$VERIFIED_SHA"
+          test "$VERIFIED_SHA" = "$EXPECTED_SHA"

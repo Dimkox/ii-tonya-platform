@@ -362,6 +362,15 @@ const defaultDependencies: TestPostgresDependencies = {
   createDb: (pool) => drizzle(pool as Pool, { schema }) as DrizzleDb,
 };
 
+/** Role-changing tests must never share a PostgreSQL cluster with other work. */
+export async function startDisposableTestPostgres(): Promise<TestDatabase> {
+  return startTestPostgres({
+    ...defaultDependencies,
+    startContainer: async () =>
+      new PostgreSqlContainer("postgres:17.5-bookworm").start(),
+  });
+}
+
 async function stopResources(
   pool: TestPoolHandle,
   container: TestContainerHandle,
@@ -615,6 +624,13 @@ export async function startTestPostgres(
     },
     async reset() {
       await resetWithImmutableExpertReferralAdminResults(db, async (tx) => {
+        // Disposable reset only: production erasure must retain nonfinancial identity reservations.
+        // Older migration-prefix fixtures legitimately have no registry yet.
+        await tx.execute(sql`do $$ begin
+          if to_regclass('public.public_expert_provider_identities') is not null then
+            truncate table public.public_expert_provider_identities;
+          end if;
+        end $$`);
         await tx.execute(sql`
           truncate table admin_case_actions, integration_errors,
             client_identity_proof_receipts, client_sessions,
