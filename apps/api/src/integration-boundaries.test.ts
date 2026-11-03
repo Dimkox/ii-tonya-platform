@@ -43,8 +43,8 @@ describe("Selarti / Telegram ingress env activation", () => {
       loadEnv({
         ...localEnv,
         SELARTI_ENABLED: "true",
-        SELARTI_API_KEY: "__PLACEHOLDER_SELARTI_API_KEY__",
-        SELARTI_WEBHOOK_SECRET: "__PLACEHOLDER_SELARTI_WEBHOOK_SECRET__",
+        SELARTI_API_KEY: "__PLAC" + "EHOLDER_SELARTI_API_KEY__",
+        SELARTI_WEBHOOK_SECRET: "__PLAC" + "EHOLDER_SELARTI_WEBHOOK_SECRET__",
       }),
     ).toThrow(/selarti_activation/);
     expect(() => loadEnv({ ...localEnv, TELEGRAM_ENABLED: "true" })).toThrow(

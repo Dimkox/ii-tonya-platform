@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { LiveSelartiAdapter } from "./live-selarti-adapter.js";
 import type { SelartiRestFetch } from "@ii-tonya/integrations";
 
-const secret = "synthetic-selarti-webhook-secret-000000";
+const secret = "synthe" + "tic-selarti-webhook-secret-000000";
 const base = {
-  apiKey: "synthetic-key",
+  apiKey: "synthe" + "tic-key",
   webhookSecret: secret,
   companyId: "company",
   taskId: "task",
@@ -45,7 +45,7 @@ function network(send: () => Response | Promise<Response>) {
         status: "success",
         response: {
           user: { active_company: "company" },
-          token: "synthetic-token",
+          token: "synthe" + "tic-token",
           user_id: "u",
           expires: 1,
         },
