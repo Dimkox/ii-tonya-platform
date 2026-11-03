@@ -261,6 +261,38 @@ describe("content-free logger boundary", () => {
     ]);
   });
 
+  it("keeps only route templates on completion lines (SCRUM-111)", async () => {
+    const line = await capture((logger) => {
+      for (const route of [
+        "/telegram/:botKey",
+        "/health/ready",
+        "/telegram/123456:AAbbcc",
+        "/a?token=secret",
+        "/x/%2Fsecret",
+        "https://ii-tonya.ru/",
+        "/users/0f3c9a7e",
+        42,
+      ])
+        logger.info({
+          event: "http_request_completed",
+          method: "GET",
+          route,
+          statusCode: 200,
+          durationMs: 1,
+        });
+    });
+    expect(records(line).map((record) => record.route)).toEqual([
+      "/telegram/:botKey",
+      "/health/ready",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
   it("never evaluates unknown getters, coercion, serialization or proxy traps", async () => {
     const invoked = vi.fn(() => {
       throw new Error(canary);
