@@ -125,4 +125,16 @@ describe("WAIT-T03 guide delivery authority", () => {
       ),
     ).not.toContain(owner.userId);
   });
+  it("WAIT-T05 records a manager question only for a registered promo user", async () => {
+    const owner = await identity();
+    expect(await promo.recordManagerQuestion(owner, "Вопрос")).toBe(false);
+    await promo.register(command(owner));
+    expect(await promo.recordManagerQuestion(owner, "Вопрос")).toBe(true);
+    const rows = (
+      await database.db.execute<{ status: string }>(
+        sql`select status from expert_promo_manager_questions where user_id=${owner.userId}::uuid`,
+      )
+    ).rows;
+    expect(rows).toEqual([{ status: "open" }]);
+  });
 });

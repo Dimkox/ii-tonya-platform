@@ -4,6 +4,10 @@ import {
   renderPersonalOffer,
   type PersonalOfferView,
 } from "./expert-personal-offer-service.js";
+import {
+  matchExpertPromoFaq,
+  type ExpertPromoFaqEntry,
+} from "./expert-promo-faq.js";
 import { createHash } from "node:crypto";
 
 export type ExpertApplicantScope = {
@@ -19,6 +23,10 @@ type Command = ExpertApplicantScope & {
 export interface ExpertApplicantRepository {
   isActiveResident?(scope: ExpertApplicantScope): Promise<boolean>;
   optOutReferral?(scope: ExpertApplicantScope): Promise<boolean>;
+  recordManagerQuestion?(
+    scope: ExpertApplicantScope,
+    question: string,
+  ): Promise<boolean>;
   isVerificationPending?(scope: ExpertApplicantScope): Promise<boolean>;
   saveProfile?(
     input: Command & {
@@ -117,6 +125,8 @@ export function createExpertApplicantService(deps: {
   repository: ExpertApplicantRepository;
   /** BOT-02.2 redirect target for an active resident; https URL of the expert bot. */
   activeResidentBotUrl?: string;
+  /** WAIT-T05: free text → FAQ answer, else manager handoff. */
+  faq?: readonly ExpertPromoFaqEntry[] | true;
   personalOffers?: {
     readPromoIdentity(
       scope: ExpertApplicantScope,
@@ -346,6 +356,23 @@ export function createExpertApplicantService(deps: {
             status: "handled",
             text: `Заявка ${result.applicationId} ожидает проверки менеджером. TODO: Wait for Prompt Spec`,
           };
+        }
+        if (deps.faq && !input.text.startsWith("/") && input.text.trim()) {
+          const answer = matchExpertPromoFaq(
+            input.text,
+            deps.faq === true ? undefined : deps.faq,
+          );
+          if (answer) return { status: "handled", text: answer };
+          if (
+            await deps.repository.recordManagerQuestion?.(
+              scope,
+              input.text.trim().slice(0, 3000),
+            )
+          )
+            return {
+              status: "handled",
+              text: "Спасибо за вопрос! Передал его менеджеру, ответ придёт в этот чат.",
+            };
         }
         return {
           status: /^\/(?:start|tariff|tariffs|apply|consent)(?: |$)/u.test(

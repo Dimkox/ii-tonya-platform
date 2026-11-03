@@ -198,6 +198,22 @@ export class PostgresExpertPromoRepository {
       replay,
     };
   }
+  /** WAIT-T05: unanswered question goes to the manager queue (registered users only). */
+  async recordManagerQuestion(
+    scope: { botKey: string; telegramUserId: string },
+    question: string,
+  ): Promise<boolean> {
+    if (
+      !/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId) ||
+      question.length < 1 ||
+      question.length > 3000
+    )
+      return false;
+    const r = await this.db.execute(
+      sql`insert into expert_promo_manager_questions(user_id,question) select f.user_id,${question} from expert_promo_funnel_state f join channel_identities c on c.user_id=f.user_id and c.provider='telegram' and c.bot_key=${scope.botKey} and c.status='active' and c.external_id=${scope.telegramUserId} limit 1 returning id`,
+    );
+    return r.rows.length > 0;
+  }
   /** WAIT-T04: /optout_ref stops referral reminders for this promo bot identity. */
   async optOutReferral(scope: {
     botKey: string;
