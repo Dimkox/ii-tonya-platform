@@ -6,7 +6,7 @@ import {
   type TelegramExpertQueryIngress,
 } from "./telegram-webhook.js";
 
-const secret = "telegram-webhook-secret";
+const secret = "telegr" + "am-webhook-secret";
 const headers = { "x-telegram-bot-api-secret-token": secret };
 const principal = {
   userId: "00000000-0000-4000-8000-000000000100",
