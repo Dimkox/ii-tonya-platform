@@ -604,7 +604,7 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "d62bcad8c4fa9517e478679ef57cf098a89b88f5ca1eac196051580d47b1064e",
+    "6747d0144e10c83995f326d909b8fc570072c749a9dd80871ef526d03e95fecc",
   ],
   [
     "packages/contracts/src/index.ts",
@@ -867,7 +867,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "apps/api/src/server.ts",
-    "d3f290dd170493f4ec439968de283594156d55d256ffa8e95019b4253e0a520e",
+    "b0fd30c9bc7be637deb114cf481d05514e4acc57206f995714e8cea39fbb4a90",
   ],
 
   [
@@ -1287,7 +1287,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/validate-runtime-env.sh",
-    "54bd8f94a80fd551d424266b9b64c4195f1e390bd36e31477c24c1387c10ae25",
+    "8e368ee045998de5b22719657aee983f40357bd52d2fc18d013b8516d8b26aaf",
   ],
   // Local pre-push gate remains an additional check before the hosted gates run.
   [

@@ -8,7 +8,7 @@ let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
   db = await startHistoricalEarlyBirdIntentDatabase();
   await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
+    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
   );
 }, 120_000);
 afterAll(async () => {
@@ -64,7 +64,7 @@ it("rejects a request that expires while waiting for its row lock", async () => 
     baseMonthlyMinor: BigInt(b.amount),
     participantKind: "expert",
     firstOfferAtMs: Date.parse(b.first),
-    quotedAtMs: Date.parse("2026-11-02T00:00:00+03:00"),
+    quotedAtMs: Date.parse(b.first),
     promotion: true,
     termMonths: 1,
   }).monthlyPriceMinor;
