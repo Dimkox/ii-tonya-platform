@@ -796,7 +796,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "tests/integration/public-onboarding-terminal-migration-state.test.ts",
-    "eccc7b2cfd08c3937124e4440a043f7d8f6e753e26047e54d8528c5f2e0058df",
+    "1977fd4739ae0aa871feb34f5abd9825269651f35e6f3cf0406add0c1072b308",
   ],
   [
     "tests/integration/resident-native-uuid-migration-state.test.ts",

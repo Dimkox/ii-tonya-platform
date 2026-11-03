@@ -275,18 +275,16 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
     let offsetSeconds = Math.ceil(
       (Date.parse("2027-01-11T12:00:00.000Z") - Date.now()) / 1000,
     );
-    await (await import("node:fs/promises")).chmod(directory, 0o755);
-    await writeFile(
-      join(directory, "clock"),
-      `${offsetSeconds >= 0 ? "+" : ""}${offsetSeconds}s`,
-    );
+    // Offset goes in FAKETIME env, parsed once per process. No clock file and no
+    // FAKETIME_NO_CACHE: re-reading a file on every time() call does fopen/malloc
+    // inside PG's SIGALRM timeout handler and corrupts the heap (backend SIGABRT,
+    // then the whole cluster enters crash recovery and tests get 57P03).
+    const fakeOffset = `${offsetSeconds >= 0 ? "+" : ""}${offsetSeconds}s`;
     container = execFileSync(
       "docker",
       [
         "run",
         "-d",
-        "--mount",
-        `type=bind,src=${directory},dst=/journey-clock,readonly`,
         "--user",
         "postgres",
         "-p",
@@ -300,9 +298,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
         "-e",
         "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1",
         "-e",
-        "FAKETIME_TIMESTAMP_FILE=/journey-clock/clock",
-        "-e",
-        "FAKETIME_NO_CACHE=1",
+        `FAKETIME=${fakeOffset}`,
         "-e",
         "DONT_FAKE_MONOTONIC=1",
         "-e",
