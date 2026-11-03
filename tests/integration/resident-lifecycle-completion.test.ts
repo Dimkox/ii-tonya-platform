@@ -608,7 +608,9 @@ const receipt = async (input: {
   receipt: { botKey: input.botKey, chatId: input.chatId, messageId: 101 },
 });
 beforeAll(async () => {
-  publicPayments = await startPublicHeldOnboardingFixture();
+  publicPayments = await startPublicHeldOnboardingFixture({
+    advanceable: false,
+  });
   database = publicPayments.database;
   expect(
     (await database.db.execute(sql`show server_version_num`)).rows[0]
