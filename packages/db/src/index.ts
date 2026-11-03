@@ -187,6 +187,10 @@ export {
 } from "./repositories/feedback-repository.js";
 export { PostgresWorkerJobsRepository } from "./repositories/worker-jobs-repository.js";
 export {
+  PostgresTelegramCallbackReplayRepository,
+  TELEGRAM_CALLBACK_PROVIDER,
+} from "./repositories/telegram-callback-replay-repository.js";
+export {
   PostgresWebhookInboxRepository,
   WebhookInboxClaimLostError,
 } from "./repositories/webhook-inbox-repository.js";

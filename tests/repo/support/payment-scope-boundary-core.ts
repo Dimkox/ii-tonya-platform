@@ -604,7 +604,7 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "d62bcad8c4fa9517e478679ef57cf098a89b88f5ca1eac196051580d47b1064e",
+    "6747d0144e10c83995f326d909b8fc570072c749a9dd80871ef526d03e95fecc",
   ],
   [
     "packages/contracts/src/index.ts",
@@ -867,7 +867,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "apps/api/src/server.ts",
-    "a2059bfd5bf6a3023afb7b7211110167f355a61dc098716bc45913d42bf43b69",
+    "b0fd30c9bc7be637deb114cf481d05514e4acc57206f995714e8cea39fbb4a90",
   ],
 
   [
