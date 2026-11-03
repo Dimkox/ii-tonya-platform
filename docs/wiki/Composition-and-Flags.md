@@ -127,3 +127,15 @@ GOOGLE_SHEETS_PROJECTION_ENABLED, INTENT_MODEL_ENABLED, LLM_PROVIDER, MINOR_ONBO
 изменения схемы, а `tests/e2e/api-boundary.test.ts` проверяет наличие literal по тексту исходника.
 
 ← [Home](Home.md) · [Гейты](Release-Gates.md)
+
+## Selarti and Telegram callback ingress (issues #45, #56)
+
+`SELARTI_ENABLED` and `TELEGRAM_ENABLED` are `"true" | "false"` env flags, default `"false"`.
+
+- Off: `createDefaultLifecycle` uses `DisabledSelartiAdapter` and the fail-closed
+  `disabledTelegramCallbacks` (`apps/api/src/integration-boundaries.ts`).
+- On: env validation requires project-owned credentials (`SELARTI_API_KEY` and
+  `SELARTI_WEBHOOK_SECRET`; a valid `TELEGRAM_BOT_TOKEN` and `TELEGRAM_WEBHOOK_SECRET`;
+  placeholders are rejected). The live boundary must be supplied through
+  `createDefaultLifecycle({ integrationBoundaries })`. Without it, startup fails with
+  `selarti_capability_required` / `telegram_callback_capability_required`.

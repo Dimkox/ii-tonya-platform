@@ -1,3 +1,4 @@
+import { assertIntegrationBoundaries } from "./integration-boundaries.js";
 import { residentLifecycleRoutes } from "./routes/resident-lifecycle.js";
 import {
   expertManagerTelegramRoutes,
@@ -228,6 +229,9 @@ const assertDisabled = (config: RuntimeConfig): void => {
   const nonPaymentIntegrations = {
     ...config.integrations,
     payments: false,
+    // Gated by env activation rules and assertIntegrationBoundaries instead.
+    selarti: false,
+    telegram: false,
   };
   if (
     Object.values(nonPaymentIntegrations).some((enabled) => enabled !== false)
@@ -298,6 +302,7 @@ export async function buildApp(
   deps: AppDependencies,
 ): Promise<FastifyInstance> {
   assertDisabled(deps.config);
+  assertIntegrationBoundaries(deps.config, deps);
   if (
     deps.config.features.ownerTestPricingAdmin === true &&
     (deps.adminApprovals === undefined ||
