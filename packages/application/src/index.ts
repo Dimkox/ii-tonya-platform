@@ -7,6 +7,7 @@ export * from "./client-booking-service.js";
 export * from "./waitlist-service.js";
 export * from "./client-session-service.js";
 export * from "./conversation-service.js";
+export * from "./deterministic-dialog.js";
 export * from "./ports.js";
 export * from "./privacy-service.js";
 export * from "./expert-code-crypto.js";

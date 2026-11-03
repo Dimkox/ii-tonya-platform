@@ -867,7 +867,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "apps/api/src/server.ts",
-    "d3f290dd170493f4ec439968de283594156d55d256ffa8e95019b4253e0a520e",
+    "a58692cf446023932692e1a47061b3a15c19c7e85ae2ae6f8f052ef1b75025b5",
   ],
 
   [

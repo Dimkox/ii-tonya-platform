@@ -165,11 +165,8 @@ describe("production API composition", () => {
     // Pinned on purpose: while these stay proxies, no user-facing dialogue can run,
     // and a newly stubbed service fails here too. When one is wired for real, drop
     // it from this list in the same change and cover its route above. See #45.
-    expect(await disabledLabels(deps)).toEqual([
-      "booking ingress",
-      "catalog ingress",
-      "conversation ingress",
-      "privacy ingress",
-    ]);
+    // conversation is wired (deterministic menu dialog); legacy booking and
+    // catalog proxies were removed in favour of the client MVP services.
+    expect(await disabledLabels(deps)).toEqual(["privacy ingress"]);
   }, 30_000);
 });

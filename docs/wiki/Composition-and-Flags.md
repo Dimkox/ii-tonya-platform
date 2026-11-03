@@ -4,12 +4,15 @@
 
 ## Что исполняется, а что нет
 
-`apps/api/src/server.ts` строит боевой lifecycle (`createDefaultLifecycle`) и подставляет
-`disabledService()` — Proxy, где любой вызов бросает `Error("<name> is disabled")` — для четырёх
-сервисов: `conversationService` ("conversation ingress"), `bookingService` ("booking ingress"),
-`catalogService` ("catalog ingress"), `privacyService` ("privacy ingress"). Плюс захардкоженные
-заглушки `selarti: new DisabledSelartiAdapter()` и `telegramCallbacks` с
-`isAuthorizedIdentity → false`, `verifyCallback → false`, `process → throw`.
+`apps/api/src/server.ts` строит боевой lifecycle (`createDefaultLifecycle`). `conversationService`
+собирается по-настоящему (`apps/api/src/client-conversation-composition.ts`): детерминированный
+диалог-меню (`packages/application/src/deterministic-dialog.ts`) — ключевые слова «каталог»,
+«запись», «данные», «оператор», `/start`; кризисные слова уходят человеку (handoff на первого
+админа с ролью `support`, срок реакции 4 часа); LLM-хук есть, но выключен. Легаси-заглушки
+`bookingService`/`catalogService` удалены — их заменяют `clientBookingService`/`clientCatalogService`.
+`privacyService` остаётся `disabledService()` ("privacy ingress"), пока выключен
+`CLIENT_PRIVACY_ENABLED`. Транспорт диалога — `/v1/webhooks/selarti`; адаптер по умолчанию
+`DisabledSelartiAdapter`, `telegramCallbacks` по-прежнему заглушки.
 
 Одновременно с этим боевой lifecycle **реально собирает** клиентский MVP-контур
 (`clientSessionService`, `clientCatalogService`, `clientBookingService` через
@@ -21,8 +24,7 @@
 **кроме платежей** (`payments` принудительно `false` в проверке) — то есть платёжный контур выведен из-под
 этого запрета и регулируется `PAYMENTS_ENABLED`/`YOOKASSA_ENABLED` и внешними гейтами.
 
-Следствие: продукт «диалог в Telegram» не исполняется, потому что не собраны `conversation ingress` и
-Telegram-колбэки, а не потому что нет доменных сервисов. Детали — [https://github.com/Dimkox/ii-tonya-platform/issues/45](https://github.com/Dimkox/ii-tonya-platform/issues/45).
+Следствие: диалог собран, но наружу отвечает только при включённом адаптере Selarti. Детали — [https://github.com/Dimkox/ii-tonya-platform/issues/45](https://github.com/Dimkox/ii-tonya-platform/issues/45).
 
 ## Покрытие боевой сборки
 
