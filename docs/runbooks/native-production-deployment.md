@@ -172,6 +172,12 @@ GitHub Actions are not used. Run `scripts/run-claw-ci.sh` directly on Claw with 
    prior compatible release, and restart through the coordinated recovery procedure.
    Database rollback is forward-fix unless a separately reviewed reverse migration exists.
 
+10. After acceptance, tag the served commit and publish a GitHub release:
+    `node scripts/tag-production-release.mjs <full-sha> --date YYYY-MM-DD --evidence <deploy record>`.
+    The script refuses a SHA that is not on `origin/main` or that differs from the
+    public `https://ii-tonya.ru/SOURCE_SHA`. Tags are `prod-<first 8 hex>`. For a
+    past deploy, add `--skip-live-check`; such releases are not marked Latest.
+
 ## Historical production state — 2026-09-18
 
 The old production image/Compose and GitHub Actions entrypoints are removed. The first
