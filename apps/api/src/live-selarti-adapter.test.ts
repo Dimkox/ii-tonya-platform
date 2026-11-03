@@ -78,6 +78,22 @@ const command = {
 };
 
 describe("LiveSelartiAdapter webhook", () => {
+  it.each([
+    ["company_id", "other-company"],
+    ["task_id", "other-task"],
+  ])("rejects a signed event bound to a different %s", async (field, value) => {
+    const foreign = Buffer.from(
+      JSON.stringify({ ...JSON.parse(body.toString()), [field]: value }),
+    );
+    const adapter = new LiveSelartiAdapter(base);
+    await expect(
+      adapter.decodeVerifiedWebhook(
+        foreign,
+        headers("1800000000", sign("1800000000", foreign)),
+      ),
+    ).rejects.toThrow("binding_mismatch");
+  });
+
   it("accepts a correctly signed fresh all_messages webhook", async () => {
     const adapter = new LiveSelartiAdapter(base);
     await expect(

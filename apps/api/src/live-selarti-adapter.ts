@@ -68,6 +68,7 @@ export class LiveSelartiAdapter implements SelartiPort {
     this.decoder = new SelartiContractAdapter({
       transport: noTransport,
       maxBodyBytes: 64_000,
+      binding: { companyId: options.companyId, taskId: options.taskId },
       authenticate: (body, headers) =>
         verify({
           body,

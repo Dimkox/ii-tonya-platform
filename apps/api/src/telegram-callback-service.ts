@@ -70,7 +70,10 @@ export function createTelegramCallbackService(
       if (parsed === undefined) return false;
       if (!(await store.isActiveExpertTelegramUser(parsed.fromId)))
         return false;
-      return !(await store.isProcessed(callbackReplayKey(parsed.id)));
+      // Authentication only. A redelivered callback is a duplicate, not a
+      // forgery: the route's update_id inbox dedups it, and process() is a
+      // first-writer-wins no-op for an already-recorded callback id.
+      return true;
     },
     async process(update: Readonly<Record<string, unknown>>) {
       const parsed = parseTelegramCallback(update);

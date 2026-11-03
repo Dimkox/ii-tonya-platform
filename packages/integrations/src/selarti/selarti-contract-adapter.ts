@@ -62,6 +62,8 @@ export interface SelartiContractAdapterDeps {
   ): WebhookVerification;
   maxBodyBytes: number;
   rateLimitResponsePolicy?: "confirmed_not_applied";
+  /** When set, signed events for any other company/task are rejected. */
+  binding?: { readonly companyId: string; readonly taskId: string };
 }
 
 const retryAfterMilliseconds = (
@@ -130,6 +132,15 @@ export class SelartiContractAdapter implements SelartiPort {
     const message = allMessagesSchema.safeParse(parsed);
     if (!message.success) {
       throw new Error("invalid_schema");
+    }
+
+    const binding = this.deps.binding;
+    if (
+      binding !== undefined &&
+      (message.data.company_id !== binding.companyId ||
+        message.data.task_id !== binding.taskId)
+    ) {
+      throw new Error("binding_mismatch");
     }
 
     return {

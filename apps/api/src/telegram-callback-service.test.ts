@@ -57,14 +57,15 @@ describe("Telegram callback service", () => {
     await expect(s.isAuthorizedIdentity("01")).resolves.toBe(false);
   });
 
-  it("rejects replayed callback ids after processing", async () => {
+  it("acknowledges a redelivered callback as an idempotent duplicate", async () => {
     const store = memoryStore(["1001"]);
     const s = createTelegramCallbackService(store);
     await expect(s.verifyCallback(update(), "c")).resolves.toBe(true);
     await s.process(update(), "c");
     expect(store.seen.has(callbackReplayKey("cbq-1"))).toBe(true);
-    await expect(s.verifyCallback(update(), "c")).resolves.toBe(false);
+    await expect(s.verifyCallback(update(), "c")).resolves.toBe(true);
     await expect(s.process(update(), "c")).resolves.toBeUndefined();
+    expect(store.seen.size).toBe(1);
   });
 
   it("rejects callbacks from a different, unknown sender", async () => {
