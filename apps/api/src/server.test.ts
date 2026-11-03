@@ -424,6 +424,8 @@ describe("server composition", () => {
         return {
           config,
           conversationService: disabled as never,
+          bookingService: disabled as never,
+          catalogService: disabled as never,
           privacyService: disabled as never,
           adminService: disabled as never,
           selarti: disabled as never,
@@ -858,6 +860,8 @@ describe("server composition", () => {
         return {
           config,
           conversationService: disabled as never,
+          bookingService: disabled as never,
+          catalogService: disabled as never,
           privacyService: disabled as never,
           adminService: disabled as never,
           selarti: disabled as never,
