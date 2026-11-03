@@ -7,7 +7,7 @@ const read = (path: string) =>
   existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
 
 describe("database-derived migration state baseline", () => {
-  it.each([81, 82, 83, 84, 85])(
+  it.each([81, 82, 83, 84, 85, 86])(
     "records protected private schemas and PUBLIC execution at state %i",
     (last) => {
       const tag = String(last).padStart(4, "0");
@@ -23,7 +23,7 @@ describe("database-derived migration state baseline", () => {
         supplement.functionPrivileges.filter(
           (entry: { schema: string }) => entry.schema === "early_bird_private",
         ),
-      ).toHaveLength(last >= 84 ? 55 : 7);
+      ).toHaveLength(last >= 86 ? 57 : last >= 84 ? 55 : 7);
       expect(
         supplement.functionPrivileges
           .filter(
@@ -101,6 +101,75 @@ describe("database-derived migration state baseline", () => {
       "resident_service_version_source",
     ]);
   });
+  it("pins the additive private terminal projection at0086 to its0085 predecessor", () => {
+    const previousSnapshot = read(`${folder}/meta/0085_snapshot.json`);
+    const snapshot = read(`${folder}/meta/0086_snapshot.json`);
+    expect(snapshot.id).not.toBe(previousSnapshot.id);
+    expect(snapshot).toEqual({
+      ...previousSnapshot,
+      id: snapshot.id,
+      prevId: previousSnapshot.id,
+    });
+    expect(
+      read(`${folder}/state/0086_manifest.json`).migrations.slice(0, 86),
+    ).toEqual(read(`${folder}/state/0085_manifest.json`).migrations);
+    const previous = read(`${folder}/state/0085_sql_objects.json`);
+    const state = read(`${folder}/state/0086_sql_objects.json`);
+    expect({
+      ...state,
+      functions: previous.functions,
+      functionPrivileges: previous.functionPrivileges,
+      triggers: previous.triggers,
+    }).toEqual(previous);
+    const addedNames = [
+      "public_sync_sales_terminal",
+      "public_sync_sales_terminal_trigger",
+    ];
+    const isAdded = (entry: { name: string }) =>
+      addedNames.includes(entry.name);
+    expect(
+      state.functions.filter((entry: { name: string }) => !isAdded(entry)),
+    ).toEqual(previous.functions);
+    expect(
+      state.functions
+        .filter(isAdded)
+        .map((entry: { name: string; arguments: string }) => ({
+          name: entry.name,
+          arguments: entry.arguments,
+        })),
+    ).toEqual([
+      { name: "public_sync_sales_terminal", arguments: "target_request uuid" },
+      { name: "public_sync_sales_terminal_trigger", arguments: "" },
+    ]);
+    expect(
+      state.functionPrivileges.filter(
+        (entry: { name: string }) => !isAdded(entry),
+      ),
+    ).toEqual(previous.functionPrivileges);
+    expect(state.functionPrivileges.filter(isAdded)).toEqual(
+      addedNames.map((name, index) => ({
+        schema: "early_bird_private",
+        name,
+        arguments: index === 0 ? "target_request uuid" : "",
+        security_definer: true,
+        public_execute: false,
+      })),
+    );
+    const addedTrigger = (entry: { name: string }) =>
+      entry.name === "public_sales_terminal_projection";
+    expect(
+      state.triggers.filter((entry: { name: string }) => !addedTrigger(entry)),
+    ).toEqual(previous.triggers);
+    expect(state.triggers.filter(addedTrigger)).toEqual([
+      expect.objectContaining({
+        table_name: "public_expert_payment_resolutions",
+        name: "public_sales_terminal_projection",
+        enabled: "O",
+      }),
+    ]);
+    expect(state.functions).toHaveLength(327);
+    expect(state.triggers).toHaveLength(294);
+  });
   it("preserves composite FK position, index opclasses and unvalidated constraints", () => {
     const snapshot = read(`${folder}/meta/0039_snapshot.json`);
     expect(
@@ -160,7 +229,7 @@ describe("database-derived migration state baseline", () => {
 
   it.each([
     39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 70, 71, 72, 73, 74, 75,
-    76, 77, 78, 79, 80, 81, 82, 83, 84, 85,
+    76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86,
   ])(
     "binds state %i evidence to every SQL input and exact snapshot bytes",
     (last) => {

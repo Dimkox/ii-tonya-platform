@@ -237,8 +237,10 @@ it.each(["legacy_residency_v1", "expert_residency_v2"] as const)(
     ).rows;
     const a = await order(expert.expertId, tariffId),
       b = await order(expert.expertId, tariffId);
-    const boundary = gate((text) =>
-      text.startsWith("select max(residency_ends_at)"),
+    const boundary = gate(
+      (text) =>
+        text ===
+        "select greatest( (select max(residency_ends_at) from expert_residency_orders where expert_id=$1::uuid and status='settled'), early_bird_active_coverage_end($2::uuid) ) as \"endAt\"",
     );
     const pending = new PostgresExpertResidencyProviderInboxRepository(
       boundary.db,
@@ -298,8 +300,10 @@ it("does not introduce a global authority lock for different experts", async () 
   const tariffId = await tariff("legacy_residency_v1");
   const oa = await order(a.expertId, tariffId),
     ob = await order(b.expertId, tariffId);
-  const boundary = gate((text) =>
-    text.startsWith("select max(residency_ends_at)"),
+  const boundary = gate(
+    (text) =>
+      text ===
+      "select greatest( (select max(residency_ends_at) from expert_residency_orders where expert_id=$1::uuid and status='settled'), early_bird_active_coverage_end($2::uuid) ) as \"endAt\"",
   );
   const pending = new PostgresExpertResidencyProviderInboxRepository(
     boundary.db,

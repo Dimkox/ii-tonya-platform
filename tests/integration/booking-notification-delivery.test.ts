@@ -6,6 +6,7 @@ import {
   type TestDatabase,
 } from "../../packages/db/src/testkit/postgres.js";
 import { resolveBookingNotificationRecipient } from "../../packages/db/src/repositories/booking-notification-authority.js";
+import { observeBookingNotificationSlot } from "../support/booking-notification-clock.js";
 
 let database: TestDatabase;
 beforeAll(async () => {
@@ -99,11 +100,9 @@ async function fixture(
   origin?: { botKey: string; client: string; expert: string },
 ) {
   const f = await database.createReservableFixture();
-  f.command.now = new Date();
   await database.db.execute(
     sql`update slots set starts_at=clock_timestamp()+interval '2 days',ends_at=clock_timestamp()+interval '2 days 1 hour',observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
   );
-  f.command.now = new Date();
   const botKey = origin?.botKey ?? randomUUID();
   await database.db.execute(
     sql`insert into booking_notification_bot_controls(bot_key,admission_enabled) values(${botKey},true) on conflict(bot_key) do nothing`,
@@ -131,6 +130,10 @@ async function fixture(
       messagingPolicyVersion: "client-messaging-v1",
     },
   });
+  f.command.now = await observeBookingNotificationSlot(
+    database.db,
+    f.command.slotId,
+  );
   const result = await bookings.reserve(f.command);
   if (result.kind === "unavailable") throw new Error("fixture_not_reserved");
   const ledger = new PostgresBookingNotificationRepository(database.db, botKey);
@@ -405,15 +408,16 @@ async function provider(f: Awaited<ReturnType<typeof fixture>>) {
   await database.db.execute(
     sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) select expert_service_id,${accountId},1,60,'UTC',true,clock_timestamp() from reservations where id=${f.reservationId}::uuid`,
   );
-  await database.db.execute(
-    sql`update slots set observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
+  const now = await observeBookingNotificationSlot(
+    database.db,
+    f.command.slotId,
   );
   await f.bookings.transition({
     reservationId: f.reservationId,
     expectedVersion: 1,
     action: "expert_confirm",
     actor: { type: "expert", id: f.expertId },
-    now: new Date(),
+    now,
     correlationId: randomUUID(),
   });
   const repo = new PostgresPlanerkaBookingRepository(database.db);
@@ -533,7 +537,10 @@ it("a producer failure rolls the reservation, context, source and intent back to
   await database.db.execute(
     sql`update slots set starts_at=clock_timestamp()+interval '2 days',ends_at=clock_timestamp()+interval '2 days 1 hour',observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
   );
-  f.command.now = new Date();
+  f.command.now = await observeBookingNotificationSlot(
+    database.db,
+    f.command.slotId,
+  );
   await database.db.execute(
     sql`create function notification_test_rollback() returns trigger language plpgsql as $$ begin raise exception 'synthetic_intent_failure'; end $$; create trigger notification_test_rollback before insert on booking_notification_deliveries for each row execute function notification_test_rollback()`,
   );

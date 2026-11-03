@@ -74,6 +74,8 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0082_early_bird_worker_capabilities.sql",
       "packages/db/migrations/0083_early_bird_launch_publication.sql",
       "packages/db/migrations/0084_public_expert_payment_gateway.sql",
+      "packages/db/migrations/0085_resident_native_uuid_sources.sql",
+      "packages/db/migrations/0086_public_onboarding_terminal_projection.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/0076_snapshot.json",
@@ -85,6 +87,8 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/meta/0082_snapshot.json",
       "packages/db/migrations/meta/0083_snapshot.json",
       "packages/db/migrations/meta/0084_snapshot.json",
+      "packages/db/migrations/meta/0085_snapshot.json",
+      "packages/db/migrations/meta/0086_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
       "packages/db/migrations/state/0076_manifest.json",
       "packages/db/migrations/state/0076_sql_objects.json",
@@ -104,6 +108,10 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/state/0083_sql_objects.json",
       "packages/db/migrations/state/0084_manifest.json",
       "packages/db/migrations/state/0084_sql_objects.json",
+      "packages/db/migrations/state/0085_manifest.json",
+      "packages/db/migrations/state/0085_sql_objects.json",
+      "packages/db/migrations/state/0086_manifest.json",
+      "packages/db/migrations/state/0086_sql_objects.json",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_RELATIONS].sort()).toEqual([
       "booking_handoff_revocation_receipts",

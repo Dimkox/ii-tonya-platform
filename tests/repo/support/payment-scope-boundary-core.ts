@@ -126,6 +126,11 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0086_public_onboarding_terminal_projection.sql",
+  "packages/db/migrations/meta/0086_snapshot.json",
+  "packages/db/migrations/state/0086_manifest.json",
+  "packages/db/migrations/state/0086_sql_objects.json",
+
   "packages/db/migrations/0085_resident_native_uuid_sources.sql",
   "packages/db/migrations/meta/0085_snapshot.json",
   "packages/db/migrations/state/0085_manifest.json",
@@ -779,8 +784,16 @@ const reviewedDomHarnessHashes = new Map([
 
 const approvedAutomationArtifactHashes = new Map([
   [
+    "tests/integration/public-held-terminal-refresh.test.ts",
+    "312852b997be5714c02a1c547ce325c6b80364c8ca099d857a32f8724334fdfd",
+  ],
+  [
+    "tests/integration/public-onboarding-terminal-migration-state.test.ts",
+    "eccc7b2cfd08c3937124e4440a043f7d8f6e753e26047e54d8528c5f2e0058df",
+  ],
+  [
     "tests/integration/resident-native-uuid-migration-state.test.ts",
-    "d41061fc847629859d2fa17a8dd270dcd8184ff0ce4556a69c28e12634315e5d",
+    "038766ffed54e075391c5c4c3d6dd91e6ab25a7cf662043b8b036e685c00fecc",
   ],
   [
     "packages/db/src/repositories/resident-native-uuid-sources.integration.test.ts",
@@ -1473,6 +1486,23 @@ const approvedDependencySpecifiers = new Map([
   ["zod", "^4.6.6"],
 ]);
 const approvedMigrationHashes = new Map([
+  [
+    "packages/db/migrations/0086_public_onboarding_terminal_projection.sql",
+    "be00ebe1372815312ea8959b63bbe3b7914551bc45ca2224fc65e8acf529dadd",
+  ],
+  [
+    "packages/db/migrations/meta/0086_snapshot.json",
+    "bf446234aeb4cb841ba34a21869e68348d8c15b42d961d790af7ac3e4c6bc3ce",
+  ],
+  [
+    "packages/db/migrations/state/0086_manifest.json",
+    "cbe3366f9c83d7bd98e51c52f89adbe5c2c326241d7b5075dbef37e5828ee74e",
+  ],
+  [
+    "packages/db/migrations/state/0086_sql_objects.json",
+    "22d77212c9ceb23dd06d50bf3a1e6554ec0a7380cb33a4014fe8959dc6014e0d",
+  ],
+
   [
     "packages/db/migrations/0085_resident_native_uuid_sources.sql",
     "5b45f11ac06f88f603d1b300ebc746a051ef5a1f265a112fe0d27951a893cd27",
@@ -2455,7 +2485,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "b0d18cfa79d43f40aad82d9a4327e09770dea4074105b8ec36bf293384c588fb",
+    "1de3d9017898fc2587f4ef2198e10d1125eb0643ebf57f70345056cc1047d67a",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -2535,7 +2565,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "b0d18cfa79d43f40aad82d9a4327e09770dea4074105b8ec36bf293384c588fb",
+    "1de3d9017898fc2587f4ef2198e10d1125eb0643ebf57f70345056cc1047d67a",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -2738,6 +2768,8 @@ const isVersionedGetzillaToolingPath = (path: string): boolean =>
 
 // Exact reviewed deployment and CI discovery inventory.
 const reviewedGatewayProvisionArtifacts = new Set([
+  "tests/integration/public-held-terminal-refresh.test.ts",
+  "tests/integration/public-onboarding-terminal-migration-state.test.ts",
   "tests/integration/resident-native-uuid-migration-state.test.ts",
   "packages/db/src/repositories/resident-native-uuid-sources.integration.test.ts",
 
@@ -3716,6 +3748,9 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0086_snapshot.json", 1192800],
+    ["packages/db/migrations/state/0086_sql_objects.json", 1882568],
+
     ["packages/db/migrations/meta/0085_snapshot.json", 1192800],
     ["packages/db/migrations/state/0085_sql_objects.json", 1876151],
 
