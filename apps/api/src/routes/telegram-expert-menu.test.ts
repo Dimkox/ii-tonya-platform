@@ -32,7 +32,9 @@ const build = async (active: boolean) => {
     kind: "processed" as const,
     deliveryOutcome: "applied" as const,
   }));
-  const sendInactiveResident = vi.fn(async () => ({ kind: "applied" }));
+  const sendInactiveResident = vi.fn(async (): Promise<{ kind: string }> => ({
+    kind: "applied",
+  }));
   const processReschedule = vi.fn<
     NonNullable<TelegramExpertQueryIngress["processReschedule"]>
   >(async (input) =>
@@ -82,6 +84,7 @@ const build = async (active: boolean) => {
     app,
     claim,
     complete,
+    fail,
     resolvePrincipal,
     processCommand,
     processMenuAction,
@@ -136,6 +139,24 @@ describe("BOT-03 expert /start and main menu", () => {
         telegramUserId: "123456789",
       });
       expect(state.processCommand).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("keeps /start retryable when the inactive-resident refusal is not delivered", async () => {
+    const state = await build(false);
+    state.sendInactiveResident.mockResolvedValueOnce({ kind: "not_applied" });
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: start,
+      });
+      expect(response.statusCode).toBe(503);
+      expect(state.complete).not.toHaveBeenCalled();
+      expect(state.fail).toHaveBeenCalled();
     } finally {
       await state.app.close();
     }

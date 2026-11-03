@@ -1117,10 +1117,19 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
               if (claim.kind !== "claimed")
                 return { accepted: true, duplicate: true };
               try {
-                await sendInactiveResident.call(deps.expertQueries, {
-                  idempotencyKey: `telegram:${updateId}:inactive`,
-                  telegramUserId,
-                });
+                const sent = (await sendInactiveResident.call(
+                  deps.expertQueries,
+                  {
+                    idempotencyKey: `telegram:${updateId}:inactive`,
+                    telegramUserId,
+                  },
+                )) as { readonly kind?: unknown } | undefined;
+                if (
+                  typeof sent === "object" &&
+                  sent !== null &&
+                  sent.kind === "not_applied"
+                )
+                  throw new Error("inactive_resident_not_applied");
                 await deps.inbox.complete(claim.claimId);
               } catch {
                 await deps.inbox.fail(claim.claimId);
