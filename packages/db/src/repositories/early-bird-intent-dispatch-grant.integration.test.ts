@@ -20,7 +20,7 @@ beforeAll(async () => {
   });
   configId = cfg;
   await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
+    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
   );
 }, 120_000);
 afterAll(async () => {
