@@ -219,6 +219,94 @@ describe("release assets", () => {
     ).not.toBe(0);
   });
 
+  it("allows integration flags only when their required keys are present", () => {
+    const fixture = mkdtempSync(join(tmpdir(), "ii-tonya-runtime-env-flags-"));
+    const runtimeFile = join(fixture, "runtime.env");
+    const sha = "a".repeat(40);
+    const base: Record<string, string> = {
+      NODE_ENV: "production",
+      DATABASE_URL: "postgresql://u:p@db/app?sslmode=verify-full",
+      ALLOW_INSECURE_LOCAL_DATABASE: "false",
+      MIGRATION_COMPATIBILITY_APPROVED_SHA: sha,
+      SELARTI_OUTBOUND_BILLING_MODE: "disabled",
+      PAYMENT_PROVIDER: "disabled",
+      LLM_PROVIDER: "disabled",
+    };
+    for (const flag of [
+      "MINOR_ONBOARDING_ENABLED",
+      "SELARTI_ENABLED",
+      "PLANERKA_ENABLED",
+      "TELEGRAM_ENABLED",
+      "PAYMENTS_ENABLED",
+      "LLM_ENABLED",
+      "INTENT_MODEL_ENABLED",
+      "MAKE_PROJECTION_ENABLED",
+      "GOOGLE_SHEETS_PROJECTION_ENABLED",
+      "EXPERT_REFERRAL_ENABLED",
+      "EXPERT_RESIDENCY_BILLING_ENABLED",
+      "EXPERT_TELEGRAM_QUERIES_ENABLED",
+      "RAW_CONVERSATION_LOGGING",
+    ]) {
+      base[flag] = "false";
+    }
+    const validate = (overrides: Record<string, string>) => {
+      const env = { ...base, ...overrides };
+      writeFileSync(
+        runtimeFile,
+        `${Object.entries(env)
+          .map(([k, v]) => `${k}=${v}`)
+          .join("\n")}\n`,
+      );
+      return spawnSync(
+        "bash",
+        ["scripts/validate-runtime-env.sh", runtimeFile, sha],
+        { encoding: "utf8" },
+      );
+    };
+    expect(validate({}).status).toBe(0);
+    expect(validate({ TELEGRAM_ENABLED: "true" }).stderr).toContain(
+      "TELEGRAM_ENABLED=true requires TELEGRAM_BOT_TOKEN",
+    );
+    expect(
+      validate({
+        TELEGRAM_ENABLED: "true",
+        TELEGRAM_BOT_TOKEN: "1:x",
+        TELEGRAM_WEBHOOK_SECRET: "s",
+      }).status,
+    ).toBe(0);
+    expect(
+      validate({ SELARTI_ENABLED: "true", SELARTI_API_KEY: "k" }).status,
+    ).not.toBe(0);
+    expect(validate({ PLANERKA_ENABLED: "true" }).status).not.toBe(0);
+    expect(validate({ SELARTI_ENABLED: "maybe" }).status).not.toBe(0);
+    expect(
+      validate({ PLANERKA_AVAILABILITY_ENABLED: "true" }).stderr,
+    ).toContain("requires PLANERKA_RECOVERY_ENABLED=true");
+    expect(validate({ PLANERKA_RECOVERY_ENABLED: "true" }).status).not.toBe(0);
+    expect(
+      validate({
+        PLANERKA_RECOVERY_ENABLED: "true",
+        PLANERKA_AVAILABILITY_ENABLED: "true",
+        PLANERKA_CREATE_ENABLED: "true",
+        PLANERKA_API_KEY: "k",
+        PLANERKA_ACCOUNT_ID: "1",
+      }).status,
+    ).toBe(0);
+    expect(
+      validate({
+        EXPERT_RESIDENCY_BILLING_ENABLED: "true",
+        EXPERT_TELEGRAM_BOT_TOKEN: "1:x",
+      }).stderr,
+    ).toContain("requires PAYMENTS_ENABLED=true");
+    expect(
+      validate({
+        PAYMENTS_ENABLED: "true",
+        PAYMENT_PROVIDER: "yookassa",
+        YOOKASSA_SHOP_ID: "1",
+      }).stderr,
+    ).toContain("PAYMENTS_ENABLED must be false");
+  });
+
   it("rejects NODE_OPTIONS from the runtime environment", () => {
     const fixture = mkdtempSync(join(tmpdir(), "ii-tonya-runtime-env-node-"));
     const runtimeFile = join(fixture, "runtime.env");

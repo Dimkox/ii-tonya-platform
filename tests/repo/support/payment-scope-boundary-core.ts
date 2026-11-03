@@ -1287,7 +1287,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/validate-runtime-env.sh",
-    "54bd8f94a80fd551d424266b9b64c4195f1e390bd36e31477c24c1387c10ae25",
+    "8e368ee045998de5b22719657aee983f40357bd52d2fc18d013b8516d8b26aaf",
   ],
   // Local pre-push gate remains an additional check before the hosted gates run.
   [
