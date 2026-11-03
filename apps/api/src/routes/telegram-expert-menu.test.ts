@@ -33,6 +33,13 @@ const build = async (active: boolean) => {
     deliveryOutcome: "applied" as const,
   }));
   const sendInactiveResident = vi.fn(async () => ({ kind: "applied" }));
+  const processReschedule = vi.fn<
+    NonNullable<TelegramExpertQueryIngress["processReschedule"]>
+  >(async (input) =>
+    input.data.startsWith("rs2.") && input.data.endsWith("A")
+      ? { kind: "forbidden" }
+      : { kind: "processed", deliveryOutcome: "applied" },
+  );
   const answerCallbackQuery = vi.fn(async () => ({
     kind: "applied" as const,
     providerOperationId: "answer-1",
@@ -62,6 +69,7 @@ const build = async (active: boolean) => {
         throw new Error("unused");
       }),
       processMenuAction,
+      processReschedule,
       sendInactiveResident,
     } as TelegramExpertQueryIngress,
     expertAiEnabled: false,
@@ -77,6 +85,7 @@ const build = async (active: boolean) => {
     resolvePrincipal,
     processCommand,
     processMenuAction,
+    processReschedule,
     sendInactiveResident,
     answerCallbackQuery,
   };
@@ -187,4 +196,64 @@ describe("BOT-03 expert /start and main menu", () => {
       }
     },
   );
+});
+
+describe("SCRUM-64 🔄 reschedule callbacks", () => {
+  const callback = (data: string, updateId: number) => ({
+    update_id: updateId,
+    callback_query: { id: `rs-${updateId}`, from: { id: 123456789 }, data },
+  });
+
+  it("routes rs1 of an active resident with the resolved principal", async () => {
+    const state = await build(true);
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: callback(`rs1.${"B".repeat(22)}`, 60),
+      });
+      expect(response.statusCode).toBe(200);
+      expect(state.processReschedule).toHaveBeenCalledWith(
+        expect.objectContaining({ data: `rs1.${"B".repeat(22)}`, principal }),
+      );
+      expect(state.complete).toHaveBeenCalledWith("claim-1");
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("does not touch bookings for an inactive resident", async () => {
+    const state = await build(false);
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: callback(`rs2.${"B".repeat(44)}`, 61),
+      });
+      expect(response.statusCode).toBe(200);
+      expect(state.processReschedule).not.toHaveBeenCalled();
+    } finally {
+      await state.app.close();
+    }
+  });
+
+  it("answers 403 when the booking belongs to another expert", async () => {
+    const state = await build(true);
+    try {
+      const response = await state.app.inject({
+        method: "POST",
+        url: "/v1/webhooks/telegram",
+        headers,
+        payload: callback(`rs2.${"B".repeat(43)}A`, 62),
+      });
+      expect(response.statusCode).toBe(403);
+      expect(state.answerCallbackQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "unavailable" }),
+      );
+    } finally {
+      await state.app.close();
+    }
+  });
 });

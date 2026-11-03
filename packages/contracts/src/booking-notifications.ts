@@ -101,7 +101,15 @@ export type BookingCalendarCancellation = z.infer<
 // Shape/size only: issuance/authentication remains in the existing callback service.
 const callbackToken = z.string().regex(/^ct2\.[A-Za-z0-9_-]{44}$/u);
 const callbacks = z
-  .strictObject({ confirm: callbackToken, cancel: callbackToken })
+  .strictObject({
+    confirm: callbackToken,
+    cancel: callbackToken,
+    // SCRUM-64: 🔄 перенос; не токен-разрешение, сервер проверяет эксперта.
+    reschedule: z
+      .string()
+      .regex(/^rs1\.[A-Za-z0-9_-]{22}$/u)
+      .optional(),
+  })
   .refine((value) => value.confirm !== value.cancel);
 
 /** Server-authored projection AFTER DB authority/state validation. Not a send grant.
@@ -189,11 +197,24 @@ export type BookingNotificationRenderResult =
       recipient: "client" | "expert";
       text: string;
       replyMarkup: null | Readonly<{
-        inline_keyboard: readonly [
-          readonly [
-            Readonly<{ text: "Подтвердить"; callback_data: string }>,
-            Readonly<{ text: "Отказать"; callback_data: string }>,
-          ],
-        ];
+        inline_keyboard:
+          | readonly [
+              readonly [
+                Readonly<{ text: "Подтвердить"; callback_data: string }>,
+                Readonly<{ text: "Отказать"; callback_data: string }>,
+              ],
+            ]
+          | readonly [
+              readonly [
+                Readonly<{ text: "Подтвердить"; callback_data: string }>,
+                Readonly<{ text: "Отказать"; callback_data: string }>,
+              ],
+              readonly [
+                Readonly<{ text: "🔄 Перенести"; callback_data: string }>,
+              ],
+            ];
       }>;
     }>;
+
+// SCRUM-64: codec кнопки 🔄; реэкспорт здесь, т.к. index.ts закреплён хешем scope-boundary.
+export * from "./expert-reschedule-callback.js";

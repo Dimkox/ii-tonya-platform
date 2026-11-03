@@ -222,6 +222,21 @@ export interface ExpertTelegramQueryViewPort {
     idempotencyKey: string;
     telegramUserId: string;
   }): Promise<TelegramSendOutcome>;
+  /** SCRUM-64 🔄: выбор нового слота для переноса брони. */
+  sendRescheduleChoices?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    timezone: string;
+    choices: readonly { startsAt: string; callbackData: string }[];
+  }): Promise<TelegramSendOutcome>;
+  /** SCRUM-64 🔄: итог переноса. */
+  sendRescheduleResult?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    timezone: string;
+    outcome: "rescheduled" | "unavailable";
+    reservedUntil?: string;
+  }): Promise<TelegramSendOutcome>;
   /** BOT-03.1: отказ неактивному резиденту со ссылкой на промобот. */
   sendInactiveResident?(view: {
     idempotencyKey: string;
@@ -862,6 +877,59 @@ export class TelegramAdapter
     telegramUserId: string;
   }): Promise<TelegramSendOutcome> {
     return this.sendText({ ...view, text: EXPERT_MENU_STUB_TEXT });
+  }
+
+  async sendRescheduleChoices(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    timezone: string;
+    choices: readonly { startsAt: string; callbackData: string }[];
+  }): Promise<TelegramSendOutcome> {
+    if (view.choices.length === 0) {
+      return this.sendText({
+        idempotencyKey: view.idempotencyKey,
+        telegramUserId: view.telegramUserId,
+        text: "Нет свободных слотов для переноса.",
+      });
+    }
+    if (
+      view.choices.length > 10 ||
+      view.choices.some(
+        (choice) => !/^rs2\.[A-Za-z0-9_-]{44}$/u.test(choice.callbackData),
+      )
+    )
+      throw new Error("invalid_expert_view");
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: "Выберите новое время. Старая бронь будет отменена, клиенту придёт новая заявка на 72 ч.",
+      replyMarkup: {
+        inline_keyboard: view.choices.map((choice) => [
+          {
+            text: `🔄 ${formatInstant(choice.startsAt, view.timezone, true)}`,
+            callback_data: choice.callbackData,
+          },
+        ]),
+      },
+    });
+  }
+
+  async sendRescheduleResult(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    timezone: string;
+    outcome: "rescheduled" | "unavailable";
+    reservedUntil?: string;
+  }): Promise<TelegramSendOutcome> {
+    const text =
+      view.outcome === "rescheduled" && view.reservedUntil !== undefined
+        ? `Бронь перенесена. Новая заявка ждёт подтверждения до ${formatInstant(view.reservedUntil, view.timezone, true)}.`
+        : "Перенос недоступен.";
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text,
+    });
   }
 
   async sendInactiveResident(view: {

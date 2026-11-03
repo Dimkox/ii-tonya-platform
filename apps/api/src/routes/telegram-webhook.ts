@@ -140,6 +140,22 @@ export interface TelegramExpertQueryIngress {
     readonly kind: "processed" | "unsupported" | "disabled" | "unavailable";
     readonly deliveryOutcome?: "applied" | "unknown_outcome";
   }>;
+  /** SCRUM-64 🔄: rs1./rs2. перенос брони экспертом. */
+  processReschedule?(input: {
+    readonly data: string;
+    readonly principal: {
+      readonly userId: string;
+      readonly expertId: string;
+      readonly telegramUserId: string;
+      readonly timezone: string;
+    };
+    readonly idempotencyKey: string;
+    readonly correlationId: string;
+  }): Promise<{
+    readonly kind:
+      "processed" | "forbidden" | "unsupported" | "disabled" | "unavailable";
+    readonly deliveryOutcome?: "applied" | "unknown_outcome";
+  }>;
   sendInactiveResident?(input: {
     readonly idempotencyKey: string;
     readonly telegramUserId: string;
@@ -901,6 +917,70 @@ export const telegramWebhookRoutes: FastifyPluginAsync<{
                 .send({ error: "expert_query_unavailable" });
             }
             await deps.inbox.complete(claim.claimId);
+            await answerBestEffort("processed");
+            return { accepted: true };
+          } catch {
+            await deps.inbox.fail(claim.claimId);
+            await answerBestEffort("unavailable");
+            return reply.code(500).send({ error: "expert_query_unavailable" });
+          }
+        }
+        if (/^rs[12]\.[A-Za-z0-9_-]{22,44}$/u.test(data)) {
+          const processReschedule = deps.expertQueries?.processReschedule;
+          if (
+            deps.expertQueriesEnabled !== true ||
+            deps.expertQueries === undefined ||
+            processReschedule === undefined
+          ) {
+            return { accepted: true, unsupported: true };
+          }
+          const updateId = String(body.update_id);
+          const answerBestEffort = async (
+            status: "processed" | "unavailable",
+          ): Promise<void> => {
+            try {
+              await deps.expertQueries?.answerCallbackQuery({
+                callbackQueryId,
+                status,
+                idempotencyKey: `telegram:${updateId}:reschedule:answer`,
+              });
+            } catch {
+              // Acknowledgement is separate from the reschedule.
+            }
+          };
+          const claim = await deps.inbox.claim("telegram", updateId);
+          if (claim.kind !== "claimed") {
+            await answerBestEffort("unavailable");
+            return { accepted: true, duplicate: true };
+          }
+          try {
+            // Только активный резидент; принадлежность брони проверяет транзакция.
+            const principal = await deps.expertQueries.resolvePrincipal(
+              String(id),
+            );
+            if (principal === null) {
+              await deps.inbox.complete(claim.claimId);
+              await answerBestEffort("unavailable");
+              return { accepted: true, unavailable: true };
+            }
+            const result = await processReschedule.call(deps.expertQueries, {
+              data,
+              principal,
+              idempotencyKey: `telegram:${updateId}:reschedule`,
+              correlationId,
+            });
+            if (result.deliveryOutcome === "unknown_outcome") {
+              await deps.inbox.fail(claim.claimId);
+              await answerBestEffort("unavailable");
+              return reply
+                .code(503)
+                .send({ error: "expert_query_unavailable" });
+            }
+            await deps.inbox.complete(claim.claimId);
+            if (result.kind === "forbidden") {
+              await answerBestEffort("unavailable");
+              return reply.code(403).send({ error: "invalid_callback" });
+            }
             await answerBestEffort("processed");
             return { accepted: true };
           } catch {

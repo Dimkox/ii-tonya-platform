@@ -8,6 +8,15 @@ const button = z.strictObject({
     .refine((s) => s.isWellFormed()),
   callback_data: z.string().regex(/^ct2\.[A-Za-z0-9_-]{44}$/u),
 });
+// SCRUM-64: необязательная вторая строка с кнопкой 🔄 (rs1.*, проверяется сервером).
+const rescheduleButton = z.strictObject({
+  text: z
+    .string()
+    .min(1)
+    .max(64)
+    .refine((s) => s.isWellFormed()),
+  callback_data: z.string().regex(/^rs1\.[A-Za-z0-9_-]{22}$/u),
+});
 const wire = z.strictObject({
   chatId: z
     .string()
@@ -19,7 +28,12 @@ const wire = z.strictObject({
     .max(4096)
     .refine((s) => s.isWellFormed()),
   replyMarkup: z
-    .strictObject({ inline_keyboard: z.tuple([z.tuple([button, button])]) })
+    .strictObject({
+      inline_keyboard: z.union([
+        z.tuple([z.tuple([button, button])]),
+        z.tuple([z.tuple([button, button]), z.tuple([rescheduleButton])]),
+      ]),
+    })
     .nullish(),
 });
 

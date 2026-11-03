@@ -1369,6 +1369,176 @@ export class PostgresBookingRepository {
     });
   }
 
+  /**
+   * SCRUM-64 🔄: свободные будущие слоты той же услуги для переноса брони.
+   * Пусто, если бронь не принадлежит эксперту или не активна (чужим ничего не читаем).
+   */
+  async listExpertRescheduleSlots(command: {
+    expertId: string;
+    reservationId: string;
+    limit: number;
+  }): Promise<readonly { slotId: string; startsAt: Date }[]> {
+    if (
+      !UUID_PATTERN.test(command.expertId) ||
+      !UUID_PATTERN.test(command.reservationId) ||
+      !Number.isSafeInteger(command.limit) ||
+      command.limit < 1 ||
+      command.limit > 10
+    )
+      return [];
+    const rows = (
+      await this.db.execute<{ slotId: string; startsAt: Date | string }>(sql`
+        select s.id as "slotId", s.starts_at as "startsAt"
+        from reservations r
+        join experts e on e.id = r.expert_id and e.active and e.verified
+        join expert_services es on es.id = r.expert_service_id and es.active
+        join slots s on s.expert_service_id = es.id
+        where r.id = ${command.reservationId}::uuid
+          and r.expert_id = ${command.expertId}::uuid
+          and r.status in ('reserved', 'booked')
+          and s.id <> r.slot_id
+          and s.provider <> 'resident_native'
+          and s.starts_at > clock_timestamp() + ${MINIMUM_LEAD_MS}::bigint * interval '1 millisecond'
+          and resident_slot_fresh(s.id, clock_timestamp())
+          and (select count(*) from reservations o
+               where o.slot_id = s.id and o.status in ('reserved', 'booked')) < s.capacity
+        order by s.starts_at, s.id
+        limit ${command.limit}
+      `)
+    ).rows;
+    return rows.map((row) => ({
+      slotId: row.slotId,
+      startsAt: normalizeBookingTimestamp(row.startsAt, "slots.starts_at"),
+    }));
+  }
+
+  /**
+   * SCRUM-64 🔄: эксперт переносит бронь. В одной сериализуемой транзакции:
+   * проверка владельца ДО изменения, отмена старой (expert_cancel, освобождение
+   * слота, уведомление клиенту) и новая Reserved на 72 ч на выбранный слот.
+   * Если новую создать нельзя, откатывается всё, включая отмену.
+   */
+  async rescheduleByExpert(command: {
+    expertId: string;
+    reservationId: string;
+    targetSlotId: string;
+    idempotencyKey: string;
+    correlationId: string;
+  }): Promise<
+    | {
+        kind: "rescheduled" | "replayed";
+        reservationId: string;
+        reservedUntil: Date;
+      }
+    | { kind: "forbidden" | "conflict" }
+  > {
+    if (
+      !UUID_PATTERN.test(command.expertId) ||
+      !UUID_PATTERN.test(command.reservationId) ||
+      !UUID_PATTERN.test(command.targetSlotId) ||
+      !/^[A-Za-z0-9:._-]{1,160}$/u.test(command.idempotencyKey) ||
+      command.correlationId.length < 1
+    )
+      return { kind: "forbidden" };
+    const newKey = `expert-reschedule:${command.reservationId}:${command.targetSlotId}`;
+    class RescheduleRollback extends Error {}
+    try {
+      return await this.runSerializable(async (tx) => {
+        const owned = (
+          await tx.execute<{
+            userId: string;
+            slotId: string;
+            status: ReservationStatus;
+            version: number;
+            native: boolean;
+            providerOperation: boolean;
+          }>(sql`
+            select r.user_id as "userId", r.slot_id as "slotId", r.status, r.version,
+              exists(select 1 from resident_native_slots ns where ns.slot_id=r.slot_id) as native,
+              exists(select 1 from planerka_booking_operations o where o.reservation_id=r.id) as "providerOperation"
+            from reservations r
+            join experts e on e.id = r.expert_id and e.active and e.verified
+            where r.id = ${command.reservationId}::uuid
+              and r.expert_id = ${command.expertId}::uuid
+          `)
+        ).rows[0];
+        // Чужая или несуществующая бронь: отказ до любого изменения.
+        if (owned === undefined) return { kind: "forbidden" as const };
+        const replay = (
+          await tx.execute<{ id: string; reservedUntil: Date | string }>(sql`
+            select id, reserved_until as "reservedUntil" from reservations
+            where idempotency_key = ${newKey} and user_id = ${owned.userId}::uuid
+              and expert_id = ${command.expertId}::uuid
+          `)
+        ).rows[0];
+        if (replay !== undefined)
+          return {
+            kind: "replayed" as const,
+            reservationId: replay.id,
+            reservedUntil: normalizeBookingTimestamp(
+              replay.reservedUntil,
+              "reservations.reserved_until",
+            ),
+          };
+        if (
+          owned.native ||
+          owned.providerOperation ||
+          (owned.status !== "reserved" && owned.status !== "booked") ||
+          owned.slotId === command.targetSlotId
+        )
+          return { kind: "conflict" as const };
+        const target = (
+          await tx.execute(sql`
+            select s.id from slots s
+            join reservations r on r.id = ${command.reservationId}::uuid
+            where s.id = ${command.targetSlotId}::uuid
+              and s.expert_service_id = r.expert_service_id
+              and s.provider <> 'resident_native'
+          `)
+        ).rows[0];
+        if (target === undefined) return { kind: "conflict" as const };
+        const now = normalizeBookingTimestamp(
+          one(
+            (
+              await tx.execute<{ databaseNow: Date | string }>(
+                sql`select clock_timestamp() as "databaseNow"`,
+              )
+            ).rows,
+            "the database clock",
+          ).databaseNow,
+          "clock_timestamp",
+        );
+        await this.transitionInTransaction(tx, {
+          reservationId: command.reservationId,
+          expectedVersion: owned.version,
+          action: "expert_cancel",
+          actor: { type: "expert", id: command.expertId },
+          now,
+          correlationId: command.correlationId,
+        });
+        const reserved = await this.reserveInTransaction(tx, {
+          idempotencyKey: newKey,
+          userId: owned.userId,
+          slotId: command.targetSlotId,
+          now,
+          minimumLeadMs: MINIMUM_LEAD_MS,
+          // Срок ожидания = min(72 ч, начало слота − 24 ч), см. computeReservedUntil.
+          confirmationBufferMs: MINIMUM_LEAD_MS,
+          correlationId: command.correlationId,
+        });
+        if (reserved.kind !== "reserved") throw new RescheduleRollback();
+        return {
+          kind: "rescheduled" as const,
+          reservationId: reserved.reservationId,
+          reservedUntil: reserved.reservedUntil,
+        };
+      });
+    } catch (error) {
+      if (error instanceof RescheduleRollback) return { kind: "conflict" };
+      throw error;
+    }
+  }
+
   cancelBookingForErasure(
     command: CancelBookingForErasureCommand,
   ): Promise<ProtectedClientBookingCancelResult> {

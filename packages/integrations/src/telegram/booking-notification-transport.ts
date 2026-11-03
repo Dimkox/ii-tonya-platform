@@ -24,7 +24,22 @@ const requestSchema = z
       .refine((text) => text.isWellFormed()),
     deadline: z.string().datetime({ offset: true }),
     replyMarkup: z
-      .object({ inline_keyboard: z.tuple([z.tuple([button, button])]) })
+      .object({
+        inline_keyboard: z.union([
+          z.tuple([z.tuple([button, button])]),
+          z.tuple([
+            z.tuple([button, button]),
+            z.tuple([
+              z
+                .object({
+                  text: z.string().min(1).max(64),
+                  callback_data: z.string().regex(/^rs1\.[A-Za-z0-9_-]{22}$/u),
+                })
+                .strict(),
+            ]),
+          ]),
+        ]),
+      })
       .strict()
       .nullish(),
   })

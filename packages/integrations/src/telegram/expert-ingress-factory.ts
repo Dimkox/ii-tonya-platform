@@ -38,6 +38,7 @@ export const createExpertTelegramIngress = (
     processCommand: processor.processCommand,
     processClientView: processor.processClientView,
     processMenuAction: processor.processMenuAction,
+    processReschedule: processor.processReschedule,
     ...(deps.promoBotUrl === undefined ||
     deps.views.sendInactiveResident === undefined
       ? {}

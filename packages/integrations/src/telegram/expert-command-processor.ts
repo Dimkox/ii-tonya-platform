@@ -3,6 +3,33 @@ import type {
   ExpertTelegramViewPort,
 } from "./telegram-adapter.js";
 import type { TelegramSendOutcome } from "./telegram-adapter.js";
+import {
+  encodeExpertReschedulePick,
+  parseExpertRescheduleCallback,
+} from "@ii-tonya/contracts";
+
+/** SCRUM-64 🔄: порт переноса брони; ownership проверяется в транзакции. */
+export interface ExpertReschedulePort {
+  listSlots(command: {
+    readonly expertId: string;
+    readonly reservationId: string;
+    readonly limit: number;
+  }): Promise<readonly { readonly slotId: string; readonly startsAt: Date }[]>;
+  reschedule(command: {
+    readonly expertId: string;
+    readonly reservationId: string;
+    readonly targetSlotId: string;
+    readonly idempotencyKey: string;
+    readonly correlationId: string;
+  }): Promise<
+    | {
+        readonly kind: "rescheduled" | "replayed";
+        readonly reservationId: string;
+        readonly reservedUntil: Date;
+      }
+    | { readonly kind: "forbidden" | "conflict" }
+  >;
+}
 
 export interface ExpertTelegramCommandPrincipal {
   readonly userId: string;
@@ -160,6 +187,16 @@ export interface ExpertCommandProcessor {
     readonly kind: "processed" | "unsupported" | "disabled" | "unavailable";
     readonly deliveryOutcome?: "applied" | "unknown_outcome";
   }>;
+  processReschedule(command: {
+    readonly data: string;
+    readonly principal: ExpertTelegramCommandPrincipal;
+    readonly idempotencyKey: string;
+    readonly correlationId: string;
+  }): Promise<{
+    readonly kind:
+      "processed" | "forbidden" | "unsupported" | "disabled" | "unavailable";
+    readonly deliveryOutcome?: "applied" | "unknown_outcome";
+  }>;
   processClientView(command: {
     readonly principal: ExpertTelegramCommandPrincipal;
     readonly authenticated: Parameters<
@@ -200,6 +237,7 @@ export const createExpertCommandProcessor = (deps: {
   readonly residency?: ResidencyQueryService;
   readonly checkoutReadiness?: boolean;
   readonly checkout?: ResidencyCheckoutIssuer;
+  readonly reschedule?: ExpertReschedulePort;
 }): ExpertCommandProcessor => {
   if (
     (deps.financialViewsEnabled === true ||
@@ -470,6 +508,68 @@ export const createExpertCommandProcessor = (deps: {
           return { kind: "unsupported", deliveryOutcome };
         }
       }
+    },
+
+    async processReschedule(command) {
+      if (!deps.enabled) return { kind: "disabled" };
+      const parsed = parseExpertRescheduleCallback(command.data);
+      if (parsed === null) return { kind: "forbidden" };
+      if (
+        deps.reschedule === undefined ||
+        deps.views.sendRescheduleChoices === undefined ||
+        deps.views.sendRescheduleResult === undefined
+      )
+        return sendUnsupported(command);
+      const expertId = command.principal.expertId;
+      if (parsed.kind === "start") {
+        const slots = await unavailable(() =>
+          deps.reschedule!.listSlots({
+            expertId,
+            reservationId: parsed.reservationId,
+            limit: 5,
+          }),
+        );
+        const deliveryOutcome = ordinaryDeliveryOutcome(
+          await deps.views.sendRescheduleChoices({
+            idempotencyKey: command.idempotencyKey,
+            telegramUserId: command.principal.telegramUserId,
+            timezone: command.principal.timezone,
+            choices: slots.map((slot) => ({
+              startsAt: slot.startsAt.toISOString(),
+              callbackData: encodeExpertReschedulePick(
+                parsed.reservationId,
+                slot.slotId,
+              ),
+            })),
+          }),
+        );
+        return { kind: "processed", deliveryOutcome };
+      }
+      const result = await unavailable(() =>
+        deps.reschedule!.reschedule({
+          expertId,
+          reservationId: parsed.reservationId,
+          targetSlotId: parsed.slotId,
+          idempotencyKey: command.idempotencyKey,
+          correlationId: command.correlationId,
+        }),
+      );
+      // Чужая бронь: ничего не изменено и ничего не раскрываем.
+      if (result.kind === "forbidden") return { kind: "forbidden" };
+      const deliveryOutcome = ordinaryDeliveryOutcome(
+        await deps.views.sendRescheduleResult({
+          idempotencyKey: command.idempotencyKey,
+          telegramUserId: command.principal.telegramUserId,
+          timezone: command.principal.timezone,
+          ...("reservedUntil" in result
+            ? {
+                outcome: "rescheduled" as const,
+                reservedUntil: result.reservedUntil.toISOString(),
+              }
+            : { outcome: "unavailable" as const }),
+        }),
+      );
+      return { kind: "processed", deliveryOutcome };
     },
 
     async processClientView(command) {
