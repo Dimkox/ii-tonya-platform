@@ -29,7 +29,7 @@ beforeAll(async () => {
   });
   // A disposable DB runs the real phase logic against a deterministic launch-period clock.
   await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
+    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
   );
   await applyEarlyBirdDraftIfNeeded(
     db.db,
@@ -47,7 +47,7 @@ it.each(["discounted", "full"] as const)(
   "prepares standard %s price from an authenticated encrypted wave contact",
   async (priceKind) => {
     await db.db.execute(
-      sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
+      sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
     );
     const { seedClientConsent } = await import("../testkit/client-consent.js");
     const chat = priceKind === "full" ? "123457" : "123456";
