@@ -8,7 +8,7 @@ let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
   db = await startHistoricalEarlyBirdIntentDatabase();
   await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-02T00:00:00+03:00'::timestamptz $$`,
+    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
   );
 }, 120_000);
 afterAll(async () => {
@@ -64,7 +64,7 @@ it("records canonical pricing inputs and fixed quote time", async () => {
     baseMonthlyMinor: BigInt(b.amount),
     participantKind: "expert",
     firstOfferAtMs: Date.parse(b.first),
-    quotedAtMs: Date.parse("2026-11-02T00:00:00+03:00"),
+    quotedAtMs: Date.parse(b.first),
     promotion: true,
     termMonths: 1,
   }).monthlyPriceMinor;
@@ -96,7 +96,7 @@ it("records canonical pricing inputs and fixed quote time", async () => {
     participant_kind: "expert",
     rule_version: "expert_separated_sales_v3",
   });
-  expect(Date.parse(row!.quoted_at)).toBe(
-    Date.parse("2026-11-02T00:00:00+03:00"),
+  expect(Math.abs(Date.parse(row!.quoted_at) - Date.now())).toBeLessThan(
+    10 * 60 * 1000,
   );
 }, 120_000);

@@ -75,7 +75,7 @@
 
 Всего распознано 35 переменных окружения. Схема оканчивается `.passthrough()`, но наружу
 из `process.env` попадают только отобранные ключи. Из них **10 заперты `z.literal`** (SELARTI_ENABLED,
-SELARTI_OUTBOUND_BILLING_MODE, PLANERKA_ENABLED, TELEGRAM_ENABLED, LLM_ENABLED, MAKE_PROJECTION_ENABLED,
+SELARTI_OUTBOUND_BILLING_MODE, LLM_ENABLED, MAKE_PROJECTION_ENABLED,
 GOOGLE_SHEETS_PROJECTION_ENABLED, INTENT_MODEL_ENABLED, LLM_PROVIDER, MINOR_ONBOARDING_ENABLED), а
 `RAW_CONVERSATION_LOGGING="true"` бросает `Raw conversation logging is prohibited` уже в `loadEnv`, и в
 конфиг жёстко пишется `rawConversationLogging: false`. Остальные — `z.enum(["true","false"])` со
@@ -85,45 +85,47 @@ GOOGLE_SHEETS_PROJECTION_ENABLED, INTENT_MODEL_ENABLED, LLM_PROVIDER, MINOR_ONBO
 Проверка запертых literal есть в тестах: `tests/e2e/api-boundary.test.ts` утверждает, что установка
 такого флага в `"true"` бросает исключение.
 
-| Флаг                                   | Схема                              | По умолчанию      | Включение                  |
-| -------------------------------------- | ---------------------------------- | ----------------- | -------------------------- |
-| `DATABASE_URL`                         | `z.string()`                       | `— (обязательно)` | включается явным значением |
-| `ALLOW_INSECURE_LOCAL_DATABASE`        | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `SELARTI_ENABLED`                      | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой     |
-| `SELARTI_OUTBOUND_BILLING_MODE`        | `z.literal(`disabled`)`            | `"disabled"`      | нельзя включить схемой     |
-| `PLANERKA_ENABLED`                     | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой     |
-| `TELEGRAM_ENABLED`                     | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой     |
-| `LLM_ENABLED`                          | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой     |
-| `MAKE_PROJECTION_ENABLED`              | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой     |
-| `GOOGLE_SHEETS_PROJECTION_ENABLED`     | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой     |
-| `INTENT_MODEL_ENABLED`                 | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой     |
-| `PAYMENTS_ENABLED`                     | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `EXPERT_REFERRAL_ENABLED`              | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `EXPERT_TELEGRAM_QUERIES_ENABLED`      | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `EXPERT_AI_INGRESS_ENABLED`            | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `WORKER_OUTBOX_DELIVERY_ENABLED`       | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `CLIENT_SESSION_ENABLED`               | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `CLIENT_CATALOG_ENABLED`               | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `CLIENT_BOOKING_ENABLED`               | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `CLIENT_BOOKING_RESERVE_ENABLED`       | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `CLIENT_PRIVACY_ENABLED`               | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `CLIENT_FREE_ACCESS_V2_ENABLED`        | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `CLIENT_TELEGRAM_INGRESS_ENABLED`      | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `CLIENT_HYBRID_ROUTING_ENABLED`        | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `SELARTI_COST_ADMISSION_ENABLED`       | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `B2_TELEGRAM_DISPATCH_ENABLED`         | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `TELEGRAM_EGRESS_CONSENT_GATE_ENABLED` | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `B2_SENSITIVE_RETENTION_ENABLED`       | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `TEST_EXPERT_PROMO_ENABLED`            | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `TEST_EXPERT_SELARTI_ENABLED`          | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `EXPERT_REFERRAL_HMAC_KEY_VERSION`     | `z.string()`                       | `— (обязательно)` | включается явным значением |
-| `EXPERT_REFERRAL_HMAC_KEY_REF`         | `z.string()`                       | `— (обязательно)` | включается явным значением |
-| `PAYMENT_PROVIDER`                     | `z.enum([`disabled`, `yookassa`])` | `"disabled"`      | включается явным значением |
-| `YOOKASSA_ENABLED`                     | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `LLM_PROVIDER`                         | `z.literal(`disabled`)`            | `"disabled"`      | нельзя включить схемой     |
-| `MINOR_ONBOARDING_ENABLED`             | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой     |
-| `RAW_CONVERSATION_LOGGING`             | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением |
-| `DISPLAY_TIMEZONE`                     | `z.string()`                       | `"Europe/Moscow"` | включается явным значением |
+| Флаг                                   | Схема                              | По умолчанию      | Включение                                                                                |
+| -------------------------------------- | ---------------------------------- | ----------------- | ---------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                         | `z.string()`                       | `— (обязательно)` | включается явным значением                                                               |
+| `ALLOW_INSECURE_LOCAL_DATABASE`        | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `SELARTI_ENABLED`                      | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением (нужны `SELARTI_API_KEY`, `SELARTI_WEBHOOK_SECRET`; #131)     |
+| `SELARTI_OUTBOUND_BILLING_MODE`        | `z.literal(`disabled`)`            | `"disabled"`      | нельзя включить схемой                                                                   |
+| `PLANERKA_RECOVERY_ENABLED`            | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением (нужны `PLANERKA_API_KEY`, `PLANERKA_ACCOUNT_ID`)             |
+| `PLANERKA_AVAILABILITY_ENABLED`        | `z.enum([`true`/`false`])`         | `"false"`         | только вместе с recovery                                                                 |
+| `PLANERKA_CREATE_ENABLED`              | `z.enum([`true`/`false`])`         | `"false"`         | только вместе с recovery                                                                 |
+| `TELEGRAM_ENABLED`                     | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением (нужны `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`; #131) |
+| `LLM_ENABLED`                          | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой                                                                   |
+| `MAKE_PROJECTION_ENABLED`              | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой                                                                   |
+| `GOOGLE_SHEETS_PROJECTION_ENABLED`     | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой                                                                   |
+| `INTENT_MODEL_ENABLED`                 | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой                                                                   |
+| `PAYMENTS_ENABLED`                     | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `EXPERT_REFERRAL_ENABLED`              | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `EXPERT_TELEGRAM_QUERIES_ENABLED`      | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `EXPERT_AI_INGRESS_ENABLED`            | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `WORKER_OUTBOX_DELIVERY_ENABLED`       | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `CLIENT_SESSION_ENABLED`               | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `CLIENT_CATALOG_ENABLED`               | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `CLIENT_BOOKING_ENABLED`               | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `CLIENT_BOOKING_RESERVE_ENABLED`       | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `CLIENT_PRIVACY_ENABLED`               | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `CLIENT_FREE_ACCESS_V2_ENABLED`        | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `CLIENT_TELEGRAM_INGRESS_ENABLED`      | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `CLIENT_HYBRID_ROUTING_ENABLED`        | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `SELARTI_COST_ADMISSION_ENABLED`       | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `B2_TELEGRAM_DISPATCH_ENABLED`         | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `TELEGRAM_EGRESS_CONSENT_GATE_ENABLED` | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `B2_SENSITIVE_RETENTION_ENABLED`       | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `TEST_EXPERT_PROMO_ENABLED`            | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `TEST_EXPERT_SELARTI_ENABLED`          | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `EXPERT_REFERRAL_HMAC_KEY_VERSION`     | `z.string()`                       | `— (обязательно)` | включается явным значением                                                               |
+| `EXPERT_REFERRAL_HMAC_KEY_REF`         | `z.string()`                       | `— (обязательно)` | включается явным значением                                                               |
+| `PAYMENT_PROVIDER`                     | `z.enum([`disabled`, `yookassa`])` | `"disabled"`      | включается явным значением                                                               |
+| `YOOKASSA_ENABLED`                     | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `LLM_PROVIDER`                         | `z.literal(`disabled`)`            | `"disabled"`      | нельзя включить схемой                                                                   |
+| `MINOR_ONBOARDING_ENABLED`             | `z.literal(`false`)`               | `"false"`         | нельзя включить схемой                                                                   |
+| `RAW_CONVERSATION_LOGGING`             | `z.enum([`true`/`false`])`         | `"false"`         | включается явным значением                                                               |
+| `DISPLAY_TIMEZONE`                     | `z.string()`                       | `"Europe/Moscow"` | включается явным значением                                                               |
 
 `z.literal("false")` означает, что значение `true` не проходит валидацию — включение провайдера требует
 изменения схемы, а `tests/e2e/api-boundary.test.ts` проверяет наличие literal по тексту исходника.
@@ -141,3 +143,12 @@ GOOGLE_SHEETS_PROJECTION_ENABLED, INTENT_MODEL_ENABLED, LLM_PROVIDER, MINOR_ONBO
   placeholders are rejected). The live boundary must be supplied through
   `createDefaultLifecycle({ integrationBoundaries })`. Without it, startup fails with
   `selarti_capability_required` / `telegram_callback_capability_required`.
+
+## Обновление после #131
+
+`SELARTI_ENABLED` и `TELEGRAM_ENABLED` больше не заперты `z.literal("false")`: это `"true" | "false"`
+с проверкой ключей (см. раздел выше). Легаси-флаг `PLANERKA_ENABLED` удалён из схемы
+`packages/config` — он ничего не включал; рабочие флаги Planerka: `PLANERKA_RECOVERY_ENABLED`,
+`PLANERKA_AVAILABILITY_ENABLED`, `PLANERKA_CREATE_ENABLED`. Строка `PLANERKA_ENABLED=false` в
+шаблонах остаётся только ради закреплённого `scripts/validate-runtime-env.sh` и игнорируется.
+Порядок включения на проде: [prod-enable-checklist](../operations/prod-enable-checklist.md).

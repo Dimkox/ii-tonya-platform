@@ -83,8 +83,10 @@ const schema = z
     SELARTI_ENABLED: z.enum(["true", "false"]).default("false"),
     SELARTI_API_KEY: optionalNonEmptyString,
     SELARTI_WEBHOOK_SECRET: optionalNonEmptyString,
+    SELARTI_COMPANY_ID: optionalNonEmptyString,
+    SELARTI_TASK_ID: optionalNonEmptyString,
+    SELARTI_AI_ID: optionalNonEmptyString,
     SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
-    PLANERKA_ENABLED: z.literal("false").default("false"),
     PLANERKA_CREATE_ENABLED: z.enum(["true", "false"]).default("false"),
     PLANERKA_RECOVERY_ENABLED: z.enum(["true", "false"]).default("false"),
     PLANERKA_AVAILABILITY_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -313,6 +315,19 @@ const schema = z
             code: "custom",
             path: [key],
             message: "selarti_activation_requires_project_credentials",
+          });
+        }
+      }
+      for (const key of [
+        "SELARTI_COMPANY_ID",
+        "SELARTI_TASK_ID",
+        "SELARTI_AI_ID",
+      ] as const) {
+        if (!selartiBindingId(value[key])) {
+          context.addIssue({
+            code: "custom",
+            path: [key],
+            message: "selarti_activation_requires_provider_binding",
           });
         }
       }
@@ -576,6 +591,14 @@ export type RuntimeConfig = {
   clientMessagingConsentPolicyVersion?: string;
   selartiAiConsentPolicyVersion?: string;
   telegramWebhookSecret?: string;
+  /** Present only when SELARTI_ENABLED=true; all fields are validated. */
+  selartiLive?: {
+    apiKey: string;
+    webhookSecret: string;
+    companyId: string;
+    taskId: string;
+    aiId: string;
+  };
   selartiResponseSharedSecret?: string;
   features: {
     ownerTestPricingAdmin?: boolean;
@@ -672,6 +695,12 @@ export type RuntimeConfig = {
 };
 
 /** A configured secret that is not an example placeholder. */
+/** Selarti provider ids: 1-256 visible chars, no placeholder. */
+const selartiBindingId = (value: string | undefined): boolean =>
+  value !== undefined &&
+  /^[^\s\p{Cc}]{1,256}$/u.test(value) &&
+  !/placeholder/iu.test(value);
+
 const liveSecret = (value: string | undefined): boolean =>
   value !== undefined &&
   value.trim().length >= 16 &&
@@ -1081,6 +1110,17 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(value.TELEGRAM_WEBHOOK_SECRET === undefined
       ? {}
       : { telegramWebhookSecret: value.TELEGRAM_WEBHOOK_SECRET }),
+    ...(value.SELARTI_ENABLED === "true"
+      ? {
+          selartiLive: {
+            apiKey: value.SELARTI_API_KEY!,
+            webhookSecret: value.SELARTI_WEBHOOK_SECRET!,
+            companyId: value.SELARTI_COMPANY_ID!,
+            taskId: value.SELARTI_TASK_ID!,
+            aiId: value.SELARTI_AI_ID!,
+          },
+        }
+      : {}),
     ...(value.SELARTI_RESPONSE_SHARED_SECRET === undefined
       ? {}
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),

@@ -17,3 +17,30 @@ it("retains recovery independently of new creation", () => {
     }),
   ).toMatchObject({ planerkaWorkflow: { createEnabled: false, accountId: 1 } });
 });
+it("no longer validates the legacy PLANERKA_ENABLED flag", () => {
+  expect(() => loadEnv({ ...base, PLANERKA_ENABLED: "true" })).not.toThrow();
+  expect(
+    loadEnv({ ...base, PLANERKA_ENABLED: "true" }).integrations.planerka,
+  ).toBe(false);
+});
+it("enables the full Planerka workflow with recovery credentials", () => {
+  expect(
+    loadEnv({
+      ...base,
+      PLANERKA_RECOVERY_ENABLED: "true",
+      PLANERKA_AVAILABILITY_ENABLED: "true",
+      PLANERKA_CREATE_ENABLED: "true",
+      PLANERKA_API_KEY: "cal_fixture",
+      PLANERKA_ACCOUNT_ID: "42",
+    }),
+  ).toMatchObject({ planerkaWorkflow: { createEnabled: true, accountId: 42 } });
+});
+it("rejects availability without recovery credentials", () => {
+  expect(() =>
+    loadEnv({
+      ...base,
+      PLANERKA_AVAILABILITY_ENABLED: "true",
+      PLANERKA_RECOVERY_ENABLED: "true",
+    }),
+  ).toThrow();
+});

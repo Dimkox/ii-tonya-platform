@@ -212,7 +212,46 @@ export interface ExpertTelegramQueryViewPort {
     callbackQueryId: string;
     status: "processed" | "unavailable";
   }): Promise<TelegramSendOutcome>;
+  /** BOT-03.2: главное меню рабочего эксперта. */
+  sendMainMenu?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome>;
+  /** BOT-03.2: заглушка для пункта меню без серверного действия. */
+  sendMenuStub?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome>;
+  /** SCRUM-64 🔄: выбор нового слота для переноса брони. */
+  sendRescheduleChoices?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    timezone: string;
+    choices: readonly { startsAt: string; callbackData: string }[];
+  }): Promise<TelegramSendOutcome>;
+  /** SCRUM-64 🔄: итог переноса. */
+  sendRescheduleResult?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    timezone: string;
+    outcome: "rescheduled" | "unavailable";
+    reservedUntil?: string;
+  }): Promise<TelegramSendOutcome>;
+  /** BOT-03.1: отказ неактивному резиденту со ссылкой на промобот. */
+  sendInactiveResident?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    promoBotUrl: string;
+  }): Promise<TelegramSendOutcome>;
 }
+
+export const EXPERT_MAIN_MENU = Object.freeze([
+  { text: "Мои брони", callback_data: "em1.bookings" },
+  { text: "Добавить слот", callback_data: "em1.slot" },
+  { text: "Мой баланс", callback_data: "em1.balance" },
+  { text: "Поддержка", callback_data: "em1.support" },
+] as const);
+export const EXPERT_MENU_STUB_TEXT = "скоро";
 
 export interface TelegramTransportRequest {
   method: "POST";
@@ -818,6 +857,93 @@ export class TelegramAdapter
     telegramUserId: string;
   }): Promise<TelegramSendOutcome> {
     return this.sendText({ ...view, text: "Команда недоступна." });
+  }
+
+  async sendMainMenu(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      ...view,
+      text: "Главное меню",
+      replyMarkup: {
+        inline_keyboard: EXPERT_MAIN_MENU.map((button) => [{ ...button }]),
+      },
+    });
+  }
+
+  async sendMenuStub(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome> {
+    return this.sendText({ ...view, text: EXPERT_MENU_STUB_TEXT });
+  }
+
+  async sendRescheduleChoices(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    timezone: string;
+    choices: readonly { startsAt: string; callbackData: string }[];
+  }): Promise<TelegramSendOutcome> {
+    if (view.choices.length === 0) {
+      return this.sendText({
+        idempotencyKey: view.idempotencyKey,
+        telegramUserId: view.telegramUserId,
+        text: "Нет свободных слотов для переноса.",
+      });
+    }
+    if (
+      view.choices.length > 10 ||
+      view.choices.some(
+        (choice) => !/^rs2\.[A-Za-z0-9_-]{44}$/u.test(choice.callbackData),
+      )
+    )
+      throw new Error("invalid_expert_view");
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: "Выберите новое время. Старая бронь будет отменена, клиенту придёт новая заявка на 72 ч.",
+      replyMarkup: {
+        inline_keyboard: view.choices.map((choice) => [
+          {
+            text: `🔄 ${formatInstant(choice.startsAt, view.timezone, true)}`,
+            callback_data: choice.callbackData,
+          },
+        ]),
+      },
+    });
+  }
+
+  async sendRescheduleResult(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    timezone: string;
+    outcome: "rescheduled" | "unavailable";
+    reservedUntil?: string;
+  }): Promise<TelegramSendOutcome> {
+    const text =
+      view.outcome === "rescheduled" && view.reservedUntil !== undefined
+        ? `Бронь перенесена. Новая заявка ждёт подтверждения до ${formatInstant(view.reservedUntil, view.timezone, true)}.`
+        : "Перенос недоступен.";
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text,
+    });
+  }
+
+  async sendInactiveResident(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    promoBotUrl: string;
+  }): Promise<TelegramSendOutcome> {
+    const url = new URL(view.promoBotUrl);
+    if (url.protocol !== "https:") throw new Error("invalid_expert_view");
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: `Доступ только для активного резидента. Подключиться: ${url.toString()}`,
+    });
   }
 
   async answerCallbackQuery(view: {

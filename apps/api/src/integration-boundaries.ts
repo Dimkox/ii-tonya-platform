@@ -25,6 +25,12 @@ export interface IntegrationBoundaryCapabilities {
   telegramCallbacks?: TelegramCallbackService;
 }
 
+/** Builders for the real live boundaries; used when a flag is on and no capability is injected. */
+export interface LiveIntegrationFactories {
+  selarti?: () => SelartiPort;
+  telegramCallbacks?: () => TelegramCallbackService;
+}
+
 export interface IntegrationBoundaries {
   selarti: SelartiPort;
   telegramCallbacks: TelegramCallbackService;
@@ -33,14 +39,16 @@ export interface IntegrationBoundaries {
 /**
  * Picks the Selarti and Telegram callback boundaries from env flags.
  * Flag off: the disabled boundary, even if a capability is supplied.
- * Flag on: the supplied live capability; a missing one stops startup.
+ * Flag on: the injected capability, else the live factory. Only when both
+ * are absent does startup stop (no silent stub behind an enabled flag).
  */
 export function resolveIntegrationBoundaries(
   config: Pick<RuntimeConfig, "integrations">,
   capabilities: IntegrationBoundaryCapabilities = {},
+  live: LiveIntegrationFactories = {},
 ): IntegrationBoundaries {
   const selarti = config.integrations.selarti
-    ? capabilities.selarti
+    ? (capabilities.selarti ?? live.selarti?.())
     : new DisabledSelartiAdapter();
   if (
     selarti === undefined ||
@@ -48,7 +56,7 @@ export function resolveIntegrationBoundaries(
   )
     throw new Error("selarti_capability_required");
   const telegramCallbacks = config.integrations.telegram
-    ? capabilities.telegramCallbacks
+    ? (capabilities.telegramCallbacks ?? live.telegramCallbacks?.())
     : disabledTelegramCallbacks;
   if (
     telegramCallbacks === undefined ||
