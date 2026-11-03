@@ -58,6 +58,12 @@ historical snapshot chain has gaps at `0014`, `0019`, `0020`, and `0022`-`0038`.
 The state baseline at `0039` was reconstructed from the SQL journal on PostgreSQL 17.5;
 its SQL-only supplement and input hashes are under `packages/db/migrations/state`.
 
+- A migration number is not a change identifier across branches. Another branch may carry
+  different SQL under the same `NNNN` index, and drizzle applies an entry only when its
+  `journal.when` is later than the last applied one, so a reused number or an old `when` is
+  skipped silently. Before opening a PR, rebase onto `origin/main`, take the next free index,
+  and set `when` above every `when` on `origin/main`;
+  `tests/repo/migration-number-collision.test.ts` enforces both.
 - Do not run `drizzle-kit generate`. Before the state baseline repair its newest stored
   snapshot was `0021`, so it re-emitted every object added afterwards - a 2026-09-10 probe produced a 215-statement
   `0039_*.sql` recreating existing tables. It also aborts before that on the BigInt default

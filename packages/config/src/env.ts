@@ -80,7 +80,9 @@ const schema = z
   .object({
     DATABASE_URL: z.string(),
     ALLOW_INSECURE_LOCAL_DATABASE: z.enum(["true", "false"]).default("false"),
-    SELARTI_ENABLED: z.literal("false").default("false"),
+    SELARTI_ENABLED: z.enum(["true", "false"]).default("false"),
+    SELARTI_API_KEY: optionalNonEmptyString,
+    SELARTI_WEBHOOK_SECRET: optionalNonEmptyString,
     SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
     PLANERKA_ENABLED: z.literal("false").default("false"),
     PLANERKA_CREATE_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -91,7 +93,7 @@ const schema = z
       .regex(/^cal_[A-Za-z0-9_-]{1,252}$/u)
       .optional(),
     PLANERKA_ACCOUNT_ID: z.coerce.number().int().positive().safe().optional(),
-    TELEGRAM_ENABLED: z.literal("false").default("false"),
+    TELEGRAM_ENABLED: z.enum(["true", "false"]).default("false"),
     LLM_ENABLED: z.literal("false").default("false"),
     MAKE_PROJECTION_ENABLED: z.literal("false").default("false"),
     GOOGLE_SHEETS_PROJECTION_ENABLED: z.literal("false").default("false"),
@@ -300,6 +302,36 @@ const schema = z
         message:
           "DATABASE_URL must be a hierarchical Postgres URL with an unambiguous TLS mode unless explicit local evidence mode is enabled",
       });
+    }
+    if (value.SELARTI_ENABLED === "true") {
+      for (const key of [
+        "SELARTI_API_KEY",
+        "SELARTI_WEBHOOK_SECRET",
+      ] as const) {
+        if (!liveSecret(value[key])) {
+          context.addIssue({
+            code: "custom",
+            path: [key],
+            message: "selarti_activation_requires_project_credentials",
+          });
+        }
+      }
+    }
+    if (value.TELEGRAM_ENABLED === "true") {
+      if (clientTelegramBotId(value.TELEGRAM_BOT_TOKEN) === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["TELEGRAM_BOT_TOKEN"],
+          message: "telegram_activation_requires_project_bot_token",
+        });
+      }
+      if (!liveSecret(value.TELEGRAM_WEBHOOK_SECRET)) {
+        context.addIssue({
+          code: "custom",
+          path: ["TELEGRAM_WEBHOOK_SECRET"],
+          message: "telegram_activation_requires_webhook_secret",
+        });
+      }
     }
     if (value.EXPERT_REFERRAL_ENABLED === "true") {
       if (!/^v[1-9]\d*$/u.test(value.EXPERT_REFERRAL_HMAC_KEY_VERSION ?? "")) {
@@ -529,9 +561,9 @@ export type RuntimeConfig = {
   };
   databaseUrl: string;
   integrations: {
-    selarti: false;
+    selarti: boolean;
     planerka: false;
-    telegram: false;
+    telegram: boolean;
     makeProjection: false;
     intentModel: false;
     payments: boolean;
@@ -638,6 +670,12 @@ export type RuntimeConfig = {
         windowHours: number;
       };
 };
+
+/** A configured secret that is not an example placeholder. */
+const liveSecret = (value: string | undefined): boolean =>
+  value !== undefined &&
+  value.trim().length >= 16 &&
+  !/placeholder/iu.test(value);
 
 export function clientTelegramBotId(
   token: string | undefined,
@@ -1014,9 +1052,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
           },
         }),
     integrations: {
-      selarti: false,
+      selarti: value.SELARTI_ENABLED === "true",
       planerka: false,
-      telegram: false,
+      telegram: value.TELEGRAM_ENABLED === "true",
       makeProjection: false,
       intentModel: false,
       payments: value.PAYMENTS_ENABLED === "true",
