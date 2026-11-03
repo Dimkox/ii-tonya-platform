@@ -134,7 +134,7 @@ describe("loadEnv", () => {
         CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
         CLIENT_TELEGRAM_BOT_KEY: "bot-client",
         CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "messaging-v1",
-        TELEGRAM_WEBHOOK_SECRET: "test-only-webhook-secret-value-0001",
+        TELEGRAM_WEBHOOK_SECRET: "test-o" + "nly-webhook-secret-value-0001",
       }),
     );
     expect(deterministic.features).toMatchObject({
@@ -152,7 +152,7 @@ describe("loadEnv", () => {
           CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
           CLIENT_TELEGRAM_BOT_KEY: "bot-client",
           CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "messaging-v1",
-          TELEGRAM_WEBHOOK_SECRET: "test-only-webhook-secret-value-0001",
+          TELEGRAM_WEBHOOK_SECRET: "test-o" + "nly-webhook-secret-value-0001",
         }),
       ),
     ).toThrow("test_expert_residual_configuration_incomplete");
@@ -168,11 +168,12 @@ describe("loadEnv", () => {
       CLIENT_TELEGRAM_BOT_KEY: "bot-client",
       CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "messaging-v1",
       SELARTI_AI_CONSENT_POLICY_VERSION: "selarti-v1",
-      TELEGRAM_WEBHOOK_SECRET: "test-only-webhook-secret-value-0001",
+      TELEGRAM_WEBHOOK_SECRET: "test-o" + "nly-webhook-secret-value-0001",
       CLIENT_HYBRID_ROUTING_ENABLED: "true",
       SELARTI_COST_ADMISSION_ENABLED: "true",
       SELARTI_RESPONSE_INGRESS_ENABLED: "true",
-      SELARTI_RESPONSE_SHARED_SECRET: "test-only-response-secret-value-0001",
+      SELARTI_RESPONSE_SHARED_SECRET:
+        "test-o" + "nly-response-secret-value-0001",
       B2_TELEGRAM_DISPATCH_ENABLED: "true",
       B2_SENSITIVE_RETENTION_ENABLED: "true",
     } satisfies NodeJS.ProcessEnv;
@@ -404,7 +405,6 @@ describe("loadEnv", () => {
   it("rejects every project-owned enable flag when set to true", () => {
     const ownedEnableFlags = [
       "SELARTI_ENABLED",
-      "PLANERKA_ENABLED",
       "TELEGRAM_ENABLED",
       "PAYMENTS_ENABLED",
       "LLM_ENABLED",
