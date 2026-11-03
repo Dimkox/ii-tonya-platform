@@ -37,3 +37,57 @@ describe("WAIT-T03 guide delivery job", () => {
     expect(p.markGuideDelivered).not.toHaveBeenCalled();
   });
 });
+import { runExpertPromoFunnelTimers } from "./expert-promo-funnel-jobs.js";
+describe("WAIT-T04 funnel timers", () => {
+  it("sends each claimed timer once and counts failures", async () => {
+    const claimTimer = vi.fn(async ({ kind }: { kind: string }) =>
+      kind === "message6"
+        ? [{ userId: "a", chatId: "1" }]
+        : [{ userId: "b", chatId: "2" }],
+    );
+    const sendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error("x"));
+    expect(
+      await runExpertPromoFunnelTimers({ claimTimer, sendMessage }),
+    ).toEqual({
+      message6: 1,
+      gift: 0,
+      failed: 1,
+    });
+  });
+});
+import { runExpertPromoCrmSync } from "./expert-promo-funnel-jobs.js";
+describe("WAIT-T06 CRM sync", () => {
+  const contact = {
+    userId: "u",
+    firstName: "Аня",
+    gender: "female" as const,
+    status: "REFERRAL_ACTIVE",
+    referralCount: 1,
+  };
+  it("is disabled by default and makes no calls", async () => {
+    const crm = { upsertContact: vi.fn() };
+    const listCrmDue = vi.fn(async () => [contact]);
+    expect(
+      await runExpertPromoCrmSync({ listCrmDue, markCrmSynced: vi.fn(), crm }),
+    ).toMatchObject({ skipped: true });
+    expect(listCrmDue).not.toHaveBeenCalled();
+    expect(crm.upsertContact).not.toHaveBeenCalled();
+  });
+  it("syncs and marks when enabled", async () => {
+    const crm = { upsertContact: vi.fn(async () => {}) };
+    const markCrmSynced = vi.fn(async () => true);
+    expect(
+      await runExpertPromoCrmSync(
+        { listCrmDue: async () => [contact], markCrmSynced, crm },
+        { enabled: true },
+      ),
+    ).toEqual({ synced: 1, failed: 0, skipped: false });
+    expect(markCrmSynced).toHaveBeenCalledWith({
+      userId: "u",
+      referralCount: 1,
+    });
+  });
+});

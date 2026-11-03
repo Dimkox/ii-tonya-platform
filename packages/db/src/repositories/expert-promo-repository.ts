@@ -198,6 +198,59 @@ export class PostgresExpertPromoRepository {
       replay,
     };
   }
+  /** WAIT-T06: profile fields for the funnel (Telegram first name, gender). */
+  async saveFunnelProfile(
+    scope: { botKey: string; telegramUserId: string },
+    profile: { firstName?: string; gender?: "female" | "male" },
+  ): Promise<boolean> {
+    const firstName =
+      profile.firstName !== undefined &&
+      profile.firstName.length >= 1 &&
+      profile.firstName.length <= 64 &&
+      !/[\p{Cc}\p{Cf}]/u.test(profile.firstName)
+        ? profile.firstName
+        : null;
+    const gender =
+      profile.gender === "female" || profile.gender === "male"
+        ? profile.gender
+        : null;
+    if (
+      !/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId) ||
+      (firstName === null && gender === null)
+    )
+      return false;
+    const r = await this.db.execute(
+      sql`update expert_promo_funnel_state f set first_name=coalesce(${firstName}::text,f.first_name),gender=coalesce(${gender}::text,f.gender),last_interaction_at=clock_timestamp() from channel_identities c where c.user_id=f.user_id and c.provider='telegram' and c.bot_key=${scope.botKey} and c.status='active' and c.external_id=${scope.telegramUserId} returning f.user_id`,
+    );
+    return r.rows.length > 0;
+  }
+  /** WAIT-T05: unanswered question goes to the manager queue (registered users only). */
+  async recordManagerQuestion(
+    scope: { botKey: string; telegramUserId: string },
+    question: string,
+  ): Promise<boolean> {
+    if (
+      !/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId) ||
+      question.length < 1 ||
+      question.length > 3000
+    )
+      return false;
+    const r = await this.db.execute(
+      sql`insert into expert_promo_manager_questions(user_id,question) select f.user_id,${question} from expert_promo_funnel_state f join channel_identities c on c.user_id=f.user_id and c.provider='telegram' and c.bot_key=${scope.botKey} and c.status='active' and c.external_id=${scope.telegramUserId} limit 1 returning id`,
+    );
+    return r.rows.length > 0;
+  }
+  /** WAIT-T04: /optout_ref stops referral reminders for this promo bot identity. */
+  async optOutReferral(scope: {
+    botKey: string;
+    telegramUserId: string;
+  }): Promise<boolean> {
+    if (!/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId)) return false;
+    const r = await this.db.execute(
+      sql`update expert_promo_funnel_state f set opt_out_ref=true,opt_out_at=coalesce(f.opt_out_at,clock_timestamp()),last_interaction_at=clock_timestamp() from channel_identities c where c.user_id=f.user_id and c.provider='telegram' and c.bot_key=${scope.botKey} and c.status='active' and c.external_id=${scope.telegramUserId} returning f.user_id`,
+    );
+    return r.rows.length > 0;
+  }
   /** BOT-02.2: an active, verified resident is routed to the expert bot. */
   async isActiveResident(scope: { telegramUserId: string }): Promise<boolean> {
     if (!/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId)) return false;

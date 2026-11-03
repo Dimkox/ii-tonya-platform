@@ -49,3 +49,78 @@ export async function runExpertPromoGuideDelivery(
   }
   return { delivered, failed, skipped: false };
 }
+
+/** WAIT-T04 reminder texts; final wording is owner content (WAIT-T07). */
+export const FUNNEL_TIMER_TEXT = {
+  message6:
+    "Напоминаем: пригласите двух коллег по вашему коду и получите гайд. Отписаться от напоминаний: /optout_ref",
+  gift: "Ваш подарок ждёт: пригласите коллег по коду, чтобы получить гайд и бонус. Отписаться: /optout_ref",
+} as const;
+export async function runExpertPromoFunnelTimers(
+  ports: {
+    claimTimer(input: {
+      kind: "message6" | "gift";
+      limit: number;
+    }): Promise<{ userId: string; chatId: string }[]>;
+    sendMessage(input: { chatId: string; text: string }): Promise<unknown>;
+  },
+  config: { limit?: number } = {},
+) {
+  const result = { message6: 0, gift: 0, failed: 0 };
+  for (const kind of ["message6", "gift"] as const) {
+    for (const target of await ports.claimTimer({
+      kind,
+      limit: config.limit ?? 20,
+    })) {
+      try {
+        await ports.sendMessage({
+          chatId: target.chatId,
+          text: FUNNEL_TIMER_TEXT[kind],
+        });
+        result[kind]++;
+      } catch {
+        result.failed++;
+      }
+    }
+  }
+  return result;
+}
+
+/** WAIT-T06 CRM sync. Disabled by default; the CRM port is injected and no
+ * real CRM client exists in this repository (no external calls). */
+export interface ExpertPromoCrmContact {
+  userId: string;
+  firstName: string | null;
+  gender: "female" | "male" | null;
+  status: string;
+  referralCount: number;
+}
+export async function runExpertPromoCrmSync(
+  ports: {
+    listCrmDue(limit: number): Promise<ExpertPromoCrmContact[]>;
+    markCrmSynced(input: {
+      userId: string;
+      referralCount: number;
+    }): Promise<boolean>;
+    crm?: { upsertContact(contact: ExpertPromoCrmContact): Promise<void> };
+  },
+  config: { enabled?: boolean; limit?: number } = {},
+) {
+  if (config.enabled !== true || !ports.crm)
+    return { synced: 0, failed: 0, skipped: true };
+  let synced = 0;
+  let failed = 0;
+  for (const contact of await ports.listCrmDue(config.limit ?? 50)) {
+    try {
+      await ports.crm.upsertContact(contact);
+      await ports.markCrmSynced({
+        userId: contact.userId,
+        referralCount: contact.referralCount,
+      });
+      synced++;
+    } catch {
+      failed++;
+    }
+  }
+  return { synced, failed, skipped: false };
+}
