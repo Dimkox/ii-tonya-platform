@@ -36,7 +36,10 @@ it("stores processed Telegram callbacks in Postgres and blocks replay", async ()
   await expect(service.isAuthorizedIdentity("999")).resolves.toBe(false);
   await expect(service.verifyCallback(update, "c")).resolves.toBe(true);
   await service.process(update, "c");
-  await expect(service.verifyCallback(update, "c")).resolves.toBe(false);
+  // A redelivered callback stays authenticated; replay protection is the
+  // first-writer-wins record, so a second process() is a no-op.
+  await expect(service.verifyCallback(update, "c")).resolves.toBe(true);
+  await service.process(update, "c");
   // Concurrent replays: exactly one writer wins.
   const results = await Promise.all(
     Array.from({ length: 8 }, () => repo.recordProcessed("race-key")),

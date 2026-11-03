@@ -90,7 +90,10 @@ describe("real browser entry dispatch over a prerendered landing", () => {
   it("preserves the server-rendered landing on the home route", async () => {
     await openEntry("/");
     expect(root.innerHTML).toBe(prerenderedLanding);
-    expect(page.querySelectorAll).toHaveBeenCalledWith("[data-reveal]");
+    // The cookie banner is loaded lazily; reveal wiring runs after it.
+    await vi.waitFor(() =>
+      expect(page.querySelectorAll).toHaveBeenCalledWith("[data-reveal]"),
+    );
     expect(views.landing).not.toHaveBeenCalled();
     expect(views.bindCatalog).not.toHaveBeenCalled();
     expect(views.bindPrivacy).not.toHaveBeenCalled();

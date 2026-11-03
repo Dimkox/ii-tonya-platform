@@ -116,6 +116,7 @@ export async function startHeldOnboardingLocal(paymentId = "sales_payment_1") {
     },
   };
   return {
+    paymentId,
     client,
     protector,
     decryptor,
@@ -128,6 +129,10 @@ export async function startHeldOnboardingLocal(paymentId = "sales_payment_1") {
     },
     dropCancel() {
       dropCancel = true;
+    },
+    /** Models a provider object created out of band and found only by GET. */
+    existing(bound: Record<string, string>) {
+      metadata = { ...bound };
     },
     dropCreate() {
       dropCreate = true;

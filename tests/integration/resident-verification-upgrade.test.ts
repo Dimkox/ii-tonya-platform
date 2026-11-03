@@ -189,15 +189,48 @@ async function approved(
   return { ...f, repo, invoice, local, checkout, paymentId, vault };
 }
 
+/**
+ * The held checkout never makes a first provider POST (no receipt-contact
+ * disclosure without the cancellation fence). Fixtures therefore model a
+ * provider object that already exists, bind it only through the manager GET
+ * recovery path, and then open the checkout from that authoritative object.
+ */
+async function openExisting(f: Awaited<ReturnType<typeof approved>>) {
+  f.local.existing({
+    order_id: f.invoice.id,
+    operation_id: f.invoice.operationId,
+    user_id: f.userId,
+    purpose: "onboarding",
+  });
+  await f.checkout.recoverProviderObject(
+    session,
+    f.invoice.id,
+    f.paymentId,
+    randomUUID(),
+  );
+  return f.checkout.createCheckout({ invoiceId: f.invoice.id });
+}
+
 it("upgrades genuine pending/submitted/approved/paid v1 history without rewriting financial facts or frozen bytes", async () => {
   const pending = await owner();
   const approvedOwner = await approved();
   const paid = await approved("quarter");
   try {
-    await paid.checkout.createCheckout({ invoiceId: paid.invoice.id });
-    paid.local.waiting();
-    await paid.checkout.reconcile(paid.invoice.id);
-    await paid.checkout.reconcile(paid.invoice.id);
+    // The v1 history is produced by today's held checkout, whose frame
+    // excludes invoices owned by the public gateway (0084). This 0061-era
+    // fixture has no public requests at all, so model that empty relation
+    // only while the paid history is written, then remove it again.
+    await db.db.execute(
+      sql`create table public_expert_payment_requests(invoice_id uuid)`,
+    );
+    try {
+      await openExisting(paid);
+      paid.local.waiting();
+      await paid.checkout.reconcile(paid.invoice.id);
+      await paid.checkout.reconcile(paid.invoice.id);
+    } finally {
+      await db.db.execute(sql`drop table public_expert_payment_requests`);
+    }
     expect(
       (
         await db.db.execute(
@@ -277,12 +310,17 @@ it("upgrades genuine pending/submitted/approved/paid v1 history without rewritin
     });
     expect(resumed.formVersion).toBe(1);
     expect(resumed.educationRequirement).toBe("unknown_manual_review");
-    await approvedOwner.checkout.createCheckout({
-      invoiceId: approvedOwner.invoice.id,
-    });
-    approvedOwner.local.waiting();
-    await approvedOwner.checkout.reconcile(approvedOwner.invoice.id);
-    await approvedOwner.checkout.reconcile(approvedOwner.invoice.id);
+    await db.db.execute(
+      sql`create table public_expert_payment_requests(invoice_id uuid)`,
+    );
+    try {
+      await openExisting(approvedOwner);
+      approvedOwner.local.waiting();
+      await approvedOwner.checkout.reconcile(approvedOwner.invoice.id);
+      await approvedOwner.checkout.reconcile(approvedOwner.invoice.id);
+    } finally {
+      await db.db.execute(sql`drop table public_expert_payment_requests`);
+    }
     expect(
       (
         await db.db.execute(
