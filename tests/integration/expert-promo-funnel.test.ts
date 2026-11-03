@@ -137,4 +137,31 @@ describe("WAIT-T03 guide delivery authority", () => {
     ).rows;
     expect(rows).toEqual([{ status: "open" }]);
   });
+  it("WAIT-T06 stores profile fields and syncs CRM marker idempotently", async () => {
+    const owner = await identity();
+    await promo.register(command(owner));
+    expect(await promo.saveFunnelProfile(owner, { firstName: "Аня" })).toBe(
+      true,
+    );
+    expect(await promo.saveFunnelProfile(owner, { gender: "female" })).toBe(
+      true,
+    );
+    const due = (await funnel.listCrmDue(100)).find(
+      (r) => r.userId === owner.userId,
+    );
+    expect(due).toMatchObject({
+      firstName: "Аня",
+      gender: "female",
+      referralCount: 0,
+    });
+    expect(
+      await funnel.markCrmSynced({ userId: owner.userId, referralCount: 0 }),
+    ).toBe(true);
+    expect(
+      await funnel.markCrmSynced({ userId: owner.userId, referralCount: 0 }),
+    ).toBe(false);
+    expect(
+      (await funnel.listCrmDue(100)).find((r) => r.userId === owner.userId),
+    ).toBeUndefined();
+  });
 });

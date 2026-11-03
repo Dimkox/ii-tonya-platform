@@ -64,3 +64,18 @@ describe("WAIT-T05 FAQ and manager handoff", () => {
     ).toBe("unhandled");
   });
 });
+describe("WAIT-T06 profile command", () => {
+  it("saves gender via /gender", async () => {
+    const saveFunnelProfile = vi.fn(async () => true);
+    const s = createExpertApplicantService({
+      enabled: true,
+      repository: { ...repo(false), saveFunnelProfile } as never,
+    });
+    const out = await s.handle({ ...scope, text: "/gender female" });
+    expect(out.status).toBe("handled");
+    expect(saveFunnelProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ telegramUserId: "456" }),
+      { gender: "female" },
+    );
+  });
+});

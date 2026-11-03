@@ -85,3 +85,42 @@ export async function runExpertPromoFunnelTimers(
   }
   return result;
 }
+
+/** WAIT-T06 CRM sync. Disabled by default; the CRM port is injected and no
+ * real CRM client exists in this repository (no external calls). */
+export interface ExpertPromoCrmContact {
+  userId: string;
+  firstName: string | null;
+  gender: "female" | "male" | null;
+  status: string;
+  referralCount: number;
+}
+export async function runExpertPromoCrmSync(
+  ports: {
+    listCrmDue(limit: number): Promise<ExpertPromoCrmContact[]>;
+    markCrmSynced(input: {
+      userId: string;
+      referralCount: number;
+    }): Promise<boolean>;
+    crm?: { upsertContact(contact: ExpertPromoCrmContact): Promise<void> };
+  },
+  config: { enabled?: boolean; limit?: number } = {},
+) {
+  if (config.enabled !== true || !ports.crm)
+    return { synced: 0, failed: 0, skipped: true };
+  let synced = 0;
+  let failed = 0;
+  for (const contact of await ports.listCrmDue(config.limit ?? 50)) {
+    try {
+      await ports.crm.upsertContact(contact);
+      await ports.markCrmSynced({
+        userId: contact.userId,
+        referralCount: contact.referralCount,
+      });
+      synced++;
+    } catch {
+      failed++;
+    }
+  }
+  return { synced, failed, skipped: false };
+}

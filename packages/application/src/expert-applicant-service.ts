@@ -23,6 +23,10 @@ type Command = ExpertApplicantScope & {
 export interface ExpertApplicantRepository {
   isActiveResident?(scope: ExpertApplicantScope): Promise<boolean>;
   optOutReferral?(scope: ExpertApplicantScope): Promise<boolean>;
+  saveFunnelProfile?(
+    scope: ExpertApplicantScope,
+    profile: { firstName?: string; gender?: "female" | "male" },
+  ): Promise<boolean>;
   recordManagerQuestion?(
     scope: ExpertApplicantScope,
     question: string,
@@ -172,7 +176,7 @@ export function createExpertApplicantService(deps: {
       try {
         if (
           deps.separatedSales &&
-          !/^(?:\/(?:start|consent)(?: |$)|\/optout_ref$|promo_[0-9a-f]{32}$)/u.test(
+          !/^(?:\/(?:start|consent)(?: |$)|\/optout_ref$|\/gender (?:female|male)$|promo_[0-9a-f]{32}$)/u.test(
             input.text.trim(),
           )
         ) {
@@ -182,7 +186,7 @@ export function createExpertApplicantService(deps: {
         if (
           deps.verificationForm &&
           !(deps.separatedSales && input.text.startsWith("/profile")) &&
-          !/^(?:\/(?:start|consent)(?: |$)|\/optout_ref$|promo_[0-9a-f]{32}$)/u.test(
+          !/^(?:\/(?:start|consent)(?: |$)|\/optout_ref$|\/gender (?:female|male)$|promo_[0-9a-f]{32}$)/u.test(
             input.text.trim(),
           )
         ) {
@@ -222,6 +226,16 @@ export function createExpertApplicantService(deps: {
               };
         }
         if (input.text.startsWith("/profile")) return { status: "rejected" };
+        const gender = /^\/gender (female|male)$/u.exec(input.text.trim());
+        if (gender && deps.repository.saveFunnelProfile)
+          return {
+            status: "handled",
+            text: (await deps.repository.saveFunnelProfile(scope, {
+              gender: gender[1] as "female" | "male",
+            }))
+              ? "Спасибо, данные профиля сохранены."
+              : "Сначала зарегистрируйтесь: отправьте /start.",
+          };
         if (
           input.text.trim() === "/optout_ref" &&
           deps.repository.optOutReferral
@@ -247,6 +261,10 @@ export function createExpertApplicantService(deps: {
             ...command(),
             ...(start[1] ? { refCode: start[1] } : {}),
           });
+          if (input.firstName)
+            await deps.repository.saveFunnelProfile?.(scope, {
+              firstName: input.firstName,
+            });
           if (enrollment.kind === "waiting_content")
             return { status: "handled", text: "TODO: Wait for Prompt Spec" };
           if (enrollment.kind === "consent_pending")

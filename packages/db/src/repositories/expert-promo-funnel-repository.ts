@@ -137,4 +137,36 @@ export class PostgresExpertPromoFunnelRepository {
       return claimed;
     });
   }
+
+  /** T06: rows whose referral count changed since the last CRM sync. */
+  async listCrmDue(limit: number) {
+    const n = Math.max(1, Math.min(100, Math.trunc(limit)));
+    return (
+      await this.db.execute<{
+        userId: string;
+        firstName: string | null;
+        gender: "female" | "male" | null;
+        status: string;
+        referralCount: number;
+      }>(
+        sql`select * from (select f.user_id "userId",f.first_name "firstName",f.gender,f.status,(select count(*)::int from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id) "referralCount",f.crm_synced_referral_count synced from expert_promo_funnel_state f join users u on u.id=f.user_id and u.active) x where x.synced is distinct from x."referralCount" order by x."userId" limit ${n}`,
+      )
+    ).rows.map(({ userId, firstName, gender, status, referralCount }) => ({
+      userId,
+      firstName,
+      gender,
+      status,
+      referralCount,
+    }));
+  }
+
+  /** Idempotent: re-marking the same count is a no-op. */
+  async markCrmSynced(input: { userId: string; referralCount: number }) {
+    if (!Number.isSafeInteger(input.referralCount) || input.referralCount < 0)
+      throw new Error("expert_promo_crm_count_invalid");
+    const r = await this.db.execute(
+      sql`update expert_promo_funnel_state set crm_synced_referral_count=${input.referralCount},crm_synced_at=clock_timestamp() where user_id=${input.userId}::uuid and crm_synced_referral_count is distinct from ${input.referralCount}::int returning user_id`,
+    );
+    return r.rows.length === 1;
+  }
 }

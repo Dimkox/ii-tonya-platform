@@ -198,6 +198,32 @@ export class PostgresExpertPromoRepository {
       replay,
     };
   }
+  /** WAIT-T06: profile fields for the funnel (Telegram first name, gender). */
+  async saveFunnelProfile(
+    scope: { botKey: string; telegramUserId: string },
+    profile: { firstName?: string; gender?: "female" | "male" },
+  ): Promise<boolean> {
+    const firstName =
+      profile.firstName !== undefined &&
+      profile.firstName.length >= 1 &&
+      profile.firstName.length <= 64 &&
+      !/[\p{Cc}\p{Cf}]/u.test(profile.firstName)
+        ? profile.firstName
+        : null;
+    const gender =
+      profile.gender === "female" || profile.gender === "male"
+        ? profile.gender
+        : null;
+    if (
+      !/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId) ||
+      (firstName === null && gender === null)
+    )
+      return false;
+    const r = await this.db.execute(
+      sql`update expert_promo_funnel_state f set first_name=coalesce(${firstName}::text,f.first_name),gender=coalesce(${gender}::text,f.gender),last_interaction_at=clock_timestamp() from channel_identities c where c.user_id=f.user_id and c.provider='telegram' and c.bot_key=${scope.botKey} and c.status='active' and c.external_id=${scope.telegramUserId} returning f.user_id`,
+    );
+    return r.rows.length > 0;
+  }
   /** WAIT-T05: unanswered question goes to the manager queue (registered users only). */
   async recordManagerQuestion(
     scope: { botKey: string; telegramUserId: string },
