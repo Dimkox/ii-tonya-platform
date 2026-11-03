@@ -67,3 +67,4 @@ export {
   CancellationUncertain,
   type ReceiptDisclosureCancellation,
 } from "./receipt-disclosure-boundary.js";
+export * from "./expert-promo-funnel-jobs.js";
