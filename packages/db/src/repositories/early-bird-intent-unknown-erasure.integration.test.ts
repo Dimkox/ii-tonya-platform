@@ -65,7 +65,7 @@ it("retains a nonpersonal recovery record for an unknown provider outcome during
     baseMonthlyMinor: BigInt(b.amount),
     participantKind: "expert",
     firstOfferAtMs: Date.parse(b.first),
-    quotedAtMs: Date.parse("2026-11-02T00:00:00+03:00"),
+    quotedAtMs: Date.parse(b.first),
     promotion: true,
     termMonths: 1,
   }).monthlyPriceMinor;
