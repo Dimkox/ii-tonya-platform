@@ -54,8 +54,18 @@ export function renderBookingNotification(
               { text: "Подтвердить", callback_data: view.callbacks.confirm },
               { text: "Отказать", callback_data: view.callbacks.cancel },
             ],
+            ...(view.callbacks.reschedule === undefined
+              ? []
+              : [
+                  [
+                    {
+                      text: "🔄 Перенести" as const,
+                      callback_data: view.callbacks.reschedule,
+                    },
+                  ] as const,
+                ]),
           ],
-        },
+        } as never,
       };
     case "client.booking_confirmed":
       return result("client", `Запись подтверждена на ${time}.`);

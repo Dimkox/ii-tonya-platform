@@ -7,6 +7,7 @@ import {
   type BookingCalendarCancellation,
   bookingNotificationViewSchema,
   serializeBookingNotificationWire,
+  encodeExpertRescheduleStart,
   type BookingNotificationView,
   type BookingNotificationRenderResult,
 } from "@ii-tonya/contracts";
@@ -496,6 +497,8 @@ export class PostgresBookingNotificationRepository {
     private readonly db: DrizzleDb,
     private readonly botKey: string,
     private readonly preparation?: BookingNotificationPreparation,
+    /** SCRUM-64: показывать эксперту кнопку 🔄 «Перенести» в заявке. */
+    private readonly options?: { readonly expertReschedule?: boolean },
   ) {}
   /** Read-only startup capability check; never enables or unpauses a bot. */
   async hasBotControl(): Promise<boolean> {
@@ -756,7 +759,19 @@ export class PostgresBookingNotificationRepository {
             startsAt: checked.startsAt,
             status: checked.status,
             ...(d.kind === "telegram.reservation_request"
-              ? { callbacks }
+              ? {
+                  callbacks: {
+                    ...callbacks,
+                    // SCRUM-64: 🔄 для эксперта; полномочия проверяет обработчик.
+                    ...(this.options?.expertReschedule === true
+                      ? {
+                          reschedule: encodeExpertRescheduleStart(
+                            d.reservation_id,
+                          ),
+                        }
+                      : {}),
+                  },
+                }
               : terminal
                 ? {}
                 : { calendar: checked.calendar }),

@@ -15,6 +15,8 @@ type AuthenticatedClientView = Parameters<
 export interface ExpertTelegramIngressFactoryDependencies extends ProcessorDependencies {
   readonly checkoutReadiness?: boolean;
   readonly checkout?: ExpertTelegramCheckoutCapability;
+  /** BOT-03.1: ссылка на промобот для неактивного резидента. */
+  readonly promoBotUrl?: string;
   resolvePrincipal(telegramUserId: string): Promise<Principal | null>;
   authenticateClientView(input: {
     readonly data: string;
@@ -35,9 +37,24 @@ export const createExpertTelegramIngress = (
     authenticateClientView: deps.authenticateClientView,
     processCommand: processor.processCommand,
     processClientView: processor.processClientView,
-    async processResidencyCheckout(input: Parameters<
-      ExpertTelegramCheckoutCapability["process"]
-    >[0]) {
+    processMenuAction: processor.processMenuAction,
+    processReschedule: processor.processReschedule,
+    ...(deps.promoBotUrl === undefined ||
+    deps.views.sendInactiveResident === undefined
+      ? {}
+      : {
+          sendInactiveResident: (input: {
+            readonly idempotencyKey: string;
+            readonly telegramUserId: string;
+          }) =>
+            deps.views.sendInactiveResident!({
+              ...input,
+              promoBotUrl: deps.promoBotUrl!,
+            }),
+        }),
+    async processResidencyCheckout(
+      input: Parameters<ExpertTelegramCheckoutCapability["process"]>[0],
+    ) {
       if (deps.checkoutReadiness !== true) {
         throw new Error("Expert Telegram checkout is disabled");
       }
@@ -46,9 +63,11 @@ export const createExpertTelegramIngress = (
       }
       return deps.checkout.process(input);
     },
-    async sendResidencyCheckoutLink(input: Parameters<
-      ExpertTelegramIngressFactoryDependencies["views"]["sendResidencyCheckoutLink"]
-    >[0]) {
+    async sendResidencyCheckoutLink(
+      input: Parameters<
+        ExpertTelegramIngressFactoryDependencies["views"]["sendResidencyCheckoutLink"]
+      >[0],
+    ) {
       if (deps.checkoutReadiness !== true) {
         throw new Error("Expert Telegram checkout is disabled");
       }
