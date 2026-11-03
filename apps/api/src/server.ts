@@ -20,6 +20,7 @@ import {
 import { loadEarlyBirdGatewayBootstrap } from "./early-bird-gateway-bootstrap.js";
 import type { createPostgresEarlyBirdAuthority } from "./expert-early-bird-authority.js";
 import { PostgresReceiptRevocationOutbox } from "@ii-tonya/db";
+import { createPostgresClientConversationService } from "./client-conversation-composition.js";
 import { ExperimentalGatewayIpc } from "@ii-tonya/integrations";
 import { createReceiptContactFence } from "./receipt-disclosure-contact-fence.js";
 import type { TestExpertTrialMetricEvent } from "@ii-tonya/application";
@@ -75,9 +76,6 @@ import {
   createExpertReferralAdminService,
   createOperatorCaseService,
   ExpertCodeCrypto,
-  type BookingService,
-  type CatalogService,
-  type ConversationService,
   type ExpertCodeKeyring,
   type ExpertAiIngressService,
   type PrivacyService,
@@ -898,11 +896,23 @@ export const createDefaultLifecycle = (
       ...(expertApi ? { expertApi } : {}),
       ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
-      conversationService: disabledService<ConversationService>(
-        "conversation ingress",
-      ),
-      bookingService: disabledService<BookingService>("booking ingress"),
-      catalogService: disabledService<CatalogService>("catalog ingress"),
+      conversationService: createPostgresClientConversationService(db, {
+        waveCoverage: config.features.waveWorkspace === true,
+        ...(options.clientCommercialPolicyRepository
+          ? { clientCommercialPolicy: options.clientCommercialPolicyRepository }
+          : {}),
+        clientFreeAccessV2Enabled: config.features.clientFreeAccessV2 === true,
+        ...(config.clientTelegramBotKey &&
+        config.clientMessagingConsentPolicyVersion
+          ? {
+              telegramDelivery: {
+                botKey: config.clientTelegramBotKey,
+                messagingPolicyVersion:
+                  config.clientMessagingConsentPolicyVersion,
+              },
+            }
+          : {}),
+      }),
       publicCatalog: {
         listPublicServices: (input) =>
           db.transaction(async (tx) => {

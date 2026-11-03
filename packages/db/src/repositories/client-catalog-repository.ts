@@ -239,6 +239,74 @@ async function lockCatalogChoices(
   `);
 }
 
+type CatalogExecutor = Pick<DrizzleDb, "execute">;
+
+/** Shared transactional body so conversation completion can bind a catalog request atomically. */
+export async function createOrReplayClientCatalogRequestInTx(
+  tx: CatalogExecutor,
+  input: {
+    userId: string;
+    requestDigest: string;
+    serviceCode?: string;
+    language?: string;
+    correlationId: string;
+    version?: 1 | 2;
+  },
+): Promise<{ catalogRequestId: string; state: "pending" | "ready" }> {
+  const userId = canonicalUuid(input.userId);
+  const subjectKey = clientCatalogErasureSubjectKey(userId);
+  if (!HASH_PATTERN.test(input.requestDigest) || input.correlationId.length < 1)
+    throw new Error("client_catalog_request_invalid");
+  const serviceCode = optionalFilter(input.serviceCode, 64);
+  const language = optionalFilter(input.language, 32);
+  const version = input.version ?? 1;
+  if (version !== 1 && version !== 2)
+    throw new Error("client_catalog_request_invalid");
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${input.requestDigest}`}, 0))`,
+  );
+  const existing = (
+    await tx.execute<{ catalogRequestId: string; state: string }>(sql`
+        select id as "catalogRequestId",state
+        from client_catalog_requests
+        where user_id=${userId}::uuid and request_digest=${input.requestDigest}
+        for update
+      `)
+  ).rows[0];
+  if (existing !== undefined) {
+    return {
+      catalogRequestId: existing.catalogRequestId,
+      state: state(existing.state),
+    };
+  }
+
+  const catalogRequestId = randomUUID();
+  await tx.execute(sql`
+      insert into client_catalog_requests (
+        id,user_id,request_digest,service_code,language
+      ) values (
+        ${catalogRequestId}::uuid,${userId}::uuid,${input.requestDigest},
+        ${serviceCode ?? null},${language ?? null}
+      )
+    `);
+  await tx.execute(sql`
+      insert into client_catalog_erasure_index (request_id,subject_key,expires_at)
+      select id,${subjectKey},expires_at from client_catalog_requests
+      where id=${catalogRequestId}::uuid
+    `);
+  const payload = canonicalPayload(catalogRequestId, version);
+  const payloadHash = createHash("sha256").update(payload).digest("hex");
+  await tx.execute(sql`
+      insert into integration_outbox (
+        idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash
+      ) values (
+        ${`client-catalog:${catalogRequestId}`},'catalog.show',${payload}::jsonb,
+        ${input.correlationId},${`client-catalog:${catalogRequestId}:v${version}`},${payloadHash}
+      )
+    `);
+  return { catalogRequestId, state: "pending" as const };
+}
+
 export class PostgresClientCatalogRepository implements ClientCatalogRequestRepository {
   constructor(private readonly db: DrizzleDb) {}
 
@@ -250,66 +318,10 @@ export class PostgresClientCatalogRepository implements ClientCatalogRequestRepo
     correlationId: string;
     version?: 1 | 2;
   }): Promise<{ catalogRequestId: string; state: "pending" | "ready" }> {
-    const userId = canonicalUuid(input.userId);
-    const subjectKey = clientCatalogErasureSubjectKey(userId);
-    if (
-      !HASH_PATTERN.test(input.requestDigest) ||
-      input.correlationId.length < 1
-    ) {
-      return Promise.reject(new Error("client_catalog_request_invalid"));
-    }
-    const serviceCode = optionalFilter(input.serviceCode, 64);
-    const language = optionalFilter(input.language, 32);
-    const version = input.version ?? 1;
-    if (version !== 1 && version !== 2) {
-      return Promise.reject(new Error("client_catalog_request_invalid"));
-    }
     return withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
-        await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`${userId}:${input.requestDigest}`}, 0))`,
-        );
-        const existing = (
-          await tx.execute<{ catalogRequestId: string; state: string }>(sql`
-            select id as "catalogRequestId",state
-            from client_catalog_requests
-            where user_id=${userId}::uuid and request_digest=${input.requestDigest}
-            for update
-          `)
-        ).rows[0];
-        if (existing !== undefined) {
-          return {
-            catalogRequestId: existing.catalogRequestId,
-            state: state(existing.state),
-          };
-        }
-
-        const catalogRequestId = randomUUID();
-        await tx.execute(sql`
-          insert into client_catalog_requests (
-            id,user_id,request_digest,service_code,language
-          ) values (
-            ${catalogRequestId}::uuid,${userId}::uuid,${input.requestDigest},
-            ${serviceCode ?? null},${language ?? null}
-          )
-        `);
-        await tx.execute(sql`
-          insert into client_catalog_erasure_index (request_id,subject_key,expires_at)
-          select id,${subjectKey},expires_at from client_catalog_requests
-          where id=${catalogRequestId}::uuid
-        `);
-        const payload = canonicalPayload(catalogRequestId, version);
-        const payloadHash = createHash("sha256").update(payload).digest("hex");
-        await tx.execute(sql`
-          insert into integration_outbox (
-            idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash
-          ) values (
-            ${`client-catalog:${catalogRequestId}`},'catalog.show',${payload}::jsonb,
-            ${input.correlationId},${`client-catalog:${catalogRequestId}:v${version}`},${payloadHash}
-          )
-        `);
-        return { catalogRequestId, state: "pending" as const };
+        return createOrReplayClientCatalogRequestInTx(tx, input);
       }),
     );
   }

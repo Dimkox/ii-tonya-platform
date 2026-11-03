@@ -38,8 +38,6 @@ import type { BookingCallbackService } from "./booking-callback-service.js";
 import type { ClientAccountPackagesRepository } from "../../../packages/contracts/src/client-account-packages.js";
 import type {
   AdminService,
-  BookingService,
-  CatalogService,
   ClientCatalogService,
   ClientBookingService,
   ClientPrincipalResolver,
@@ -149,8 +147,6 @@ export interface AppDependencies {
   expertSession?: ExpertBrowserOptions;
   config: RuntimeConfig;
   conversationService: ConversationService;
-  bookingService: BookingService;
-  catalogService: CatalogService;
   privacyService: PrivacyService;
   erasureRequests?: ErasureRequestService;
   telegramDeletion?: TelegramDeletionCapability | undefined;
@@ -1053,8 +1049,6 @@ export async function buildTestApp(
         : {}),
     },
     conversationService: conversation,
-    bookingService: never as BookingService,
-    catalogService: never as CatalogService,
     privacyService: never as PrivacyService,
     adminService: never as AdminService,
     selarti: {
