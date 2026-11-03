@@ -126,6 +126,11 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0088_expert_promo_funnel_gift_timer.sql",
+  "packages/db/migrations/meta/0088_snapshot.json",
+  "packages/db/migrations/state/0088_manifest.json",
+  "packages/db/migrations/state/0088_sql_objects.json",
+
   "packages/db/migrations/0087_expert_promo_funnel_state.sql",
   "packages/db/migrations/meta/0087_snapshot.json",
   "packages/db/migrations/state/0087_manifest.json",
@@ -1494,6 +1499,22 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0088_expert_promo_funnel_gift_timer.sql",
+    "2301c780930e94580d769581dacd1c97060aa9a3956984667c420d8cf09b0497",
+  ],
+  [
+    "packages/db/migrations/meta/0088_snapshot.json",
+    "196dd3e214ad60f5dc0b977bf3d8451d72a4e7ea21ffd5ee34a3ad4e6fce331a",
+  ],
+  [
+    "packages/db/migrations/state/0088_manifest.json",
+    "fdbf48ad509ed8ddf999530769763a9b6f0ed7bb0196b39b6b068f4ea79a6907",
+  ],
+  [
+    "packages/db/migrations/state/0088_sql_objects.json",
+    "ea78ab1ad0c488e16f6cb0b954059809a297d8ca73bcfe62f30a4806707e49e3",
+  ],
+  [
     "packages/db/migrations/0087_expert_promo_funnel_state.sql",
     "861b9022dbf235f5fd994e9754773bc896c022bedac13874d481e0966477bdcb",
   ],
@@ -2508,7 +2529,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "cd07c9cb408acb8bb57bff352d0bcd4886743236e999c1df540543bd020403a9",
+    "3a01baaa77beb20e4b85a352ad19311aeb2ce9ad1dde85201313cc6c37d7f57c",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -2588,7 +2609,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "cd07c9cb408acb8bb57bff352d0bcd4886743236e999c1df540543bd020403a9",
+    "3a01baaa77beb20e4b85a352ad19311aeb2ce9ad1dde85201313cc6c37d7f57c",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -3773,6 +3794,9 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0088_snapshot.json", 1200906],
+    ["packages/db/migrations/state/0088_sql_objects.json", 1890684],
+
     ["packages/db/migrations/meta/0087_snapshot.json", 1200523],
     ["packages/db/migrations/state/0087_sql_objects.json", 1890198],
 

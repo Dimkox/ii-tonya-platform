@@ -49,3 +49,39 @@ export async function runExpertPromoGuideDelivery(
   }
   return { delivered, failed, skipped: false };
 }
+
+/** WAIT-T04 reminder texts; final wording is owner content (WAIT-T07). */
+export const FUNNEL_TIMER_TEXT = {
+  message6:
+    "Напоминаем: пригласите двух коллег по вашему коду и получите гайд. Отписаться от напоминаний: /optout_ref",
+  gift: "Ваш подарок ждёт: пригласите коллег по коду, чтобы получить гайд и бонус. Отписаться: /optout_ref",
+} as const;
+export async function runExpertPromoFunnelTimers(
+  ports: {
+    claimTimer(input: {
+      kind: "message6" | "gift";
+      limit: number;
+    }): Promise<{ userId: string; chatId: string }[]>;
+    sendMessage(input: { chatId: string; text: string }): Promise<unknown>;
+  },
+  config: { limit?: number } = {},
+) {
+  const result = { message6: 0, gift: 0, failed: 0 };
+  for (const kind of ["message6", "gift"] as const) {
+    for (const target of await ports.claimTimer({
+      kind,
+      limit: config.limit ?? 20,
+    })) {
+      try {
+        await ports.sendMessage({
+          chatId: target.chatId,
+          text: FUNNEL_TIMER_TEXT[kind],
+        });
+        result[kind]++;
+      } catch {
+        result.failed++;
+      }
+    }
+  }
+  return result;
+}

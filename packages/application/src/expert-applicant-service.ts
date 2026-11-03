@@ -18,6 +18,7 @@ type Command = ExpertApplicantScope & {
 };
 export interface ExpertApplicantRepository {
   isActiveResident?(scope: ExpertApplicantScope): Promise<boolean>;
+  optOutReferral?(scope: ExpertApplicantScope): Promise<boolean>;
   isVerificationPending?(scope: ExpertApplicantScope): Promise<boolean>;
   saveProfile?(
     input: Command & {
@@ -161,7 +162,7 @@ export function createExpertApplicantService(deps: {
       try {
         if (
           deps.separatedSales &&
-          !/^(?:\/(?:start|consent)(?: |$)|promo_[0-9a-f]{32}$)/u.test(
+          !/^(?:\/(?:start|consent)(?: |$)|\/optout_ref$|promo_[0-9a-f]{32}$)/u.test(
             input.text.trim(),
           )
         ) {
@@ -171,7 +172,7 @@ export function createExpertApplicantService(deps: {
         if (
           deps.verificationForm &&
           !(deps.separatedSales && input.text.startsWith("/profile")) &&
-          !/^(?:\/(?:start|consent)(?: |$)|promo_[0-9a-f]{32}$)/u.test(
+          !/^(?:\/(?:start|consent)(?: |$)|\/optout_ref$|promo_[0-9a-f]{32}$)/u.test(
             input.text.trim(),
           )
         ) {
@@ -211,6 +212,16 @@ export function createExpertApplicantService(deps: {
               };
         }
         if (input.text.startsWith("/profile")) return { status: "rejected" };
+        if (
+          input.text.trim() === "/optout_ref" &&
+          deps.repository.optOutReferral
+        )
+          return {
+            status: "handled",
+            text: (await deps.repository.optOutReferral(scope))
+              ? "Готово: напоминания о реферальной программе отключены."
+              : "Сначала зарегистрируйтесь: отправьте /start.",
+          };
         // WAIT-002: after consent a typed inviter code converges with /start promo_….
         const typedCode = /^(promo_[0-9a-f]{32})$/u.exec(input.text.trim());
         const start =

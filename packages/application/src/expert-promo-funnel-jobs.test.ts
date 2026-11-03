@@ -37,3 +37,24 @@ describe("WAIT-T03 guide delivery job", () => {
     expect(p.markGuideDelivered).not.toHaveBeenCalled();
   });
 });
+import { runExpertPromoFunnelTimers } from "./expert-promo-funnel-jobs.js";
+describe("WAIT-T04 funnel timers", () => {
+  it("sends each claimed timer once and counts failures", async () => {
+    const claimTimer = vi.fn(async ({ kind }: { kind: string }) =>
+      kind === "message6"
+        ? [{ userId: "a", chatId: "1" }]
+        : [{ userId: "b", chatId: "2" }],
+    );
+    const sendMessage = vi
+      .fn()
+      .mockResolvedValueOnce({})
+      .mockRejectedValueOnce(new Error("x"));
+    expect(
+      await runExpertPromoFunnelTimers({ claimTimer, sendMessage }),
+    ).toEqual({
+      message6: 1,
+      gift: 0,
+      failed: 1,
+    });
+  });
+});

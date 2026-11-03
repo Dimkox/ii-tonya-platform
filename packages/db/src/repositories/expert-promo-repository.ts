@@ -198,6 +198,17 @@ export class PostgresExpertPromoRepository {
       replay,
     };
   }
+  /** WAIT-T04: /optout_ref stops referral reminders for this promo bot identity. */
+  async optOutReferral(scope: {
+    botKey: string;
+    telegramUserId: string;
+  }): Promise<boolean> {
+    if (!/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId)) return false;
+    const r = await this.db.execute(
+      sql`update expert_promo_funnel_state f set opt_out_ref=true,opt_out_at=coalesce(f.opt_out_at,clock_timestamp()),last_interaction_at=clock_timestamp() from channel_identities c where c.user_id=f.user_id and c.provider='telegram' and c.bot_key=${scope.botKey} and c.status='active' and c.external_id=${scope.telegramUserId} returning f.user_id`,
+    );
+    return r.rows.length > 0;
+  }
   /** BOT-02.2: an active, verified resident is routed to the expert bot. */
   async isActiveResident(scope: { telegramUserId: string }): Promise<boolean> {
     if (!/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId)) return false;

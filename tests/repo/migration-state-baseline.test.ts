@@ -7,7 +7,7 @@ const read = (path: string) =>
   existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
 
 describe("database-derived migration state baseline", () => {
-  it.each([81, 82, 83, 84, 85, 86, 87])(
+  it.each([81, 82, 83, 84, 85, 86, 87, 88])(
     "records protected private schemas and PUBLIC execution at state %i",
     (last) => {
       const tag = String(last).padStart(4, "0");
@@ -273,7 +273,7 @@ describe("database-derived migration state baseline", () => {
 
   it.each([
     39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 70, 71, 72, 73, 74, 75,
-    76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87,
+    76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
   ])(
     "binds state %i evidence to every SQL input and exact snapshot bytes",
     (last) => {

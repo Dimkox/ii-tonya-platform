@@ -94,4 +94,35 @@ describe("WAIT-T03 guide delivery authority", () => {
     ).rows;
     expect(state).toEqual([{ status: "WAITING_FOR_LAUNCH" }]);
   });
+  it("WAIT-T04 fires 48h and 5d timers once, honours opt-out and count>=2", async () => {
+    const owner = await identity();
+    await promo.register(command(owner));
+    const quiet = await identity();
+    await promo.register(command(quiet));
+    const qualified = await qualifiedOwner();
+    await database.db.execute(
+      sql`update expert_promo_funnel_state set code_issued_at=code_issued_at-interval '6 days',last_interaction_at=last_interaction_at where user_id in (${owner.userId}::uuid,${quiet.userId}::uuid,${qualified.userId}::uuid)`,
+    );
+    expect(await promo.optOutReferral(quiet)).toBe(true);
+    const m6 = await funnel.claimTimer({ kind: "message6", limit: 50 });
+    const ids = m6.map((r) => r.userId);
+    expect(ids).toContain(owner.userId);
+    expect(ids).not.toContain(quiet.userId);
+    expect(ids).not.toContain(qualified.userId);
+    expect(
+      (await funnel.claimTimer({ kind: "message6", limit: 50 })).map(
+        (r) => r.userId,
+      ),
+    ).not.toContain(owner.userId);
+    expect(
+      (await funnel.claimTimer({ kind: "gift", limit: 50 })).map(
+        (r) => r.userId,
+      ),
+    ).toContain(owner.userId);
+    expect(
+      (await funnel.claimTimer({ kind: "gift", limit: 50 })).map(
+        (r) => r.userId,
+      ),
+    ).not.toContain(owner.userId);
+  });
 });
