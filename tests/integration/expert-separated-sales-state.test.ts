@@ -200,6 +200,47 @@ async function expire(invoice: string) {
     );
   });
 }
+/**
+ * The held checkout never makes a first provider POST (no receipt-contact
+ * disclosure without the cancellation fence). Fixtures therefore model a
+ * provider object that already exists, bind it only through the manager GET
+ * recovery path, and then open the checkout from that authoritative object.
+ */
+async function seedExisting(
+  local: { existing(bound: Record<string, string>): void },
+  invoiceId: string,
+) {
+  const frame = (
+    await db.db.execute<{ operationId: string; userId: string }>(
+      sql`select o.id as "operationId",i.user_id as "userId" from expert_onboarding_invoices i join expert_onboarding_payment_operations o on o.invoice_id=i.id where i.id=${invoiceId}::uuid`,
+    )
+  ).rows[0]!;
+  local.existing({
+    order_id: invoiceId,
+    operation_id: frame.operationId,
+    user_id: frame.userId,
+    purpose: "onboarding",
+  });
+}
+async function bindExisting(
+  checkout: InstanceType<typeof PostgresHeldOnboardingCheckout>,
+  local: { existing(bound: Record<string, string>): void },
+  invoiceId: string,
+  paymentId: string,
+) {
+  await seedExisting(local, invoiceId);
+  await checkout.recoverProviderObject(
+    session,
+    invoiceId,
+    paymentId,
+    randomUUID(),
+  );
+  return checkout.createCheckout({ invoiceId });
+}
+async function openExisting(f: Awaited<ReturnType<typeof approved>>) {
+  return bindExisting(f.checkout, f.local, f.invoice.id, f.paymentId);
+}
+
 it("explicit choices deny foreign ownership, stale revision, replay conflict and base-quarter SKU", async () => {
   const f = await owner(),
     other = await owner();
@@ -276,7 +317,7 @@ it("scheduler does not disclose promotion or invoice to a silent owner, and unpa
 it("expired waiting payment is GET-verified and canceled, never captured", async () => {
   const f = await approved();
   try {
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     await expire(f.invoice.id);
     f.local.waiting();
     const { createSeparatedSalesRunner } =
@@ -335,6 +376,8 @@ it("unknown create never becomes a second POST and recovers only through actual 
     await expect(
       f.checkout.createCheckout({ invoiceId: f.invoice.id }),
     ).rejects.toThrow();
+    // Current held checkout never sends a first create: without a bound
+    // provider object recovery stays unavailable and nothing is POSTed.
     expect(
       (
         await f.checkout.recoverCheckout({
@@ -342,8 +385,9 @@ it("unknown create never becomes a second POST and recovers only through actual 
           operationId: f.invoice.operationId,
         })
       ).kind,
-    ).toBe("pending");
-    expect(f.local.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+    ).toBe("unavailable");
+    expect(f.local.requests.filter((r) => r.method === "POST")).toHaveLength(0);
+    await seedExisting(f.local, f.invoice.id);
     await f.checkout.recoverProviderObject(
       session,
       f.invoice.id,
@@ -358,7 +402,7 @@ it("unknown create never becomes a second POST and recovers only through actual 
         })
       ).kind,
     ).toBe("ready");
-    expect(f.local.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+    expect(f.local.requests.filter((r) => r.method === "POST")).toHaveLength(0);
   } finally {
     await f.local.stop();
   }
@@ -392,7 +436,7 @@ it("deletion during pre-send decryption cancels actual first disclosure", async 
       operationId: f.invoice.operationId,
     });
     pending = send.catch(() => {});
-    await reached;
+    await Promise.race([reached, pending]);
     await db.db.execute(
       sql`update users set active=false where id=${f.userId}::uuid`,
     );
@@ -404,7 +448,7 @@ it("deletion during pre-send decryption cancels actual first disclosure", async 
         await db.db.execute(
           sql`select encrypted_body from expert_sales_provider_requests where invoice_id=${f.invoice.id}::uuid`,
         )
-      ).rows[0]?.encrypted_body,
+      ).rows[0]?.encrypted_body ?? null,
     ).toBeNull();
   } finally {
     release();
@@ -415,7 +459,7 @@ it("deletion during pre-send decryption cancels actual first disclosure", async 
 it("proven late money remains immutable recovery work without price lock or interview", async () => {
   const f = await approved();
   try {
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     await expire(f.invoice.id);
     const binding = (await f.repo.findOnboardingPaymentBinding(f.invoice.id))!;
     const client = createYooKassaClient(
@@ -680,7 +724,7 @@ it("an explicit unpaid intake transition preserves the original form and enters 
 it("on-time capture reported after checkout expiry still locks its original bound terms", async () => {
   const f = await approved();
   try {
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     f.local.waiting();
     await f.checkout.reconcile(f.invoice.id);
     const observation = await f.local.client.inspect(f.paymentId);
@@ -711,7 +755,7 @@ it("on-time capture reported after checkout expiry still locks its original boun
 it("a proven capture after erasure retains money and recovery but no paid lock or receipt PII", async () => {
   const f = await approved();
   try {
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     f.local.waiting();
     await f.checkout.reconcile(f.invoice.id);
     await db.db.execute(
@@ -737,7 +781,7 @@ it("a proven capture after erasure retains money and recovery but no paid lock o
         await db.db.execute(
           sql`select encrypted_body from expert_sales_provider_requests where invoice_id=${f.invoice.id}::uuid and kind='create'`,
         )
-      ).rows[0]?.encrypted_body,
+      ).rows[0]?.encrypted_body ?? null,
     ).toBeNull();
   } finally {
     await f.local.stop();
@@ -765,7 +809,7 @@ it("checkout TTL refreshes before the commercial stage without repricing or a ne
 it("erasing the submitted form alone blocks delayed captured money from re-admitting the applicant", async () => {
   const f = await approved();
   try {
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     f.local.waiting();
     await f.checkout.reconcile(f.invoice.id);
     await db.db.execute(
@@ -795,7 +839,7 @@ it("two genuine captures serialize to one lifetime winner and explicit duplicate
   const f = await approved();
   let second: Awaited<ReturnType<typeof startHeldOnboardingLocal>> | undefined;
   try {
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     f.local.waiting();
     await f.checkout.reconcile(f.invoice.id);
     const first = await f.local.client.inspect(f.paymentId);
@@ -828,7 +872,7 @@ it("two genuine captures serialize to one lifetime winner and explicit duplicate
       vatCode: 1,
       mode: "test",
     });
-    await checkout.createCheckout({ invoiceId: invoice.id });
+    await bindExisting(checkout, second, invoice.id, second.paymentId);
     second.waiting();
     await checkout.reconcile(invoice.id);
     await Promise.all([
@@ -868,7 +912,7 @@ it("review R3 supplemental answers preserve the submitted approval and capture a
       expectedRevision: form.revision,
       answer: "Дополнение без изменения отправленной анкеты",
     });
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     f.local.waiting();
     await f.checkout.reconcile(f.invoice.id);
     await f.checkout.reconcile(f.invoice.id);
@@ -928,10 +972,12 @@ it("review R7 unresolved owner does not abort the scheduler batch", async () => 
   const f = await approved(),
     g = await approved();
   try {
-    f.local.dropCreate();
-    await expect(
-      f.checkout.createCheckout({ invoiceId: f.invoice.id }),
-    ).rejects.toThrow();
+    // Leave f with a genuinely unresolved (dispatched, outcome unknown)
+    // provider request: the capture is sent but its response is lost.
+    await openExisting(f);
+    f.local.waiting();
+    f.local.dropCapture();
+    await f.checkout.reconcile(f.invoice.id).catch(() => {});
     await ageBase(f.base.id, 97);
     await ageBase(g.base.id, 97);
     await expire(f.invoice.id);
@@ -1035,7 +1081,7 @@ it.each(["succeeded", "canceled"] as const)(
   async (terminal) => {
     const f = await approved();
     try {
-      await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+      await openExisting(f);
       f.local.waiting();
       f.local.dropCapture(terminal);
       await expect(f.checkout.reconcile(f.invoice.id)).rejects.toThrow();
@@ -1084,7 +1130,7 @@ it.each(["succeeded", "canceled"] as const)(
 it("review R13 lost cancel ACK is resolved by GET without repost", async () => {
   const f = await approved();
   try {
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     f.local.waiting();
     await expire(f.invoice.id);
     f.local.dropCancel();
@@ -1143,7 +1189,7 @@ it("review R2 expired original bridge quote retains finite fiscal custody for la
         )
       ).rows[0]?.redacted_at,
     ).toBeNull();
-    await f.checkout.createCheckout({ invoiceId: f.invoice.id });
+    await openExisting(f);
     await expire(f.invoice.id);
     await f.sales.transition(command(f.scope));
     const latest = (
@@ -1168,7 +1214,7 @@ it("review R2 expired original bridge quote retains finite fiscal custody for la
         mode: "test",
       });
       await expect(
-        checkout.createCheckout({ invoiceId: latest.id }),
+        bindExisting(checkout, replacement, latest.id, replacement.paymentId),
       ).resolves.toHaveProperty("url");
     } finally {
       await replacement.stop();
@@ -1190,10 +1236,7 @@ it("review R6 operational recovery requires fresh manager and records the real G
     await import("../../packages/application/src/expert-verification-service.js");
   const app = Fastify({ logger: false });
   try {
-    f.local.dropCreate();
-    await expect(
-      f.checkout.createCheckout({ invoiceId: f.invoice.id }),
-    ).rejects.toThrow();
+    await seedExisting(f.local, f.invoice.id);
     const token = SYNTHETIC_FIXTURE_VALUE_2,
       sessionHash = `sha256:${hash(token)}`;
     await db.db.execute(
@@ -1265,7 +1308,7 @@ it("review R6 operational recovery requires fresh manager and records the real G
         })
       ).statusCode,
     ).toBe(403);
-    expect(f.local.requests.filter((r) => r.method === "POST")).toHaveLength(1);
+    expect(f.local.requests.filter((r) => r.method === "POST")).toHaveLength(0);
   } finally {
     await app.close();
     await f.local.stop();
@@ -1403,6 +1446,13 @@ it.each(["waiting", "canceled"] as const)(
           client: { getPayment: (id) => f.local.client.inspect(id) },
         },
       })!;
+      await seedExisting(f.local, f.invoice.id);
+      await f.checkout.recoverProviderObject(
+        session,
+        f.invoice.id,
+        f.paymentId,
+        randomUUID(),
+      );
       expect(
         await capability.service.checkout(session, f.invoice.id),
       ).toMatchObject({ kind: "ok", payment: { status: "ready" } });

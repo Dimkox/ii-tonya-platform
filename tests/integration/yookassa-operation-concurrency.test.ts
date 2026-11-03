@@ -26,8 +26,9 @@ async function settleCapturedPayment(operationId: string, paymentId: string) {
   const operation = await repository.bindProviderObject(operationId, paymentId);
   const capturedAt = (
     await db.execute<{ at: string }>(sql`
+      -- YooKassa reports millisecond ISO-8601 instants (canonical evidence).
       select to_char(clock_timestamp() at time zone 'UTC',
-        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as at
+        'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at
     `)
   ).rows[0]!.at;
   const client = createYooKassaClient(

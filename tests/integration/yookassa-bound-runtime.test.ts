@@ -478,6 +478,7 @@ it("concurrent webhook and worker acceptance produces one canonical settlement",
   };
   // Hold the common order row until both independent settlement transactions
   // are observed waiting on PostgreSQL locks, not merely scheduled together.
+  // The second one may wait on the subject advisory lock held by the first.
   const lock = await database.db.$client.connect();
   let waiters = 0;
   let outcomes: PromiseSettledResult<unknown>[] = [];
@@ -495,7 +496,8 @@ it("concurrent webhook and worker acceptance produces one canonical settlement",
           select count(*)::int as count from pg_stat_activity
           where datname=current_database() and wait_event_type='Lock'
             and (query ilike '%expert_residency_provider_event_inbox%'
-              or query ilike '%expert_residency_orders%')
+              or query ilike '%expert_residency_orders%'
+              or query ilike '%pg_advisory_xact_lock%')
         `);
         waiters = Number(observed.rows[0]?.count ?? 0);
         if (waiters >= 2) break;

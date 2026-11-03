@@ -259,7 +259,9 @@ export async function startPublicExpertGatewayProvider(
  * canonical quote deadlines, MFA and public coverage. No host clock is changed.
  * Debian package and official PG image are pinned; the generated image is local.
  */
-export async function startPublicExpertFuturePostgres() {
+export async function startPublicExpertFuturePostgres({
+  advanceable = true,
+} = {}) {
   const directory = await mkdtemp(join(tmpdir(), "public-expert-pg-clock-"));
   const image = "ii-tonya-public-journey-clock:pg17.5-faketime0.9.10-2.1";
   const dockerfile = `FROM postgres:17.5-bookworm@sha256:fbcea1bd13b6a882cd6caa6b58db3ae5c102efe50ec625b3e2a5cbc50db5bfe4
@@ -275,18 +277,39 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
     let offsetSeconds = Math.ceil(
       (Date.parse("2027-01-11T12:00:00.000Z") - Date.now()) / 1000,
     );
-    await (await import("node:fs/promises")).chmod(directory, 0o755);
-    await writeFile(
-      join(directory, "clock"),
-      `${offsetSeconds >= 0 ? "+" : ""}${offsetSeconds}s`,
-    );
+    const fakeOffset = `${offsetSeconds >= 0 ? "+" : ""}${offsetSeconds}s`;
+    // advanceable: the clock file lives inside the container (no host bind
+    // mount, so it also works with a remote Docker daemon) and libfaketime
+    // re-reads it on every time() call, so advance() moves the PG clock at once.
+    // Static: offset in FAKETIME env, parsed once per process. Use static when
+    // advance() is not needed and the file has lock waits: the per-call file
+    // re-read does fopen/malloc inside PG's SIGALRM timeout handler and can
+    // corrupt the heap (backend SIGABRT, cluster crash recovery, 57P03).
+    const clockFile = "/tmp/journey-clock";
+    const clockArgs = advanceable
+      ? [
+          "-e",
+          `JOURNEY_CLOCK=${fakeOffset}`,
+          "-e",
+          `FAKETIME_TIMESTAMP_FILE=${clockFile}`,
+          "-e",
+          "FAKETIME_NO_CACHE=1",
+          "--entrypoint",
+          "sh",
+        ]
+      : ["-e", `FAKETIME=${fakeOffset}`];
+    const command = advanceable
+      ? [
+          "-c",
+          `printf %s "$JOURNEY_CLOCK" > ${clockFile} && exec docker-entrypoint.sh postgres`,
+        ]
+      : [];
     container = execFileSync(
       "docker",
       [
         "run",
         "-d",
-        "--mount",
-        `type=bind,src=${directory},dst=/journey-clock,readonly`,
+        ...clockArgs,
         "--user",
         "postgres",
         "-p",
@@ -300,14 +323,11 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
         "-e",
         "LD_PRELOAD=/usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1",
         "-e",
-        "FAKETIME_TIMESTAMP_FILE=/journey-clock/clock",
-        "-e",
-        "FAKETIME_NO_CACHE=1",
-        "-e",
         "DONT_FAKE_MONOTONIC=1",
         "-e",
         "FAKETIME_DONT_FAKE_MONOTONIC=1",
         image,
+        ...command,
       ],
       { encoding: "utf8" },
     ).trim();
@@ -356,11 +376,25 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
       offsetSeconds,
       imageId,
       async advance(seconds) {
+        if (!advanceable)
+          throw Error(
+            "startPublicExpertFuturePostgres: advance() needs advanceable clock",
+          );
         offsetSeconds += seconds;
         this.offsetSeconds = offsetSeconds;
-        await writeFile(
-          join(directory, "clock"),
-          `${offsetSeconds >= 0 ? "+" : ""}${offsetSeconds}s`,
+        // Atomic replace: libfaketime never reads a half-written file.
+        execFileSync(
+          "docker",
+          [
+            "exec",
+            "-e",
+            `JOURNEY_CLOCK=${offsetSeconds >= 0 ? "+" : ""}${offsetSeconds}s`,
+            container,
+            "sh",
+            "-c",
+            `printf %s "$JOURNEY_CLOCK" > ${clockFile}.next && mv ${clockFile}.next ${clockFile}`,
+          ],
+          { stdio: "pipe" },
         );
       },
       async stop() {

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import {
   mkdtemp,
@@ -391,11 +392,26 @@ it("normal migrateDb backfills a genuinely approved main73 rich service and pres
     await database.db.execute(
       sql`alter table expert_card_drafts add column initial_schedule jsonb; alter table resident_card_versions add column initial_schedule jsonb`,
     );
+    // Promo registration (0087) records funnel state; it is not part of the
+    // main73 boundary and is removed together with the schedule projections.
+    await database.db.execute(
+      sql.raw(
+        readFileSync(
+          "packages/db/migrations/0087_expert_promo_funnel_state.sql",
+          "utf8",
+        ).split("--> statement-breakpoint")[0]!,
+      ),
+    );
+    // Current card approval also records the 0075 lifecycle subject and work
+    // notice; model only the columns it writes and drop it before migrateDb creates it.
+    await database.db.execute(
+      sql`create table resident_lifecycle_subjects(user_id uuid primary key,expert_id uuid,activation_kind text,activation_order_id uuid,activated_at timestamptz,first_main_invoice_order_id uuid,first_main_invoice_at timestamptz,last_scanned_at timestamptz not null default '-infinity'); create table resident_work_notices(id uuid primary key default gen_random_uuid(),user_id uuid,draft_id uuid,kind text,review_id uuid,target_bot_id text,target_bot_key text,target_chat_id text,identity_id uuid,consent_authority jsonb,unique(review_id,kind))`,
+    );
     const f = await secondRichFixture(),
       approved = await f.approve();
     expect(approved.reviewId).toBeTruthy();
     await database.db.execute(
-      sql`alter table expert_card_drafts drop column initial_schedule; alter table resident_card_versions drop column initial_schedule`,
+      sql`alter table expert_card_drafts drop column initial_schedule; alter table resident_card_versions drop column initial_schedule; drop table expert_promo_funnel_state; drop table resident_lifecycle_subjects; drop table resident_work_notices`,
     );
     const mainState = JSON.parse(
       await readFile(join(source, "state/0073_sql_objects.json"), "utf8"),
@@ -448,7 +464,7 @@ it("normal migrateDb backfills a genuinely approved main73 rich service and pres
           sql`select count(*)::int n from drizzle.__drizzle_migrations`,
         )
       ).rows[0]?.n,
-    ).toBe(75);
+    ).toBe(journal.entries.length);
   } finally {
     await database?.stop();
     await rm(folder, { recursive: true, force: true });

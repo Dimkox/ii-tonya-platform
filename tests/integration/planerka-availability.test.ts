@@ -380,15 +380,25 @@ it("preserves successful freshness when deferring a failed refresh", async () =>
 it("omits an occupied row while preserving another fresh choice in the same service", async () => {
   const f = await fixture();
   const userId = await database.createUser();
-  await new PostgresBookingRepository(database.db).reserve({
+  // Use the database clock rounded up to JS millisecond precision: slot
+  // freshness rejects observations that are later than the command instant.
+  const reserveNow = new Date(
+    (
+      await database.db.execute<{ now: Date | string }>(
+        sql`select date_trunc('milliseconds',clock_timestamp())+interval '1 millisecond' as now`,
+      )
+    ).rows[0]!.now,
+  );
+  const reservation = await new PostgresBookingRepository(database.db).reserve({
     userId,
     slotId: f.slotId,
-    now: new Date(),
+    now: reserveNow,
     idempotencyKey: randomUUID(),
     correlationId: randomUUID(),
     minimumLeadMs: 86400000,
     confirmationBufferMs: 3600000,
   });
+  expect(reservation.kind).not.toBe("unavailable");
   const row = (
     await database.db.execute<{ id: string; observedAt: Date | string }>(
       sql`insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,capacity,observed_at) select expert_service_id,provider,${randomUUID()},starts_at+interval '2 hours',ends_at+interval '2 hours',1,date_trunc('milliseconds',clock_timestamp()) from slots where id=${f.slotId}::uuid returning id,observed_at as "observedAt"`,

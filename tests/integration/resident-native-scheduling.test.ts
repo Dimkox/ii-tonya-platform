@@ -274,6 +274,18 @@ beforeAll(async () => {
     );
   });
   await database.enableExpertReferralCommands();
+  // Current promo registration writes the 0087 funnel state table.
+  const fs = await import("node:fs");
+  await database.db.execute(
+    sql.raw(
+      fs
+        .readFileSync(
+          "packages/db/migrations/0087_expert_promo_funnel_state.sql",
+          "utf8",
+        )
+        .split("--> statement-breakpoint")[0]!,
+    ),
+  );
   expect(
     (await database.db.execute(sql`show server_version_num`)).rows[0]
       ?.server_version_num,
@@ -361,6 +373,8 @@ beforeAll(async () => {
         .digest("hex"),
     })),
   ).toEqual(manifest.migrations);
+  // Remove the fixture-only funnel table so the real 0087 migration applies.
+  await database.db.execute(sql`drop table expert_promo_funnel_state`);
   for (const entry of journal.entries.filter((entry) => entry.idx > 75))
     await database.db.execute(
       sql.raw(readFileSync(`packages/db/migrations/${entry.tag}.sql`, "utf8")),

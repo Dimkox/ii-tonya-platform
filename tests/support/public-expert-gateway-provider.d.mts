@@ -10,7 +10,9 @@ export interface PublicExpertGatewayProvider {
   command(command: Record<string, unknown>): Promise<Record<string, unknown>>;
   close(): Promise<void>;
 }
-export function startPublicExpertFuturePostgres(): Promise<PublicExpertFuturePostgres>;
+export function startPublicExpertFuturePostgres(options?: {
+  advanceable?: boolean;
+}): Promise<PublicExpertFuturePostgres>;
 export function startPublicExpertGatewayProvider(
   connectionString: string,
   login: string,

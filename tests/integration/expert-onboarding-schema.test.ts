@@ -244,9 +244,17 @@ describe("applicant queue foundation (PG17.5)", () => {
     }
   });
   it("matches the hand-authored state supplement for new constraints and indexes", async () => {
+    // The fixture replays the full chain, so compare against the latest state.
+    const latestTag = (
+      JSON.parse(
+        readFileSync("packages/db/migrations/meta/_journal.json", "utf8"),
+      ) as { entries: Array<{ tag: string }> }
+    ).entries
+      .at(-1)!
+      .tag.slice(0, 4);
     const expected = JSON.parse(
       readFileSync(
-        "packages/db/migrations/state/0084_sql_objects.json",
+        `packages/db/migrations/state/${latestTag}_sql_objects.json`,
         "utf8",
       ),
     ) as {

@@ -27,10 +27,14 @@ type ProviderStats = {
 export async function startPublicHeldOnboardingFixture(
   options: {
     replay?: Parameters<typeof startExpertReferralTestDatabase>[0];
+    /** false: static PG clock, advance() throws (no per-call clock file re-read). */
+    advanceable?: boolean;
   } = {},
 ) {
   const NativeDate = Date;
-  const clock = await startPublicExpertFuturePostgres();
+  const clock = await startPublicExpertFuturePostgres({
+    advanceable: options.advanceable ?? true,
+  });
   globalThis.Date = new Proxy(NativeDate, {
     construct(target, args) {
       return Reflect.construct(

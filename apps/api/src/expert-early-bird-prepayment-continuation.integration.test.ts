@@ -28,7 +28,13 @@ let db: ExpertReferralTestDatabase,
   tariff: string,
   sequence = 880000;
 const start = Date.parse("2027-01-11T00:00:00+03:00"),
-  enrollment = Date.parse("2026-11-01T00:00:00+03:00");
+  enrollment = Date.parse("2026-11-01T00:00:00+03:00"),
+  // Frozen quote clock. Base offers are stamped with the real database clock
+  // and quotes must not precede them, so keep the frozen instant ahead of the
+  // real clock instead of pinning a calendar date that later becomes the past.
+  frozenNow = new Date(
+    Math.max(Date.parse("2026-11-02T00:00:00Z"), Date.now() + 60 * 60 * 1000),
+  ).toISOString();
 const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-continuation-only";
 const policy = {
   botId: "1",
@@ -55,7 +61,7 @@ beforeAll(async () => {
     "insert into early_bird_launch_configs(phase,enrollment_start_at,client_start_at,promo_deadline_days,final_call_trigger_at) values('WAVE_1_EARLY_BIRD','2026-11-01T00:00:00+03','2027-01-11T00:00:00+03',10,'2026-12-28T10:00:00+03')",
   );
   await q(
-    "create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$select '2026-11-02T00:00:00Z'::timestamptz$$",
+    `create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$select '${frozenNow}'::timestamptz$$`,
   );
   tariff = await db.createResidencyTariff({
     tariffKey: "PRO",
@@ -325,7 +331,7 @@ async function fixture(choice: "now" | "later", owner = false) {
     phase: "WAVE_1_EARLY_BIRD",
     enrollmentStartMs: enrollment,
     clientStartMs: start,
-    now: () => Date.parse("2026-11-02T00:00:00Z"),
+    now: () => Date.parse(frozenNow),
   });
   const input = () => ({ ...scope, updateId: ++sequence, text: "/my_tariff" });
   const click = () =>
