@@ -278,6 +278,20 @@ describe("release assets", () => {
       validate({ SELARTI_ENABLED: "true", SELARTI_API_KEY: "k" }).status,
     ).not.toBe(0);
     expect(validate({ PLANERKA_ENABLED: "true" }).status).not.toBe(0);
+    expect(validate({ SELARTI_ENABLED: "maybe" }).status).not.toBe(0);
+    expect(
+      validate({ PLANERKA_AVAILABILITY_ENABLED: "true" }).stderr,
+    ).toContain("requires PLANERKA_RECOVERY_ENABLED=true");
+    expect(validate({ PLANERKA_RECOVERY_ENABLED: "true" }).status).not.toBe(0);
+    expect(
+      validate({
+        PLANERKA_RECOVERY_ENABLED: "true",
+        PLANERKA_AVAILABILITY_ENABLED: "true",
+        PLANERKA_CREATE_ENABLED: "true",
+        PLANERKA_API_KEY: "k",
+        PLANERKA_ACCOUNT_ID: "1",
+      }).status,
+    ).toBe(0);
     expect(
       validate({
         EXPERT_RESIDENCY_BILLING_ENABLED: "true",
