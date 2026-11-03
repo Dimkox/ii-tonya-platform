@@ -165,6 +165,8 @@ const HAND_SQL_FUNCTIONS = [
   "early_bird_private.public_snapshot",
   "early_bird_private.public_source_data",
   "early_bird_private.public_source_valid",
+  "early_bird_private.public_sync_sales_terminal",
+  "early_bird_private.public_sync_sales_terminal_trigger",
   "early_bird_private.public_time",
   "early_bird_private.public_wave_application",
   "early_bird_private.standard_admit_send",
@@ -547,6 +549,7 @@ const HAND_SQL_TRIGGERS = [
   "public_onboarding_state_guard",
   "public_provider_identity_guard",
   "public_provider_identity_immutable",
+  "public_sales_terminal_projection",
   "reconciliation_mismatches_append_only",
   "resident_approved_services",
   "resident_card_correction_source",
@@ -703,7 +706,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(85);
+    expect(newest).toBe(86);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );

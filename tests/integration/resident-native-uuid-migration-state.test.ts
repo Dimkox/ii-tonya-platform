@@ -13,6 +13,7 @@ import {
   captureMigrationSqlState,
   normalizeMigrationSnapshot,
 } from "../../packages/db/src/testkit/migration-state.js";
+import { replayMigrationsThrough } from "../../packages/db/src/testkit/replay-migrations-through.js";
 
 const folder = "packages/db/migrations";
 const latest = 85;
@@ -24,7 +25,7 @@ let database: TestDatabase;
 let output: string;
 beforeAll(async () => {
   database = await startDisposableTestPostgres();
-  await database.migrate();
+  await replayMigrationsThrough(database.db, latest);
 }, 120_000);
 afterAll(async () => {
   try {
@@ -40,7 +41,9 @@ it("reproduces canonical0085 snapshot and exact SQL state from a full PostgreSQL
       ?.server_version_num,
   ).toBe("170005");
   const journal = read(`${folder}/meta/_journal.json`);
-  expect(journal.entries.at(-1)).toMatchObject({
+  expect(
+    journal.entries.find((entry: { idx: number }) => entry.idx === latest),
+  ).toMatchObject({
     idx: latest,
     tag: "0085_resident_native_uuid_sources",
     breakpoints: true,
@@ -52,7 +55,9 @@ it("reproduces canonical0085 snapshot and exact SQL state from a full PostgreSQL
   expect(manifest.migrations.slice(0, latest)).toEqual(
     read(`${folder}/state/0084_manifest.json`).migrations,
   );
-  for (const entry of journal.entries)
+  for (const entry of journal.entries.filter(
+    (entry: { idx: number }) => entry.idx <= latest,
+  ))
     expect(manifest.migrations[entry.idx]).toEqual({
       idx: entry.idx,
       tag: entry.tag,

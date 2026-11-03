@@ -14,6 +14,7 @@ import {
   captureMigrationSqlState,
   normalizeMigrationSnapshot,
 } from "../../packages/db/src/testkit/migration-state.js";
+import { replayMigrationsThrough } from "../../packages/db/src/testkit/replay-migrations-through.js";
 import {
   buildEarlyBirdRoleProvisioningSql,
   loadEarlyBirdRoleCapabilities,
@@ -40,16 +41,44 @@ let database: TestDatabase;
 let output: string;
 const limitedPools: TestDatabase["db"]["$client"][] = [];
 beforeAll(async () => {
-  database = await startDisposableTestPostgres();
-  const journal = read(`${folder}/meta/_journal.json`);
-  for (const entry of journal.entries.filter(
-    (entry: { idx: number }) => entry.idx <= latest,
-  ))
-    for (const statement of readFileSync(
-      `${folder}/${entry.tag}.sql`,
-      "utf8",
-    ).split("--> statement-breakpoint"))
-      if (statement.trim()) await database.db.$client.query(statement);
+  let stage: "postgres_start" | "replay_prefix_0083" = "postgres_start";
+  try {
+    database = await startDisposableTestPostgres();
+    stage = "replay_prefix_0083";
+    await replayMigrationsThrough(database.db, latest);
+  } catch (error) {
+    // Keep the stage and machine code, never SQL, credentials or raw messages.
+    const failure = error as { code?: unknown; cause?: { code?: unknown } };
+    const allowedStates = new Set([
+      "08006",
+      "0A000",
+      "23502",
+      "23503",
+      "23505",
+      "23514",
+      "3F000",
+      "40001",
+      "40P01",
+      "42501",
+      "42601",
+      "42703",
+      "42710",
+      "42883",
+      "42P01",
+      "42P07",
+      "55P03",
+      "57014",
+      "P0001",
+      "XX000",
+    ]);
+    const state = [failure?.code, failure?.cause?.code].find(
+      (code): code is string =>
+        typeof code === "string" && allowedStates.has(code),
+    );
+    throw new Error(
+      `early_bird_launch_state_setup_failed:${stage}:sqlstate=${state ?? "unavailable"}`,
+    );
+  }
 }, 120_000);
 afterAll(async () => {
   await Promise.all(limitedPools.map((pool) => pool.end()));

@@ -654,14 +654,26 @@ async function nativeFixture(
   const target = new Date(
     Date.now() + (options.near ? 20 * 60000 : 3 * 86400000),
   );
-  const date = target.toISOString().slice(0, 10),
-    start = options.near ? target.toISOString().slice(11, 16) : "09:00",
-    end = options.near ? "23:59" : "14:00";
+  // Keep the near UTC instant, but place it in a full local working morning.
+  // Fixed IANA Etc/GMT offsets have reversed signs and no DST transitions.
+  let offsetHours = 9 - target.getUTCHours();
+  if (offsetHours < -12) offsetHours += 24;
+  const localTarget = options.near
+      ? new Date(target.getTime() + offsetHours * 3600000)
+      : target,
+    timezone = options.near
+      ? offsetHours === 0
+        ? "Etc/UTC"
+        : `Etc/GMT${offsetHours > 0 ? "-" : "+"}${Math.abs(offsetHours)}`
+      : "2",
+    date = localTarget.toISOString().slice(0, 10),
+    start = options.near ? localTarget.toISOString().slice(11, 16) : "09:00",
+    end = "14:00";
   const send = async (text: string) =>
     (await f.repo.scheduleAction({ ...event(f.work), text })).pageText;
   await send("/slots_setup");
   for (const answer of [
-    options.near ? "Etc/UTC" : "2",
+    timezone,
     date + " " + date,
     "1 2 3 4 5 6 7",
     start + "-" + end,

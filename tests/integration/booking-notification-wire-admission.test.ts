@@ -20,6 +20,7 @@ import { captureBookingNotificationIntents } from "../../packages/db/src/reposit
 import { PostgresWorkerJobsRepository } from "../../packages/db/src/repositories/worker-jobs-repository.js";
 import { PostgresPlanerkaBookingRepository } from "../../packages/db/src/repositories/planerka-booking-repository.js";
 import { createBookingNotificationTransport } from "../../packages/integrations/src/telegram/booking-notification-transport.js";
+import { observeBookingNotificationSlot } from "../support/booking-notification-clock.js";
 
 let database: TestDatabase;
 const secret = Buffer.alloc(32, 81);
@@ -74,7 +75,10 @@ async function fixture(
       messagingPolicyVersion: "client-messaging-v1",
     },
   });
-  f.command.now = new Date();
+  f.command.now = await observeBookingNotificationSlot(
+    database.db,
+    f.command.slotId,
+  );
   const reserved = await bookings.reserve(f.command);
   if (reserved.kind === "unavailable") throw Error("wire_fixture_unavailable");
   const deliveryId = (
@@ -575,15 +579,16 @@ it("calendar rejection's two-source transaction obeys disabled capture", async (
   await database.db.execute(
     sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) select expert_service_id,9876,1,60,'UTC',true,clock_timestamp() from slots where id=${f.command.slotId}::uuid`,
   );
-  await database.db.execute(
-    sql`update slots set observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
+  const now = await observeBookingNotificationSlot(
+    database.db,
+    f.command.slotId,
   );
   await f.bookings.transition({
     reservationId: f.reserved.reservationId,
     expectedVersion: f.reserved.version,
     action: "expert_confirm",
     actor: { type: "expert", id: f.expertId },
-    now: new Date(),
+    now,
     correlationId: "wire-calendar",
   });
   const provider = new PostgresPlanerkaBookingRepository(database.db);
@@ -645,9 +650,7 @@ it("local journey binds prepared HTTP receipt, ct2 decision and provider complet
   await database.db.execute(
     sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) select expert_service_id,9877,1,60,'UTC',true,clock_timestamp() from slots where id=${f.command.slotId}::uuid`,
   );
-  await database.db.execute(
-    sql`update slots set observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
-  );
+  await observeBookingNotificationSlot(database.db, f.command.slotId);
   const bodies: string[] = [];
   const transport = createBookingNotificationTransport({
     botKey: f.botKey,

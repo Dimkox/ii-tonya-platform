@@ -25,8 +25,11 @@ let commandId: string;
 async function settleCapturedPayment(operationId: string, paymentId: string) {
   const operation = await repository.bindProviderObject(operationId, paymentId);
   const capturedAt = (
-    await db.execute<{ at: Date }>(sql`select clock_timestamp() as at`)
-  ).rows[0]!.at.toISOString();
+    await db.execute<{ at: string }>(sql`
+      select to_char(clock_timestamp() at time zone 'UTC',
+        'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as at
+    `)
+  ).rows[0]!.at;
   const client = createYooKassaClient(
     { mode: "test", shopId: "test-shop", secretKey: "synthetic-fixture-only" },
     async (url, init) => {

@@ -49,13 +49,29 @@ it("reconstructs lifecycle75 from SQL with owned deferred delivery authority and
     },
   ]);
   expect(journal[75].when).toBeGreaterThan(journal[74].when);
-  expect(journal.at(-1)).toEqual({
-    idx: 84,
-    version: "7",
-    when: 1793152800015,
-    tag: "0084_public_expert_payment_gateway",
-    breakpoints: true,
-  });
+  expect(journal.slice(-3)).toEqual([
+    {
+      idx: 84,
+      version: "7",
+      when: 1793152800015,
+      tag: "0084_public_expert_payment_gateway",
+      breakpoints: true,
+    },
+    {
+      idx: 85,
+      version: "7",
+      when: 1793152800016,
+      tag: "0085_resident_native_uuid_sources",
+      breakpoints: true,
+    },
+    {
+      idx: 86,
+      version: "7",
+      when: 1793152800017,
+      tag: "0086_public_onboarding_terminal_projection",
+      breakpoints: true,
+    },
+  ]);
   expect(journal.at(-1).when).toBeGreaterThan(journal.at(-2).when);
 });
 it("pins actual default PostgreSQL fixture to the same supported Compose version", () => {

@@ -21,6 +21,7 @@ import {
   type ExpertCallbackClaims,
 } from "../../packages/integrations/src/telegram/callback-token.js";
 import { createBookingCallbackVault } from "../../packages/integrations/src/telegram/booking-callback-vault.js";
+import { observeBookingNotificationSlot } from "../support/booking-notification-clock.js";
 
 let database: TestDatabase;
 const secret = Buffer.alloc(32, 71);
@@ -60,7 +61,6 @@ afterAll(async () => {
 let account = 9000;
 async function fixture() {
   const f = await database.createReservableFixture();
-  f.command.now = new Date();
   const botKey = randomUUID();
   await database.db.execute(
     sql`insert into booking_notification_bot_controls(bot_key,admission_enabled) values(${botKey},true)`,
@@ -71,7 +71,6 @@ async function fixture() {
   await database.db.execute(
     sql`update slots set ends_at=starts_at+interval '1 hour' where id=${f.command.slotId}::uuid`,
   );
-  f.command.now = new Date();
   const expertUser = (
     await database.db.execute<{ id: string }>(
       sql`select user_id as id from experts where id=${f.expertId}::uuid`,
@@ -85,16 +84,16 @@ async function fixture() {
   await database.db.execute(
     sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) select expert_service_id,${++account},1,60,'UTC',true,clock_timestamp() from slots where id=${f.command.slotId}::uuid`,
   );
-  await database.db.execute(
-    sql`update slots set observed_at=clock_timestamp() where id=${f.command.slotId}::uuid`,
-  );
   const bookings = new PostgresBookingRepository(database.db, {
     notificationOrigin: {
       botKey,
       messagingPolicyVersion: "client-messaging-v1",
     },
   });
-  f.command.now = new Date();
+  f.command.now = await observeBookingNotificationSlot(
+    database.db,
+    f.command.slotId,
+  );
   const result = await bookings.reserve(f.command);
   if (result.kind === "unavailable") throw Error("fixture_not_reserved");
   const deliveryId = (

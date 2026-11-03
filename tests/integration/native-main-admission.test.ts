@@ -23,16 +23,19 @@ it("catalog filters invalid rows before the limit and retains fresh valid extern
   await database.db
     .execute(sql`insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,observed_at,capacity)
    select ${service}::uuid,'local','stale-'||g,clock_timestamp()+interval '2 days',clock_timestamp()+interval '2 days 1 hour',clock_timestamp()-interval '16 minutes',1 from generate_series(1,501) g`);
-  const valid = (
+  const fresh = (
     await database.db.execute<{
       id: string;
+      observedAt: Date | string;
     }>(sql`insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,observed_at,capacity)
-   values(${service}::uuid,'local','valid',statement_timestamp()+interval '4 days',statement_timestamp()+interval '4 days 1 hour',clock_timestamp(),1) returning id`)
-  ).rows[0]!.id;
+   values(${service}::uuid,'local','valid',statement_timestamp()+interval '4 days',statement_timestamp()+interval '4 days 1 hour',date_trunc('milliseconds',clock_timestamp()),1) returning id,observed_at as "observedAt"`)
+  ).rows[0]!;
+  const valid = fresh.id;
+  let databaseNow = new Date(fresh.observedAt);
   const read = () =>
     new PostgresCatalogRepository(database.db).read({
       sourceKey: service,
-      databaseNow: new Date(),
+      databaseNow,
     });
   expect(await read()).toMatchObject({
     kind: "complete",
@@ -47,8 +50,12 @@ it("catalog filters invalid rows before the limit and retains fresh valid extern
    values(${service}::uuid,991,992,'Europe/Moscow',60,true,clock_timestamp())`);
   // A mapping change invalidates prior provider observations. Republish a fresh
   // synthetic observation before expecting the slot to become discoverable.
-  await database.db.execute(
-    sql`update slots set observed_at=clock_timestamp() where id=${valid}::uuid`,
+  databaseNow = new Date(
+    (
+      await database.db.execute<{ observedAt: Date | string }>(
+        sql`update slots set observed_at=date_trunc('milliseconds',clock_timestamp()) where id=${valid}::uuid returning observed_at as "observedAt"`,
+      )
+    ).rows[0]!.observedAt,
   );
   expect(await read()).toMatchObject({
     kind: "complete",

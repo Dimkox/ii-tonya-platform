@@ -24,7 +24,11 @@ type ProviderStats = {
 /** One per file: actual full-schema PG clock, exact capability LOGINs and child
  * gateway. Only the existing provider fixture's destination is local TLS. No
  * source, approval, payment or receipt facts are fabricated by startup. */
-export async function startPublicHeldOnboardingFixture() {
+export async function startPublicHeldOnboardingFixture(
+  options: {
+    replay?: Parameters<typeof startExpertReferralTestDatabase>[0];
+  } = {},
+) {
   const NativeDate = Date;
   const clock = await startPublicExpertFuturePostgres();
   globalThis.Date = new Proxy(NativeDate, {
@@ -81,7 +85,7 @@ export async function startPublicHeldOnboardingFixture() {
     const previous = process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
     process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL = clock.connectionString;
     try {
-      database = await startExpertReferralTestDatabase();
+      database = await startExpertReferralTestDatabase(options.replay);
     } finally {
       if (previous === undefined)
         delete process.env.II_TONYA_TEST_POSTGRES_ADMIN_URL;
@@ -143,6 +147,13 @@ export async function startPublicHeldOnboardingFixture() {
       runtime,
       gateway,
       connections: principals.connections,
+      async advance(seconds: number) {
+        await clock.advance(seconds);
+        await activeProvider.command({
+          op: "offset",
+          seconds: clock.offsetSeconds,
+        });
+      },
       stats: () =>
         activeProvider.command({ op: "stats" }) as Promise<ProviderStats>,
       async waiting(paymentId: string) {

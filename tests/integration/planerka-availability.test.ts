@@ -87,8 +87,8 @@ async function fixture(refreshLegacyObservation = true) {
     catalog,
     times,
     due,
-    read: () =>
-      catalog.read({ sourceKey: row.serviceId, databaseNow: new Date() }),
+    read: (databaseNow = new Date()) =>
+      catalog.read({ sourceKey: row.serviceId, databaseNow }),
     claim: async () => {
       const c = await repository.claim(accountId);
       expect(c).toBeDefined();
@@ -390,11 +390,11 @@ it("omits an occupied row while preserving another fresh choice in the same serv
     confirmationBufferMs: 3600000,
   });
   const row = (
-    await database.db.execute<{ id: string }>(
-      sql`insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,capacity,observed_at) select expert_service_id,provider,${randomUUID()},starts_at+interval '2 hours',ends_at+interval '2 hours',1,clock_timestamp() from slots where id=${f.slotId}::uuid returning id`,
+    await database.db.execute<{ id: string; observedAt: Date | string }>(
+      sql`insert into slots(expert_service_id,provider,external_slot_id,starts_at,ends_at,capacity,observed_at) select expert_service_id,provider,${randomUUID()},starts_at+interval '2 hours',ends_at+interval '2 hours',1,date_trunc('milliseconds',clock_timestamp()) from slots where id=${f.slotId}::uuid returning id,observed_at as "observedAt"`,
     )
   ).rows[0]!;
-  expect(await f.read()).toMatchObject({
+  expect(await f.read(new Date(row.observedAt))).toMatchObject({
     kind: "complete",
     slots: [{ localSlotId: row.id }],
   });

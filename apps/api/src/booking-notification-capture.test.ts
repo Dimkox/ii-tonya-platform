@@ -45,6 +45,7 @@ it("binds new reservation capture to configured bot and consent version", async 
   });
   await createDefaultLifecycle().dependencies(c, db);
   expect(captured.options).toContainEqual({
+    waveCoverage: false,
     notificationOrigin: {
       botKey: "client",
       messagingPolicyVersion: "messaging-v1",

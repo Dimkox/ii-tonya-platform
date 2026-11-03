@@ -55,13 +55,29 @@ describe("B1 schema/migration parity", () => {
         breakpoints: true,
       },
     ]);
-    expect(journal.entries.at(-1)).toEqual({
-      idx: 84,
-      version: "7",
-      when: 1793152800015,
-      tag: "0084_public_expert_payment_gateway",
-      breakpoints: true,
-    });
+    expect(journal.entries.slice(-3)).toEqual([
+      {
+        idx: 84,
+        version: "7",
+        when: 1793152800015,
+        tag: "0084_public_expert_payment_gateway",
+        breakpoints: true,
+      },
+      {
+        idx: 85,
+        version: "7",
+        when: 1793152800016,
+        tag: "0085_resident_native_uuid_sources",
+        breakpoints: true,
+      },
+      {
+        idx: 86,
+        version: "7",
+        when: 1793152800017,
+        tag: "0086_public_onboarding_terminal_projection",
+        breakpoints: true,
+      },
+    ]);
   });
   it("mirrors every B3 policy numeric and derived-cost bound in Drizzle", () => {
     expect(integrationSchema).toContain(
