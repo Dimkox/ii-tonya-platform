@@ -81,7 +81,12 @@ export function httpRetryAfter(error: unknown): string | undefined {
 type Schema = Readonly<
   Record<
     string,
-    readonly string[] | "status" | "duration" | "count" | "fingerprint"
+    | readonly string[]
+    | "status"
+    | "duration"
+    | "count"
+    | "fingerprint"
+    | "route"
   >
 >;
 const modules = ["api", "worker", "integrations"];
@@ -111,7 +116,12 @@ const http = {
   ],
   statusCode: "status",
   durationMs: "duration",
+  route: "route",
 } as const;
+// Fastify route TEMPLATE only (e.g. "/telegram/:botKey"), never a raw URL:
+// no query, fragment, encoded bytes or digits-only/hex-like path values.
+const ROUTE_TEMPLATE =
+  /^(\/(:[A-Za-z][A-Za-z0-9_]{0,63}|[a-z][a-z0-9_-]{0,63}|\*)?)+$/u;
 const schemas: Readonly<Record<string, Schema>> = {
   planerka_availability: {
     outcome: [
@@ -175,6 +185,13 @@ function project(
     const item = ownData(value, key);
     if (typeof rule !== "string") {
       if (typeof item === "string" && rule.includes(item)) result[key] = item;
+    } else if (rule === "route") {
+      if (
+        typeof item === "string" &&
+        item.length <= 160 &&
+        ROUTE_TEMPLATE.test(item)
+      )
+        result[key] = item;
     } else if (rule === "fingerprint") {
       if (typeof item === "string" && /^h1:[0-9a-f]{64}$/u.test(item))
         result[key] = item;

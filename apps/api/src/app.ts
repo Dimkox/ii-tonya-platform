@@ -537,6 +537,9 @@ export async function buildApp(
       request.log.info({
         event: "http_request_completed",
         method: request.method,
+        ...(request.routeOptions.url === undefined
+          ? {}
+          : { route: request.routeOptions.url }),
         statusCode: reply.statusCode,
         durationMs: reply.elapsedTime,
       }),
