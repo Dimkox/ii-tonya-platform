@@ -161,7 +161,9 @@ it.each(["discounted", "full"] as const)(
     await review.confirm(session, result!, preview.previewId, preview.hash);
     if (priceKind === "full")
       await db.db.execute(
-        sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '2026-11-12T00:00:00+03:00'::timestamptz $$`,
+        sql.raw(
+          `create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select '${new Date(Date.now() + 241 * 60 * 60 * 1000).toISOString()}'::timestamptz $$`,
+        ),
       );
     const vault = createPayerReceiptVault({
       activeKeyId: "fixture",
