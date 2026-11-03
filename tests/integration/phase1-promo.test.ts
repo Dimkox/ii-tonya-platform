@@ -632,4 +632,19 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
       ),
     ).rejects.toThrow();
   });
+  it("WAIT-T01 stores the inviter code in funnel state apart from the personal code", async () => {
+    const owner = await identity();
+    const code = (await repo.register(command(owner))).refCode;
+    const invitee = await identity();
+    const own = (await repo.register(command(invitee, code))).refCode;
+    await repo.register(command(invitee));
+    const rows = (
+      await database.db.execute<{ incoming: string | null; status: string }>(
+        sql`select incoming_referrer_code incoming,status from expert_promo_funnel_state where user_id=${invitee.userId}::uuid`,
+      )
+    ).rows;
+    expect(rows).toEqual([{ incoming: code, status: "REFERRAL_ACTIVE" }]);
+    expect(own).not.toBe(code);
+    expect(await repo.isActiveResident(invitee)).toBe(false);
+  });
 });

@@ -7,7 +7,7 @@ const read = (path: string) =>
   existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : null;
 
 describe("database-derived migration state baseline", () => {
-  it.each([81, 82, 83, 84, 85, 86])(
+  it.each([81, 82, 83, 84, 85, 86, 87])(
     "records protected private schemas and PUBLIC execution at state %i",
     (last) => {
       const tag = String(last).padStart(4, "0");
@@ -170,6 +170,50 @@ describe("database-derived migration state baseline", () => {
     expect(state.functions).toHaveLength(327);
     expect(state.triggers).toHaveLength(294);
   });
+  it("pins the additive pre-launch funnel tables at0087 to its0086 predecessor", () => {
+    const previousSnapshot = read(`${folder}/meta/0086_snapshot.json`);
+    const snapshot = read(`${folder}/meta/0087_snapshot.json`);
+    const added = [
+      "public.expert_promo_funnel_state",
+      "public.expert_promo_manager_questions",
+    ];
+    expect(snapshot.prevId).toBe(previousSnapshot.id);
+    expect(
+      Object.keys(snapshot.tables).filter(
+        (t) => !(t in previousSnapshot.tables),
+      ),
+    ).toEqual(added);
+    const kept = Object.fromEntries(
+      Object.entries(snapshot.tables).filter(([t]) => !added.includes(t)),
+    );
+    expect({
+      ...snapshot,
+      id: previousSnapshot.id,
+      prevId: previousSnapshot.prevId,
+      tables: kept,
+    }).toEqual(previousSnapshot);
+    expect(
+      read(`${folder}/state/0087_manifest.json`).migrations.slice(0, 87),
+    ).toEqual(read(`${folder}/state/0086_manifest.json`).migrations);
+    const previous = read(`${folder}/state/0086_sql_objects.json`);
+    const state = read(`${folder}/state/0087_sql_objects.json`);
+    const isAdded = (entry: { table_name: string }) =>
+      ["expert_promo_funnel_state", "expert_promo_manager_questions"].includes(
+        entry.table_name,
+      );
+    expect({
+      ...state,
+      constraints: state.constraints.filter(
+        (entry: { table_name: string }) => !isAdded(entry),
+      ),
+      indexes: state.indexes.filter(
+        (entry: { table_name: string }) => !isAdded(entry),
+      ),
+    }).toEqual(previous);
+    expect(state.constraints.filter(isAdded).length).toBeGreaterThan(0);
+    expect(state.triggers).toEqual(previous.triggers);
+    expect(state.functions).toEqual(previous.functions);
+  });
   it("preserves composite FK position, index opclasses and unvalidated constraints", () => {
     const snapshot = read(`${folder}/meta/0039_snapshot.json`);
     expect(
@@ -229,7 +273,7 @@ describe("database-derived migration state baseline", () => {
 
   it.each([
     39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 70, 71, 72, 73, 74, 75,
-    76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86,
+    76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87,
   ])(
     "binds state %i evidence to every SQL input and exact snapshot bytes",
     (last) => {
