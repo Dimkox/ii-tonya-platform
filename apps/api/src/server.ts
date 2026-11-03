@@ -902,6 +902,16 @@ export const createDefaultLifecycle = (
           ? { clientCommercialPolicy: options.clientCommercialPolicyRepository }
           : {}),
         clientFreeAccessV2Enabled: config.features.clientFreeAccessV2 === true,
+        ...(config.clientTelegramBotKey &&
+        config.clientMessagingConsentPolicyVersion
+          ? {
+              telegramDelivery: {
+                botKey: config.clientTelegramBotKey,
+                messagingPolicyVersion:
+                  config.clientMessagingConsentPolicyVersion,
+              },
+            }
+          : {}),
       }),
       publicCatalog: {
         listPublicServices: (input) =>

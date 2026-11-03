@@ -14,6 +14,7 @@ import {
 import {
   PostgresCatalogRepository,
   PostgresMessageRepository,
+  type ConversationTelegramDelivery,
   type DrizzleDb,
 } from "@ii-tonya/db";
 import { sql } from "drizzle-orm";
@@ -136,10 +137,29 @@ export const createPostgresClientConversationService = (
     readonly waveCoverage: boolean;
     readonly clientCommercialPolicy?: ClientCommercialPolicyPort;
     readonly clientFreeAccessV2Enabled?: boolean;
+    /**
+     * Client bot + messaging consent policy. Without it replies have no
+     * deliverable channel, so inbound handling fails closed (nothing charged).
+     */
+    readonly telegramDelivery?: ConversationTelegramDelivery;
   },
-): ConversationService =>
-  createClientConversationService({
-    messages: new PostgresMessageRepository(db),
+): ConversationService => {
+  const delivery = options.telegramDelivery;
+  if (
+    delivery === undefined ||
+    delivery.botKey.length === 0 ||
+    delivery.messagingPolicyVersion.length === 0
+  ) {
+    const unavailable = async (): Promise<never> => {
+      throw new ConversationServiceError("dependency_unavailable");
+    };
+    return {
+      handleInbound: unavailable,
+      handleOutboundDelivery: unavailable,
+    };
+  }
+  return createClientConversationService({
+    messages: new PostgresMessageRepository(db, { telegramDelivery: delivery }),
     authorization: {
       async scopeFor() {
         const services = await db.transaction(async (tx) => {
@@ -175,3 +195,4 @@ export const createPostgresClientConversationService = (
       ? { clientFreeAccessV2Enabled: true }
       : {}),
   });
+};

@@ -1,10 +1,15 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
 import {
   InboxPayloadMismatchError,
   PostgresInboxRepository,
 } from "./inbox-repository.js";
+import {
+  captureClientConsentAuthority,
+  lockClientConsentSubject,
+} from "./client-consent-authority.js";
+import { createOrReplayClientCatalogRequestInTx } from "./client-catalog-repository.js";
 
 export interface AcceptInboundCommand {
   provider: string;
@@ -139,7 +144,32 @@ export interface MessageRepository {
   ): Promise<{ ledgerBalance: number }>;
 }
 
+export interface ConversationTelegramDelivery {
+  /** Client bot whose bound dialogue receives conversation replies. */
+  botKey: string;
+  messagingPolicyVersion: string;
+  /** Text acknowledging a catalog request; the catalog itself is materialized by catalog.show. */
+  catalogAcknowledgement?: string;
+}
+
+export const CONVERSATION_CATALOG_ACKNOWLEDGEMENT =
+  "Подбираю специалистов под ваш запрос. Каталог откроется в приложении.";
+
+export class ConversationDeliveryUnavailableError extends Error {
+  constructor() {
+    super("conversation_delivery_unavailable");
+    this.name = "ConversationDeliveryUnavailableError";
+  }
+}
+
 export interface MessageRepositoryOptions {
+  /**
+   * When set, answers and catalog acknowledgements are delivered as
+   * dialogue-bound telegram.send_text.v1 rows and show_catalog creates a
+   * versioned catalog request. The conversation completion row is then a
+   * terminal (succeeded) record and is never dispatched.
+   */
+  telegramDelivery?: ConversationTelegramDelivery;
   beforeCompleteCommit?: () => void | Promise<void>;
   afterCompleteCommit?: (
     result: Extract<CompleteInboundResult, { kind: "completed" }>,
@@ -166,6 +196,19 @@ type CompletionEvent = {
 
 export class CompensationConflictError extends Error {}
 export class ConversationCompletionDataError extends Error {}
+
+// telegram.send_text.v1 accepts 1..4096 UTF-16 units and no C0/C1 controls
+// (newlines included), so controls collapse to spaces.
+function telegramText(value: string): string | undefined {
+  const cleaned = value.replace(/[\u0000-\u001F\u007F-\u009F]+/gu, " ").trim();
+  if (cleaned.length === 0) return undefined;
+  let out = "";
+  for (const char of cleaned) {
+    if (out.length + char.length > 4096) break;
+    out += char;
+  }
+  return out;
+}
 
 function hash(parts: unknown): string {
   return createHash("sha256").update(JSON.stringify(parts)).digest("hex");
@@ -461,6 +504,9 @@ export class PostgresMessageRepository implements MessageRepository {
     const result = await withSerializableRetry(() =>
       this.db.transaction(async (tx) => {
         await tx.execute(sql`set transaction isolation level serializable`);
+        if (this.options.telegramDelivery !== undefined) {
+          await lockClientConsentSubject(tx, command.userId);
+        }
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended(${command.userId}, 0))`,
         );
@@ -828,6 +874,36 @@ export class PostgresMessageRepository implements MessageRepository {
         ${completionHash}
       )
     `);
+    const delivery = this.options.telegramDelivery;
+    const delivered =
+      delivery !== undefined &&
+      (outcome.kind === "answer" || outcome.kind === "show_catalog");
+    if (delivered) {
+      if (outcome.kind === "show_catalog") {
+        const serviceCode = outcome.payload.serviceCode ?? "";
+        await createOrReplayClientCatalogRequestInTx(tx, {
+          userId: command.userId,
+          requestDigest: createHash("sha256")
+            .update(`client-catalog-v1\0${command.userId}\0${serviceCode}\0`)
+            .digest("hex"),
+          ...(outcome.payload.serviceCode === undefined
+            ? {}
+            : { serviceCode: outcome.payload.serviceCode }),
+          correlationId: command.correlationId,
+          version: 1,
+        });
+      }
+      await this.enqueueTelegramText(
+        tx,
+        command,
+        delivery,
+        outcome.kind === "answer"
+          ? outcome.payload.text
+          : (delivery.catalogAcknowledgement ??
+              CONVERSATION_CATALOG_ACKNOWLEDGEMENT),
+        outcome.kind === "answer" ? "selarti" : "deterministic",
+      );
+    }
     await tx.execute(sql`
       insert into integration_outbox (
         idempotency_key,
@@ -835,14 +911,112 @@ export class PostgresMessageRepository implements MessageRepository {
         payload,
         correlation_id,
         reconciliation_key,
-        payload_hash
+        payload_hash,
+        status
       ) values (
         ${`conversation:${command.messageEventId}`},
         ${outcome.topic},
         ${JSON.stringify(completionPayload)}::jsonb,
         ${command.correlationId},
         ${`conversation:${command.messageEventId}`},
-        ${completionHash}
+        ${completionHash},
+        ${delivered ? "succeeded" : "pending"}::outbox_status
+      )
+    `);
+  }
+
+  private async enqueueTelegramText(
+    tx: Transaction,
+    command: CompleteInboundCommand,
+    delivery: ConversationTelegramDelivery,
+    rawText: string,
+    source: "selarti" | "deterministic",
+  ): Promise<void> {
+    const text = telegramText(rawText);
+    const dialogue = (
+      await tx.execute<{
+        dialogueId: string;
+        botKey: string;
+        chatId: string;
+      }>(sql`
+        select d.id as "dialogueId", d.bot_key as "botKey",
+          d.external_chat_id as "chatId"
+        from dialogues d
+        join users u on u.id = d.user_id and u.active = true
+        where d.user_id = ${command.userId}::uuid
+          and d.provider = 'telegram'
+          and d.bot_key = ${delivery.botKey}
+          and d.external_chat_id ~ '^[1-9][0-9]{0,19}$'
+        order by d.created_at, d.id
+        limit 1
+        for update of d
+      `)
+    ).rows[0];
+    const consentAuthority =
+      dialogue === undefined
+        ? undefined
+        : await captureClientConsentAuthority(tx, {
+            subjectId: command.userId,
+            botKey: dialogue.botKey,
+            chatId: dialogue.chatId,
+            messagingPolicyVersion: delivery.messagingPolicyVersion,
+          });
+    // Roll back the whole completion (including any debit) rather than
+    // charging for a reply that cannot be delivered.
+    if (
+      dialogue === undefined ||
+      consentAuthority === undefined ||
+      text === undefined
+    ) {
+      throw new ConversationDeliveryUnavailableError();
+    }
+    const sequence = Number(
+      (
+        await tx.execute<{ sequence: bigint | number | string }>(sql`
+          update dialogues
+          set next_delivery_sequence = next_delivery_sequence + 1
+          where id = ${dialogue.dialogueId}::uuid
+            and user_id = ${command.userId}::uuid
+            and provider = 'telegram'
+          returning next_delivery_sequence as sequence
+        `)
+      ).rows[0]?.sequence,
+    );
+    if (!Number.isSafeInteger(sequence) || sequence < 1) {
+      throw new ConversationDeliveryUnavailableError();
+    }
+    const deliveryId = randomUUID();
+    const outboxId = randomUUID();
+    const deliveryKey = `sha256:${createHash("sha256")
+      .update(`conversation-delivery\0${command.messageEventId}`)
+      .digest("hex")}`;
+    const payload = {
+      deliveryId,
+      dialogueId: dialogue.dialogueId,
+      sequence,
+      botKey: dialogue.botKey,
+      chatId: dialogue.chatId,
+      text,
+      consentAuthority,
+    };
+    const serialized = JSON.stringify(payload);
+    const payloadHash = createHash("sha256").update(serialized).digest("hex");
+    await tx.execute(sql`
+      insert into integration_outbox (
+        id, idempotency_key, topic, payload, correlation_id, reconciliation_key,
+        payload_hash, dialogue_id, dialogue_sequence
+      ) values (
+        ${outboxId}::uuid, ${deliveryKey}, 'telegram.send_text.v1',
+        ${serialized}::jsonb, ${command.correlationId}, ${deliveryKey},
+        ${payloadHash}, ${dialogue.dialogueId}::uuid, ${sequence}
+      )
+    `);
+    await tx.execute(sql`
+      insert into dialogue_deliveries (
+        id, dialogue_id, dialogue_sequence, source, source_id, outbox_id, payload_hash
+      ) values (
+        ${deliveryId}::uuid, ${dialogue.dialogueId}::uuid, ${sequence},
+        ${source}, ${command.messageEventId}, ${outboxId}::uuid, ${payloadHash}
       )
     `);
   }
