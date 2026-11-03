@@ -84,6 +84,12 @@ async function initialize(): Promise<void> {
       }),
     );
   }
+  const { mountCookieBanner } = await import("./analytics-consent.js");
+  try {
+    mountCookieBanner(root, route, window.localStorage, document);
+  } catch {
+    /* Storage blocked: no banner, analytics stays off. */
+  }
   const reducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
   ).matches;

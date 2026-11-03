@@ -1716,3 +1716,29 @@ summary:focus-visible {
     transform: none;
   }
 }
+
+/* SCRUM-110: analytics choice (landing only). */
+.cookie-banner {
+  position: fixed;
+  inset: auto 1rem 1rem;
+  z-index: 50;
+  max-width: 40rem;
+  margin-inline: auto;
+  padding: 1rem 1.25rem;
+  border-radius: 1rem;
+  background: var(--paper);
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.18);
+}
+.cookie-banner__title {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+.cookie-banner__text {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+}
+.cookie-banner__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
