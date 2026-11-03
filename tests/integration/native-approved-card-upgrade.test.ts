@@ -464,7 +464,7 @@ it("normal migrateDb backfills a genuinely approved main73 rich service and pres
           sql`select count(*)::int n from drizzle.__drizzle_migrations`,
         )
       ).rows[0]?.n,
-    ).toBe(75);
+    ).toBe(journal.entries.length);
   } finally {
     await database?.stop();
     await rm(folder, { recursive: true, force: true });

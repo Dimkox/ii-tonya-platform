@@ -1,9 +1,17 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { sql } from "drizzle-orm";
+import { migrateDb } from "../../packages/db/src/client.js";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import {
   startDisposableTestPostgres,
@@ -22,14 +30,32 @@ const digest = (path: string) =>
   createHash("sha256").update(readFileSync(path)).digest("hex");
 let database: TestDatabase;
 let output: string;
+// Later migrations exist; replay only the 0000..0086 prefix so this test keeps
+// pinning the canonical0086 state rather than whatever is newest.
+const prefix = mkdtempSync(join(tmpdir(), "ii-tonya-0086-prefix-"));
 beforeAll(async () => {
+  const journal = read(`${folder}/meta/_journal.json`);
+  const entries = journal.entries.filter(
+    (entry: { idx: number }) => entry.idx <= latest,
+  );
+  mkdirSync(join(prefix, "meta"));
+  writeFileSync(
+    join(prefix, "meta/_journal.json"),
+    JSON.stringify({ ...journal, entries }),
+  );
+  for (const entry of entries)
+    copyFileSync(
+      join(folder, `${entry.tag}.sql`),
+      join(prefix, `${entry.tag}.sql`),
+    );
   database = await startDisposableTestPostgres();
-  await database.migrate();
+  await migrateDb(database.db, prefix);
 }, 120_000);
 afterAll(async () => {
   try {
     await database?.stop();
   } finally {
+    rmSync(prefix, { recursive: true, force: true });
     if (output) rmSync(output, { recursive: true, force: true });
   }
 }, 120_000);
@@ -39,7 +65,7 @@ it("reproduces canonical0086 snapshot and exact SQL state from a full PostgreSQL
     (await database.db.execute(sql`show server_version_num`)).rows[0]
       ?.server_version_num,
   ).toBe("170005");
-  const journal = read(`${folder}/meta/_journal.json`);
+  const journal = read(`${prefix}/meta/_journal.json`);
   expect(journal.entries.at(-1)).toMatchObject({
     idx: latest,
     tag: "0086_public_onboarding_terminal_projection",
