@@ -10,6 +10,7 @@ import {
   text,
   timestamp,
   uuid,
+  boolean,
   unique,
 } from "drizzle-orm/pg-core";
 import { users, channelIdentities } from "./identity.js";
@@ -208,5 +209,87 @@ export const expertPromoEnrollments = pgTable(
       "expert_promo_enrollment_expiry",
       sql`isfinite(${t.expiresAt}) AND ${t.expiresAt}>${t.createdAt} AND ${t.expiresAt}<=${t.createdAt}+interval '24 hours'`,
     ),
+  ],
+);
+/** Pre-launch funnel state (WAIT-T01..T06). Separate from the booking FIFO waitlist (AUD-C07). */
+export const expertPromoFunnelState = pgTable(
+  "expert_promo_funnel_state",
+  {
+    userId: owner(),
+    status: text("status").notNull().default("REFERRAL_ACTIVE"),
+    // Inviter code from step 2; the personal code stays in expert_promo_codes (AUD-C08).
+    incomingReferrerCode: text("incoming_referrer_code"),
+    optOutRef: boolean("opt_out_ref").notNull().default(false),
+    optOutAt: timestamp("opt_out_at", { withTimezone: true }),
+    codeIssuedAt: timestamp("code_issued_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    message6SentAt: timestamp("message6_sent_at", { withTimezone: true }),
+    lastInteractionAt: timestamp("last_interaction_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    firstName: text("first_name"),
+    gender: text("gender"),
+    crmSyncedReferralCount: integer("crm_synced_referral_count"),
+    crmSyncedAt: timestamp("crm_synced_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check(
+      "expert_promo_funnel_status",
+      sql`${t.status} IN ('REFERRAL_ACTIVE','WAITING_FOR_LAUNCH')`,
+    ),
+    check(
+      "expert_promo_funnel_incoming_code",
+      sql`${t.incomingReferrerCode} IS NULL OR ${t.incomingReferrerCode} ~ '^promo_[0-9a-f]{32}$'`,
+    ),
+    check(
+      "expert_promo_funnel_opt_out",
+      sql`(${t.optOutRef} AND ${t.optOutAt} IS NOT NULL AND isfinite(${t.optOutAt})) OR (NOT ${t.optOutRef} AND ${t.optOutAt} IS NULL)`,
+    ),
+    check(
+      "expert_promo_funnel_times",
+      sql`isfinite(${t.codeIssuedAt}) AND isfinite(${t.lastInteractionAt}) AND (${t.message6SentAt} IS NULL OR (isfinite(${t.message6SentAt}) AND ${t.message6SentAt}>=${t.codeIssuedAt}))`,
+    ),
+    check(
+      "expert_promo_funnel_first_name",
+      sql`${t.firstName} IS NULL OR length(${t.firstName}) BETWEEN 1 AND 64`,
+    ),
+    check(
+      "expert_promo_funnel_gender",
+      sql`${t.gender} IS NULL OR ${t.gender} IN ('female','male')`,
+    ),
+    check(
+      "expert_promo_funnel_crm",
+      sql`(${t.crmSyncedReferralCount} IS NULL AND ${t.crmSyncedAt} IS NULL) OR (${t.crmSyncedReferralCount}>=0 AND ${t.crmSyncedAt} IS NOT NULL AND isfinite(${t.crmSyncedAt}))`,
+    ),
+    index("expert_promo_funnel_timer_idx")
+      .on(t.codeIssuedAt)
+      .where(sql`status='REFERRAL_ACTIVE' AND NOT opt_out_ref`),
+  ],
+);
+export const expertPromoManagerQuestions = pgTable(
+  "expert_promo_manager_questions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    question: text("question").notNull(),
+    status: text("status").notNull().default("open"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    check(
+      "expert_promo_question_text",
+      sql`length(${t.question}) BETWEEN 1 AND 3000`,
+    ),
+    check(
+      "expert_promo_question_status",
+      sql`${t.status} IN ('open','answered')`,
+    ),
+    index("expert_promo_manager_questions_open_idx")
+      .on(t.createdAt)
+      .where(sql`status='open'`),
   ],
 );

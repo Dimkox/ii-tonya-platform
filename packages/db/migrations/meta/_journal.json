@@ -610,6 +610,13 @@
       "when": 1793152800017,
       "tag": "0086_public_onboarding_terminal_projection",
       "breakpoints": true
+    },
+    {
+      "idx": 87,
+      "version": "7",
+      "when": 1793152800018,
+      "tag": "0087_expert_promo_funnel_state",
+      "breakpoints": true
     }
   ]
 }

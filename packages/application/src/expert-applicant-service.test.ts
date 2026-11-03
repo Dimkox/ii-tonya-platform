@@ -392,3 +392,39 @@ it("remediation: start preserves non-price referral information alongside the re
   expect(f.createQuote).not.toHaveBeenCalled();
   expect(f.createApplication).not.toHaveBeenCalled();
 });
+describe("WAIT-T01 pre-launch entry", () => {
+  it("redirects an active resident to the expert bot without registering", async () => {
+    const f = fixture();
+    const service = createExpertApplicantService({
+      enabled: true,
+      activeResidentBotUrl: "https://t.me/ii_tonya_expert_bot",
+      repository: {
+        register: f.register,
+        saveProfile: f.saveProfile,
+        resolve: f.resolve,
+        createApplication: f.createApplication,
+        createQuote: f.createQuote,
+        listTariffs: f.listTariffs,
+        beginEnrollment: f.beginEnrollment,
+        completeEnrollment: f.completeEnrollment,
+        isActiveResident: vi.fn(async () => true),
+      },
+    });
+    const r = await service.handle({ ...scope, text: "/start" });
+    expect(r).toMatchObject({ status: "handled" });
+    expect((r as { text: string }).text).toContain(
+      "https://t.me/ii_tonya_expert_bot",
+    );
+    expect(f.register).not.toHaveBeenCalled();
+    expect(f.beginEnrollment).not.toHaveBeenCalled();
+  });
+  it("accepts a typed inviter code as the referral entry", async () => {
+    const f = fixture();
+    const code = `promo_${"a".repeat(32)}`;
+    const r = await f.service.handle({ ...scope, text: ` ${code} ` });
+    expect(r.status).toBe("handled");
+    expect(f.register).toHaveBeenCalledWith(
+      expect.objectContaining({ refCode: code }),
+    );
+  });
+});

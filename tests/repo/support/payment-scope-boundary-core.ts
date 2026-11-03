@@ -126,6 +126,11 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0087_expert_promo_funnel_state.sql",
+  "packages/db/migrations/meta/0087_snapshot.json",
+  "packages/db/migrations/state/0087_manifest.json",
+  "packages/db/migrations/state/0087_sql_objects.json",
+
   "packages/db/migrations/0086_public_onboarding_terminal_projection.sql",
   "packages/db/migrations/meta/0086_snapshot.json",
   "packages/db/migrations/state/0086_manifest.json",
@@ -402,6 +407,8 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "expert_promo_bonus_indications",
   "expert_promo_manager_work",
   "expert_promo_enrollments",
+  "expert_promo_funnel_state",
+  "expert_promo_manager_questions",
   // Exact Phase0 inventory; rationale: docs/spec/phase0-guard-registration-audit.md.
   "client_paid_orders",
   "client_paid_payment_bindings",
@@ -1487,6 +1494,22 @@ const approvedDependencySpecifiers = new Map([
 ]);
 const approvedMigrationHashes = new Map([
   [
+    "packages/db/migrations/0087_expert_promo_funnel_state.sql",
+    "861b9022dbf235f5fd994e9754773bc896c022bedac13874d481e0966477bdcb",
+  ],
+  [
+    "packages/db/migrations/meta/0087_snapshot.json",
+    "327198380fb673a26393f0f5b872aa288d17b973c953a84c8a3c7af0184434b4",
+  ],
+  [
+    "packages/db/migrations/state/0087_manifest.json",
+    "e5bc712f6a885935ea94bdcddd4af04d389df9bac0bcf3d79858acfdbc3f9fca",
+  ],
+  [
+    "packages/db/migrations/state/0087_sql_objects.json",
+    "1deccdb814a5e28ad6cba7591647f5be59e133ba185be1eb91fdd89695e341ef",
+  ],
+  [
     "packages/db/migrations/0086_public_onboarding_terminal_projection.sql",
     "be00ebe1372815312ea8959b63bbe3b7914551bc45ca2224fc65e8acf529dadd",
   ],
@@ -2485,7 +2508,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "1de3d9017898fc2587f4ef2198e10d1125eb0643ebf57f70345056cc1047d67a",
+    "cd07c9cb408acb8bb57bff352d0bcd4886743236e999c1df540543bd020403a9",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -2565,7 +2588,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "1de3d9017898fc2587f4ef2198e10d1125eb0643ebf57f70345056cc1047d67a",
+    "cd07c9cb408acb8bb57bff352d0bcd4886743236e999c1df540543bd020403a9",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -2621,6 +2644,8 @@ const approvedDatabaseRelations = new Set([
   "expert_promo_bonus_indications",
   "expert_promo_manager_work",
   "expert_promo_enrollments",
+  "expert_promo_funnel_state",
+  "expert_promo_manager_questions",
   "expert_onboarding_applications",
   "admin_case_actions",
   "admin_approvals",
@@ -3748,6 +3773,9 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0087_snapshot.json", 1200523],
+    ["packages/db/migrations/state/0087_sql_objects.json", 1890198],
+
     ["packages/db/migrations/meta/0086_snapshot.json", 1192800],
     ["packages/db/migrations/state/0086_sql_objects.json", 1882568],
 

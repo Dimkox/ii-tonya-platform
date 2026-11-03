@@ -1107,6 +1107,12 @@ export class PostgresPrivacyRepository implements PrivacyRepository {
           sql`delete from expert_promo_manager_work where user_id=${command.targetUserId}::uuid`,
         );
         await tx.execute(
+          sql`delete from expert_promo_manager_questions where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
+          sql`delete from expert_promo_funnel_state where user_id=${command.targetUserId}::uuid`,
+        );
+        await tx.execute(
           sql`delete from expert_promo_enrollments where user_id=${command.targetUserId}::uuid`,
         );
         await tx.execute(

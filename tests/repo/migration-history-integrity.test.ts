@@ -728,7 +728,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(86);
+    expect(newest).toBe(87);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -868,6 +868,6 @@ describe("migration history integrity", () => {
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
     // Native lifecycle plus early-bird policy tables.
-    expect(declared.size).toBe(280);
+    expect(declared.size).toBe(282);
   });
 });

@@ -198,6 +198,16 @@ export class PostgresExpertPromoRepository {
       replay,
     };
   }
+  /** BOT-02.2: an active, verified resident is routed to the expert bot. */
+  async isActiveResident(scope: { telegramUserId: string }): Promise<boolean> {
+    if (!/^[1-9][0-9]{0,19}$/u.test(scope.telegramUserId)) return false;
+    const row = (
+      await this.db.execute<{ active: boolean }>(
+        sql`select exists(select 1 from channel_identities c join users u on u.id=c.user_id and u.active join experts e on e.user_id=u.id and e.active and e.verified where c.provider='telegram' and c.status='active' and c.external_id=${scope.telegramUserId}) as active`,
+      )
+    ).rows[0];
+    return row?.active === true;
+  }
   async register(
     raw: ExpertPromoCommand & { refCode?: string },
   ): Promise<ExpertPromoRegistration> {
@@ -265,6 +275,11 @@ export class PostgresExpertPromoRepository {
       }
       await tx.execute(
         sql`insert into expert_promo_codes(user_id,ref_code) values(${userId}::uuid,${`promo_${randomBytes(16).toString("hex")}`}) on conflict(user_id) do nothing`,
+      );
+      // Funnel state (WAIT-T01/T06): the personal code stays in expert_promo_codes;
+      // the inviter code is stored separately and only on first registration.
+      await tx.execute(
+        sql`insert into expert_promo_funnel_state(user_id,incoming_referrer_code) values(${userId}::uuid,${registered.length ? null : (refCode ?? null)}) on conflict(user_id) do update set last_interaction_at=greatest(expert_promo_funnel_state.last_interaction_at,clock_timestamp())`,
       );
       if (referrerId) {
         // Owner serialization is separate from consent locks, avoiding cross-referral

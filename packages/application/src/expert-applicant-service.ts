@@ -17,6 +17,7 @@ type Command = ExpertApplicantScope & {
   requestDigest: string;
 };
 export interface ExpertApplicantRepository {
+  isActiveResident?(scope: ExpertApplicantScope): Promise<boolean>;
   isVerificationPending?(scope: ExpertApplicantScope): Promise<boolean>;
   saveProfile?(
     input: Command & {
@@ -96,6 +97,10 @@ const pendingVerification = (): ExpertApplicantReply => ({
   text: "Ваша анкета ожидает проверки. Тарифы пока недоступны; сохранённые ответы остаются на месте.",
   replyMarkup: { remove_keyboard: true },
 });
+const activeResidentText = (url: string | undefined) =>
+  url && /^https:\/\/t\.me\/[A-Za-z0-9_]{5,64}$/u.test(url)
+    ? `Вы уже активный резидент ии-Тони. Работайте в боте эксперта: ${url}`
+    : "Вы уже активный резидент ии-Тони. Работайте в боте эксперта.";
 const uuid =
   "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const tariff = new RegExp(`^/tariff (${uuid}) (1|3)$`, "u");
@@ -109,6 +114,8 @@ export function createExpertApplicantService(deps: {
     handle(input: ResidentFormInput): Promise<ExpertApplicantReply | null>;
   };
   repository: ExpertApplicantRepository;
+  /** BOT-02.2 redirect target for an active resident; https URL of the expert bot. */
+  activeResidentBotUrl?: string;
   personalOffers?: {
     readPromoIdentity(
       scope: ExpertApplicantScope,
@@ -154,7 +161,9 @@ export function createExpertApplicantService(deps: {
       try {
         if (
           deps.separatedSales &&
-          !/^\/(?:start|consent)(?: |$)/u.test(input.text)
+          !/^(?:\/(?:start|consent)(?: |$)|promo_[0-9a-f]{32}$)/u.test(
+            input.text.trim(),
+          )
         ) {
           const sales = await deps.separatedSales.handle(input);
           if (sales) return sales;
@@ -162,7 +171,9 @@ export function createExpertApplicantService(deps: {
         if (
           deps.verificationForm &&
           !(deps.separatedSales && input.text.startsWith("/profile")) &&
-          !/^\/(?:start|consent)(?: |$)/u.test(input.text)
+          !/^(?:\/(?:start|consent)(?: |$)|promo_[0-9a-f]{32}$)/u.test(
+            input.text.trim(),
+          )
         ) {
           const form = await deps.verificationForm.handle(input);
           if (form) return form;
@@ -200,10 +211,17 @@ export function createExpertApplicantService(deps: {
               };
         }
         if (input.text.startsWith("/profile")) return { status: "rejected" };
-        const start = /^\/start(?: (promo_[A-Za-z0-9_-]{8,48}))?$/u.exec(
-          input.text,
-        );
+        // WAIT-002: after consent a typed inviter code converges with /start promo_….
+        const typedCode = /^(promo_[0-9a-f]{32})$/u.exec(input.text.trim());
+        const start =
+          /^\/start(?: (promo_[A-Za-z0-9_-]{8,48}))?$/u.exec(input.text) ??
+          (typedCode ? [input.text, typedCode[1]] : null);
         if (start) {
+          if (await deps.repository.isActiveResident?.(scope))
+            return {
+              status: "handled",
+              text: activeResidentText(deps.activeResidentBotUrl),
+            };
           const enrollment = await deps.repository.beginEnrollment({
             ...command(),
             ...(start[1] ? { refCode: start[1] } : {}),
@@ -273,7 +291,7 @@ export function createExpertApplicantService(deps: {
             status: "handled",
             text:
               result.kind === "granted"
-                ? "Выбор сохранён. Для регистрации отправьте /start."
+                ? "Согласие сохранено. Есть реферальный код коллеги? Отправьте его сообщением (promo_…). Нет кода — отправьте /start, и вы станете первопроходцем."
                 : "Отказ сохранён. Регистрация и начисления не выполнены.",
           };
         }
