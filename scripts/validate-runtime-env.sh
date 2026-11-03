@@ -76,18 +76,14 @@ if [[ -n "$release_sha" ]]; then
       SELARTI_COMPANY_ID SELARTI_TASK_ID SELARTI_AI_ID
   [[ "$(flag_value TELEGRAM_ENABLED)" == false ]] ||
     require_keys TELEGRAM_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET
-  payments="$(flag_value PAYMENTS_ENABLED)"
-  if [[ "$payments" == true ]]; then
-    grep -Eqx 'PAYMENT_PROVIDER=(yookassa|yookassa_gateway)' "$runtime_env" ||
-      fail "PAYMENTS_ENABLED=true requires a YooKassa PAYMENT_PROVIDER"
-    require_keys PAYMENTS_ENABLED YOOKASSA_SHOP_ID
-  else
-    grep -Fx 'PAYMENT_PROVIDER=disabled' "$runtime_env" >/dev/null || fail "payments must be disabled"
-  fi
+  # Payment activation needs the full YooKassa gateway profile (packages/config/src/env.ts);
+  # this release keeps payments and residency billing off until that profile is validated here.
+  [[ "$(flag_value PAYMENTS_ENABLED)" == false ]] || fail "PAYMENTS_ENABLED must be false"
+  grep -Fx 'PAYMENT_PROVIDER=disabled' "$runtime_env" >/dev/null || fail "payments must be disabled"
   for flag in EXPERT_REFERRAL_ENABLED EXPERT_TELEGRAM_QUERIES_ENABLED EXPERT_RESIDENCY_BILLING_ENABLED; do
     [[ "$(flag_value "$flag")" == false ]] || require_keys "$flag" EXPERT_TELEGRAM_BOT_TOKEN
   done
-  [[ "$(flag_value EXPERT_RESIDENCY_BILLING_ENABLED)" == false || "$payments" == true ]] ||
+  [[ "$(flag_value EXPERT_RESIDENCY_BILLING_ENABLED)" == false ]] ||
     fail "EXPERT_RESIDENCY_BILLING_ENABLED=true requires PAYMENTS_ENABLED=true"
   grep -Fx 'SELARTI_OUTBOUND_BILLING_MODE=disabled' "$runtime_env" >/dev/null || fail "Selarti billing must be disabled"
   grep -Fx 'LLM_PROVIDER=disabled' "$runtime_env" >/dev/null || fail "LLM provider must be disabled"

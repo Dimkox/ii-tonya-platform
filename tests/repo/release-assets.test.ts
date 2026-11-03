@@ -303,8 +303,8 @@ describe("release assets", () => {
         PAYMENTS_ENABLED: "true",
         PAYMENT_PROVIDER: "yookassa",
         YOOKASSA_SHOP_ID: "1",
-      }).status,
-    ).toBe(0);
+      }).stderr,
+    ).toContain("PAYMENTS_ENABLED must be false");
   });
 
   it("rejects NODE_OPTIONS from the runtime environment", () => {
