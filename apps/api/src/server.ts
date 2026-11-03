@@ -1,4 +1,8 @@
 import {
+  resolveIntegrationBoundaries,
+  type IntegrationBoundaryCapabilities,
+} from "./integration-boundaries.js";
+import {
   createEarlyBirdStandardRuntimeComposition,
   type EarlyBirdStandardRuntimeConfiguration,
 } from "./expert-early-bird-standard-runtime-composition.js";
@@ -123,7 +127,6 @@ import {
 } from "@ii-tonya/db";
 import {
   createExpertTelegramIngress,
-  DisabledSelartiAdapter,
   createBookingCallbackVault,
   issueCallback,
   EnvironmentExpertCodeSecretResolver,
@@ -185,6 +188,8 @@ export const createDefaultLifecycle = (
     receiptDisclosureGateway?: ExperimentalGatewayIpc;
     receiptDisclosureKeyVersion?: string;
     earlyBirdRuntime?: EarlyBirdOwnerRuntimeConfiguration;
+    /** Live Selarti / Telegram callback capabilities, used only when their env flag is on. */
+    integrationBoundaries?: IntegrationBoundaryCapabilities;
     publicExpertRuntime?: import("@ii-tonya/db").PublicExpertPaymentRuntime;
     earlyBirdStandardRuntime?: EarlyBirdStandardRuntimeConfiguration;
     earlyBirdDeferred?: Parameters<typeof createPostgresEarlyBirdAuthority>[6];
@@ -992,18 +997,7 @@ export const createDefaultLifecycle = (
       expertReferralAdminService: createExpertReferralAdminService({
         workflows: new PostgresExpertReferralAdminRepository(db, codeCrypto),
       }),
-      selarti: new DisabledSelartiAdapter(),
-      telegramCallbacks: {
-        async isAuthorizedIdentity() {
-          return false;
-        },
-        async verifyCallback() {
-          return false;
-        },
-        async process() {
-          throw new Error("Telegram integration is disabled");
-        },
-      },
+      ...resolveIntegrationBoundaries(config, options.integrationBoundaries),
       readiness: {
         async check() {
           const state = await checkDbReadiness(db);

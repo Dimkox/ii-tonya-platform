@@ -14,6 +14,17 @@ type JournalEntry = {
   breakpoints: boolean;
 };
 
+// Matches `CREATE [OR REPLACE] [CONSTRAINT] TRIGGER name` with the name bare or
+// double-quoted. Repository migrations quote trigger names, so a bare-only pattern
+// silently reports zero unlisted triggers (issue #86).
+const TRIGGER_NAME_PATTERN =
+  /create\s+(?:or\s+replace\s+)?(?:constraint\s+)?trigger\s+"?([a-z_][a-z0-9_]*)"?/gi;
+
+const collectTriggerNames = (sql: string): string[] =>
+  [...sql.matchAll(TRIGGER_NAME_PATTERN)]
+    .map((match) => match[1])
+    .filter((name): name is string => name !== undefined);
+
 const snapshotPath = (idx: number): string =>
   `${META}/${String(idx).padStart(4, "0")}_snapshot.json`;
 
@@ -362,6 +373,7 @@ const HAND_SQL_FUNCTIONS = [
 ] as const;
 
 const HAND_SQL_TRIGGERS = [
+  "admin_case_actions_append_only",
   "audit_events_append_only",
   "booking_handoff_revocation_receipts_append_only",
   "booking_notification_attempt_delivery_state",
@@ -460,6 +472,8 @@ const HAND_SQL_TRIGGERS = [
   "expert_card_reviews_immutable",
   "expert_card_staff_actions_immutable",
   "expert_card_tag_selection_guard",
+  "expert_first_settlement_guard",
+  "expert_ledger_allocations_exact_total",
   "expert_main_activation_admission_source",
   "expert_main_activation_admissions_append_only",
   "expert_offer_application_erasure",
@@ -478,22 +492,27 @@ const HAND_SQL_TRIGGERS = [
   "expert_onboarding_operations_immutable",
   "expert_onboarding_operations_no_delete",
   "expert_onboarding_payment_facts_immutable",
+  "expert_orders_provider_deadline_default",
   "expert_promo_codes_immutable",
   "expert_promo_qualification_immutable",
   "expert_promo_qualification_source",
   "expert_promo_referral_source",
   "expert_promo_registrations_immutable",
   "expert_promo_requests_immutable",
+  "expert_provider_reversal_result_guard",
   "expert_published_card_source",
+  "expert_receipt_contacts_append_only",
   "expert_referral_admin_approval_global_unique",
   "expert_referral_admin_results_immutable",
   "expert_referral_admin_results_truncate_immutable",
+  "expert_referral_append_only",
   "expert_referral_maturities_delete_guard",
   "expert_referral_maturities_terminal_guard",
   "expert_residency_calendar_pause_access",
   "expert_residency_calendar_pause_publication",
   "expert_residency_renewal_attempt_source",
   "expert_residency_renewal_bill_source",
+  "expert_reward_grants_eligible_settlement",
   "expert_sales_attempt_immutable",
   "expert_sales_attempt_source",
   "expert_sales_base_immutable",
@@ -525,8 +544,11 @@ const HAND_SQL_TRIGGERS = [
   "expert_verification_decisions_no_delete",
   "expert_verification_decisions_source",
   "human_escalations_append_only",
+  "human_escalations_transition_integrity",
+  "message_ledger_admin_provenance",
   "message_ledger_entries_append_only",
   "message_packages_append_only",
+  "message_packages_legacy_marker_migration_only",
   "owner_test_pricing_grant_guard",
   "partner_shadow_quotes_immutable",
   "partner_tariff_policy_versions_immutable",
@@ -759,6 +781,25 @@ describe("migration history integrity", () => {
     expect(contract).toContain("0021");
     expect(contract).toContain("Everything's fine");
   });
+  it("collects bare and double-quoted trigger names, including constraint triggers", () => {
+    expect(
+      collectTriggerNames(`
+        CREATE TRIGGER bare_one BEFORE UPDATE ON t FOR EACH ROW EXECUTE FUNCTION f();
+        CREATE TRIGGER "quoted_two" BEFORE UPDATE ON t FOR EACH ROW EXECUTE FUNCTION f();
+        create constraint trigger "quoted_constraint" after insert on t
+          deferrable initially deferred for each row execute function f();
+        CREATE OR REPLACE TRIGGER "replaced_four" AFTER DELETE ON t FOR EACH ROW EXECUTE FUNCTION f();
+      `),
+    ).toEqual(["bare_one", "quoted_two", "quoted_constraint", "replaced_four"]);
+  });
+  it("fails the trigger pin when a quoted trigger is not listed", () => {
+    const tree = `CREATE TRIGGER "unlisted_quoted_trigger" BEFORE UPDATE ON t
+      FOR EACH ROW EXECUTE FUNCTION f();`;
+    const unlisted = collectTriggerNames(tree).filter(
+      (name) => !(HAND_SQL_TRIGGERS as readonly string[]).includes(name),
+    );
+    expect(unlisted).toEqual(["unlisted_quoted_trigger"]);
+  });
   it("pins the SQL objects that drizzle-kit cannot reproduce", () => {
     const sources = readdirSync(MIGRATIONS)
       .filter((name) => name.endsWith(".sql"))
@@ -783,9 +824,7 @@ describe("migration history integrity", () => {
         (name) => name.replace(/^public\./u, ""),
       ),
     ).toEqual([...HAND_SQL_FUNCTIONS]);
-    expect(
-      collect(/create\s+(?:constraint\s+)?trigger\s+([a-z_][a-z0-9_]*)/gi),
-    ).toEqual([...HAND_SQL_TRIGGERS]);
+    expect(collect(TRIGGER_NAME_PATTERN)).toEqual([...HAND_SQL_TRIGGERS]);
     expect(collect(/create\s+(?:or replace\s+)?view\s+([a-z_.]+)/gi)).toEqual([
       ...HAND_SQL_VIEWS,
     ]);
