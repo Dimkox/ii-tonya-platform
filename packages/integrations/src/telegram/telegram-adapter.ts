@@ -212,7 +212,31 @@ export interface ExpertTelegramQueryViewPort {
     callbackQueryId: string;
     status: "processed" | "unavailable";
   }): Promise<TelegramSendOutcome>;
+  /** BOT-03.2: главное меню рабочего эксперта. */
+  sendMainMenu?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome>;
+  /** BOT-03.2: заглушка для пункта меню без серверного действия. */
+  sendMenuStub?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome>;
+  /** BOT-03.1: отказ неактивному резиденту со ссылкой на промобот. */
+  sendInactiveResident?(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    promoBotUrl: string;
+  }): Promise<TelegramSendOutcome>;
 }
+
+export const EXPERT_MAIN_MENU = Object.freeze([
+  { text: "Мои брони", callback_data: "em1.bookings" },
+  { text: "Добавить слот", callback_data: "em1.slot" },
+  { text: "Мой баланс", callback_data: "em1.balance" },
+  { text: "Поддержка", callback_data: "em1.support" },
+] as const);
+export const EXPERT_MENU_STUB_TEXT = "скоро";
 
 export interface TelegramTransportRequest {
   method: "POST";
@@ -818,6 +842,40 @@ export class TelegramAdapter
     telegramUserId: string;
   }): Promise<TelegramSendOutcome> {
     return this.sendText({ ...view, text: "Команда недоступна." });
+  }
+
+  async sendMainMenu(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome> {
+    return this.sendText({
+      ...view,
+      text: "Главное меню",
+      replyMarkup: {
+        inline_keyboard: EXPERT_MAIN_MENU.map((button) => [{ ...button }]),
+      },
+    });
+  }
+
+  async sendMenuStub(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+  }): Promise<TelegramSendOutcome> {
+    return this.sendText({ ...view, text: EXPERT_MENU_STUB_TEXT });
+  }
+
+  async sendInactiveResident(view: {
+    idempotencyKey: string;
+    telegramUserId: string;
+    promoBotUrl: string;
+  }): Promise<TelegramSendOutcome> {
+    const url = new URL(view.promoBotUrl);
+    if (url.protocol !== "https:") throw new Error("invalid_expert_view");
+    return this.sendText({
+      idempotencyKey: view.idempotencyKey,
+      telegramUserId: view.telegramUserId,
+      text: `Доступ только для активного резидента. Подключиться: ${url.toString()}`,
+    });
   }
 
   async answerCallbackQuery(view: {

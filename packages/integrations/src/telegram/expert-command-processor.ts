@@ -132,7 +132,24 @@ interface QueryService {
   }>;
 }
 
+export type ExpertMenuAction = "bookings" | "slot" | "balance" | "support";
+export const parseExpertMenuAction = (
+  data: string,
+): ExpertMenuAction | null => {
+  const match = /^em1\.(bookings|slot|balance|support)$/u.exec(data);
+  return match === null ? null : (match[1] as ExpertMenuAction);
+};
+
 export interface ExpertCommandProcessor {
+  processMenuAction(command: {
+    readonly action: ExpertMenuAction;
+    readonly principal: ExpertTelegramCommandPrincipal;
+    readonly idempotencyKey: string;
+    readonly correlationId: string;
+  }): Promise<{
+    readonly kind: "processed" | "unsupported" | "disabled" | "unavailable";
+    readonly deliveryOutcome?: "applied" | "unknown_outcome";
+  }>;
   processCommand(command: {
     readonly text: string;
     readonly chatType: string;
@@ -205,11 +222,56 @@ export const createExpertCommandProcessor = (deps: {
   const tariffCommand =
     /^\/residency ([0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu;
   const redeemCommand = /^\/redeem (EXR_[A-Za-z0-9_-]{22,128})$/u;
-  return {
+  const sendUnsupported = async (command: {
+    readonly principal: ExpertTelegramCommandPrincipal;
+    readonly idempotencyKey: string;
+  }) => ({
+    kind: "unsupported" as const,
+    deliveryOutcome: ordinaryDeliveryOutcome(
+      await deps.views.sendUnsupported({
+        idempotencyKey: command.idempotencyKey,
+        telegramUserId: command.principal.telegramUserId,
+      }),
+    ),
+  });
+  const processor: ExpertCommandProcessor = {
+    async processMenuAction(command) {
+      if (!deps.enabled) return { kind: "disabled" };
+      // Пункты меню отображаются на существующие команды; без серверного действия — заглушка.
+      if (command.action === "bookings" || command.action === "balance") {
+        return processor.processCommand({
+          text: command.action === "bookings" ? "/schedule" : "/referral",
+          chatType: "private",
+          principal: command.principal,
+          idempotencyKey: command.idempotencyKey,
+          correlationId: command.correlationId,
+        });
+      }
+      if (deps.views.sendMenuStub === undefined)
+        return sendUnsupported(command);
+      const deliveryOutcome = ordinaryDeliveryOutcome(
+        await deps.views.sendMenuStub({
+          idempotencyKey: command.idempotencyKey,
+          telegramUserId: command.principal.telegramUserId,
+        }),
+      );
+      return { kind: "processed", deliveryOutcome };
+    },
     async processCommand(command) {
       if (!deps.enabled) return { kind: "disabled" };
       if (command.chatType !== "private") return { kind: "unavailable" };
       switch (command.text) {
+        case "/start": {
+          if (deps.views.sendMainMenu === undefined)
+            return sendUnsupported(command);
+          const deliveryOutcome = ordinaryDeliveryOutcome(
+            await deps.views.sendMainMenu({
+              idempotencyKey: command.idempotencyKey,
+              telegramUserId: command.principal.telegramUserId,
+            }),
+          );
+          return { kind: "processed", deliveryOutcome };
+        }
         case "/referral": {
           if (deps.financialViewsEnabled !== true) {
             const deliveryOutcome = ordinaryDeliveryOutcome(
@@ -439,4 +501,5 @@ export const createExpertCommandProcessor = (deps: {
       return { kind: "processed", deliveryOutcome: outcome.kind };
     },
   };
+  return processor;
 };
