@@ -38,7 +38,6 @@ describe("hardened API boundary", () => {
     });
     for (const flag of [
       "SELARTI_ENABLED",
-      "PLANERKA_ENABLED",
       "TELEGRAM_ENABLED",
       "MAKE_PROJECTION_ENABLED",
       "INTENT_MODEL_ENABLED",

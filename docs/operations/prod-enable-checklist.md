@@ -1,0 +1,35 @@
+# Prod enable checklist (client MVP + integrations)
+
+Шаблон: `deploy/runtime.env.example`, блок `FULL ENABLE PROFILE`. Значения — только плейсхолдеры;
+реальные секреты берутся из хранилища секретов на хосте и в репозиторий не попадают.
+Каждый шаг: поменять флаги → перезапуск api/worker → `/health/*` зелёный → только потом следующий.
+
+## Ограничения до старта
+
+- `scripts/validate-runtime-env.sh` (release mode) пока требует `false` для `SELARTI_ENABLED`,
+  `TELEGRAM_ENABLED`, `PAYMENTS_ENABLED`, `EXPERT_REFERRAL_ENABLED`, `EXPERT_RESIDENCY_BILLING_ENABLED`,
+  `EXPERT_TELEGRAM_QUERIES_ENABLED`, а также `PAYMENT_PROVIDER=disabled`. Файл закреплён хешем в
+  `tests/repo/scope-boundary.test.ts`; до живого включения этих шагов гейт надо обновить отдельным PR.
+- `LIFECYCLE_CHECKUPS_ENABLED`, `LIFECYCLE_FEEDBACK_ENABLED`, `LIFECYCLE_COUPON_NOTICES_ENABLED`
+  схема отвергает (нет authority) — оставить `false`.
+- Заперты схемой: `LLM_ENABLED`, `INTENT_MODEL_ENABLED`, `MAKE_PROJECTION_ENABLED`,
+  `GOOGLE_SHEETS_PROJECTION_ENABLED`, `MINOR_ONBOARDING_ENABLED`, `LLM_PROVIDER=disabled`.
+- `PLANERKA_ENABLED` удалён из схемы (игнорируется).
+
+## Порядок
+
+| # | Флаги (по порядку) | Обязательные ключи |
+|---|--------------------|--------------------|
+| 1 | `WORKER_OUTBOX_DELIVERY_ENABLED` | — |
+| 2 | `CLIENT_SESSION_ENABLED` | `CLIENT_WEB_ORIGIN` (точный https origin), `CLIENT_TELEGRAM_LOGIN_BOT_USERNAME` — если включается веб-логин |
+| 3 | `CLIENT_CATALOG_ENABLED` | — |
+| 4 | `CLIENT_PRIVACY_ENABLED` (нужен session) | — |
+| 5 | `CLIENT_BOOKING_ENABLED` (нужны session + catalog + outbox), затем `CLIENT_BOOKING_RESERVE_ENABLED`, `CLIENT_SESSION_BOOKING_GRANTS_ENABLED`, `CLIENT_WAITLIST_ENABLED` | — |
+| 6 | `TELEGRAM_ENABLED`, `B2_TELEGRAM_DISPATCH_ENABLED`, затем `TELEGRAM_EGRESS_CONSENT_GATE_ENABLED` (нужен dispatch) | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `CLIENT_TELEGRAM_BOT_KEY`, `CLIENT_MESSAGING_CONSENT_POLICY_VERSION` |
+| 7 | `LIFECYCLE_REMINDERS_ENABLED` (нужны booking + outbox) | `CLIENT_TELEGRAM_BOT_KEY`, `CLIENT_MESSAGING_CONSENT_POLICY_VERSION` |
+| 8 | `SELARTI_ENABLED` | `SELARTI_API_KEY`, `SELARTI_WEBHOOK_SECRET` |
+| 9 | `PAYMENTS_ENABLED`, `PAYMENT_PROVIDER=yookassa`, `YOOKASSA_ENABLED` | `YOOKASSA_MODE`, `YOOKASSA_SHOP_ID`, `YOOKASSA_SECRET_KEY`, `YOOKASSA_SECRET_REF=env://YOOKASSA_SECRET_KEY`, `YOOKASSA_RETURN_URL` (https://ii-tonya.ru/...), `YOOKASSA_RECEIPT_VAT_CODE`, `YOOKASSA_RECEIPT_PAYMENT_SUBJECT`, `YOOKASSA_RECEIPT_PAYMENT_MODE` |
+| 10 | `EXPERT_REFERRAL_ENABLED`, `EXPERT_RESIDENCY_BILLING_ENABLED`, `EXPERT_TELEGRAM_QUERIES_ENABLED`, `EXPERT_TELEGRAM_FINANCIAL_VIEWS_ENABLED`, `EXPERT_TELEGRAM_REFERRAL_ENABLED`, `EXPERT_TELEGRAM_CHECKOUT_ENABLED`, `EXPERT_AI_INGRESS_ENABLED` | `EXPERT_REFERRAL_HMAC_KEY_VERSION`, `EXPERT_REFERRAL_HMAC_KEY_REF` |
+| 11 | `PLANERKA_RECOVERY_ENABLED`, затем `PLANERKA_AVAILABILITY_ENABLED`, `PLANERKA_CREATE_ENABLED` (оба требуют recovery) | `PLANERKA_API_KEY`, `PLANERKA_ACCOUNT_ID` (целое > 0) |
+
+Откат: вернуть флаг шага в `false` и перезапустить; флаги верхних шагов зависят от нижних.

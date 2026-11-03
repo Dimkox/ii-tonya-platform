@@ -84,7 +84,6 @@ const schema = z
     SELARTI_API_KEY: optionalNonEmptyString,
     SELARTI_WEBHOOK_SECRET: optionalNonEmptyString,
     SELARTI_OUTBOUND_BILLING_MODE: z.literal("disabled").default("disabled"),
-    PLANERKA_ENABLED: z.literal("false").default("false"),
     PLANERKA_CREATE_ENABLED: z.enum(["true", "false"]).default("false"),
     PLANERKA_RECOVERY_ENABLED: z.enum(["true", "false"]).default("false"),
     PLANERKA_AVAILABILITY_ENABLED: z.enum(["true", "false"]).default("false"),

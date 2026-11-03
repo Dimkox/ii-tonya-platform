@@ -404,7 +404,6 @@ describe("loadEnv", () => {
   it("rejects every project-owned enable flag when set to true", () => {
     const ownedEnableFlags = [
       "SELARTI_ENABLED",
-      "PLANERKA_ENABLED",
       "TELEGRAM_ENABLED",
       "PAYMENTS_ENABLED",
       "LLM_ENABLED",
