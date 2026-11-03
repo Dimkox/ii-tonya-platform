@@ -2,6 +2,9 @@ import {
   resolveIntegrationBoundaries,
   type IntegrationBoundaryCapabilities,
 } from "./integration-boundaries.js";
+import { createTelegramCallbackService } from "./telegram-callback-service.js";
+import { PostgresTelegramCallbackReplayRepository } from "@ii-tonya/db";
+import { LiveSelartiAdapter } from "./live-selarti-adapter.js";
 import {
   createEarlyBirdStandardRuntimeComposition,
   type EarlyBirdStandardRuntimeConfiguration,
@@ -997,14 +1000,26 @@ export const createDefaultLifecycle = (
       expertReferralAdminService: createExpertReferralAdminService({
         workflows: new PostgresExpertReferralAdminRepository(db, codeCrypto),
       }),
-      ...resolveIntegrationBoundaries(config, options.integrationBoundaries),
+      ...resolveIntegrationBoundaries(config, options.integrationBoundaries, {
+        selarti: () => {
+          if (config.selartiLive === undefined)
+            throw new Error("selarti_capability_required");
+          return new LiveSelartiAdapter(config.selartiLive);
+        },
+        telegramCallbacks: () =>
+          createTelegramCallbackService(
+            new PostgresTelegramCallbackReplayRepository(db),
+          ),
+      }),
       readiness: {
         async check() {
           const state = await checkDbReadiness(db);
           return {
             ...state,
-            adapters: Object.values(config.integrations).every(
-              (value) => value === false,
+            // Selarti and Telegram now have live boundaries; others stay off.
+            adapters: Object.entries(config.integrations).every(
+              ([name, value]) =>
+                name === "selarti" || name === "telegram" || value === false,
             ),
           };
         },

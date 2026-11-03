@@ -58,6 +58,9 @@ describe("Selarti / Telegram ingress env activation", () => {
       SELARTI_ENABLED: "true",
       SELARTI_API_KEY: "k".repeat(32),
       SELARTI_WEBHOOK_SECRET: "s".repeat(32),
+      SELARTI_COMPANY_ID: "company-1",
+      SELARTI_TASK_ID: "task-1",
+      SELARTI_AI_ID: "ai-1",
       TELEGRAM_ENABLED: "true",
       TELEGRAM_BOT_TOKEN: `123456789:${"A".repeat(35)}`,
       TELEGRAM_WEBHOOK_SECRET: "w".repeat(32),
@@ -66,6 +69,22 @@ describe("Selarti / Telegram ingress env activation", () => {
       selarti: true,
       telegram: true,
     });
+    expect(config.selartiLive).toMatchObject({
+      companyId: "company-1",
+      taskId: "task-1",
+      aiId: "ai-1",
+    });
+  });
+
+  it("rejects Selarti activation without provider binding ids", () => {
+    expect(() =>
+      loadEnv({
+        ...localEnv,
+        SELARTI_ENABLED: "true",
+        SELARTI_API_KEY: "k".repeat(32),
+        SELARTI_WEBHOOK_SECRET: "s".repeat(32),
+      }),
+    ).toThrow(/selarti_activation_requires_provider_binding/);
   });
 });
 
@@ -105,6 +124,17 @@ describe("integration boundary composition", () => {
       selarti: liveSelarti,
       telegramCallbacks: liveCallbacks,
     });
+    expect(b.selarti).toBe(liveSelarti);
+    expect(b.telegramCallbacks).toBe(liveCallbacks);
+    expect(() => assertIntegrationBoundaries(on, b)).not.toThrow();
+  });
+
+  it("flag on without injected capability: live factories are used", () => {
+    const b = resolveIntegrationBoundaries(
+      on,
+      {},
+      { selarti: () => liveSelarti, telegramCallbacks: () => liveCallbacks },
+    );
     expect(b.selarti).toBe(liveSelarti);
     expect(b.telegramCallbacks).toBe(liveCallbacks);
     expect(() => assertIntegrationBoundaries(on, b)).not.toThrow();
