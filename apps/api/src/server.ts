@@ -55,6 +55,7 @@ import { createTelegramDeletionCapability } from "./telegram-deletion-compositio
 import { randomBytes } from "node:crypto";
 import { createExpertSessionService } from "@ii-tonya/application";
 import { PostgresExpertSessionRepository } from "@ii-tonya/db";
+import type { PublicExpertPaymentRuntime } from "@ii-tonya/db";
 import { createTelegramExpertProofVerifier } from "./telegram-expert-proof.js";
 import {
   createExpertSessionToken,
@@ -192,7 +193,7 @@ export const createDefaultLifecycle = (
     earlyBirdRuntime?: EarlyBirdOwnerRuntimeConfiguration;
     /** Live Selarti / Telegram callback capabilities, used only when their env flag is on. */
     integrationBoundaries?: IntegrationBoundaryCapabilities;
-    publicExpertRuntime?: import("@ii-tonya/db").PublicExpertPaymentRuntime;
+    publicExpertRuntime?: PublicExpertPaymentRuntime;
     earlyBirdStandardRuntime?: EarlyBirdStandardRuntimeConfiguration;
     earlyBirdDeferred?: Parameters<typeof createPostgresEarlyBirdAuthority>[6];
     /** Explicitly constructed trusted capabilities; absent by default, never enabled from env. */

@@ -8,6 +8,7 @@ import {
   type YooKassaPayment,
   type YooKassaRefund,
   type PublicExpertPrepareDescriptor,
+  type PublicExpertPaymentSnapshot,
 } from "@ii-tonya/integrations";
 import {
   startPublicExpertTestDatabase,
@@ -526,10 +527,7 @@ it("preallocated authorized refund sends the exact canonical fiscal body once an
     refundable: true,
   };
   const transport = {
-    async dispatch(
-      s: import("@ii-tonya/integrations").PublicExpertPaymentSnapshot,
-      bytes: Uint8Array,
-    ) {
+    async dispatch(s: PublicExpertPaymentSnapshot, bytes: Uint8Array) {
       expect(Buffer.from(bytes).toString()).toBe(body);
       await claim(s);
       posts++;

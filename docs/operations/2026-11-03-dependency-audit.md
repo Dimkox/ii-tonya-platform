@@ -20,10 +20,14 @@ nanoid, source-map-js, undici, uuid). Эти overrides сохраняются.
    Версии 3.1.5, 5.1.9, 9.0.9, 10.2.5 — все последние в своих major.
    Исправление только в 11.0.1+; backport нет. Пути: eslint, vitest/glob,
    testcontainers. Вход — только шаблоны из конфигов репозитория (доверенные).
-   Override на major 11 ломает API v3/v5 (eslint) — не применяем.
+   Обновление 2026-11-04 (PR #149): override `minimatch@<11.0.1` → 11.0.4.
+   Проверено: `pnpm lint`, `pnpm typecheck`, `tests/repo` проходят.
+   Ранний прогноз «ломает eslint» не подтвердился.
 2. **glob** 10.5.0 GHSA-3g3m-2fjr-6pw4 (обход AbortSignal).
    Путь: `@testcontainers/postgresql > testcontainers > archiver > glob`.
    Только тестовая инфраструктура, сигнал отмены не используется.
+   Обновление 2026-11-04 (PR #149): override `glob@<14.0.2` → 14.0.3.
+3. После overrides `scripts/getzilla_vulns.py --online`: PASS, 0 находок.
 
 ## Контроль
 

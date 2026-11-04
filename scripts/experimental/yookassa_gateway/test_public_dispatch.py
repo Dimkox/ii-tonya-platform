@@ -337,8 +337,13 @@ class PublicDispatchTests(unittest.TestCase):
     def test_pg_claim_returns_strict_snapshot_not_boolean_and_fails_closed(self):
         from pg_authority import PgAuthority
 
-        authority = PgAuthority(
-            psql_path="/usr/bin/psql", service="synthetic", service_file="/tmp/service", pass_file="/tmp/pass"
+        # Synthetic paths only: subprocess.run is mocked below, nothing is read or written.
+        # pass_file is a synthetic path, not a password.
+        authority = PgAuthority(  # nosec B106
+            psql_path="/usr/bin/psql",
+            service="synthetic",
+            service_file="/synthetic/service",
+            pass_file="/synthetic/pass",
         )
         self.assertTrue(callable(getattr(authority, "claim_public", None)), "typed PG claim missing")
         with patch("pg_authority.subprocess.run") as run:
