@@ -6,7 +6,7 @@ Getzilla 2.3.1 (`.getzilla/getzilla.zip`).
 
 Reproduce (read-only; uses a temporary detached worktree that it then removes):
 
-    python3 scripts/reproduce_getzilla_false_signals.py ee323e39 a37c3c73
+    node scripts/reproduce-getzilla-false-signals.mjs ee323e39 a37c3c73
 
 Output is in `reproduction.json`. The engine reports `status: incomplete`, `risk: high`,
 `gaps: [BINARY_OR_UNKNOWN_INVENTORY]`. That one gap blocks qualification by itself.
