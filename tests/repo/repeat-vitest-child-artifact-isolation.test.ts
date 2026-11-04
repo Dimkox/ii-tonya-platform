@@ -55,7 +55,22 @@ it("nested missing-path Vitest preserves its parent's coverage and report under 
   };
   try {
     copyFileSync("vitest.config.ts", join(directory, "vitest.config.ts"));
-    writeFileSync(join(directory, "package.json"), '{"type":"module"}\n');
+    // Pin the repo's pnpm: without packageManager, corepack may pick a newer pnpm that prunes the
+    // symlinked node_modules below, i.e. deletes the real checkout's dependencies.
+    const { packageManager } = JSON.parse(
+      readFileSync("package.json", "utf8"),
+    ) as {
+      packageManager: string;
+    };
+    writeFileSync(
+      join(directory, "package.json"),
+      `${JSON.stringify({ type: "module", packageManager })}\n`,
+    );
+    // The fixture borrows the checkout's node_modules; pnpm must never try to "fix" it.
+    writeFileSync(
+      join(directory, "pnpm-workspace.yaml"),
+      "verifyDepsBeforeRun: false\n",
+    );
     symlinkSync(
       resolve("node_modules"),
       join(directory, "node_modules"),
