@@ -1,0 +1,72 @@
+{
+  "engine_version": "2.3.1",
+  "base": "ee323e396183104e694570dec5675879558f5afa",
+  "head": "a37c3c7354e1b94e02943dda314151311c9d5363",
+  "engine": {
+    "status": "incomplete",
+    "risk": "high",
+    "gaps": ["BINARY_OR_UNKNOWN_INVENTORY"]
+  },
+  "binary_file_reasons": 15,
+  "gap_paths": 1242,
+  "by_cause": {
+    "archive-or-executable-suffix": 1242
+  },
+  "by_classifier": {
+    "vendored-engine-archive": 1,
+    "compressed-text-evidence": 1237,
+    "reviewed-document-fixture": 1,
+    "compressed-inert-image": 3
+  },
+  "unexplained": [],
+  "examples": {
+    "vendored-engine-archive": [
+      {
+        "path": ".getzilla/getzilla.zip",
+        "causes": ["archive-or-executable-suffix"],
+        "classifier": "vendored-engine-archive"
+      }
+    ],
+    "compressed-text-evidence": [
+      {
+        "path": "docs/test-evidence/final-verification-messages-2026-10-26/api-composition-fixed.log.gz",
+        "causes": ["archive-or-executable-suffix"],
+        "classifier": "compressed-text-evidence"
+      },
+      {
+        "path": "docs/test-evidence/final-verification-messages-2026-10-26/api-composition.log.gz",
+        "causes": ["archive-or-executable-suffix"],
+        "classifier": "compressed-text-evidence"
+      },
+      {
+        "path": "docs/test-evidence/final-verification-messages-2026-10-26/api-types-current.log.gz",
+        "causes": ["archive-or-executable-suffix"],
+        "classifier": "compressed-text-evidence"
+      }
+    ],
+    "reviewed-document-fixture": [
+      {
+        "path": "docs/test-evidence/residency-rich-onboarding-2026-10-27/labelled.docx.gz",
+        "causes": ["archive-or-executable-suffix"],
+        "classifier": "reviewed-document-fixture"
+      }
+    ],
+    "compressed-inert-image": [
+      {
+        "path": "docs/test-evidence/residency-rich-onboarding-2026-10-27/manager-browser.png.gz",
+        "causes": ["archive-or-executable-suffix"],
+        "classifier": "compressed-inert-image"
+      },
+      {
+        "path": "docs/test-evidence/residency-rich-onboarding-second-2026-10-27/manager-browser.png.gz",
+        "causes": ["archive-or-executable-suffix"],
+        "classifier": "compressed-inert-image"
+      },
+      {
+        "path": "docs/test-evidence/residency-semantic-tags-2026-10-27/manager-browser.png.gz",
+        "causes": ["archive-or-executable-suffix"],
+        "classifier": "compressed-inert-image"
+      }
+    ]
+  }
+}
