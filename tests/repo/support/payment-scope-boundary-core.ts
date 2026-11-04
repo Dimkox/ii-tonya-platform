@@ -814,11 +814,11 @@ const approvedAutomationArtifactHashes = new Map([
 
   [
     "scripts/experimental/yookassa_gateway/test_public_journey_reader_seam.py",
-    "a7493e386749d328290a61caf3a05abddea62832aa44f4606e0dd723911c4ea6",
+    "1dfab99acc9a8815c05d7117cbcb736ba24eb4f97ddbeebc6a2244a8c183e71c",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_public_dispatch.py",
-    "eb4a8367068457864657a40edbebae150e6b7a87f8d6178b57666ccd871dc688",
+    "f0bb56c27f905ce82d2f1f8e85600ca76632593c8aaede175dce7a805c2cecad",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_public_dispatch_response.py",
@@ -921,7 +921,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "deploy/gateway-provision/test_prepare_gateway.py",
-    "5660041061bf0b894da7f34b663212397c31d2d17ec145ccc6d59a58879c215c",
+    "1eefe22c115eb5d790f8a0c022f48cea9d4479d1650fccf15fe2ea726f359821",
   ],
   [
     "deploy/gateway-provision/test_prepare_gateway_bad_marker.py",
