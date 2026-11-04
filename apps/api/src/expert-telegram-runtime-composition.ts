@@ -126,7 +126,8 @@ export const createExpertTelegramRuntimeComposition = (input: {
   });
 
   const resolvePrincipal = async (telegramUserId: string) => {
-    const owner = await sessions.resolveTelegramIdentity(telegramUserId);
+    // Read-only queries keep access for paused experts with native obligations.
+    const owner = await sessions.resolveTelegramQueryIdentity(telegramUserId);
     return owner === null
       ? null
       : {

@@ -35,8 +35,8 @@ export class PostgresExpertSessionRepository {
     if (/^[A-Za-z0-9_-]{1,64}$/u.exec(botKey)?.[0] !== botKey)
       throw new Error("expert_session_configuration_required");
   }
-  private eligible() {
-    return sql`c.provider='telegram' and c.status='active' and u.active and e.active and e.verified
+  private eligible(expertActive = sql`e.active`) {
+    return sql`c.provider='telegram' and c.status='active' and u.active and ${expertActive} and e.verified
   and e.user_id=c.user_id and c.external_id ~ '^[1-9][0-9]{0,15}$'
   and ((c.bot_key=${this.botKey} and c.external_chat_id=c.external_id)
     or (c.bot_key is null and (c.external_chat_id is null or c.external_chat_id=c.external_id)
@@ -58,6 +58,26 @@ export class PostgresExpertSessionRepository {
       .execute<Owner>(sql`select u.id "userId",e.id "expertId",c.id "channelIdentityId",c.external_id "externalId",c.bot_key "botKey",c.external_chat_id "externalChatId"
    from channel_identities c join users u on u.id=c.user_id join experts e on e.user_id=u.id
    where c.external_id=${externalId} and ${this.eligible()}`);
+    return r.rows.length === 1 ? r.rows[0]! : null;
+  }
+  /**
+   * Read-only expert bot queries (/schedule, /client, /stats). A paused expert
+   * (voluntary pause or unpaid listing expiry) keeps read access while a resident
+   * native obligation exists, like the query repositories. Never use this for
+   * session issue, booking or mutation admission.
+   */
+  async resolveTelegramQueryIdentity(
+    externalId: string,
+  ): Promise<Owner | null> {
+    if (
+      /^[1-9][0-9]{0,15}$/u.exec(externalId)?.[0] !== externalId ||
+      !Number.isSafeInteger(Number(externalId))
+    )
+      return null;
+    const r = await this.db
+      .execute<Owner>(sql`select u.id "userId",e.id "expertId",c.id "channelIdentityId",c.external_id "externalId",c.bot_key "botKey",c.external_chat_id "externalChatId"
+   from channel_identities c join users u on u.id=c.user_id join experts e on e.user_id=u.id
+   where c.external_id=${externalId} and ${this.eligible(sql`(e.active or resident_native_obligation(e.id))`)}`);
     return r.rows.length === 1 ? r.rows[0]! : null;
   }
   async issue(

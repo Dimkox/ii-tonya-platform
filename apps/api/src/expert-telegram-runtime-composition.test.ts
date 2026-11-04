@@ -119,6 +119,25 @@ describe("expert Telegram runtime composition (SCRUM-513)", () => {
     ).resolves.toBeNull();
   });
 
+  it("resolves query principals with the paused-expert obligation rule", async () => {
+    const { PgDialect } = await import("drizzle-orm/pg-core");
+    const execute = vi.fn((query: unknown) =>
+      Promise.resolve({ rows: [], query }),
+    );
+    const composition = createExpertTelegramRuntimeComposition({
+      config: config({ expertTelegramQueries: true }),
+      db: { execute } as unknown as DrizzleDb,
+      env: { EXPERT_TELEGRAM_CLIENT_VIEW_SECRET: SECRET },
+    })!;
+    await composition.resolvePrincipal("12345");
+    expect(execute).toHaveBeenCalledTimes(1);
+    const text = new PgDialect().sqlToQuery(
+      execute.mock.calls[0]![0] as never,
+    ).sql;
+    expect(text).toContain("(e.active or resident_native_obligation(e.id))");
+    expect(text).toContain("e.verified");
+  });
+
   it("fetch transport posts JSON only to api.telegram.org", async () => {
     const fetchImpl = vi.fn(
       async () => new Response('{"ok":true,"result":{"message_id":5}}'),
