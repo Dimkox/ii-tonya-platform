@@ -270,7 +270,12 @@ File format (strict; unknown fields and duplicates are rejected):
 {
   "accountId": 123,
   "mappings": [
-    { "expertServiceId": "<uuid of active expert_services row>", "eventTypeId": 456, "timeZone": "Europe/Moscow", "enabled": true }
+    {
+      "expertServiceId": "<uuid of active expert_services row>",
+      "eventTypeId": 456,
+      "timeZone": "Europe/Moscow",
+      "enabled": true
+    }
   ]
 }
 ```
