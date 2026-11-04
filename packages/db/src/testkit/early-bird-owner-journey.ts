@@ -14,6 +14,7 @@ import { expect } from "vitest";
 import { sql } from "drizzle-orm";
 import { startExpertReferralTestDatabase } from "./expert-referral.js";
 import type { ExpertReferralTestDatabase } from "./expert-referral.js";
+import { earlyBirdLaunchPeriodClock } from "./early-bird-clock.js";
 
 /** Disposable, real-schema approved expert and encrypted owner invoice fixture. */
 export async function createEarlyBirdOwnerJourney(
@@ -36,10 +37,7 @@ export async function createEarlyBirdOwnerJourney(
       );
     });
     // Injected fixtures own their actual isolated clock and lifecycle.
-    if (!options.database)
-      await db.db.execute(
-        sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
-      );
+    if (!options.database) await db.db.execute(earlyBirdLaunchPeriodClock());
     await applyEarlyBirdDraftIfNeeded(
       db.db,
       "docs/superpowers/implementation-artifacts/drafts/0081_early_bird_composite.sql",

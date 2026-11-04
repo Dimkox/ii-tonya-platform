@@ -6,6 +6,7 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+import { earlyBirdLaunchPeriodClock } from "../testkit/early-bird-clock.js";
 
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
@@ -19,9 +20,7 @@ beforeAll(async () => {
     );
   });
   // A disposable DB runs the real phase logic against a deterministic launch-period clock.
-  await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
-  );
+  await db.db.execute(earlyBirdLaunchPeriodClock());
 }, 120_000);
 afterAll(async () => {
   await db?.stop();

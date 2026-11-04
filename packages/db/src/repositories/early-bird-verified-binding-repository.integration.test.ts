@@ -14,6 +14,7 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+import { earlyBirdLaunchPeriodClock } from "../testkit/early-bird-clock.js";
 const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-only-password";
 
 let db: ExpertReferralTestDatabase;
@@ -30,9 +31,7 @@ beforeAll(async () => {
     );
   });
   // A disposable DB runs the real phase logic against a deterministic launch-period clock.
-  await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
-  );
+  await db.db.execute(earlyBirdLaunchPeriodClock());
   await db.db.execute(
     sql`create role ii_tonya_wave_verifier nologin noinherit nosuperuser nocreatedb nocreaterole nobypassrls`,
   );

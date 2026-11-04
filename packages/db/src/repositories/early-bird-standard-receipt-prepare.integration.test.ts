@@ -14,6 +14,7 @@ import {
   startExpertReferralTestDatabase,
   type ExpertReferralTestDatabase,
 } from "../testkit/expert-referral.js";
+import { earlyBirdLaunchPeriodClock } from "../testkit/early-bird-clock.js";
 
 let db: ExpertReferralTestDatabase;
 let sharedTariff: string | undefined;
@@ -28,9 +29,7 @@ beforeAll(async () => {
     );
   });
   // A disposable DB runs the real phase logic against a deterministic launch-period clock.
-  await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
-  );
+  await db.db.execute(earlyBirdLaunchPeriodClock());
   await applyEarlyBirdDraftIfNeeded(
     db.db,
     "docs/superpowers/implementation-artifacts/drafts/0081_early_bird_composite.sql",
@@ -46,9 +45,7 @@ afterAll(async () => {
 it.each(["discounted", "full"] as const)(
   "prepares standard %s price from an authenticated encrypted wave contact",
   async (priceKind) => {
-    await db.db.execute(
-      sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
-    );
+    await db.db.execute(earlyBirdLaunchPeriodClock());
     const { seedClientConsent } = await import("../testkit/client-consent.js");
     const chat = priceKind === "full" ? "123457" : "123456";
     const user = await db.createUser();
