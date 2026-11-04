@@ -27,6 +27,8 @@ export interface YooKassaClientConfig {
   readonly mode: YooKassaMode;
   readonly shopId: string;
   readonly secretKey: string;
+  /** SCRUM-518 pilot cap: createPayment refuses larger amounts before any network call. */
+  readonly maxPaymentAmountMinor?: bigint;
 }
 
 export interface CreateYooKassaPayment {
@@ -368,6 +370,11 @@ export const createYooKassaClient = (
   return {
     async createPayment(command, options) {
       const amountMinor = command.amountMinor;
+      if (
+        config.maxPaymentAmountMinor !== undefined &&
+        amountMinor > config.maxPaymentAmountMinor
+      )
+        throw new YooKassaTerminalError("yookassa_pilot_amount_exceeded");
       const amount = formatRubMinor(amountMinor);
       const result = parsePayment(
         await request("/v3/payments", {

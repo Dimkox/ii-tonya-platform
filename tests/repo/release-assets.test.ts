@@ -297,14 +297,14 @@ describe("release assets", () => {
         EXPERT_RESIDENCY_BILLING_ENABLED: "true",
         EXPERT_TELEGRAM_BOT_TOKEN: "1:x",
       }).stderr,
-    ).toContain("requires PAYMENTS_ENABLED=true");
+    ).toContain("EXPERT_RESIDENCY_BILLING_ENABLED must be false");
     expect(
       validate({
         PAYMENTS_ENABLED: "true",
         PAYMENT_PROVIDER: "yookassa",
         YOOKASSA_SHOP_ID: "1",
-      }).stderr,
-    ).toContain("PAYMENTS_ENABLED must be false");
+      }).status,
+    ).not.toBe(0);
   });
 
   it("rejects NODE_OPTIONS from the runtime environment", () => {

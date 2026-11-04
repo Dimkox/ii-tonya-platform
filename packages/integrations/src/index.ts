@@ -430,3 +430,8 @@ export type {
 } from "./yookassa/public-expert-recovery.js";
 export { publicExpertPaymentSourceSchema } from "./yookassa/public-expert-gateway-contracts.js";
 export type { PublicExpertPaymentSourceData } from "./yookassa/public-expert-gateway-contracts.js";
+export {
+  assertPaymentsPilotAllowed,
+  PaymentsPilotRefusedError,
+  type PaymentsPilotPolicy,
+} from "./yookassa/payments-pilot.js";

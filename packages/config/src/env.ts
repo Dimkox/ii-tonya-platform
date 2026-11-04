@@ -33,6 +33,12 @@ import {
   type PayerReceiptConfig,
 } from "./payer-receipt-config.js";
 
+/** One pilot principal: a UUID or a numeric id, never a list. */
+const PAYMENTS_PILOT_PRINCIPAL =
+  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[1-9]\d{0,19})$/u;
+/** Pilot cap in whole RUB: 1..10. */
+const PAYMENTS_PILOT_MAX_RUB = /^(?:[1-9]|10)$/u;
+
 const optionalNonEmptyString = z.preprocess(
   (value) => (value === "" ? undefined : value),
   z.string().optional(),
@@ -223,6 +229,8 @@ const schema = z
     PAYMENT_PROVIDER: z
       .enum(["disabled", "yookassa", "yookassa_gateway"])
       .default("disabled"),
+    PAYMENTS_PILOT_ALLOWLIST: optionalNonEmptyString,
+    PAYMENTS_PILOT_MAX_AMOUNT_RUB: optionalNonEmptyString,
     YOOKASSA_GATEWAY_CONFIG_FILE: optionalNonEmptyString,
     YOOKASSA_GATEWAY_WORKER_CONFIG_FILE: optionalNonEmptyString,
     PUBLIC_EXPERT_GATEWAY_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -496,6 +504,18 @@ const schema = z
         });
       }
     }
+    // SCRUM-518 guarded pilot: exactly one principal and a cap of at most 10 RUB.
+    if (
+      (value.PAYMENTS_PILOT_ALLOWLIST !== undefined ||
+        value.PAYMENTS_PILOT_MAX_AMOUNT_RUB !== undefined) &&
+      (!PAYMENTS_PILOT_PRINCIPAL.test(value.PAYMENTS_PILOT_ALLOWLIST ?? "") ||
+        !PAYMENTS_PILOT_MAX_RUB.test(value.PAYMENTS_PILOT_MAX_AMOUNT_RUB ?? ""))
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["PAYMENTS_PILOT_ALLOWLIST"],
+        message: "payments_pilot_configuration_invalid",
+      });
     if (value.YOOKASSA_UNBOUND_RECOVERY_ENABLED === "true") {
       const retention = Number(value.YOOKASSA_RECOVERY_RETENTION_DAYS);
       const windowHours = Number(value.YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS);
@@ -681,6 +701,11 @@ export type RuntimeConfig = {
     workerConfigFile?: string;
     returnUrl: string;
     receipt: NonNullable<RuntimeConfig["yookassa"]>["receipt"];
+  };
+  /** SCRUM-518: when set, payments are limited to one principal and a RUB cap. */
+  paymentsPilot?: {
+    principalId: string;
+    maxAmountMinor: bigint;
   };
   yookassaRecovery:
     | { enabled: false }
@@ -1229,6 +1254,14 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     },
     clientBookingConfirmationBufferMs:
       Number(value.CLIENT_BOOKING_CONFIRMATION_BUFFER_MINUTES) * 60 * 1_000,
+    ...(value.PAYMENTS_PILOT_ALLOWLIST !== undefined
+      ? {
+          paymentsPilot: {
+            principalId: value.PAYMENTS_PILOT_ALLOWLIST,
+            maxAmountMinor: BigInt(value.PAYMENTS_PILOT_MAX_AMOUNT_RUB!) * 100n,
+          },
+        }
+      : {}),
     yookassaRecovery:
       value.YOOKASSA_UNBOUND_RECOVERY_ENABLED === "true"
         ? {
