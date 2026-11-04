@@ -7,6 +7,9 @@ import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 export const FULL_SHA = /^[0-9a-f]{40}$/;
+// Bare DNS hostname only: no scheme, port, path, userinfo, IP literal or "localhost".
+export const PUBLIC_HOST =
+  /^(?=.{4,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 export function releaseTag(sha) {
   if (!FULL_SHA.test(sha))
@@ -29,6 +32,10 @@ export function parseArgs(argv) {
   }
   if (!opts.sha) throw new Error("missing <full-sha>");
   releaseTag(opts.sha);
+  if (!PUBLIC_HOST.test(opts.host ?? ""))
+    throw new Error(
+      `--host must be a bare public DNS hostname, got "${opts.host}"`,
+    );
   if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.date ?? ""))
     throw new Error("--date YYYY-MM-DD is required");
   return opts;
