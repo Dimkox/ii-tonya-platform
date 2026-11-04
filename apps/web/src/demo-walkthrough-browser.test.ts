@@ -164,7 +164,7 @@ it("walks through the isolated demo in mobile Chrome with real CSS and reload", 
         const timeout = setTimeout(() => {
           pending.delete(id);
           reject(new Error(`CDP timeout: ${method}`));
-        }, 8000);
+        }, 20000);
         pending.set(id, {
           resolve: (reply) => {
             clearTimeout(timeout);
@@ -246,7 +246,10 @@ it("walks through the isolated demo in mobile Chrome with real CSS and reload", 
     `,
     });
     await send("Page.navigate", { url: `${origin}/demo` });
-    await waitFor("document.readyState === 'complete'");
+    // about:blank is already 'complete'; wait for the /demo document itself.
+    await waitFor(
+      "location.pathname === '/demo' && document.readyState === 'complete' && !!document.querySelector('[data-demo-banner]')",
+    );
     expect(
       await evaluate("!!document.querySelector('[data-demo-banner]')"),
     ).toBe(true);

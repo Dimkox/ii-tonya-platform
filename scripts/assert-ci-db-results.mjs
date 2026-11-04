@@ -3,6 +3,8 @@ import { isAbsolute, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** Fail closed if a database test file is missing, duplicated, skipped or failed. */
+// Vitest 4 reports skipped cases as "skipped"; older reporters used "pending".
+const skipStatuses = new Set(["pending", "skipped"]);
 const allowedSkips = new Set([
   "tests/integration/verification-private-jobs.test.ts\0normal worker composes real local Telegram/S3/VK and isolated extraction without approval authority",
   "tests/integration/resident-semantic-tags.test.ts\0normal authenticated ingress uses real helper/cache, replays unchanged update after reload, and measures warm composed pipeline",
@@ -55,7 +57,7 @@ export function verifyDatabaseResults(report, expectedPaths, root) {
         (assertion) =>
           assertion?.status !== "passed" &&
           !(
-            assertion?.status === "pending" &&
+            skipStatuses.has(assertion?.status) &&
             allowedSkips.has(`${relative(root, name)}\0${assertion.fullName}`)
           ),
       )
@@ -83,7 +85,7 @@ if (
   );
   for (const result of report.testResults) {
     for (const assertion of result.assertionResults ?? []) {
-      if (assertion.status === "pending")
+      if (skipStatuses.has(assertion.status))
         process.stdout.write(
           `Documented skip: ${relative(root, result.name)}: ${assertion.fullName}\n`,
         );

@@ -40,8 +40,10 @@ it("expires unsent preparations after launch but never retries a dispatched noti
     syntheticFinalCallConfig,
   );
   const old = (await queue.claim())!;
+  // Copy the first row's exact config times. The synthetic authority reads
+  // one preparing row in uuid order, so both rows must agree on the config.
   await fixture.db.execute(
-    sql`with t as (select clock_timestamp() as now) insert into early_bird_final_call_queue(user_id,kind,config_version,trigger_at,client_start_at,scheduled_at,available_at) select ${second}::uuid,'first','wave-v1',now-interval '1 day',now+interval '1 day',now-interval '1 day',now-interval '1 day' from t`,
+    sql`insert into early_bird_final_call_queue(user_id,kind,config_version,trigger_at,client_start_at,scheduled_at,available_at) select ${second}::uuid,'first','wave-v1',trigger_at,client_start_at,scheduled_at,available_at from early_bird_final_call_queue where user_id=${first}::uuid`,
   );
   const sent = (await queue.claim())!;
   expect(await queue.dispatch(sent)).toBe(true);

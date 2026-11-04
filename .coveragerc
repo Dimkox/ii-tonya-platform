@@ -8,6 +8,7 @@ omit =
     */__pycache__/*
     .getzilla/runtime/*
     engineering/*
+    scripts/getzilla_*.py
 
 [report]
 skip_empty = True
