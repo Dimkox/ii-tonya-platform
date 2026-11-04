@@ -21,6 +21,10 @@ export interface YooKassaWebhookDependencies {
       notification: YooKassaNotification,
     ): Promise<"absent" | "pending" | "complete">;
   };
+  /** SCRUM-518 pilot: verifies via getPayment and stores the status; "absent" falls through. */
+  readonly pilot?: {
+    handle(notification: YooKassaNotification): Promise<"absent" | "complete">;
+  };
   /** Production supplies the durable binding lookup; metadata never chooses a product. */
   readonly resolvePurpose?: (
     providerObjectId: string,
@@ -111,6 +115,13 @@ export async function yookassaWebhookRoutes(
         return reply.code(503).send({ error: "delivery_pending" });
       }
       try {
+        if (
+          deps.pilot &&
+          (await deps.pilot.handle(parsed.data)) === "complete"
+        ) {
+          await deps.inbox.complete(claim.claimId);
+          return reply.send({ accepted: true });
+        }
         if (deps.publicPayment) {
           const result = await deps.publicPayment.handle(parsed.data);
           if (result === "pending")

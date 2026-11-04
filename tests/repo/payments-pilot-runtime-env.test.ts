@@ -125,6 +125,22 @@ describe("validate-runtime-env payments pilot (SCRUM-518)", () => {
     expect(result.stderr).not.toContain("fixture_only_value_x");
   });
 
+  it("keeps the pilot checkout off unless explicitly enabled", () => {
+    expect(
+      validate({ PAYMENTS_PILOT_CHECKOUT_ENABLED: "true" }).stderr,
+    ).toContain("requires PAYMENTS_ENABLED=true");
+    const on = { ...pilot, PAYMENTS_PILOT_CHECKOUT_ENABLED: "true" };
+    expect(validate({ ...on, CLIENT_SESSION_ENABLED: "true" }).status).toBe(0);
+    expect(validate(on).stderr).toContain("CLIENT_SESSION_ENABLED=true");
+    expect(
+      validate({
+        ...on,
+        CLIENT_SESSION_ENABLED: "true",
+        PAYMENTS_PILOT_ALLOWLIST: "42",
+      }).stderr,
+    ).toContain("UUID PAYMENTS_PILOT_ALLOWLIST");
+  });
+
   it("refuses duplicated pilot keys", () => {
     const dir = mkdtempSync(join(tmpdir(), "ii-tonya-pilot-dup-"));
     const file = join(dir, "runtime.env");

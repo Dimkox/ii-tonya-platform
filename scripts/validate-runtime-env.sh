@@ -78,7 +78,7 @@ if [[ -n "$release_sha" ]]; then
     require_keys TELEGRAM_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET
   # SCRUM-518: payments may be enabled only as a guarded live pilot: direct YooKassa,
   # exactly one allow-listed principal and a cap of at most 10 RUB. Otherwise off.
-  for key in PAYMENT_PROVIDER YOOKASSA_ENABLED PAYMENTS_PILOT_ALLOWLIST PAYMENTS_PILOT_MAX_AMOUNT_RUB; do
+  for key in PAYMENT_PROVIDER YOOKASSA_ENABLED PAYMENTS_PILOT_ALLOWLIST PAYMENTS_PILOT_MAX_AMOUNT_RUB PAYMENTS_PILOT_CHECKOUT_ENABLED; do
     [[ "$(grep -c "^$key=" "$runtime_env")" -le 1 ]] || fail "$key must occur at most once"
   done
   if [[ "$(flag_value PAYMENTS_ENABLED)" == true ]]; then
@@ -102,9 +102,18 @@ if [[ -n "$release_sha" ]]; then
     require_keys PAYMENTS_ENABLED YOOKASSA_RECEIPT_PAYMENT_SUBJECT YOOKASSA_RECEIPT_PAYMENT_MODE
     ! grep -Eq '^YOOKASSA_GATEWAY_(WORKER_)?CONFIG_FILE=[^[:space:]]' "$runtime_env" ||
       fail "payments pilot must not configure the YooKassa gateway"
+    # The pilot checkout route stays off unless explicitly enabled for a client-session UUID.
+    if grep -Fxq 'PAYMENTS_PILOT_CHECKOUT_ENABLED=true' "$runtime_env"; then
+      grep -Eqx 'PAYMENTS_PILOT_ALLOWLIST=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$runtime_env" ||
+        fail "PAYMENTS_PILOT_CHECKOUT_ENABLED=true requires a UUID PAYMENTS_PILOT_ALLOWLIST"
+      grep -Fxq 'CLIENT_SESSION_ENABLED=true' "$runtime_env" ||
+        fail "PAYMENTS_PILOT_CHECKOUT_ENABLED=true requires CLIENT_SESSION_ENABLED=true"
+    fi
   else
     grep -Fx 'PAYMENT_PROVIDER=disabled' "$runtime_env" >/dev/null || fail "payments must be disabled"
     ! grep -Fxq 'YOOKASSA_ENABLED=true' "$runtime_env" || fail "YOOKASSA_ENABLED=true requires PAYMENTS_ENABLED=true"
+    ! grep -Fxq 'PAYMENTS_PILOT_CHECKOUT_ENABLED=true' "$runtime_env" ||
+      fail "PAYMENTS_PILOT_CHECKOUT_ENABLED=true requires PAYMENTS_ENABLED=true"
   fi
   for flag in EXPERT_REFERRAL_ENABLED EXPERT_TELEGRAM_QUERIES_ENABLED EXPERT_RESIDENCY_BILLING_ENABLED; do
     [[ "$(flag_value "$flag")" == false ]] || require_keys "$flag" EXPERT_TELEGRAM_BOT_TOKEN

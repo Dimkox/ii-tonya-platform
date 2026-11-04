@@ -18,6 +18,10 @@ import {
   type EarlyBirdOwnerRuntimeConfiguration,
 } from "./expert-early-bird-runtime-composition.js";
 import { loadEarlyBirdGatewayBootstrap } from "./early-bird-gateway-bootstrap.js";
+import {
+  createPaymentsPilotServerOptions,
+  type PaymentsPilotService,
+} from "./payments-pilot.js";
 import type { createPostgresEarlyBirdAuthority } from "./expert-early-bird-authority.js";
 import { PostgresReceiptRevocationOutbox } from "@ii-tonya/db";
 import { createPostgresClientConversationService } from "./client-conversation-composition.js";
@@ -186,6 +190,8 @@ export const createDefaultLifecycle = (
     >;
     expertVerificationPayments?: ExpertVerificationPaymentCapabilities;
     yookassaWebhook?: Omit<YooKassaWebhookDependencies, "onboarding">;
+    /** SCRUM-518 direct-shop pilot, composed by createPaymentsPilotServerOptions. */
+    paymentsPilot?: PaymentsPilotService;
     receiptDisclosureGateway?: ExperimentalGatewayIpc;
     receiptDisclosureKeyVersion?: string;
     earlyBirdRuntime?: EarlyBirdOwnerRuntimeConfiguration;
@@ -893,6 +899,9 @@ export const createDefaultLifecycle = (
             },
           }
         : {}),
+      ...(options.paymentsPilot
+        ? { paymentsPilot: options.paymentsPilot }
+        : {}),
       ...(expertApi ? { expertApi } : {}),
       ...(bookingCallbacks === undefined ? {} : { bookingCallbacks }),
       ...(expertCodeKeyring === undefined ? {} : { expertCodeKeyring }),
@@ -1166,7 +1175,11 @@ export async function main(injectedLifecycle?: ServerLifecycle): Promise<void> {
   let lifecycle: ServerLifecycle;
   try {
     const baseLifecycle =
-      injectedLifecycle ?? createDefaultLifecycle(bootstrap?.serverOptions(db));
+      injectedLifecycle ??
+      createDefaultLifecycle(
+        bootstrap?.serverOptions(db) ??
+          createPaymentsPilotServerOptions(config, db),
+      );
     lifecycle = bootstrap
       ? {
           ...baseLifecycle,
