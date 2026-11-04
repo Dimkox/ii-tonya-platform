@@ -18,6 +18,9 @@ export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
   "packages/integrations/src/yookassa/public-expert-gateway-contracts.ts",
   "packages/integrations/src/yookassa/public-expert-gateway.ts",
   "packages/integrations/src/yookassa/public-expert-recovery.ts",
+  // SCRUM-518 owner-approved 10 RUB pilot guard (one allowlisted account, live mode).
+  "packages/integrations/src/yookassa/payments-pilot.ts",
+  "packages/integrations/src/yookassa/payments-pilot.test.ts",
 
   // Early Bird candidate inventory: explicit paths, independently reviewed before release.
   "packages/integrations/src/yookassa/early-bird-candidate-verifier.ts",
