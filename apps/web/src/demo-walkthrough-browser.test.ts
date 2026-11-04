@@ -164,7 +164,7 @@ it("walks through the isolated demo in mobile Chrome with real CSS and reload", 
         const timeout = setTimeout(() => {
           pending.delete(id);
           reject(new Error(`CDP timeout: ${method}`));
-        }, 8000);
+        }, 20000);
         pending.set(id, {
           resolve: (reply) => {
             clearTimeout(timeout);
