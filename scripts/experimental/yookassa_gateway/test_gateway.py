@@ -90,6 +90,12 @@ class HttpGatewayTests(unittest.TestCase):
                                 time.sleep(hold_open)
                     else:
                         got.append(b"")
+                except (ssl.SSLEOFError, ConnectionResetError, BrokenPipeError):
+                    # A client that closes right after the TLS handshake can make the
+                    # server's first recv fail (TLS 1.3 session-ticket write -> EPIPE,
+                    # or EOF/reset) instead of returning b"". With no request bytes
+                    # received this is still "no request reached the server".
+                    got.append(b"" if not buffer else b"error")
                 except (OSError, ssl.SSLError):
                     got.append(b"error")
             listener.close()

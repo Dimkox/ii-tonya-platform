@@ -54,7 +54,7 @@ The five JSON byte forwards are `apps/api/src/app.ts:855,877,899` and
 `apps/api/src/routes/browser-account.ts:532,580`. The latter explicitly selects
 JSON content type; the former forwards responses from the internal admin JSON
 APIs and copies their response headers. The three CLI writes are
-`scripts/assert-ci-db-results.mjs:82,88` and
+`scripts/assert-ci-db-results.mjs:84,90` and
 `scripts/preflight-expert-referral-migration.mjs:32`.
 
 The five parameterized SQL observations are
@@ -76,8 +76,8 @@ The six newly introduced observations are:
 | `apps/api/src/routes/owner-pricing-approved.ts:91`                              | `javascript.reflected-xss`     | JSON approval object              |
 | `apps/api/src/routes/owner-pricing-approved.ts:157`                             | `javascript.reflected-xss`     | JSON grant object                 |
 | `packages/integrations/src/yookassa/early-bird-deferred-checkout-sender.ts:131` | `javascript.command-injection` | Decimal amount regular expression |
-| `scripts/assert-ci-db-results.mjs:82`                                           | `javascript.reflected-xss`     | CLI stdout                        |
-| `scripts/assert-ci-db-results.mjs:88`                                           | `javascript.reflected-xss`     | CLI stdout                        |
+| `scripts/assert-ci-db-results.mjs:84`                                           | `javascript.reflected-xss`     | CLI stdout                        |
+| `scripts/assert-ci-db-results.mjs:90`                                           | `javascript.reflected-xss`     | CLI stdout                        |
 
 ## Decision and limits
 
