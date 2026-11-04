@@ -249,3 +249,31 @@ SELECT count(*) FILTER (WHERE published_at IS NULL) AS never_published,
 FROM planerka_availability_refreshes;
 COMMIT;
 ```
+
+## Managing `planerka_service_mappings` (SCRUM-519)
+
+Mappings are never seeded by migrations: operators must supply genuine IDs
+from the Planerka account. Use the CLI (reads `DATABASE_URL`; if
+`PLANERKA_ACCOUNT_ID` is set the file's `accountId` must match it):
+
+```
+pnpm exec tsx scripts/planerka-service-mappings.ts list
+pnpm exec tsx scripts/planerka-service-mappings.ts plan mappings.json            # read-only
+pnpm exec tsx scripts/planerka-service-mappings.ts apply mappings.json --confirm  # one transaction
+pnpm exec tsx scripts/planerka-service-mappings.ts disable <expertServiceId>
+pnpm exec tsx scripts/planerka-service-mappings.ts enable <expertServiceId>
+```
+
+File format (strict; unknown fields and duplicates are rejected):
+
+```json
+{
+  "accountId": 123,
+  "mappings": [
+    { "expertServiceId": "<uuid of active expert_services row>", "eventTypeId": 456, "timeZone": "Europe/Moscow", "enabled": true }
+  ]
+}
+```
+
+`duration_minutes` is copied from `expert_services`; `verified_at` is set on
+apply. An event type already bound to another service is rejected.
