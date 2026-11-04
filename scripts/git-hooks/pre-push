@@ -11,6 +11,12 @@ set -Eeuo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
+# git exports repo-local vars (GIT_DIR, GIT_INDEX_FILE, GIT_WORK_TREE, ...) to hooks. Left in place,
+# every git child of the gate, including tests that build throwaway fixture repos, would act on
+# THIS repository and commit fixtures onto the branch being pushed. cwd alone selects the repo.
+# shellcheck disable=SC2046
+unset $(git rev-parse --local-env-vars)
+
 changed_list="$(mktemp)"
 trap 'rm -f "$changed_list"' EXIT
 
