@@ -1074,7 +1074,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/experimental/yookassa_gateway/test_gateway.py",
-    "0eae248ae887fd0fef367bd2e754b378168c9ad4666d04e1a233959c4e98e839",
+    "0622d16edbfb98a8ef1676bc60dd4d8db0062ae1b4eb302bb10e0173ae04428a",
   ],
   [
     "scripts/experimental/yookassa_gateway/test_ipc.py",
