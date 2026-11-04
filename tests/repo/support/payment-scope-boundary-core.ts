@@ -1116,7 +1116,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/assert-ci-db-results.mjs",
-    "8601073b27526749c862183739357c5c2b178c07e84bca7ba9ff424be99fe893",
+    "9a1c05d33df9ca2e9e9267190772f5430829b99aeea88df21886fbb246372853",
   ],
   [
     "scripts/getzilla_ci_timeout.py",

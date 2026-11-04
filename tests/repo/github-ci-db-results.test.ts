@@ -105,6 +105,9 @@ describe("hosted DB evidence", () => {
       ],
     };
     expect(verifyDatabaseResults(evidence, [path], root)).toBe(1);
+    // Vitest 4 JSON reporter marks skipped cases as "skipped".
+    evidence.testResults[0]!.assertionResults[1]!.status = "skipped";
+    expect(verifyDatabaseResults(evidence, [path], root)).toBe(1);
     evidence.testResults[0]!.assertionResults[1]!.fullName =
       "another skipped test";
     expect(() => verifyDatabaseResults(evidence, [path], root)).toThrow(
