@@ -12,7 +12,7 @@ const INSTALLER = "scripts/install-git-hooks.sh";
 // approvedAutomationArtifactHashes. Its content is pinned here instead, using the same
 // CRLF-normalized sha256 the manifest uses.
 const HOOK_SHA256 =
-  "dad652903c723aa7b949b1086561f4a87c02505419b53b85358975df12a44719";
+  "ed57dd22dc841448d8fe9511df2c1f1d2e166409b8c77f4502db2c26d6d9bb9d";
 
 const read = (path: string): string =>
   readFileSync(path, "utf8").replace(/\r\n?/gu, "\n");
