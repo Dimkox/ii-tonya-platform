@@ -69,13 +69,15 @@ describe("validate-runtime-env payments pilot (SCRUM-518)", () => {
     expect(validate({ PAYMENT_PROVIDER: "yookassa" }).status).not.toBe(0);
   });
 
-  it("accepts the full guarded live pilot", () => {
-    const result = validate(pilot);
-    expect(result.stderr).toBe("");
-    expect(result.status).toBe(0);
-    expect(validate({ ...pilot, PAYMENTS_PILOT_ALLOWLIST: "42" }).status).toBe(
-      0,
-    );
+  it("locks the full guarded live pilot until the API runtime is wired", () => {
+    // Codex P1 (#147): the API has no direct YooKassa runtime yet, so an
+    // accepted pilot env would stop the API at startup. Activation stays locked.
+    for (const env of [pilot, { ...pilot, PAYMENTS_PILOT_ALLOWLIST: "42" }]) {
+      const result = validate(env);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain("payments pilot activation is locked");
+      expect(result.stderr).not.toContain("fixture_only_value_x");
+    }
   });
 
   it.each([
