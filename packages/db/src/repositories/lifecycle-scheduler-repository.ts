@@ -36,6 +36,80 @@ const BOOKING_JOB_TYPES = new Set<LifecycleJobType>([
 ]);
 const MAX_BATCH_SIZE = 500;
 
+/** Non-booking lifecycle kinds; each is off unless its flag enables it. */
+export interface LifecycleKindsEnabled {
+  /** Booking reminders stay on by default for backward compatibility. */
+  readonly reminders?: boolean;
+  readonly checkups?: boolean;
+  readonly feedback?: boolean;
+  readonly couponNotices?: boolean;
+}
+
+type NonBookingJobType =
+  | "weekly_checkup"
+  | "post_visit_feedback"
+  | "coupon_expiry_14d"
+  | "coupon_expiry_7d";
+
+type EligibleNotice = {
+  userId: string;
+  dialogueId: string;
+  botKey: string;
+  chatId: string;
+  timezone: string | null;
+  expiresAt: Date | string | null;
+  amountMinor: bigint | number | string | null;
+};
+
+export function lifecycleNoticeText(
+  jobType: NonBookingJobType,
+  notice: {
+    readonly expiresAt?: Date | null;
+    readonly amountMinor?: string | null;
+    readonly timezone?: string | null;
+  } = {},
+): string {
+  if (jobType === "weekly_checkup") {
+    return "Как у вас дела? Если хотите обсудить что-то с экспертом, напишите «каталог».";
+  }
+  if (jobType === "post_visit_feedback") {
+    return "Как прошла встреча с экспертом? Ответьте одним сообщением: нам важен ваш отзыв.";
+  }
+  if (jobType === "coupon_expiry_14d" || jobType === "coupon_expiry_7d") {
+    const lead = jobType === "coupon_expiry_14d" ? "14 дней" : "7 дней";
+    const timezone = safeTimezone(notice.timezone ?? null);
+    const date =
+      notice.expiresAt instanceof Date
+        ? new Intl.DateTimeFormat("ru-RU", {
+            timeZone: timezone,
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          }).format(notice.expiresAt)
+        : undefined;
+    const amount =
+      notice.amountMinor !== undefined &&
+      notice.amountMinor !== null &&
+      /^[1-9][0-9]{0,11}$/u.test(notice.amountMinor)
+        ? ` на ${Math.floor(Number(notice.amountMinor) / 100)} ₽`
+        : "";
+    return `Напоминаю: ваш купон${amount} сгорит через ${lead}${date ? ` (${date})` : ""}.`;
+  }
+  throw new Error("lifecycle_unsupported_job_type");
+}
+
+function nonBookingEnabled(
+  kinds: LifecycleKindsEnabled,
+  jobType: LifecycleJobType,
+): boolean {
+  if (jobType === "weekly_checkup") return kinds.checkups === true;
+  if (jobType === "post_visit_feedback") return kinds.feedback === true;
+  if (jobType === "coupon_expiry_14d" || jobType === "coupon_expiry_7d") {
+    return kinds.couponNotices === true;
+  }
+  return false;
+}
+
 type ClaimedJob = {
   id: string;
   leaseToken: string;
@@ -151,6 +225,7 @@ export class PostgresLifecycleSchedulerRepository {
     private readonly db: DrizzleDb,
     private readonly messagingConsentPolicyVersion: string,
     private readonly botKey: string,
+    private readonly kinds: LifecycleKindsEnabled = {},
   ) {
     if (!POLICY_RE.test(messagingConsentPolicyVersion)) {
       throw new Error("messaging consent policy version required");
@@ -167,6 +242,10 @@ export class PostgresLifecycleSchedulerRepository {
     batchSize: number;
   }): Promise<LifecycleBatchResult> {
     assertBatch(command);
+    if (this.kinds.reminders === false) {
+      await this.scheduleNonBookingLifecycle(command);
+      return this.processDueLifecycleBatch(command);
+    }
     const candidates = await this.db.execute<{ id: string }>(sql`
       select r.id from reservations r join slots s on s.id=r.slot_id
       join users u on u.id=r.user_id and u.active
@@ -182,7 +261,87 @@ export class PostgresLifecycleSchedulerRepository {
     `);
     for (const row of candidates.rows)
       await this.scheduleReservationLifecycle(row.id);
+    await this.scheduleNonBookingLifecycle(command);
     return this.processDueLifecycleBatch(command);
+  }
+
+  /** Bounded producers for checkups, feedback and coupon notices. Each kind
+   * runs only when explicitly enabled; inserts are idempotent per occurrence. */
+  async scheduleNonBookingLifecycle(command: {
+    now: Date;
+    batchSize: number;
+  }): Promise<number> {
+    assertBatch(command);
+    const reachable = (userExpression: ReturnType<typeof sql>) => sql`
+      ${currentConsentGrantedSql({ userExpression, purpose: "client_messaging", policyVersion: sql`${this.messagingConsentPolicyVersion}` })}
+      and exists(select 1 from dialogues d where d.user_id=${userExpression} and d.provider='telegram'
+        and d.bot_key=${this.botKey} and d.external_chat_id ~ '^[1-9][0-9]{0,19}$')`;
+    let inserted = 0;
+    if (this.kinds.feedback === true) {
+      const result = await this.db.execute<{ id: string }>(sql`
+        insert into lifecycle_jobs(subject_id,subject_kind,job_type,occurrence_key,run_at)
+        select r.id,'reservation','post_visit_feedback',
+          to_char(s.ends_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+          s.ends_at+interval '2 hours'
+        from reservations r join slots s on s.id=r.slot_id
+        join users u on u.id=r.user_id and u.active
+        where r.status in ('booked','completed')
+          and s.ends_at<=${command.now} and s.ends_at>${command.now}::timestamptz-interval '7 days'
+          and ${reachable(sql`r.user_id`)}
+          and not exists(select 1 from lifecycle_jobs j where j.subject_kind='reservation'
+            and j.subject_id=r.id and j.job_type='post_visit_feedback')
+        order by s.ends_at,r.id
+        limit ${command.batchSize}
+        on conflict (subject_kind,subject_id,job_type,occurrence_key) do nothing
+        returning id
+      `);
+      inserted += result.rows.length;
+    }
+    if (this.kinds.checkups === true) {
+      const result = await this.db.execute<{ id: string }>(sql`
+        insert into lifecycle_jobs(subject_id,subject_kind,job_type,occurrence_key,run_at)
+        select u.id,'user','weekly_checkup',
+          to_char(${command.now}::timestamptz at time zone 'UTC','IYYY-"W"IW'),
+          ${command.now}::timestamptz
+        from users u
+        where u.active
+          and exists(select 1 from reservations r join slots s on s.id=r.slot_id
+            where r.user_id=u.id and r.status='completed'
+              and s.ends_at>${command.now}::timestamptz-interval '30 days')
+          and not exists(select 1 from reservations r join slots s on s.id=r.slot_id
+            where r.user_id=u.id and r.status='booked' and s.starts_at>${command.now})
+          and ${reachable(sql`u.id`)}
+          and not exists(select 1 from lifecycle_jobs j where j.subject_kind='user'
+            and j.subject_id=u.id and j.job_type='weekly_checkup'
+            and j.occurrence_key=to_char(${command.now}::timestamptz at time zone 'UTC','IYYY-"W"IW'))
+        order by u.id
+        limit ${command.batchSize}
+        on conflict (subject_kind,subject_id,job_type,occurrence_key) do nothing
+        returning id
+      `);
+      inserted += result.rows.length;
+    }
+    if (this.kinds.couponNotices === true) {
+      const result = await this.db.execute<{ id: string }>(sql`
+        insert into lifecycle_jobs(subject_id,subject_kind,job_type,occurrence_key,run_at)
+        select c.id,'coupon',notice.kind,
+          to_char(c.expires_at at time zone 'UTC','YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+          c.expires_at-notice.days*interval '1 day'
+        from client_coupon_grants c
+        join users u on u.id=c.user_id and u.active
+        cross join (values ('coupon_expiry_14d',14),('coupon_expiry_7d',7)) notice(kind,days)
+        where c.expires_at-notice.days*interval '1 day'>${command.now}
+          and ${reachable(sql`c.user_id`)}
+          and not exists(select 1 from lifecycle_jobs j where j.subject_kind='coupon'
+            and j.subject_id=c.id and j.job_type=notice.kind)
+        order by c.expires_at,c.id
+        limit ${command.batchSize}
+        on conflict (subject_kind,subject_id,job_type,occurrence_key) do nothing
+        returning id
+      `);
+      inserted += result.rows.length;
+    }
+    return inserted;
   }
 
   async scheduleReservationLifecycle(reservationId: string): Promise<number> {
@@ -339,6 +498,27 @@ export class PostgresLifecycleSchedulerRepository {
           continue;
         }
 
+        if (
+          BOOKING_JOB_TYPES.has(job.jobType) &&
+          this.kinds.reminders === false
+        ) {
+          await tx.execute(sql`
+            update lifecycle_jobs
+            set status='cancelled',cancellation_reason='kind_disabled',
+              lease_token=null,lease_until=null,updated_at=clock_timestamp()
+            where id=${job.id}::uuid and status='processing'
+              and lease_token=${job.leaseToken}::uuid
+          `);
+          cancelled += 1;
+          continue;
+        }
+        if (!BOOKING_JOB_TYPES.has(job.jobType)) {
+          const outcome = await this.materializeNotice(tx, job, command.now);
+          if (outcome === "materialized") materialized += 1;
+          else cancelled += 1;
+          continue;
+        }
+
         // Resolve the subject without row locks, then join the shared consent
         // barrier before locking reservation, identity or dialogue rows.
         const subject = (
@@ -473,5 +653,160 @@ export class PostgresLifecycleSchedulerRepository {
       }
       return { examined: claimed.rows.length, materialized, cancelled };
     });
+  }
+
+  private async materializeNotice(
+    tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+    job: ClaimedJob,
+    now: Date,
+  ): Promise<"materialized" | "cancelled"> {
+    const cancel = async (reason: string): Promise<"cancelled"> => {
+      await tx.execute(sql`
+        update lifecycle_jobs
+        set status='cancelled',cancellation_reason=${reason},
+          lease_token=null,lease_until=null,updated_at=clock_timestamp()
+        where id=${job.id}::uuid and status='processing'
+          and lease_token=${job.leaseToken}::uuid
+      `);
+      return "cancelled";
+    };
+    // Fail-closed: a kind whose flag is off never sends, even if already queued.
+    if (!nonBookingEnabled(this.kinds, job.jobType)) {
+      return cancel("kind_disabled");
+    }
+    const subject = (
+      await tx.execute<{ userId: string }>(sql`
+        select coalesce(r.user_id,u.id,c.user_id) as "userId"
+        from lifecycle_jobs job
+        left join reservations r on job.subject_kind='reservation' and r.id=job.subject_id
+        left join users u on job.subject_kind='user' and u.id=job.subject_id
+        left join client_coupon_grants c on job.subject_kind='coupon' and c.id=job.subject_id
+        where job.id=${job.id}::uuid
+      `)
+    ).rows[0];
+    if (!subject?.userId) return cancel("eligibility_revoked");
+    await lockClientConsentSubject(tx, subject.userId);
+    const subjectCondition =
+      job.jobType === "post_visit_feedback"
+        ? sql`job.subject_kind='reservation' and exists(select 1 from reservations r
+            join slots s on s.id=r.slot_id where r.id=job.subject_id and r.user_id=u.id
+            and r.status in ('booked','completed') and s.ends_at<=${now})`
+        : job.jobType === "weekly_checkup"
+          ? sql`job.subject_kind='user' and job.subject_id=u.id`
+          : sql`job.subject_kind='coupon' and c.id=job.subject_id and c.expires_at>${now}`;
+    const eligible = (
+      await tx.execute<EligibleNotice>(sql`
+        select u.id as "userId",d.id as "dialogueId",d.bot_key as "botKey",
+          d.external_chat_id as "chatId",cp.timezone,
+          c.expires_at as "expiresAt",c.amount_minor as "amountMinor"
+        from lifecycle_jobs job
+        join users u on u.id=${subject.userId}::uuid and u.active=true
+        left join client_coupon_grants c on job.subject_kind='coupon' and c.id=job.subject_id
+        left join client_profiles cp on cp.user_id=u.id
+        join dialogues d on d.user_id=u.id and d.provider='telegram'
+          and d.bot_key=${this.botKey}
+          and d.external_chat_id ~ '^[1-9][0-9]{0,19}$'
+        where job.id=${job.id}::uuid and job.status='processing'
+          and job.lease_token=${job.leaseToken}::uuid
+          and ${subjectCondition}
+        order by d.created_at,d.id
+        limit 1
+        for update of d
+      `)
+    ).rows[0];
+    const consentAuthority = eligible
+      ? await captureClientConsentAuthority(tx, {
+          subjectId: eligible.userId,
+          botKey: eligible.botKey,
+          chatId: eligible.chatId,
+          messagingPolicyVersion: this.messagingConsentPolicyVersion,
+        })
+      : undefined;
+    if (!eligible || !consentAuthority) return cancel("eligibility_revoked");
+    const text = lifecycleNoticeText(job.jobType as NonBookingJobType, {
+      expiresAt:
+        eligible.expiresAt === null ? null : asDate(eligible.expiresAt),
+      amountMinor:
+        eligible.amountMinor === null ? null : String(eligible.amountMinor),
+      timezone: eligible.timezone,
+    });
+    await this.enqueueDelivery(tx, job, eligible, consentAuthority, text);
+    return "materialized";
+  }
+
+  private async enqueueDelivery(
+    tx: Parameters<Parameters<DrizzleDb["transaction"]>[0]>[0],
+    job: ClaimedJob,
+    target: {
+      userId: string;
+      dialogueId: string;
+      botKey: string;
+      chatId: string;
+    },
+    consentAuthority: unknown,
+    text: string,
+  ): Promise<void> {
+    const sequenceRow = (
+      await tx.execute<{ sequence: bigint | number | string }>(sql`
+        update dialogues
+        set next_delivery_sequence=next_delivery_sequence+1
+        where id=${target.dialogueId}::uuid
+          and user_id=${target.userId}::uuid
+          and provider='telegram'
+        returning next_delivery_sequence as sequence
+      `)
+    ).rows[0];
+    const sequence = Number(sequenceRow?.sequence);
+    if (!Number.isSafeInteger(sequence) || sequence < 1) {
+      throw new Error("lifecycle_dialogue_sequence_missing");
+    }
+    const deliveryId = randomUUID();
+    const generatedOutboxId = randomUUID();
+    const deliveryKey = `sha256:${digest(`lifecycle-delivery\0${job.id}`)}`;
+    const payload = {
+      deliveryId,
+      dialogueId: target.dialogueId,
+      sequence,
+      botKey: target.botKey,
+      chatId: target.chatId,
+      text,
+      consentAuthority,
+    };
+    const payloadHash = digest(JSON.stringify(payload));
+    const outbox = await tx.execute<{ id: string }>(sql`
+      insert into integration_outbox(
+        id,idempotency_key,topic,payload,correlation_id,reconciliation_key,
+        payload_hash,dialogue_id,dialogue_sequence
+      ) values(
+        ${generatedOutboxId}::uuid,${deliveryKey},'telegram.send_text.v1',
+        ${JSON.stringify(payload)}::jsonb,${`lifecycle:${job.id}`},${deliveryKey},
+        ${payloadHash},${target.dialogueId}::uuid,${sequence}
+      )
+      on conflict (idempotency_key) do nothing
+      returning id
+    `);
+    const persistedOutboxId = outbox.rows[0]?.id;
+    if (!persistedOutboxId) {
+      throw new Error("lifecycle_outbox_idempotency_conflict");
+    }
+    await tx.execute(sql`
+      insert into dialogue_deliveries(
+        id,dialogue_id,dialogue_sequence,source,source_id,outbox_id,payload_hash
+      ) values(
+        ${deliveryId}::uuid,${target.dialogueId}::uuid,${sequence},
+        'deterministic',${job.id},${persistedOutboxId}::uuid,${payloadHash}
+      )
+    `);
+    const terminal = await tx.execute<{ id: string }>(sql`
+      update lifecycle_jobs
+      set status='succeeded',lease_token=null,lease_until=null,
+        cancellation_reason=null,updated_at=clock_timestamp()
+      where id=${job.id}::uuid and status='processing'
+        and lease_token=${job.leaseToken}::uuid
+      returning id
+    `);
+    if (terminal.rows.length !== 1) {
+      throw new Error("lifecycle_job_fence_lost");
+    }
   }
 }
