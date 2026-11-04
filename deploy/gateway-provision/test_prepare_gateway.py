@@ -18,11 +18,12 @@ class PreparationTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.state = self.temp.name
+        # Synthetic file names only; "pass" is a path stub, not a secret.
         self.config = {
             "state_dir": self.state,
             "nonce_file": os.path.join(self.state, "nonce"),
             "pg_service_file": "service",
-            "pg_pass_file": "pass",
+            "pg_pass_file": "pass",  # nosec B105
             "pg_service": "synthetic",
             "auth_key_file": "key",
             "subject_key_file": "subject",
