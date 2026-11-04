@@ -948,16 +948,16 @@
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "scripts/assert-ci-db-results.mjs",
-      "line": "82",
-      "sha256": "8601073b27526749c862183739357c5c2b178c07e84bca7ba9ff424be99fe893",
+      "line": "84",
+      "sha256": "9a1c05d33df9ca2e9e9267190772f5430829b99aeea88df21886fbb246372853",
       "category": "json-or-cli-output",
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "scripts/assert-ci-db-results.mjs",
-      "line": "88",
-      "sha256": "8601073b27526749c862183739357c5c2b178c07e84bca7ba9ff424be99fe893",
+      "line": "90",
+      "sha256": "9a1c05d33df9ca2e9e9267190772f5430829b99aeea88df21886fbb246372853",
       "category": "json-or-cli-output",
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
     },
