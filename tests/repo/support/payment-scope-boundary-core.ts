@@ -872,7 +872,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "apps/api/src/server.ts",
-    "d795cfbd997ca82fb8ed7f38d95238f1dca95e05d0eb71819b613b1c24f51115",
+    "8835daffeb4ef358c6a9e958a1f192c55efe5d40cbf2dc642a9a23c8034c16fb",
   ],
 
   [
@@ -983,7 +983,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "engineering/opengrep-reviewed-observations.json",
-    "314bb68190223c01418fe456cb3abf444afac60c1a6d676d99e8e5091d1a1e00",
+    "22f6c2fe710b16415d786ac1df50c4fd1f477f7df8e14b7615805f49e0e2f606",
   ],
 
   [

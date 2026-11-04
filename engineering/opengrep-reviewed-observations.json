@@ -28,26 +28,26 @@
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
-      "line": "855",
-      "sha256": "57d1f6f774f28771ed1bd6c7e7d2dbbe032a9e964deb8ed5f4af99ff5f3036a5",
+      "line": "859",
+      "sha256": "b0a383df13d74d2423671f30c66face0421d32abcee7d6b2e677d52f4a7d1584",
       "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
-      "line": "877",
-      "sha256": "57d1f6f774f28771ed1bd6c7e7d2dbbe032a9e964deb8ed5f4af99ff5f3036a5",
+      "line": "881",
+      "sha256": "b0a383df13d74d2423671f30c66face0421d32abcee7d6b2e677d52f4a7d1584",
       "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
-      "line": "899",
-      "sha256": "57d1f6f774f28771ed1bd6c7e7d2dbbe032a9e964deb8ed5f4af99ff5f3036a5",
+      "line": "903",
+      "sha256": "b0a383df13d74d2423671f30c66face0421d32abcee7d6b2e677d52f4a7d1584",
       "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
@@ -394,14 +394,6 @@
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
     },
     {
-      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
-      "path": "apps/api/src/routes/expert-referral-admin.ts",
-      "line": "400",
-      "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
-      "category": "domain-command-execute",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
-    },
-    {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/routes/expert-referral-admin.ts",
       "line": "416",
@@ -423,6 +415,14 @@
       "line": "450",
       "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
       "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "apps/api/src/routes/expert-referral-admin.ts",
+      "line": "400",
+      "sha256": "6e2b906dc0956731f1a1b5efbc6a57084d03c4854ac274d8d18b98a2bfa4dfcf",
+      "category": "domain-command-execute",
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
     },
     {
@@ -626,28 +626,36 @@
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
     },
     {
-      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
       "path": "apps/api/src/routes/telegram-webhook.ts",
-      "line": "259",
-      "sha256": "126f697a47959c5e9c9767b38e80b64f13060307a6df79e84957827d74e5ced3",
-      "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "line": "866",
+      "sha256": "2e8b6f44c8439eedcf7ece7cc124463a4fa41f21cfbf4fa62ec0821077d18362",
+      "category": "regex-exec",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/routes/telegram-webhook.ts",
-      "line": "408",
-      "sha256": "126f697a47959c5e9c9767b38e80b64f13060307a6df79e84957827d74e5ced3",
+      "line": "293",
+      "sha256": "2e8b6f44c8439eedcf7ece7cc124463a4fa41f21cfbf4fa62ec0821077d18362",
       "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/routes/telegram-webhook.ts",
-      "line": "423",
-      "sha256": "126f697a47959c5e9c9767b38e80b64f13060307a6df79e84957827d74e5ced3",
+      "line": "442",
+      "sha256": "2e8b6f44c8439eedcf7ece7cc124463a4fa41f21cfbf4fa62ec0821077d18362",
       "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/routes/telegram-webhook.ts",
+      "line": "457",
+      "sha256": "2e8b6f44c8439eedcf7ece7cc124463a4fa41f21cfbf4fa62ec0821077d18362",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
@@ -674,6 +682,14 @@
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
     },
     {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/sandbox-api/src/routes.ts",
+      "line": "285",
+      "sha256": "941d1b29bd0c6a96f51681aed71515a622c40a0dd8fda807fe7419e2d513e523",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
       "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
       "path": "apps/sandbox-api/src/routes.ts",
       "line": "269",
@@ -682,12 +698,20 @@
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
     },
     {
-      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
-      "path": "apps/sandbox-api/src/routes.ts",
-      "line": "285",
-      "sha256": "941d1b29bd0c6a96f51681aed71515a622c40a0dd8fda807fe7419e2d513e523",
-      "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/public-expert-capability-readiness.integration.test.ts",
+      "line": "136",
+      "sha256": "1cbee1463286bd35063313b39502a2ed7ab5f7cbcdb018272f2f0d9cf1ceecae",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/public-expert-capability-readiness.integration.test.ts",
+      "line": "142",
+      "sha256": "1cbee1463286bd35063313b39502a2ed7ab5f7cbcdb018272f2f0d9cf1ceecae",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
@@ -701,17 +725,201 @@
       "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
       "path": "packages/db/src/repositories/expert-held-onboarding-repository.ts",
       "line": "217",
-      "sha256": "adb05580f48aa4232b19ba9d8de7d0b36bd5d3ef06e784e3d584be10bb11d260",
+      "sha256": "f82a51e3699ecbd52bac3e6d1ca02a9f758512ea25006e51b92f32a5aa6d4742",
       "category": "parameterized-sql",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
       "path": "packages/db/src/repositories/expert-held-onboarding-repository.ts",
       "line": "220",
-      "sha256": "adb05580f48aa4232b19ba9d8de7d0b36bd5d3ef06e784e3d584be10bb11d260",
+      "sha256": "f82a51e3699ecbd52bac3e6d1ca02a9f758512ea25006e51b92f32a5aa6d4742",
       "category": "parameterized-sql",
-      "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/expert-separated-sales-quote-clock.integration.test.ts",
+      "line": "31",
+      "sha256": "851bbd274f6d9dc119943abe43150e1e182f4d53a99d57ed8f5446f914720a39",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-paid-main-receipt.integration.test.ts",
+      "line": "38",
+      "sha256": "5cb271d6c48534aceb352e69bb39956227eace97dd4c615fc250d4e2f04cb36b",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-authority.integration.test.ts",
+      "line": "52",
+      "sha256": "59619919b972af6be51a2e837ca7393191eb6047505a52be8f9fd7765073c4ca",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-authority.integration.test.ts",
+      "line": "824",
+      "sha256": "59619919b972af6be51a2e837ca7393191eb6047505a52be8f9fd7765073c4ca",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-authority.integration.test.ts",
+      "line": "840",
+      "sha256": "59619919b972af6be51a2e837ca7393191eb6047505a52be8f9fd7765073c4ca",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-erasure-race.integration.test.ts",
+      "line": "62",
+      "sha256": "21aa37dd00834d28fa6d884bafdc29d89681c4287be38e73576e8c824444e1de",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-expiry-race.integration.test.ts",
+      "line": "43",
+      "sha256": "26ee9d2355988bc7242521ed6fed31a4cd69e8ec0139c602510ca0cc64e0cdc8",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-expiry-race.integration.test.ts",
+      "line": "95",
+      "sha256": "26ee9d2355988bc7242521ed6fed31a4cd69e8ec0139c602510ca0cc64e0cdc8",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-expiry-race.integration.test.ts",
+      "line": "201",
+      "sha256": "26ee9d2355988bc7242521ed6fed31a4cd69e8ec0139c602510ca0cc64e0cdc8",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-expiry-race.integration.test.ts",
+      "line": "209",
+      "sha256": "26ee9d2355988bc7242521ed6fed31a4cd69e8ec0139c602510ca0cc64e0cdc8",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-expiry-race.integration.test.ts",
+      "line": "218",
+      "sha256": "26ee9d2355988bc7242521ed6fed31a4cd69e8ec0139c602510ca0cc64e0cdc8",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-expiry-race.integration.test.ts",
+      "line": "258",
+      "sha256": "26ee9d2355988bc7242521ed6fed31a4cd69e8ec0139c602510ca0cc64e0cdc8",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-expiry-race.integration.test.ts",
+      "line": "261",
+      "sha256": "26ee9d2355988bc7242521ed6fed31a4cd69e8ec0139c602510ca0cc64e0cdc8",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-integrity.integration.test.ts",
+      "line": "43",
+      "sha256": "28e0ddf4d19387691e8fbaddf13329121b9c36a549907b61e51b683b6b8048d7",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-integrity.integration.test.ts",
+      "line": "189",
+      "sha256": "28e0ddf4d19387691e8fbaddf13329121b9c36a549907b61e51b683b6b8048d7",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-integrity.integration.test.ts",
+      "line": "306",
+      "sha256": "28e0ddf4d19387691e8fbaddf13329121b9c36a549907b61e51b683b6b8048d7",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-integrity.integration.test.ts",
+      "line": "642",
+      "sha256": "28e0ddf4d19387691e8fbaddf13329121b9c36a549907b61e51b683b6b8048d7",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-integrity.integration.test.ts",
+      "line": "706",
+      "sha256": "28e0ddf4d19387691e8fbaddf13329121b9c36a549907b61e51b683b6b8048d7",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-payment-recovery.integration.test.ts",
+      "line": "152",
+      "sha256": "9d6ac37768270764c5f69f4471f839ec927d2b9080b08b8d988fcec7c5babd3b",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/repositories/public-expert-refund-authority-digest.integration.test.ts",
+      "line": "137",
+      "sha256": "19c4a3f60a537bbb40048be4bdb725ae6053c68de2b8fe8ac5ec233fb109fe87",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/testkit/public-expert-payment-financial.ts",
+      "line": "126",
+      "sha256": "7771e1f540357955b68de58037cf818ec6e49fa06bf796ad2d09cab2c90e24a7",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/testkit/public-expert-payment.ts",
+      "line": "184",
+      "sha256": "7fd10b45cd55e41e73e98333c0142fd1c55614c7c18d460273b732f3434f0996",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
+      "path": "packages/db/src/testkit/public-expert-payment.ts",
+      "line": "193",
+      "sha256": "7fd10b45cd55e41e73e98333c0142fd1c55614c7c18d460273b732f3434f0996",
+      "category": "parameterized-sql",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
@@ -776,6 +984,30 @@
       "sha256": "9ffc2b71eb2ec9e6ea5ce14ce5a5e672188a4c1079680c8fc8efb029513dcb33",
       "category": "operator-health-fetch",
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "scripts/tag-production-release.mjs",
+      "line": "97",
+      "sha256": "f68517e2925d0d2802e0f899fbc9aee68d541c795c9a59ee8208d91b266d4762",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "scripts/tag-production-release.mjs",
+      "line": "101",
+      "sha256": "f68517e2925d0d2802e0f899fbc9aee68d541c795c9a59ee8208d91b266d4762",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.ssrf",
+      "path": "scripts/tag-production-release.mjs",
+      "line": "75",
+      "sha256": "f68517e2925d0d2802e0f899fbc9aee68d541c795c9a59ee8208d91b266d4762",
+      "category": "operator-health-fetch",
+      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
     }
   ]
 }

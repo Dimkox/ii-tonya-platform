@@ -29,6 +29,28 @@ describe("tag-production-release", () => {
     );
   });
 
+  it("accepts only a bare public DNS hostname for --host", () => {
+    const base = [SHA, "--date", "2026-10-27", "--host"];
+    expect(parseArgs([...base, "staging.ii-tonya.ru"]).host).toBe(
+      "staging.ii-tonya.ru",
+    );
+    for (const bad of [
+      "localhost",
+      "127.0.0.1",
+      "169.254.169.254",
+      "ii-tonya.ru:8080",
+      "ii-tonya.ru/x",
+      "user@ii-tonya.ru",
+      "evil.example#",
+      "II-TONYA.RU",
+      "",
+    ])
+      expect(() => parseArgs([...base, bad])).toThrow(/--host/);
+    expect(() => parseArgs([SHA, "--date", "2026-10-27", "--host"])).toThrow(
+      /--host/,
+    );
+  });
+
   it("records the live SOURCE_SHA and evidence in notes", () => {
     const notes = releaseNotes({
       sha: SHA,
