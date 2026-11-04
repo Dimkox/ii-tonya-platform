@@ -65,8 +65,10 @@ def fixture_reader_setup(namespace):
         )
         or isinstance(node, (ast.FunctionDef, ast.ClassDef)) and node.name in ("connection", constructor)
     ]
-    exec(compile(ast.Module(body=definitions, type_ignores=[]), "journey-child-reader", "exec"), namespace)
-    return namespace[constructor], eval(compile(ast.Expression(reader_patch), "journey-reader-patch", "eval"), namespace)
+    # Repo-local test source (AST parsed from this checkout), never external input.
+    exec(compile(ast.Module(body=definitions, type_ignores=[]), "journey-child-reader", "exec"), namespace)  # nosec B102
+    patch_code = compile(ast.Expression(reader_patch), "journey-reader-patch", "eval")
+    return namespace[constructor], eval(patch_code, namespace)  # nosec B307
 
 
 def child_probe():
