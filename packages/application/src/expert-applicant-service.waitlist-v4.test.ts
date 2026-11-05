@@ -91,7 +91,7 @@ describe("waitlist v4 applicant flow", () => {
     f.repository.completeEnrollment.mockResolvedValueOnce({
       kind: "denied" as const,
       replay: false,
-    });
+    } as never);
     const result = await f.service.handle({
       ...base,
       text: `/consent ${CONSENT_TOKEN} denied`,
