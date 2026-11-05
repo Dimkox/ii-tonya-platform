@@ -33,6 +33,9 @@ const payment = (
 const memoryLedger = () => {
   const records = new Map<string, PaymentsPilotRecord>();
   const ledger: PaymentsPilotLedger = {
+    beginCheckout: vi.fn(async (input) => ({
+      idempotencyKey: input.idempotencyKey,
+    })),
     recordCreated: vi.fn(async (input) => {
       records.set(input.providerPaymentId, {
         providerPaymentId: input.providerPaymentId,
@@ -81,7 +84,7 @@ const service = (
 
 describe("payments pilot service (SCRUM-518)", () => {
   it("creates a capped live payment for the allow-listed principal and stores it", async () => {
-    const { client, records, service: pilotService } = service();
+    const { client, ledger, records, service: pilotService } = service();
     const result = await pilotService.checkout({
       principalId,
       email: "owner@ii-tonya.ru",
@@ -98,7 +101,38 @@ describe("payments pilot service (SCRUM-518)", () => {
         metadata: { purpose: "payments_pilot" },
       }),
     );
+    expect(ledger.beginCheckout).toHaveBeenCalledWith(
+      expect.objectContaining({ idempotencyKey: "idem-key-0001-pilot" }),
+    );
+    expect(ledger.beginCheckout.mock.invocationCallOrder[0]).toBeLessThan(
+      client.createPayment.mock.invocationCallOrder[0]!,
+    );
     expect(records.get(paymentId)?.status).toBe("pending");
+  });
+
+  it("reuses the durable checkout key after an uncertain provider response", async () => {
+    const parts = service({
+      createPayment: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("synthetic response lost"))
+        .mockResolvedValueOnce(payment()),
+      getPayment: vi.fn(async () => payment()),
+    });
+    vi.mocked(parts.ledger.beginCheckout)
+      .mockResolvedValueOnce({ idempotencyKey: "durable-operation-key" })
+      .mockResolvedValueOnce({ idempotencyKey: "durable-operation-key" });
+    await expect(
+      parts.service.checkout({ principalId, email: "owner@ii-tonya.ru" }),
+    ).rejects.toThrow("synthetic response lost");
+    await expect(
+      parts.service.checkout({ principalId, email: "owner@ii-tonya.ru" }),
+    ).resolves.toMatchObject({ paymentId });
+    expect(parts.client.createPayment).toHaveBeenCalledTimes(2);
+    expect(
+      vi
+        .mocked(parts.client.createPayment)
+        .mock.calls.map(([input]) => input.idempotencyKey),
+    ).toEqual(["durable-operation-key", "durable-operation-key"]);
   });
 
   it("refuses another principal before any provider call", async () => {
@@ -220,6 +254,35 @@ describe("payments pilot routes", () => {
     });
     expect(foreign.statusCode).toBe(404);
   });
+});
+
+it("composes the live pilot into native startup dependencies", async () => {
+  const { loadEnv } = await import("@ii-tonya/config");
+  const { createDefaultLifecycle } = await import("./server.js");
+  const config = loadEnv({
+    DATABASE_URL: "postgresql://local:local@localhost/test",
+    ALLOW_INSECURE_LOCAL_DATABASE: "true",
+    PAYMENTS_ENABLED: "true",
+    PAYMENT_PROVIDER: "yookassa",
+    YOOKASSA_ENABLED: "true",
+    YOOKASSA_MODE: "live",
+    PAYMENTS_PILOT_ALLOWLIST: principalId,
+    PAYMENTS_PILOT_MAX_AMOUNT_RUB: "10",
+    YOOKASSA_SHOP_ID: "123456",
+    YOOKASSA_SECRET_KEY: "fixture_only_value_x",
+    YOOKASSA_SECRET_REF: "env://YOOKASSA_SECRET_KEY",
+    YOOKASSA_RETURN_URL: "https://ii-tonya.ru/pay/return",
+    YOOKASSA_RECEIPT_VAT_CODE: "1",
+    YOOKASSA_RECEIPT_PAYMENT_SUBJECT: "service",
+    YOOKASSA_RECEIPT_PAYMENT_MODE: "full_payment",
+  });
+  const lifecycle = createDefaultLifecycle(
+    createPaymentsPilotServerOptions(config, {} as never, {
+      env: { YOOKASSA_SECRET_KEY: "fixture_only_value_x" },
+    }),
+  );
+  const dependencies = await lifecycle.dependencies(config, {} as never);
+  expect(dependencies.paymentsPilot).toBeInstanceOf(PaymentsPilotService);
 });
 
 describe("payments pilot server options", () => {

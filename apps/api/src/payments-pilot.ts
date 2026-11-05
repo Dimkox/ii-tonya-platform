@@ -66,7 +66,12 @@ export class PaymentsPilotService {
     });
     if (!EMAIL.test(input.email))
       throw new Error("payments_pilot_email_invalid");
-    const idempotencyKey = this.newKey();
+    const operation = await this.deps.ledger.beginCheckout({
+      principalId: input.principalId,
+      amountMinor,
+      idempotencyKey: this.newKey(),
+    });
+    const idempotencyKey = operation.idempotencyKey;
     const payment = await this.deps.client.createPayment({
       amountMinor,
       idempotencyKey,
@@ -119,7 +124,8 @@ export class PaymentsPilotService {
       principalId: record.principalId,
       status: payment.status,
     });
-    return { ...record, status: payment.status };
+    const current = await this.deps.ledger.find(paymentId);
+    return current === null ? null : current;
   }
 
   /** Webhook hook: "absent" lets other handlers decide; "complete" means stored. */
