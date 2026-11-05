@@ -1,5 +1,9 @@
 import type { RuntimeConfig } from "@ii-tonya/config";
 import {
+  EXPERT_PROMO_LOCAL_ASSETS,
+  telegramAssetForm,
+} from "./expert-promo-local-assets.js";
+import {
   runExpertPromoFunnelTimers,
   runExpertPromoGuideDelivery,
 } from "@ii-tonya/application";
@@ -8,7 +12,7 @@ import {
   type DrizzleDb,
 } from "@ii-tonya/db";
 
-/** Promo-bot delivery only. Missing owner assets leave guide work queued. */
+/** Promo-bot delivery: configured file IDs or bundled multipart uploads. */
 export function createExpertPromoFunnelRunner(
   db: DrizzleDb,
   config: RuntimeConfig,
@@ -22,13 +26,20 @@ export function createExpertPromoFunnelRunner(
     botKey: scope.botKey,
     messagingConsentPolicyVersion: scope.messagingConsentPolicyVersion,
   });
-  const send = async (method: string, body: Record<string, unknown>) => {
+  const send = async (
+    method: string,
+    body: Record<string, unknown> | FormData,
+  ) => {
     const response = await fetcher(
       `https://api.telegram.org/bot${scope.botToken}/${method}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        ...(body instanceof FormData
+          ? { body }
+          : {
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            }),
         signal: AbortSignal.timeout(15000),
       },
     );
@@ -52,12 +63,22 @@ export function createExpertPromoFunnelRunner(
               text,
               ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
             }),
-          sendPhoto: ({ chatId, photo }) =>
-            send("sendPhoto", { chat_id: chatId, photo }),
+          sendPhoto: async ({ chatId, photo }) =>
+            photo === EXPERT_PROMO_LOCAL_ASSETS.banner.slot
+              ? send(
+                  "sendPhoto",
+                  await telegramAssetForm({
+                    chatId,
+                    field: "photo",
+                    ...EXPERT_PROMO_LOCAL_ASSETS.banner,
+                  }),
+                )
+              : send("sendPhoto", { chat_id: chatId, photo }),
         },
         {
           limit: 20,
-          ...(scope.giftBannerFileId ? { banner: scope.giftBannerFileId } : {}),
+          banner:
+            scope.giftBannerFileId || EXPERT_PROMO_LOCAL_ASSETS.banner.slot,
         },
       );
       const guide = await runExpertPromoGuideDelivery(
@@ -65,11 +86,21 @@ export function createExpertPromoFunnelRunner(
           claimGuideDeliveries:
             repository.claimGuideDeliveries.bind(repository),
           markGuideDelivered: repository.markGuideDelivered.bind(repository),
-          sendDocument: ({ chatId, document, caption }) =>
-            send("sendDocument", { chat_id: chatId, document, caption }),
+          sendDocument: async ({ chatId, document, caption }) =>
+            document === EXPERT_PROMO_LOCAL_ASSETS.guide.slot
+              ? send(
+                  "sendDocument",
+                  await telegramAssetForm({
+                    chatId,
+                    field: "document",
+                    caption,
+                    ...EXPERT_PROMO_LOCAL_ASSETS.guide,
+                  }),
+                )
+              : send("sendDocument", { chat_id: chatId, document, caption }),
         },
         {
-          ...(scope.guideFileId ? { document: scope.guideFileId } : {}),
+          document: scope.guideFileId || EXPERT_PROMO_LOCAL_ASSETS.guide.slot,
           limit: 20,
         },
       );
