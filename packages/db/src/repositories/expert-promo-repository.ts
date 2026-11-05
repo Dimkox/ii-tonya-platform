@@ -477,7 +477,10 @@ export class PostgresExpertPromoRepository {
   async beginEnrollment(raw: ExpertPromoCommand & { refCode?: string }) {
     const input = command(raw);
     const refCode = raw.refCode;
-    if (refCode !== undefined && !/^promo_[0-9a-f]{32}$/u.test(refCode))
+    if (
+      refCode !== undefined &&
+      !/^(?:promo_[0-9a-f]{32}|REF_[A-Za-z0-9_-]{4,48})$/u.test(refCode)
+    )
       fail("promo_invalid_request");
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`set local statement_timeout='2000ms'`);
@@ -485,6 +488,16 @@ export class PostgresExpertPromoRepository {
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`promo-request:${input.botId}:${input.requestKey}`},0))`,
       );
+      let canonicalRefCode = refCode;
+      if (refCode?.startsWith("REF_")) {
+        const owner = (
+          await tx.execute<{ refCode: string }>(
+            sql`select ref_code as "refCode" from expert_promo_codes where upper(substr(replace(user_id::text,'-',''),1,12))=${refCode.slice(4).toUpperCase()} order by created_at limit 1`,
+          )
+        ).rows[0];
+        if (!owner) fail("promo_invalid_request");
+        canonicalRefCode = owner!.refCode;
+      }
       const receipt = (
         await tx.execute<{
           userId: string | null;
@@ -562,7 +575,7 @@ export class PostgresExpertPromoRepository {
           active: true,
         };
         await tx.execute(
-          sql`insert into expert_promo_enrollments(user_id,channel_identity_id,bot_id,ref_code) values(${user.id}::uuid,${mapping.id}::uuid,${input.botId},${refCode ?? null})`,
+          sql`insert into expert_promo_enrollments(user_id,channel_identity_id,bot_id,ref_code) values(${user.id}::uuid,${mapping.id}::uuid,${input.botId},${canonicalRefCode ?? null})`,
         );
       }
       const enrollment = (

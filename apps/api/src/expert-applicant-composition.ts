@@ -95,6 +95,19 @@ export function createExpertApplicantComposition(
     webhookSecret: scope.webhookSecret,
     service: createExpertApplicantService({
       enabled: true,
+      faq: true,
+      ...(scope.waitlistV4Enabled
+        ? {
+            waitlistV4: {
+              channelUrl:
+                scope.telegramChannelUrl ??
+                "https://t.me/ii_tonya_experts_promo",
+              ...(scope.waitlistPrivacyUrl
+                ? { privacyUrl: scope.waitlistPrivacyUrl }
+                : {}),
+            },
+          }
+        : {}),
       ...(config.features.expertSeparatedSales === true
         ? {
             separatedSales: createExpertSeparatedSalesService({

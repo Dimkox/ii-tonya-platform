@@ -9,6 +9,13 @@ import {
   type ExpertPromoFaqEntry,
 } from "./expert-promo-faq.js";
 import { createHash } from "node:crypto";
+import {
+  renderWaitlistInvite,
+  waitlistDisplayRefCode,
+  waitlistV4Text,
+  type WaitlistV4Config,
+  type WaitlistInviteVariant,
+} from "./waitlist-funnel-v4.js";
 
 export type ExpertApplicantScope = {
   botId: string;
@@ -97,7 +104,14 @@ export type ExpertApplicantReply =
       status: "handled";
       text: string;
       replyMarkup?:
-        | { inline_keyboard: { text: string; callback_data: string }[][] }
+        | {
+            inline_keyboard: {
+              text: string;
+              callback_data?: string;
+              url?: string;
+              copy_text?: { text: string };
+            }[][];
+          }
         | { remove_keyboard: true };
     }
   | {
@@ -118,6 +132,7 @@ const uuid =
   "[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}";
 const tariff = new RegExp(`^/tariff (${uuid}) (1|3)$`, "u");
 const apply = new RegExp(`^/apply (${uuid})$`, "u");
+
 export function createExpertApplicantService(deps: {
   enabled: boolean;
   separatedSales?: {
@@ -131,6 +146,7 @@ export function createExpertApplicantService(deps: {
   activeResidentBotUrl?: string;
   /** WAIT-T05: free text → FAQ answer, else manager handoff. */
   faq?: readonly ExpertPromoFaqEntry[] | true;
+  waitlistV4?: WaitlistV4Config;
   personalOffers?: {
     readPromoIdentity(
       scope: ExpertApplicantScope,
@@ -174,6 +190,74 @@ export function createExpertApplicantService(deps: {
         requestDigest: digest,
       });
       try {
+        // Pre-launch v4 is an explicit configuration: legacy sales composition is
+        // unchanged until the release owner switches this funnel on.
+        if (deps.waitlistV4) {
+          const channelUrl = deps.waitlistV4.channelUrl;
+          const consentCallback = /^wl:consent:([A-Za-z0-9_-]{16,128})$/u.exec(
+            input.text,
+          );
+          if (consentCallback)
+            input = {
+              ...input,
+              text: `/consent ${consentCallback[1]} granted`,
+            };
+          else if (input.text === "wl:first")
+            input = { ...input, text: "/start" };
+          else if (input.text === "wl:code")
+            return {
+              status: "handled",
+              text: "Отправьте промокод коллеги одним сообщением.",
+            };
+          else if (input.text === "wl:wait" || input.text === "wl:optout")
+            return {
+              status: "handled",
+              text:
+                input.text === "wl:optout" && deps.repository.optOutReferral
+                  ? (await deps.repository.optOutReferral(scope))
+                    ? "Принято. Тогда просто ждите нашего общего анонса о старте демо-доступа. Хорошего дня! ☕️"
+                    : waitlistV4Text.wait
+                  : waitlistV4Text.wait,
+            };
+          const choice = /^wl:template:(1|2)$/u.exec(input.text);
+          const wantsMaterials =
+            Boolean(choice) ||
+            input.text === "wl:materials" ||
+            input.text.trim().toLocaleUpperCase("ru-RU") === "ПРОМОКОД";
+          if (wantsMaterials) {
+            const registration = await deps.repository.register(command());
+            if (!choice) {
+              return {
+                status: "handled",
+                text: waitlistV4Text.templateChoice,
+                replyMarkup: {
+                  inline_keyboard: [
+                    [
+                      {
+                        text: "Вариант 1 — Информативный",
+                        callback_data: "wl:template:1",
+                      },
+                    ],
+                    [
+                      {
+                        text: "Вариант 2 — Личный/Теплый",
+                        callback_data: "wl:template:2",
+                      },
+                    ],
+                  ],
+                },
+              };
+            }
+            const displayCode = waitlistDisplayRefCode(
+              registration.userId,
+              registration.refCode,
+            );
+            return {
+              status: "handled",
+              text: `Вот ваш персональный промокод: ${displayCode}\n\n${renderWaitlistInvite(Number(choice[1]) as WaitlistInviteVariant, displayCode, channelUrl)}\n\n${waitlistV4Text.materialsFooter}`,
+            };
+          }
+        }
         if (
           deps.separatedSales &&
           !/^(?:\/(?:start|consent)(?: |$)|\/optout_ref$|\/gender (?:female|male)$|promo_[0-9a-f]{32}$)/u.test(
@@ -247,10 +331,14 @@ export function createExpertApplicantService(deps: {
               : "Сначала зарегистрируйтесь: отправьте /start.",
           };
         // WAIT-002: after consent a typed inviter code converges with /start promo_….
-        const typedCode = /^(promo_[0-9a-f]{32})$/u.exec(input.text.trim());
+        const typedCode =
+          /^(promo_[0-9a-f]{32}|REF_[A-Za-z0-9_-]{4,48})$/u.exec(
+            input.text.trim(),
+          );
         const start =
-          /^\/start(?: (promo_[A-Za-z0-9_-]{8,48}))?$/u.exec(input.text) ??
-          (typedCode ? [input.text, typedCode[1]] : null);
+          /^\/start(?: ((?:promo|REF)_[A-Za-z0-9_-]{8,48}))?$/u.exec(
+            input.text,
+          ) ?? (typedCode ? [input.text, typedCode[1]] : null);
         if (start) {
           if (await deps.repository.isActiveResident?.(scope))
             return {
@@ -268,12 +356,35 @@ export function createExpertApplicantService(deps: {
           if (enrollment.kind === "waiting_content")
             return {
               status: "handled",
-              text: "Текст согласия ещё не опубликован. Регистрация не начата; менеджер уже может подготовить документ.",
+              text: deps.waitlistV4
+                ? waitlistV4Text.referralOffer
+                : "Текст согласия ещё не опубликован. Регистрация не начата; менеджер уже может подготовить документ.",
             };
           if (enrollment.kind === "consent_pending")
             return { status: "duplicate" };
           if (enrollment.kind === "consent_required") {
             const text = `${enrollment.document.title}\n${enrollment.document.body}\nСогласиться: /consent ${enrollment.token} granted\nОтказаться: /consent ${enrollment.token} denied`;
+            if (deps.waitlistV4)
+              return {
+                status: "handled",
+                text: `${waitlistV4Text.welcome(deps.waitlistV4.channelUrl, deps.waitlistV4.privacyUrl)}\n\n${enrollment.document.title}\n${enrollment.document.body}`,
+                replyMarkup: {
+                  inline_keyboard: [
+                    [
+                      {
+                        text: "Согласен(на), поехали",
+                        callback_data: `wl:consent:${enrollment.token}`,
+                      },
+                    ],
+                    [
+                      {
+                        text: "📢 Читать новости проекта",
+                        url: deps.waitlistV4.channelUrl,
+                      },
+                    ],
+                  ],
+                },
+              };
             // Preserve the complete approved notice. Never truncate legal text.
             if (text.length > 4096)
               return {
@@ -298,6 +409,27 @@ export function createExpertApplicantService(deps: {
               : "";
           const registrationText =
             `Ваш промокод: ${result.refCode}. Уникальных регистраций: ${result.referralCount}. ${guide} ${bonus}`.trim();
+          if (deps.waitlistV4)
+            return {
+              status: "handled",
+              text: `${start[1] ? waitlistV4Text.accepted : waitlistV4Text.pioneer}\n\n${waitlistV4Text.referralOffer}`,
+              replyMarkup: {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "Да, дай мне промокод и текст",
+                      callback_data: "wl:materials",
+                    },
+                  ],
+                  [
+                    {
+                      text: "Пока нет, хочу подождать старта",
+                      callback_data: "wl:wait",
+                    },
+                  ],
+                ],
+              },
+            };
           if (deps.separatedSales) {
             const sales = await deps.separatedSales.handle(input);
             if (sales) return sales;
@@ -334,10 +466,28 @@ export function createExpertApplicantService(deps: {
           if (result.replay) return { status: "duplicate" };
           return {
             status: "handled",
-            text:
-              result.kind === "granted"
+            text: deps.waitlistV4
+              ? result.kind === "granted"
+                ? waitlistV4Text.askPromo
+                : waitlistV4Text.declined
+              : result.kind === "granted"
                 ? "Согласие сохранено. Есть реферальный код коллеги? Отправьте его сообщением (promo_…). Нет кода — отправьте /start, и вы станете первопроходцем."
                 : "Отказ сохранён. Регистрация и начисления не выполнены.",
+            ...(deps.waitlistV4 && result.kind === "granted"
+              ? {
+                  replyMarkup: {
+                    inline_keyboard: [
+                      [{ text: "Да, есть промокод", callback_data: "wl:code" }],
+                      [
+                        {
+                          text: "Нет, я первый/первая",
+                          callback_data: "wl:first",
+                        },
+                      ],
+                    ],
+                  },
+                }
+              : {}),
           };
         }
         if (input.text === "/tariffs") {
