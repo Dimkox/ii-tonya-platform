@@ -31,6 +31,9 @@ const serviceOf = async (): Promise<string> => {
 it("plans, applies idempotently, rejects clashes and toggles (SCRUM-519)", async () => {
   const admin = new PostgresPlanerkaServiceMappingAdmin(database.db);
   const service = await serviceOf();
+  await expect(admin.listServices()).resolves.toEqual([
+    expect.objectContaining({ expertServiceId: service, active: true }),
+  ]);
   const other = await serviceOf();
   const file = parsePlanerkaServiceMappingFile({
     accountId: 901,

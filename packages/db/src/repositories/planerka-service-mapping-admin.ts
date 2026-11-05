@@ -105,6 +105,13 @@ export const parsePlanerkaServiceMappingFile = (
   return { accountId: root.accountId, mappings };
 };
 
+export type PlanerkaCandidateServiceRow = {
+  readonly expertServiceId: string;
+  readonly expertId: string;
+  readonly durationMinutes: number;
+  readonly active: boolean;
+};
+
 export type PlanerkaMappingPlanAction = "insert" | "update" | "unchanged";
 
 export interface PlanerkaMappingPlanEntry {
@@ -122,6 +129,15 @@ export class PostgresPlanerkaServiceMappingAdmin {
     return (
       await this.db.execute<PlanerkaServiceMappingRow>(
         sql`select ${projection} from planerka_service_mappings m order by m.account_id,m.event_type_id`,
+      )
+    ).rows;
+  }
+
+  /** Lists IDs for the reviewed mapping file; never creates experts or services. */
+  async listServices(): Promise<readonly PlanerkaCandidateServiceRow[]> {
+    return (
+      await this.db.execute<PlanerkaCandidateServiceRow>(
+        sql`select s.id as "expertServiceId",s.expert_id as "expertId",s.duration_minutes as "durationMinutes",s.active from expert_services s order by s.expert_id,s.id`,
       )
     ).rows;
   }

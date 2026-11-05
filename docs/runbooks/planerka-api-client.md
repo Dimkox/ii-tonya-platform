@@ -258,6 +258,7 @@ from the Planerka account. Use the CLI (reads `DATABASE_URL`; if
 
 ```
 pnpm exec tsx scripts/planerka-service-mappings.ts list
+pnpm exec tsx scripts/planerka-service-mappings.ts services                    # read-only service/expert UUIDs
 pnpm exec tsx scripts/planerka-service-mappings.ts plan mappings.json            # read-only
 pnpm exec tsx scripts/planerka-service-mappings.ts apply mappings.json --confirm  # one transaction
 pnpm exec tsx scripts/planerka-service-mappings.ts disable <expertServiceId>
@@ -281,4 +282,57 @@ File format (strict; unknown fields and duplicates are rejected):
 ```
 
 `duration_minutes` is copied from `expert_services`; `verified_at` is set on
-apply. An event type already bound to another service is rejected.
+apply. An event type already bound to another service is rejected. An invalid,
+unknown or inactive service aborts `plan`/`apply`; there is no automatic fallback
+to another service and no command that creates an expert or an expert service.
+
+## First expert and event type 53431
+
+Event type **53431** is an operator-supplied candidate for the first real expert
+service. It is not globally assigned in code, migrations or tests. A Planerka
+event type belongs to an account and must be bound to one real
+`expert_services` UUID; the numeric ID alone does not prove ownership, duration,
+timezone or booking suitability. No production mapping was applied while the
+expert catalogue was empty.
+
+1. Use a real applicant in the existing `/card_mode` flow and collect the
+   service details; do not seed a synthetic expert (see
+   `docs/runbooks/resident-rich-onboarding.md`).
+2. An authenticated manager uses the existing expert-card review UI/API
+   (`/v1/admin/expert-cards`) to approve the completed card. The existing
+   publication transaction creates the expert and services; payment and
+   publication gates remain unchanged. The manager must independently verify
+   identity, service details and consent.
+3. Read the resulting UUID with the read-only `services` command above. Copy it
+   into a local, non-committed JSON file in the format below. Replace account
+   and timezone placeholders with the authenticated account's actual values;
+   leave `enabled` false until the event has been reviewed.
+4. Compare event 53431 in the authenticated Planerka account: owner, both
+   duration fields, timezone, public/free/visible status, automatic acceptance,
+   one-person capacity and absence of provider payments. Require only the
+   neutral name and timezone fields accepted by the current client. Do not treat
+   this checklist as evidence that those facts have been checked.
+5. Run `plan`, review its output, then explicitly `apply ... --confirm`. Restart
+   the worker with `PLANERKA_RECOVERY_ENABLED=true`; only after preflight is
+   green admit `PLANERKA_CREATE_ENABLED=true`. A missing mapping or invalid
+   event intentionally aborts creation rather than succeeding as a no-op.
+
+Template only (replace all angle-bracket values; keep it outside Git):
+
+```json
+{
+  "accountId": "<authenticated numeric account id>",
+  "mappings": [
+    {
+      "expertServiceId": "<UUID returned by the services command>",
+      "eventTypeId": 53431,
+      "timeZone": "<authenticated Planerka profile timezone>",
+      "enabled": false
+    }
+  ]
+}
+```
+
+CREATE remains disabled by default. This runbook does not authorize production
+activation, a live booking or notifications to an expert or client. Notification
+consumers and a separately authorized end-to-end probe are still required.
