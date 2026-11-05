@@ -76,18 +76,51 @@ if [[ -n "$release_sha" ]]; then
       SELARTI_COMPANY_ID SELARTI_TASK_ID SELARTI_AI_ID
   [[ "$(flag_value TELEGRAM_ENABLED)" == false ]] ||
     require_keys TELEGRAM_ENABLED TELEGRAM_BOT_TOKEN TELEGRAM_WEBHOOK_SECRET
-  # Payment activation needs the full YooKassa gateway profile (packages/config/src/env.ts);
-  # this release keeps payments and residency billing off until that profile is validated here.
-  [[ "$(flag_value PAYMENTS_ENABLED)" == false ]] || fail "PAYMENTS_ENABLED must be false"
-  grep -Fx 'PAYMENT_PROVIDER=disabled' "$runtime_env" >/dev/null || fail "payments must be disabled"
+  # SCRUM-518: payments may be enabled only as a guarded live pilot: direct YooKassa,
+  # exactly one allow-listed principal and a cap of at most 10 RUB. Otherwise off.
+  for key in PAYMENT_PROVIDER YOOKASSA_ENABLED PAYMENTS_PILOT_ALLOWLIST PAYMENTS_PILOT_MAX_AMOUNT_RUB; do
+    [[ "$(grep -c "^$key=" "$runtime_env")" -le 1 ]] || fail "$key must occur at most once"
+  done
+  if [[ "$(flag_value PAYMENTS_ENABLED)" == true ]]; then
+    grep -Fx 'PAYMENT_PROVIDER=yookassa' "$runtime_env" >/dev/null ||
+      fail "PAYMENTS_ENABLED=true requires PAYMENT_PROVIDER=yookassa"
+    grep -Fx 'YOOKASSA_ENABLED=true' "$runtime_env" >/dev/null ||
+      fail "PAYMENTS_ENABLED=true requires YOOKASSA_ENABLED=true"
+    grep -Fx 'YOOKASSA_MODE=live' "$runtime_env" >/dev/null ||
+      fail "payments pilot requires YOOKASSA_MODE=live"
+    grep -Eqx 'PAYMENTS_PILOT_ALLOWLIST=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[1-9][0-9]{0,19})' "$runtime_env" ||
+      fail "PAYMENTS_ENABLED=true requires PAYMENTS_PILOT_ALLOWLIST with exactly one id"
+    grep -Eqx 'PAYMENTS_PILOT_MAX_AMOUNT_RUB=([1-9]|10)' "$runtime_env" ||
+      fail "PAYMENTS_ENABLED=true requires PAYMENTS_PILOT_MAX_AMOUNT_RUB between 1 and 10"
+    grep -Eqx 'YOOKASSA_SHOP_ID=[0-9]{1,32}' "$runtime_env" || fail "payments pilot requires numeric YOOKASSA_SHOP_ID"
+    grep -Eqx 'YOOKASSA_SECRET_KEY=[^[:space:]]{8,256}' "$runtime_env" || fail "payments pilot requires YOOKASSA_SECRET_KEY"
+    grep -Fx 'YOOKASSA_SECRET_REF=env://YOOKASSA_SECRET_KEY' "$runtime_env" >/dev/null ||
+      fail "payments pilot requires YOOKASSA_SECRET_REF=env://YOOKASSA_SECRET_KEY"
+    grep -Eqx 'YOOKASSA_RETURN_URL=https://ii-tonya\.ru(/[^[:space:]]*)?' "$runtime_env" ||
+      fail "payments pilot requires YOOKASSA_RETURN_URL on https://ii-tonya.ru"
+    grep -Eqx 'YOOKASSA_RECEIPT_VAT_CODE=([1-9]|1[0-2])' "$runtime_env" || fail "payments pilot requires YOOKASSA_RECEIPT_VAT_CODE"
+    require_keys PAYMENTS_ENABLED YOOKASSA_RECEIPT_PAYMENT_SUBJECT YOOKASSA_RECEIPT_PAYMENT_MODE
+    ! grep -Eq '^YOOKASSA_GATEWAY_(WORKER_)?CONFIG_FILE=[^[:space:]]' "$runtime_env" ||
+      fail "payments pilot must not configure the YooKassa gateway"
+  else
+    grep -Fx 'PAYMENT_PROVIDER=disabled' "$runtime_env" >/dev/null || fail "payments must be disabled"
+    ! grep -Fxq 'YOOKASSA_ENABLED=true' "$runtime_env" || fail "YOOKASSA_ENABLED=true requires PAYMENTS_ENABLED=true"
+  fi
   for flag in EXPERT_REFERRAL_ENABLED EXPERT_TELEGRAM_QUERIES_ENABLED EXPERT_RESIDENCY_BILLING_ENABLED; do
     [[ "$(flag_value "$flag")" == false ]] || require_keys "$flag" EXPERT_TELEGRAM_BOT_TOKEN
   done
+  # Residency billing is outside the SCRUM-518 pilot and stays off.
   [[ "$(flag_value EXPERT_RESIDENCY_BILLING_ENABLED)" == false ]] ||
-    fail "EXPERT_RESIDENCY_BILLING_ENABLED=true requires PAYMENTS_ENABLED=true"
+    fail "EXPERT_RESIDENCY_BILLING_ENABLED must be false during the payments pilot"
   grep -Fx 'SELARTI_OUTBOUND_BILLING_MODE=disabled' "$runtime_env" >/dev/null || fail "Selarti billing must be disabled"
   grep -Fx 'LLM_PROVIDER=disabled' "$runtime_env" >/dev/null || fail "LLM provider must be disabled"
   if grep -Eiq '(<[^>]+>|placeholder|change[-_]?me|example\.invalid)' "$runtime_env"; then
     fail "placeholder marker found"
   fi
+  # SCRUM-518 activation lock: the native API (apps/api/src/server.ts) has no direct
+  # YooKassa runtime yet, so PAYMENTS_ENABLED=true would stop the API at startup.
+  # Keep the pilot rejected until the checkout runtime is wired and startup-tested.
+  payments_pilot_runtime_wired=false
+  [[ "$(flag_value PAYMENTS_ENABLED)" == false || "$payments_pilot_runtime_wired" == true ]] ||
+    fail "payments pilot activation is locked until the API wires the direct YooKassa runtime"
 fi

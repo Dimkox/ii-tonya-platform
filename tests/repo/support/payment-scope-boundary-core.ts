@@ -18,6 +18,9 @@ export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
   "packages/integrations/src/yookassa/public-expert-gateway-contracts.ts",
   "packages/integrations/src/yookassa/public-expert-gateway.ts",
   "packages/integrations/src/yookassa/public-expert-recovery.ts",
+  // SCRUM-518 owner-approved 10 RUB pilot guard (one allowlisted account, live mode).
+  "packages/integrations/src/yookassa/payments-pilot.ts",
+  "packages/integrations/src/yookassa/payments-pilot.test.ts",
 
   // Early Bird candidate inventory: explicit paths, independently reviewed before release.
   "packages/integrations/src/yookassa/early-bird-candidate-verifier.ts",
@@ -663,7 +666,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/index.ts",
-    "66867a134b42d3359790287918f22acee6baedef27773fad48d302ca98d2a387",
+    "c43f83fe6d6cec4faf61f7532bd10175b1d9486ac66e34b9e668739e55e6afed",
   ],
   [
     "packages/integrations/src/payment/disabled-payment-adapter.ts",
@@ -675,7 +678,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/integrations/src/yookassa/client.ts",
-    "720a073ab5a70c1db77ec30b8dab256112dd4ce78662047584b66b078e6a6d4d",
+    "e92b1958ebb4780f55f548b1cdd9a2b337a4bfecb2c31ba8c63718c2fabe7fee",
   ],
   [
     "packages/integrations/src/yookassa/contracts.ts",
@@ -1292,7 +1295,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/validate-runtime-env.sh",
-    "8e368ee045998de5b22719657aee983f40357bd52d2fc18d013b8516d8b26aaf",
+    "ec7ef347f4b858e1d94095a29ead717b6b4cbf0d38bce61a9cb74fb546e7c488",
   ],
   // Local pre-push gate remains an additional check before the hosted gates run.
   [

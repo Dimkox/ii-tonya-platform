@@ -82,7 +82,14 @@ export function createYooKassaWorkerComposition(
   const transport = options.transport ?? ((url, init) => fetch(url, init));
   const client = config.yookassa
     ? createYooKassaClient(
-        { mode, shopId: config.yookassa.shopId, secretKey: secretKey! },
+        {
+          mode,
+          shopId: config.yookassa.shopId,
+          secretKey: secretKey!,
+          ...(config.paymentsPilot === undefined
+            ? {}
+            : { maxPaymentAmountMinor: config.paymentsPilot.maxAmountMinor }),
+        },
         async (url, init) => {
           if (!control.accepting || control.credentialsUnavailable)
             throw new Error("yookassa_worker_unavailable");
