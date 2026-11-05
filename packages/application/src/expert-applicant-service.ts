@@ -266,14 +266,20 @@ export function createExpertApplicantService(deps: {
               firstName: input.firstName,
             });
           if (enrollment.kind === "waiting_content")
-            return { status: "handled", text: "TODO: Wait for Prompt Spec" };
+            return {
+              status: "handled",
+              text: "Текст согласия ещё не опубликован. Регистрация не начата; менеджер уже может подготовить документ.",
+            };
           if (enrollment.kind === "consent_pending")
             return { status: "duplicate" };
           if (enrollment.kind === "consent_required") {
             const text = `${enrollment.document.title}\n${enrollment.document.body}\nСогласиться: /consent ${enrollment.token} granted\nОтказаться: /consent ${enrollment.token} denied`;
             // Preserve the complete approved notice. Never truncate legal text.
             if (text.length > 4096)
-              return { status: "handled", text: "TODO: Wait for Prompt Spec" };
+              return {
+                status: "handled",
+                text: "Текст согласия не помещается в одно сообщение Telegram. Регистрация не начата; отправьте /start после публикации сокращённой версии документа.",
+              };
             return { status: "handled", text };
           }
           const result = await deps.repository.register({

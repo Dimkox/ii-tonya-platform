@@ -213,11 +213,13 @@ it("presents explicit consent before enrolling a new identity", async () => {
   expect(r.text).toContain("/consent synthetic_token_12345678 granted");
   expect(f.register).not.toHaveBeenCalled();
 });
-it("keeps missing consent copy inactive", async () => {
+it("explains missing consent copy without a prompt placeholder", async () => {
   const f = fixture();
   f.beginEnrollment.mockResolvedValueOnce({ kind: "waiting_content" } as never);
   const r = await f.service.handle({ ...scope, text: "/start" });
-  expect(r.text).toContain("TODO: Wait for Prompt Spec");
+  expect(r.text).toBe(
+    "Текст согласия ещё не опубликован. Регистрация не начата; менеджер уже может подготовить документ.",
+  );
   expect(f.register).not.toHaveBeenCalled();
 });
 it("accepts only explicit bound consent decision", async () => {
@@ -298,7 +300,10 @@ it("keeps oversized consent documents inactive instead of truncating legal text"
     },
   } as never);
   const r = await f.service.handle({ ...scope, text: "/start" });
-  expect(r).toEqual({ status: "handled", text: "TODO: Wait for Prompt Spec" });
+  expect(r).toEqual({
+    status: "handled",
+    text: "Текст согласия не помещается в одно сообщение Telegram. Регистрация не начата; отправьте /start после публикации сокращённой версии документа.",
+  });
   expect(f.completeEnrollment).not.toHaveBeenCalled();
   expect(f.register).not.toHaveBeenCalled();
 });

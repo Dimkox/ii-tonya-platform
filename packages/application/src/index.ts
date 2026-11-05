@@ -70,3 +70,5 @@ export {
 } from "./receipt-disclosure-boundary.js";
 export * from "./expert-promo-funnel-jobs.js";
 export * from "./expert-promo-faq.js";
+
+export * from "./resident-onboarding-extraction-prompt.js";
