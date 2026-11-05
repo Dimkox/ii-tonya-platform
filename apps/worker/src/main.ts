@@ -12,6 +12,7 @@ import { createResidentLifecycleCompletionWorker } from "./resident-lifecycle-co
 import { createResidentPrivateJobsLifecycle } from "./resident-private-jobs-composition.js";
 import { createResidentReviewNotificationLifecycle } from "./resident-review-notification-composition.js";
 import { createSeparatedSalesRunner } from "./expert-separated-sales-composition.js";
+import { createExpertPromoFunnelRunner } from "./expert-promo-funnel-composition.js";
 import { createResidentWorkspaceNotificationLifecycle } from "./resident-workspace-notification-composition.js";
 import {
   createExpertPersonalOfferRunner,
@@ -922,6 +923,7 @@ export function createProductionWorkerRuntimeFactory(
             : {
                 planerkaBookingRunner: () => runPlanerkaBookingOnce(planerka),
               }),
+          expertPromoFunnel: createExpertPromoFunnelRunner(db, config)?.runOnce,
           jobsRepository: new PostgresWorkerJobsRepository(db),
           expertReferralJobsRepository:
             new PostgresExpertReferralWorkerRepository(db),
