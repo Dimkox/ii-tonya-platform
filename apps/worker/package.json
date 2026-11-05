@@ -18,11 +18,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ii-tonya/application": "workspace:*",
     "@ii-tonya/config": "workspace:*",
     "@ii-tonya/db": "workspace:*",
     "@ii-tonya/integrations": "workspace:*",
     "@ii-tonya/observability": "workspace:*",
-    "@ii-tonya/worker": "workspace:*",
-    "@ii-tonya/application": "workspace:*"
+    "@ii-tonya/worker": "workspace:*"
   }
 }
