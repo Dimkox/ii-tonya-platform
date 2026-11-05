@@ -231,6 +231,7 @@ const schema = z
       .default("disabled"),
     PAYMENTS_PILOT_ALLOWLIST: optionalNonEmptyString,
     PAYMENTS_PILOT_MAX_AMOUNT_RUB: optionalNonEmptyString,
+    PAYMENTS_PILOT_CHECKOUT_ENABLED: z.enum(["true", "false"]).default("false"),
     YOOKASSA_GATEWAY_CONFIG_FILE: optionalNonEmptyString,
     YOOKASSA_GATEWAY_WORKER_CONFIG_FILE: optionalNonEmptyString,
     PUBLIC_EXPERT_GATEWAY_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -516,6 +517,22 @@ const schema = z
         path: ["PAYMENTS_PILOT_ALLOWLIST"],
         message: "payments_pilot_configuration_invalid",
       });
+    // The pilot checkout binds to a client session principal (UUID) and the direct shop.
+    if (
+      value.PAYMENTS_PILOT_CHECKOUT_ENABLED === "true" &&
+      (value.PAYMENTS_PILOT_ALLOWLIST === undefined ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u.test(
+          value.PAYMENTS_PILOT_ALLOWLIST,
+        ) ||
+        value.PAYMENT_PROVIDER !== "yookassa" ||
+        value.YOOKASSA_ENABLED !== "true" ||
+        value.CLIENT_SESSION_ENABLED !== "true")
+    )
+      context.addIssue({
+        code: "custom",
+        path: ["PAYMENTS_PILOT_CHECKOUT_ENABLED"],
+        message: "payments_pilot_checkout_requires_pilot",
+      });
     if (value.YOOKASSA_UNBOUND_RECOVERY_ENABLED === "true") {
       const retention = Number(value.YOOKASSA_RECOVERY_RETENTION_DAYS);
       const windowHours = Number(value.YOOKASSA_UNBOUND_RECOVERY_WINDOW_HOURS);
@@ -706,6 +723,8 @@ export type RuntimeConfig = {
   paymentsPilot?: {
     principalId: string;
     maxAmountMinor: bigint;
+    /** Off by default: exposes the authenticated pilot checkout route. */
+    checkoutEnabled: boolean;
   };
   yookassaRecovery:
     | { enabled: false }
@@ -1259,6 +1278,7 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
           paymentsPilot: {
             principalId: value.PAYMENTS_PILOT_ALLOWLIST,
             maxAmountMinor: BigInt(value.PAYMENTS_PILOT_MAX_AMOUNT_RUB!) * 100n,
+            checkoutEnabled: value.PAYMENTS_PILOT_CHECKOUT_ENABLED === "true",
           },
         }
       : {}),

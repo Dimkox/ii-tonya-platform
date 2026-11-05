@@ -69,13 +69,12 @@ describe("validate-runtime-env payments pilot (SCRUM-518)", () => {
     expect(validate({ PAYMENT_PROVIDER: "yookassa" }).status).not.toBe(0);
   });
 
-  it("locks the full guarded live pilot until the API runtime is wired", () => {
+  it("accepts the full guarded live pilot after native API wiring", () => {
     // Codex P1 (#147): the API has no direct YooKassa runtime yet, so an
     // accepted pilot env would stop the API at startup. Activation stays locked.
     for (const env of [pilot, { ...pilot, PAYMENTS_PILOT_ALLOWLIST: "42" }]) {
       const result = validate(env);
-      expect(result.status).not.toBe(0);
-      expect(result.stderr).toContain("payments pilot activation is locked");
+      expect(result.status).toBe(0);
       expect(result.stderr).not.toContain("fixture_only_value_x");
     }
   });
@@ -125,6 +124,23 @@ describe("validate-runtime-env payments pilot (SCRUM-518)", () => {
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain(message);
     expect(result.stderr).not.toContain("fixture_only_value_x");
+  });
+
+  it("keeps the pilot checkout off unless explicitly enabled", () => {
+    expect(
+      validate({ PAYMENTS_PILOT_CHECKOUT_ENABLED: "true" }).stderr,
+    ).toContain("requires PAYMENTS_ENABLED=true");
+    const on = { ...pilot, PAYMENTS_PILOT_CHECKOUT_ENABLED: "true" };
+    // Native API startup coverage composes this exact guarded pilot configuration.
+    expect(validate({ ...on, CLIENT_SESSION_ENABLED: "true" }).status).toBe(0);
+    expect(validate(on).stderr).toContain("CLIENT_SESSION_ENABLED=true");
+    expect(
+      validate({
+        ...on,
+        CLIENT_SESSION_ENABLED: "true",
+        PAYMENTS_PILOT_ALLOWLIST: "42",
+      }).stderr,
+    ).toContain("UUID PAYMENTS_PILOT_ALLOWLIST");
   });
 
   it("refuses duplicated pilot keys", () => {

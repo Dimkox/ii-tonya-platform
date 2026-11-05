@@ -17,13 +17,24 @@ describe("PAYMENTS_PILOT_* config (SCRUM-518)", () => {
         PAYMENTS_PILOT_ALLOWLIST: "42",
         PAYMENTS_PILOT_MAX_AMOUNT_RUB: "10",
       }).paymentsPilot,
-    ).toEqual({ principalId: "42", maxAmountMinor: 1000n });
+    ).toEqual({
+      principalId: "42",
+      maxAmountMinor: 1000n,
+      checkoutEnabled: false,
+    });
   });
   it.each([
     { PAYMENTS_PILOT_ALLOWLIST: "42" },
     { PAYMENTS_PILOT_MAX_AMOUNT_RUB: "10" },
     { PAYMENTS_PILOT_ALLOWLIST: "1,2", PAYMENTS_PILOT_MAX_AMOUNT_RUB: "10" },
     { PAYMENTS_PILOT_ALLOWLIST: "42", PAYMENTS_PILOT_MAX_AMOUNT_RUB: "11" },
+    // Checkout needs a UUID client principal, the direct shop and client sessions.
+    {
+      PAYMENTS_PILOT_ALLOWLIST: "42",
+      PAYMENTS_PILOT_MAX_AMOUNT_RUB: "10",
+      PAYMENTS_PILOT_CHECKOUT_ENABLED: "true",
+    },
+    { PAYMENTS_PILOT_CHECKOUT_ENABLED: "true" },
   ])("rejects %j", (extra) => {
     expect(() => loadEnv({ ...minimal, ...extra })).toThrow();
   });

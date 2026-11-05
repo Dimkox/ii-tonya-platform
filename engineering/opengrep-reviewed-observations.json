@@ -28,26 +28,26 @@
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
-      "line": "859",
-      "sha256": "b0a383df13d74d2423671f30c66face0421d32abcee7d6b2e677d52f4a7d1584",
+      "line": "877",
+      "sha256": "ee8239d13a5704b84559dd4aa2ffe208a1674bed116cc94bde87ba2e89f30c55",
       "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
-      "line": "881",
-      "sha256": "b0a383df13d74d2423671f30c66face0421d32abcee7d6b2e677d52f4a7d1584",
+      "line": "899",
+      "sha256": "ee8239d13a5704b84559dd4aa2ffe208a1674bed116cc94bde87ba2e89f30c55",
       "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
-      "line": "903",
-      "sha256": "b0a383df13d74d2423671f30c66face0421d32abcee7d6b2e677d52f4a7d1584",
+      "line": "921",
+      "sha256": "ee8239d13a5704b84559dd4aa2ffe208a1674bed116cc94bde87ba2e89f30c55",
       "category": "json-or-cli-output",
-      "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+      "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     },
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.command-injection",
@@ -1008,6 +1008,22 @@
       "sha256": "f68517e2925d0d2802e0f899fbc9aee68d541c795c9a59ee8208d91b266d4762",
       "category": "operator-health-fetch",
       "evidence": "docs/operations/2026-11-04-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/payments-pilot.ts",
+      "line": "162",
+      "sha256": "a5c7955277cc2d8be60de8136298c961d6de7e44fcfa74a5edd28a1eafe4af4a",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
+    },
+    {
+      "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
+      "path": "apps/api/src/payments-pilot.ts",
+      "line": "189",
+      "sha256": "a5c7955277cc2d8be60de8136298c961d6de7e44fcfa74a5edd28a1eafe4af4a",
+      "category": "json-or-cli-output",
+      "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     }
   ]
 }

@@ -365,6 +365,7 @@ export type {
 export * from "./repositories/expert-campaign-read-repository.js";
 export * from "./repositories/payer-receipt-contact-repository.js";
 export * from "./repositories/planerka-availability-repository.js";
+export * from "./repositories/payments-pilot-ledger.js";
 
 export * from "./repositories/expert-promo-repository.js";
 

@@ -14,6 +14,21 @@ export const EXPERT_RESIDENCY_ALLOWED_PATHS = new Set([
   "packages/integrations/src/expert-residency/environment-secret-resolver.ts",
 ]);
 
+// SCRUM-518 owner-approved pilot checkout: explicit files, routes and identifier only.
+export const PAYMENTS_PILOT_ALLOWED_PATHS = new Set([
+  "apps/api/src/payments-pilot.ts",
+  "apps/api/src/payments-pilot.test.ts",
+  "packages/db/src/repositories/payments-pilot-ledger.ts",
+]);
+const PAYMENTS_PILOT_ALLOWED_ROUTES = new Set([
+  "/v1/payments-pilot/checkout",
+  "/v1/payments-pilot/payments/:id",
+]);
+const PAYMENTS_PILOT_ROUTE_IDENTIFIER_PATHS = new Set([
+  "apps/api/src/app.ts",
+  "apps/api/src/payments-pilot.ts",
+]);
+
 export const YOOKASSA_PAYMENT_ALLOWED_PATHS = new Set([
   "packages/integrations/src/yookassa/public-expert-gateway-contracts.ts",
   "packages/integrations/src/yookassa/public-expert-gateway.ts",
@@ -612,7 +627,7 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "08651aa4d0f33683b0a815e5f366587415e66edef6200ed89cc9546f1e9bc153",
+    "f5e15ff0e4b71be4b548d4f21d9c0fdc2663c9cccbb2e276772b26fcb3dd0483",
   ],
   [
     "packages/contracts/src/index.ts",
@@ -875,7 +890,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "apps/api/src/server.ts",
-    "3ac9bf4121c6be8a5d71f77a12c8cd287c5e80dbb2a3454620a45bd293460447",
+    "dfa68d819039e31597ef3814c159fa3f583238e9065d1ab63a51f57e8d8e8a75",
   ],
 
   [
@@ -986,7 +1001,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "engineering/opengrep-reviewed-observations.json",
-    "ba46a39586c822975cff4b2eafc6d9b5bf0d0fb37924a181b68ce84c57f5b9ea",
+    "9e257b307d93fcde14aeadb878862a6a0c74d84513d47c93726ec8fb92f513e4",
   ],
 
   [
@@ -1295,7 +1310,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/validate-runtime-env.sh",
-    "ec7ef347f4b858e1d94095a29ead717b6b4cbf0d38bce61a9cb74fb546e7c488",
+    "c1bd743255d6f3fa8c827795b438124ab9b32fc1df60a42c4ea3796f34642965",
   ],
   // Local pre-push gate remains an additional check before the hosted gates run.
   [
@@ -3433,7 +3448,11 @@ const inspectTypeScript = (
         if (
           route &&
           commercialRoute.test(route) &&
-          !EXPERT_RESIDENCY_ALLOWED_ROUTES.has(route)
+          !EXPERT_RESIDENCY_ALLOWED_ROUTES.has(route) &&
+          !(
+            PAYMENTS_PILOT_ALLOWED_PATHS.has(path) &&
+            PAYMENTS_PILOT_ALLOWED_ROUTES.has(route)
+          )
         ) {
           violations.push(`commercial API route: ${route}`);
         }
@@ -3452,6 +3471,10 @@ const inspectTypeScript = (
         !(
           path === "apps/api/src/app.ts" &&
           node.text === "yookassaWebhookRoutes"
+        ) &&
+        !(
+          PAYMENTS_PILOT_ROUTE_IDENTIFIER_PATHS.has(path) &&
+          node.text === "paymentsPilotRoutes"
         )
       ) {
         violations.push(`commercial API route identifier: ${node.text}`);
@@ -3717,14 +3740,22 @@ export const classifyPaymentScopeProbe = ({
     ) {
       violations.push("unapproved expert residency integration path");
     }
-  } else if (path.startsWith("apps/api/") && paymentApiPath.test(path)) {
+  } else if (
+    path.startsWith("apps/api/") &&
+    paymentApiPath.test(path) &&
+    !PAYMENTS_PILOT_ALLOWED_PATHS.has(path)
+  ) {
     violations.push("commercial API route path");
   } else if (
     path.startsWith("packages/application/") &&
     paymentApplicationPath.test(path)
   ) {
     violations.push("payment consumer or entitlement path");
-  } else if (path.startsWith("packages/db/") && paymentDbPath.test(path)) {
+  } else if (
+    path.startsWith("packages/db/") &&
+    paymentDbPath.test(path) &&
+    !PAYMENTS_PILOT_ALLOWED_PATHS.has(path)
+  ) {
     violations.push("commercial database schema path");
   } else if (
     path.startsWith("packages/sandbox-payments/src/") &&

@@ -118,6 +118,10 @@ import { clientSessionRoutes } from "./routes/client-sessions.js";
 import { clientBookingRoutes } from "./routes/client-booking.js";
 import { clientPrivacyRoutes } from "./routes/client-privacy.js";
 import { browserAccountRoutes } from "./routes/browser-account.js";
+import {
+  paymentsPilotRoutes,
+  type PaymentsPilotService,
+} from "./payments-pilot.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
 import { selartiResponseRoutes } from "./routes/selarti-response.js";
 const SYNTHETIC_FIXTURE_VALUE_1 = "__PLACEHOLDER_TELEGRAM_WEBHOOK_SECRET__";
@@ -208,6 +212,8 @@ export interface AppDependencies {
   expertAiRequests?: ExpertAiRequestLedger;
   expertAiTelegramPrincipal?: Pick<TelegramExpertAiIngress, "resolvePrincipal">;
   yookassaWebhook?: YooKassaWebhookDependencies;
+  /** SCRUM-518 pilot checkout; routes register only with PAYMENTS_PILOT_CHECKOUT_ENABLED. */
+  paymentsPilot?: PaymentsPilotService;
   clientCatalogService?: ClientCatalogService;
   publicCatalog?: PublicCatalogRead;
   publicCatalogLoadState?: PublicCatalogLoadState;
@@ -664,6 +670,18 @@ export async function buildApp(
   });
   if (deps.yookassaWebhook !== undefined) {
     await app.register(yookassaWebhookRoutes, deps.yookassaWebhook);
+  }
+  if (deps.config.paymentsPilot?.checkoutEnabled === true) {
+    if (
+      !deps.paymentsPilot ||
+      !deps.clientPrincipal ||
+      !deps.yookassaWebhook?.pilot
+    )
+      throw new Error("payments_pilot_checkout_capability_required");
+    await app.register(paymentsPilotRoutes, {
+      service: deps.paymentsPilot,
+      principals: deps.clientPrincipal,
+    });
   }
   await app.register(selartiWebhookRoutes, {
     selarti: deps.selarti,
