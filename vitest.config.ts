@@ -1,6 +1,20 @@
 import { defineConfig } from "vitest/config";
 import { fileURLToPath } from "node:url";
 
+// A git hook (pre-push) exports GIT_DIR and friends. Tests that create scratch
+// repositories would then write into this repository: fixture commits on the
+// pushed branch, core.bare=true. Workers inherit this cleaned environment.
+for (const name of [
+  "GIT_DIR",
+  "GIT_WORK_TREE",
+  "GIT_INDEX_FILE",
+  "GIT_PREFIX",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_COMMON_DIR",
+]) {
+  delete process.env[name];
+}
+
 export default defineConfig({
   resolve: {
     alias: [
