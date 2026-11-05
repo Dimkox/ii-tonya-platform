@@ -4,10 +4,10 @@ import {
   runTelegramBotCommandsCli,
 } from "../../scripts/telegram-bot-commands.js";
 
-const request = vi.fn(async (_token: string, _body: unknown) => ({
-  ok: true,
-  result: true,
-}));
+const request = vi.fn(async (...args: [string, unknown]) => {
+  void args;
+  return { ok: true, result: true };
+});
 const env = {
   TELEGRAM_BOT_TOKEN: "synthetic_" + "client-token",
   EXPERT_PROMO_TELEGRAM_BOT_TOKEN: "synthetic_" + "promo-token",
