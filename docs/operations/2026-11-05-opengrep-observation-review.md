@@ -25,8 +25,8 @@ also adds two new Fastify JSON response sinks in `payments-pilot.ts`.
 | Path:line                            | Rule suffix     | Category             | Reviewed behavior                                                                                                                                                                                                                                                |
 | ------------------------------------ | --------------- | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/api/src/app.ts:877,899,921`    | `reflected-xss` | `json-or-cli-output` | Same admin JSON proxy sinks as the 2026-11-04 records at 859/881/903 (`reply.send(response.rawPayload)` with copied JSON headers). Line shift only; no new taint path.                                                                                           |
-| `apps/api/src/payments-pilot.ts:162` | `reflected-xss` | `json-or-cli-output` | `reply.code(201).send({ paymentId, confirmationUrl, amountRub })`. Fastify serializes a plain object as JSON, not HTML. Fields are provider UUID, provider confirmation URL, and `formatRubMinor` of the capped pilot amount after `assertPaymentsPilotAllowed`. |
-| `apps/api/src/payments-pilot.ts:189` | `reflected-xss` | `json-or-cli-output` | `reply.send({ paymentId, status, amountRub })` on the owner-only refresh route. JSON body from the ledger/provider refresh; not an HTML sink.                                                                                                                    |
+| `apps/api/src/payments-pilot.ts:168` | `reflected-xss` | `json-or-cli-output` | `reply.code(201).send({ paymentId, confirmationUrl, amountRub })`. Fastify serializes a plain object as JSON, not HTML. Fields are provider UUID, provider confirmation URL, and `formatRubMinor` of the capped pilot amount after `assertPaymentsPilotAllowed`. |
+| `apps/api/src/payments-pilot.ts:195` | `reflected-xss` | `json-or-cli-output` | `reply.send({ paymentId, status, amountRub })` on the owner-only refresh route. JSON body from the ledger/provider refresh; not an HTML sink.                                                                                                                    |
 
 ## Decision and limits
 
@@ -36,3 +36,7 @@ and this evidence note. Local verification: sha-pinned engine plus `classify()`
 returns `128 reviewed observations; raw scanner status=fail; 0 unresolved`.
 Any new finding, changed file hash, or changed rule/path/line stays failing
 until separately reviewed. No rules, ignores, or inline suppressions changed.
+
+## 2026-11-05 follow-up: merged line shift (waitlist #160)
+
+After #148 merged, the two `payments-pilot.ts` sinks moved by six lines (162 to 168, 189 to 195) and the file digest changed. The code at each line is the same Fastify JSON reply reviewed above. Line numbers and source sha256 were refreshed so classify no longer raises `stale source` on `feat/waitlist-v4-channel`.
