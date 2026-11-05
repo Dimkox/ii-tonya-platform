@@ -1013,7 +1013,7 @@
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/payments-pilot.ts",
       "line": "162",
-      "sha256": "a5c7955277cc2d8be60de8136298c961d6de7e44fcfa74a5edd28a1eafe4af4a",
+      "sha256": "cde7313a4511dbbfe13f029baa968d9d4987c6a8ae976c0894c2b83ea07f55e1",
       "category": "json-or-cli-output",
       "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     },
@@ -1021,7 +1021,7 @@
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/payments-pilot.ts",
       "line": "189",
-      "sha256": "a5c7955277cc2d8be60de8136298c961d6de7e44fcfa74a5edd28a1eafe4af4a",
+      "sha256": "cde7313a4511dbbfe13f029baa968d9d4987c6a8ae976c0894c2b83ea07f55e1",
       "category": "json-or-cli-output",
       "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     }
