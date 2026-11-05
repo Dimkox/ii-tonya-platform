@@ -18,11 +18,17 @@ const paymentId = "2f4b6d0d-000f-5000-9000-000000000601";
 it("stores pilot payments append-only with the latest provider status (SCRUM-518)", async () => {
   const ledger = new PostgresPaymentsPilotLedger(database.db);
   expect(await ledger.find(paymentId)).toBeNull();
+  const idempotencyKey = "6a1f0d1e-6c55-4a40-9a51-6a4d3f6b0c01";
+  await ledger.beginCheckout({
+    principalId,
+    amountMinor: 1000n,
+    idempotencyKey,
+  });
   await ledger.recordCreated({
     providerPaymentId: paymentId,
     principalId,
     amountMinor: 1000n,
-    idempotencyKey: "6a1f0d1e-6c55-4a40-9a51-6a4d3f6b0c01",
+    idempotencyKey,
   });
   expect(await ledger.find(paymentId)).toEqual({
     providerPaymentId: paymentId,

@@ -7,6 +7,7 @@ import { PostgresPaymentsPilotLedger } from "./payments-pilot-ledger.js";
 let fixture: TestDatabase;
 beforeAll(async () => {
   fixture = await startTestPostgres();
+  await fixture.migrate();
 }, 120_000);
 afterAll(async () => {
   await fixture?.stop();
@@ -16,14 +17,20 @@ it("serializes an overlapping stale observation behind a terminal payment state"
   const ledger = new PostgresPaymentsPilotLedger(fixture.db);
   const principalId = randomUUID();
   const providerPaymentId = randomUUID();
+  const idempotencyKey = randomUUID();
   await fixture.db.execute(
-    sql`insert into users(id,email) values(${principalId}::uuid,${principalId + "@fixture.invalid"})`,
+    sql`insert into users(id) values(${principalId}::uuid)`,
   );
+  await ledger.beginCheckout({
+    principalId,
+    amountMinor: 1000n,
+    idempotencyKey,
+  });
   await ledger.recordCreated({
     providerPaymentId,
     principalId,
     amountMinor: 1000n,
-    idempotencyKey: randomUUID(),
+    idempotencyKey,
   });
   await ledger.recordStatus({
     providerPaymentId,
@@ -53,7 +60,7 @@ it("serializes an overlapping stale observation behind a terminal payment state"
         principalId,
         status: "canceled",
       }),
-    ).rejects.toMatchObject({ code: "55P03" });
+    ).rejects.toMatchObject({ cause: { code: "55P03" } });
     await a.query("commit");
     expect(await ledger.find(providerPaymentId)).toMatchObject({
       status: "succeeded",
@@ -69,7 +76,7 @@ it("returns one durable operation key to concurrent checkout retries", async () 
   const ledger = new PostgresPaymentsPilotLedger(fixture.db);
   const principalId = randomUUID();
   await fixture.db.execute(
-    sql`insert into users(id,email) values(${principalId}::uuid,${principalId + "@fixture.invalid"})`,
+    sql`insert into users(id) values(${principalId}::uuid)`,
   );
   const keys = [randomUUID(), randomUUID()];
   const operations = await Promise.all(
@@ -85,7 +92,7 @@ it("starts a new operation only after the previous payment is durably linked", a
   const ledger = new PostgresPaymentsPilotLedger(fixture.db);
   const principalId = randomUUID();
   await fixture.db.execute(
-    sql`insert into users(id,email) values(${principalId}::uuid,${principalId + "@fixture.invalid"})`,
+    sql`insert into users(id) values(${principalId}::uuid)`,
   );
   const firstKey = randomUUID();
   const first = await ledger.beginCheckout({
