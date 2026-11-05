@@ -575,7 +575,7 @@ export class PostgresExpertPromoRepository {
           active: true,
         };
         await tx.execute(
-          sql`insert into expert_promo_enrollments(user_id,channel_identity_id,bot_id,ref_code) values(${user.id}::uuid,${mapping.id}::uuid,${input.botId},${refCode ?? null})`,
+          sql`insert into expert_promo_enrollments(user_id,channel_identity_id,bot_id,ref_code) values(${user.id}::uuid,${mapping.id}::uuid,${input.botId},${canonicalRefCode ?? null})`,
         );
       }
       const enrollment = (

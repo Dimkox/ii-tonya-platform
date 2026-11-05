@@ -18,7 +18,10 @@ export function createExpertPromoFunnelRunner(
   if (scope?.waitlistV4Enabled !== true) return undefined;
   if (!scope.botToken || scope.botToken.split(":")[0] !== scope.botId)
     throw new Error("expert_promo_funnel_configuration_required");
-  const repository = new PostgresExpertPromoFunnelRepository(db);
+  const repository = new PostgresExpertPromoFunnelRepository(db, {
+    botKey: scope.botKey,
+    messagingConsentPolicyVersion: scope.messagingConsentPolicyVersion,
+  });
   const send = async (method: string, body: Record<string, unknown>) => {
     const response = await fetcher(
       `https://api.telegram.org/bot${scope.botToken}/${method}`,
@@ -42,7 +45,7 @@ export function createExpertPromoFunnelRunner(
     async runOnce() {
       const timers = await runExpertPromoFunnelTimers(
         {
-          ...repository,
+          claimTimer: repository.claimTimer.bind(repository),
           sendMessage: ({ chatId, text, replyMarkup }) =>
             send("sendMessage", {
               chat_id: chatId,
@@ -59,11 +62,16 @@ export function createExpertPromoFunnelRunner(
       );
       const guide = await runExpertPromoGuideDelivery(
         {
-          ...repository,
+          claimGuideDeliveries:
+            repository.claimGuideDeliveries.bind(repository),
+          markGuideDelivered: repository.markGuideDelivered.bind(repository),
           sendDocument: ({ chatId, document, caption }) =>
             send("sendDocument", { chat_id: chatId, document, caption }),
         },
-        { document: scope.guideFileId, limit: 20 },
+        {
+          ...(scope.guideFileId ? { document: scope.guideFileId } : {}),
+          limit: 20,
+        },
       );
       return { timers, guide };
     },

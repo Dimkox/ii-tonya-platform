@@ -85,8 +85,8 @@ describe("waitlist v4 applicant flow", () => {
   });
   it("softly exits when consent is denied", async () => {
     const f = setup();
-    f.repository.completeEnrollment.mockResolvedValue({
-      kind: "denied",
+    f.repository.completeEnrollment.mockResolvedValueOnce({
+      kind: "denied" as const,
       replay: false,
     });
     const result = await f.service.handle({

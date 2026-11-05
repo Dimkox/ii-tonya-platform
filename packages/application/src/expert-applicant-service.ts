@@ -109,6 +109,7 @@ export type ExpertApplicantReply =
               text: string;
               callback_data?: string;
               url?: string;
+              copy_text?: { text: string };
             }[][];
           }
         | { remove_keyboard: true };
@@ -193,8 +194,6 @@ export function createExpertApplicantService(deps: {
         // unchanged until the release owner switches this funnel on.
         if (deps.waitlistV4) {
           const channelUrl = deps.waitlistV4.channelUrl;
-          const privacyUrl =
-            deps.waitlistV4.privacyUrl ?? "https://ii-tonya.ru/privacy";
           const consentCallback = /^wl:consent:([A-Za-z0-9_-]{16,128})$/u.exec(
             input.text,
           );
@@ -228,10 +227,6 @@ export function createExpertApplicantService(deps: {
           if (wantsMaterials) {
             const registration = await deps.repository.register(command());
             if (!choice) {
-              const displayCode = waitlistDisplayRefCode(
-                registration.userId,
-                registration.refCode,
-              );
               return {
                 status: "handled",
                 text: waitlistV4Text.templateChoice,
