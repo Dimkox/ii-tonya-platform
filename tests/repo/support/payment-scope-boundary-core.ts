@@ -746,7 +746,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "apps/worker/package.json",
-    "05d8a6124c57de5c8402bfb84514df6f62df33371c31736a945bc560b022fa46",
+    "d64af0fceb5fc9a30413f082f88948df2cc95d232ea9cc9e1ce6cb2d31722a57",
   ],
   [
     "package.json",
