@@ -1,10 +1,15 @@
 /** WAIT-T05 deterministic FAQ matcher (no LLM). Entries are injectable; the
  * defaults cover only mechanics already implemented in the promo bot. */
+export const expertPromoTrustAnswer = (
+  channelUrl = "https://t.me/ii_tonya_experts_promo",
+) =>
+  `Мы открыты. Посмотрите наши публикации и отзывы подписчиков в официальном канале: ${channelUrl}. Там же мы объявляем даты запуска.`;
+
 export type ExpertPromoFaqEntry = readonly [question: string, answer: string];
 export const EXPERT_PROMO_DEFAULT_FAQ: readonly ExpertPromoFaqEntry[] = [
   [
     "Как получить реферальный код?",
-    "Отправьте /start. Бот выдаст ваш личный код promo_…, им можно делиться с коллегами.",
+    "Напишите слово «ПРОМОКОД». Бот выдаст личный код и два готовых текста для коллег.",
   ],
   [
     "Когда я получу гайд PDF?",
@@ -14,6 +19,7 @@ export const EXPERT_PROMO_DEFAULT_FAQ: readonly ExpertPromoFaqEntry[] = [
     "Как отключить напоминания о реферальной программе?",
     "Отправьте /optout_ref. Напоминания остановятся, остальные функции бота работают.",
   ],
+  ["А вы точно не скамит?", expertPromoTrustAnswer()],
   [
     "Когда запуск платформы?",
     "Мы сообщим о запуске в этом боте. Пока вы в листе ожидания.",

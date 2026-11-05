@@ -500,3 +500,4 @@ export {
   type PlanerkaServiceMappingRow,
   type PlanerkaMappingPlanEntry,
 } from "./repositories/planerka-service-mapping-admin.js";
+export * from "./repositories/expert-promo-funnel-repository.js";

@@ -50,21 +50,30 @@ export async function runExpertPromoGuideDelivery(
   return { delivered, failed, skipped: false };
 }
 
-/** WAIT-T04 reminder texts; final wording is owner content (WAIT-T07). */
+/** Approved v4 reminder copy. Dynamic values come from the claimed DB row. */
 export const FUNNEL_TIMER_TEXT = {
   message6:
-    "Напоминаем: пригласите двух коллег по вашему коду и получите гайд. Отписаться от напоминаний: /optout_ref",
-  gift: "Ваш подарок ждёт: пригласите коллег по коду, чтобы получить гайд и бонус. Отписаться: /optout_ref",
+    "Привет! 👋\n\nВидим, что вы пока не торопитесь приглашать коллег. Возможно, хотите сначала разобраться сами? Это нормально.\n\nЧтобы помочь вам принять решение, мы решили запустить мини-акцию:\n**Подарим тот самый авторитетный гид «Как получить теплых целевых клиентов» за всего двух приглашенных партнеров.**\n\n✅ Новые клиенты без таргета — сервис приводит людей, готовых купить услугу.\n✅ Свобода от рутины — умный ассистент поможет с переписками, напоминаниями и записью.\n✅ Выгодные партнёрства и взаимный обмен аудиторией.\n✅ Внутренние купоны и бонусы для снижения стоимости размещения.\n✅ Юридическая безопасность работы через сервис.\n✅ Стратегия входа до основного потока участников.\n\nКак только второй человек зарегистрируется по вашему коду, бот автоматически пришлет вам файл.",
+  gift: "Привет! 👋\n\nМы видим, что вы пока не успели собрать двух партнеров. Ничего страшного — возможно, сейчас неподходящее время или мало свободного пространства.\n\nЧтобы вы не оставались в неведении, мы решили просто подарить вам наш главный гид **«Как получить теплых целевых клиентов на свои услуги с помощью нового сервиса ии-Тоня»**.\n\n🗺 Как Тоня фильтрует шум соцсетей и приводит готовых купить клиентов.\n💰 Как монетизировать пустые слоты через взаимный обмен аудиторией.\n🛡 Почему это легально и безопасно для вашего личного бренда.\n🚀 Какие шаги сделать первыми, чтобы войти в систему с преимуществами.\n\nИзучите информацию в спокойном режиме. PDF придёт отдельным сообщением после подключения утверждённого файла.",
 } as const;
 export async function runExpertPromoFunnelTimers(
   ports: {
-    claimTimer(input: {
-      kind: "message6" | "gift";
-      limit: number;
-    }): Promise<{ userId: string; chatId: string }[]>;
-    sendMessage(input: { chatId: string; text: string }): Promise<unknown>;
+    claimTimer(input: { kind: "message6" | "gift"; limit: number }): Promise<
+      {
+        userId: string;
+        chatId: string;
+        refCode?: string;
+        referralCount?: number;
+      }[]
+    >;
+    sendMessage(input: {
+      chatId: string;
+      text: string;
+      replyMarkup?: unknown;
+    }): Promise<unknown>;
+    sendPhoto?(input: { chatId: string; photo: string }): Promise<unknown>;
   },
-  config: { limit?: number } = {},
+  config: { limit?: number; banner?: string } = {},
 ) {
   const result = { message6: 0, gift: 0, failed: 0 };
   for (const kind of ["message6", "gift"] as const) {
@@ -73,9 +82,39 @@ export async function runExpertPromoFunnelTimers(
       limit: config.limit ?? 20,
     })) {
       try {
+        if (config.banner && ports.sendPhoto)
+          await ports.sendPhoto({
+            chatId: target.chatId,
+            photo: config.banner,
+          });
+        const count = target.referralCount ?? 0;
+        const dynamic =
+          kind === "message6"
+            ? `\n\nСейчас по вашему коду зарегистрировано: **${count}** человек.\nОсталось пригласить ещё **${Math.max(0, 2 - count)}**!`
+            : `\n\nВаш личный промокод ${target.refCode ?? ""} всегда активен. Напишите слово **«ПРОМОКОД»**, и я снова дам готовые тексты для рассылки.`;
         await ports.sendMessage({
           chatId: target.chatId,
-          text: FUNNEL_TIMER_TEXT[kind],
+          text: FUNNEL_TIMER_TEXT[kind] + dynamic,
+          ...(kind === "message6"
+            ? {
+                replyMarkup: {
+                  inline_keyboard: [
+                    [
+                      {
+                        text: "Хочу вспомнить свой промокод",
+                        callback_data: "wl:materials",
+                      },
+                    ],
+                    [
+                      {
+                        text: "Не хочу участвовать, просто жду старта",
+                        callback_data: "wl:optout",
+                      },
+                    ],
+                  ],
+                },
+              }
+            : {}),
         });
         result[kind]++;
       } catch {

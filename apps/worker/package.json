@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "main": "dist/main.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -22,6 +24,7 @@
     "@ii-tonya/db": "workspace:*",
     "@ii-tonya/integrations": "workspace:*",
     "@ii-tonya/observability": "workspace:*",
-    "@ii-tonya/worker": "workspace:*"
+    "@ii-tonya/worker": "workspace:*",
+    "@ii-tonya/application": "workspace:*"
   }
 }
