@@ -1,8 +1,8 @@
 import Fastify from "fastify";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import type { RuntimeConfig } from "@ii-tonya/config";
 import type { PaymentsPilotLedger, PaymentsPilotRecord } from "@ii-tonya/db";
-import type { YooKassaPayment } from "@ii-tonya/integrations";
+import type { YooKassaClient, YooKassaPayment } from "@ii-tonya/integrations";
 import {
   createPaymentsPilotServerOptions,
   paymentsPilotRoutes,
@@ -57,7 +57,10 @@ const memoryLedger = () => {
 };
 
 const service = (
-  client = {
+  client: {
+    createPayment: Mock<YooKassaClient["createPayment"]>;
+    getPayment: Mock<YooKassaClient["getPayment"]>;
+  } = {
     createPayment: vi.fn(async () => payment()),
     getPayment: vi.fn(async () => payment({ status: "succeeded", paid: true })),
   },
@@ -104,20 +107,21 @@ describe("payments pilot service (SCRUM-518)", () => {
     expect(ledger.beginCheckout).toHaveBeenCalledWith(
       expect.objectContaining({ idempotencyKey: "idem-key-0001-pilot" }),
     );
-    expect(ledger.beginCheckout.mock.invocationCallOrder[0]).toBeLessThan(
-      client.createPayment.mock.invocationCallOrder[0]!,
-    );
+    expect(
+      vi.mocked(ledger.beginCheckout).mock.invocationCallOrder[0],
+    ).toBeLessThan(client.createPayment.mock.invocationCallOrder[0]!);
     expect(records.get(paymentId)?.status).toBe("pending");
   });
 
   it("reuses the durable checkout key after an uncertain provider response", async () => {
-    const parts = service({
+    const client = {
       createPayment: vi
-        .fn()
+        .fn<YooKassaClient["createPayment"]>()
         .mockRejectedValueOnce(new Error("synthetic response lost"))
         .mockResolvedValueOnce(payment()),
-      getPayment: vi.fn(async () => payment()),
-    });
+      getPayment: vi.fn<YooKassaClient["getPayment"]>(async () => payment()),
+    };
+    const parts = service(client);
     vi.mocked(parts.ledger.beginCheckout)
       .mockResolvedValueOnce({ idempotencyKey: "durable-operation-key" })
       .mockResolvedValueOnce({ idempotencyKey: "durable-operation-key" });
@@ -129,9 +133,9 @@ describe("payments pilot service (SCRUM-518)", () => {
     ).resolves.toMatchObject({ paymentId });
     expect(parts.client.createPayment).toHaveBeenCalledTimes(2);
     expect(
-      vi
-        .mocked(parts.client.createPayment)
-        .mock.calls.map(([input]) => input.idempotencyKey),
+      parts.client.createPayment.mock.calls.map(
+        (call) => call[0].idempotencyKey,
+      ),
     ).toEqual(["durable-operation-key", "durable-operation-key"]);
   });
 
