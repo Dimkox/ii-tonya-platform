@@ -29,6 +29,7 @@ export interface WorkerCycleReport {
   readonly unknownOutcomeReconciliation: unknown;
   readonly reservationExpiry: unknown;
   readonly waitlistPromotion: unknown;
+  readonly expertPromoFunnel?: unknown;
   readonly lifecycleScheduler: unknown;
   readonly expertResidencyExpiry: unknown;
   readonly expertTelegramCheckoutCleanup: unknown;
@@ -120,6 +121,7 @@ export interface WorkerRuntimeDependencies {
   readonly stopRecovery?: () => void;
   readonly reservationExpiry: BoundedJob;
   readonly waitlistPromotion?: BoundedJob | undefined;
+  readonly expertPromoFunnel?: BoundedJob | undefined;
   readonly lifecycleScheduler?: BoundedJob | undefined;
   readonly expertResidencyExpiry: BoundedJob;
   readonly expertTelegramCheckoutCleanup: BoundedJob;
@@ -206,6 +208,7 @@ export interface ProductionWorkerRuntimeDependencies {
   readonly clientBookingErasure?: BoundedJob;
   readonly lifecycleScheduler?: BoundedJob | undefined;
   readonly waitlistPromotion?: BoundedJob | undefined;
+  readonly expertPromoFunnel?: BoundedJob | undefined;
   readonly clientErasureRequests?: BoundedJob;
   readonly testExpertReconciliation?: BoundedJob;
   readonly jobsRepository: {
@@ -315,6 +318,9 @@ export function createWorkerRuntime(
         completed: 0,
         reason: "disabled",
       };
+      const expertPromoFunnel = acceptingClaims
+        ? await deps.expertPromoFunnel?.()
+        : undefined;
       const lifecycleScheduler = (await deps.lifecycleScheduler?.()) ?? {
         examined: 0,
         materialized: 0,
@@ -417,6 +423,7 @@ export function createWorkerRuntime(
         unknownOutcomeReconciliation,
         reservationExpiry,
         waitlistPromotion,
+        expertPromoFunnel,
         lifecycleScheduler,
         expertResidencyExpiry,
         expertTelegramCheckoutCleanup,
@@ -605,6 +612,7 @@ export function createProductionWorkerRuntime(
         batchSize,
       }),
     waitlistPromotion: deps.waitlistPromotion,
+    expertPromoFunnel: deps.expertPromoFunnel,
     lifecycleScheduler: deps.lifecycleScheduler,
     expertResidencyExpiry: async () =>
       expireExpertResidencyOrders(

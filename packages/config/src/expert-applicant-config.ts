@@ -4,6 +4,11 @@ export interface ExpertApplicantConfig {
   botKey: string;
   webhookSecret: string;
   messagingConsentPolicyVersion: string;
+  telegramChannelUrl?: string;
+  waitlistV4Enabled?: boolean;
+  waitlistPrivacyUrl?: string;
+  guideFileId?: string;
+  giftBannerFileId?: string;
 }
 type ScopeConfig = {
   features: { expertApplicant?: boolean };
@@ -68,6 +73,21 @@ export function readExpertApplicantConfig(
     webhookSecret: source.EXPERT_PROMO_TELEGRAM_WEBHOOK_SECRET ?? "",
     messagingConsentPolicyVersion:
       source.EXPERT_PROMO_MESSAGING_CONSENT_POLICY_VERSION ?? "",
+    ...(source.TELEGRAM_CHANNEL_URL
+      ? { telegramChannelUrl: source.TELEGRAM_CHANNEL_URL }
+      : {}),
+    ...(source.WAITLIST_FUNNEL_V4_ENABLED === "true"
+      ? { waitlistV4Enabled: true }
+      : {}),
+    ...(source.EXPERT_PROMO_GUIDE_FILE_ID
+      ? { guideFileId: source.EXPERT_PROMO_GUIDE_FILE_ID }
+      : {}),
+    ...(source.EXPERT_PROMO_GIFT_BANNER_FILE_ID
+      ? { giftBannerFileId: source.EXPERT_PROMO_GIFT_BANNER_FILE_ID }
+      : {}),
+    ...(source.WAITLIST_PRIVACY_URL
+      ? { waitlistPrivacyUrl: source.WAITLIST_PRIVACY_URL }
+      : {}),
   };
   assertExpertApplicantConfig({
     features: { expertApplicant: true },

@@ -219,7 +219,7 @@ export function createExpertSeparatedSalesService(deps: {
         );
       if (snapshot.state === "locked")
         return reply(
-          `Оплата онбординга подтверждена. Постоянная стоимость выбранного периода: ${rub(snapshot.selectedTotalMinor!)} за ${snapshot.termMonths} мес. Основная оплата и полный доступ — отдельные этапы.`,
+          `Оплата онбординга подтверждена. Постоянная стоимость выбранного периода: ${rub(snapshot.selectedTotalMinor!)} за ${snapshot.termMonths} мес. Основная оплата и полный доступ — отдельные этапы. До старта приема клиентов остаётся время. Подписывайтесь на наш канал https://t.me/ii_tonya_experts_promo, чтобы первыми получать обновления и материалы для анонсов.`,
         );
       if (snapshot.state === "promotion")
         return snapshot.standardOnly

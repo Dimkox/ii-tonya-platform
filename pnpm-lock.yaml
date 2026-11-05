@@ -144,6 +144,9 @@ importers:
 
   apps/worker:
     dependencies:
+      "@ii-tonya/application":
+        specifier: workspace:*
+        version: link:../../packages/application
       "@ii-tonya/config":
         specifier: workspace:*
         version: link:../../packages/config

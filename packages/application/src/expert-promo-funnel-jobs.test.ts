@@ -91,3 +91,63 @@ describe("WAIT-T06 CRM sync", () => {
     });
   });
 });
+
+describe("WAIT-v4 timers", () => {
+  it("renders current referral counts and opt-out buttons", async () => {
+    const sendMessage = vi.fn(async () => ({}));
+    const p = {
+      claimTimer: vi.fn(async () => [
+        { userId: "u", chatId: "1", refCode: "REF_U", referralCount: 1 },
+      ]),
+      sendMessage,
+    };
+    await runExpertPromoFunnelTimers(p);
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining(
+          "Сейчас по вашему коду зарегистрировано: **1** человек",
+        ),
+      }),
+    );
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining("Осталось пригласить ещё **1**"),
+      }),
+    );
+  });
+  it("uses the approved free-guide text on the final nudge", async () => {
+    const sendMessage = vi.fn(async () => ({}));
+    const p = {
+      claimTimer: vi.fn(async ({ kind }: { kind: string }) =>
+        kind === "gift"
+          ? [{ userId: "u", chatId: "1", refCode: "REF_U", referralCount: 0 }]
+          : [],
+      ),
+      sendMessage,
+    };
+    await runExpertPromoFunnelTimers(p);
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        text: expect.stringContaining(
+          "решили просто подарить вам наш главный гид",
+        ),
+      }),
+    );
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining("REF_U") }),
+    );
+  });
+  it("sends an optional gift banner before reminders", async () => {
+    const sendMessage = vi.fn(async () => ({}));
+    const sendPhoto = vi.fn(async () => ({}));
+    const p = {
+      claimTimer: vi.fn(async () => [
+        { userId: "u", chatId: "1", refCode: "REF_U", referralCount: 0 },
+      ]),
+      sendMessage,
+      sendPhoto,
+    };
+    await runExpertPromoFunnelTimers(p, { banner: "PHOTO_ID" });
+    expect(sendPhoto).toHaveBeenCalledTimes(2);
+  });
+});
