@@ -9,6 +9,8 @@ import {
 export interface ExpertPromoFunnelTarget {
   userId: string;
   chatId: string;
+  refCode?: string;
+  referralCount?: number;
 }
 
 /**
@@ -104,7 +106,7 @@ export class PostgresExpertPromoFunnelRepository {
   }
 
   /**
-   * T04 timers: message 6 at 48h, gift at 5d after code issue. Each claim
+   * T04 timers: message 6 at 48h after code issue, gift 5d later. Each claim
    * rechecks status, opt-out, pdf_sent, count<2 and consent, then stamps the
    * marker before transport (at-most-once).
    */
@@ -121,8 +123,13 @@ export class PostgresExpertPromoFunnelRepository {
     );
     return this.db.transaction(async (tx) => {
       const rows = (
-        await tx.execute<{ userId: string; chatId: string | null }>(
-          sql`select f.user_id "userId",${this.chat(sql`f.user_id`)} "chatId" from expert_promo_funnel_state f join users u on u.id=f.user_id and u.active where f.status='REFERRAL_ACTIVE' and not f.opt_out_ref and f.${marker} is null and f.code_issued_at<=clock_timestamp()-${age} and not exists(select 1 from expert_promo_guide_work w where w.user_id=f.user_id and w.status='delivered') and (select count(*) from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id)<2 order by f.code_issued_at,f.user_id limit ${limit} for update of f skip locked`,
+        await tx.execute<{
+          userId: string;
+          chatId: string | null;
+          refCode: string;
+          referralCount: number;
+        }>(
+          sql`select f.user_id "userId",${this.chat(sql`f.user_id`)} "chatId",i.ref_code "refCode",(select count(*)::int from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id) "referralCount" from expert_promo_funnel_state f join expert_promo_codes i on i.user_id=f.user_id join users u on u.id=f.user_id and u.active where f.status='REFERRAL_ACTIVE' and not f.opt_out_ref and f.${marker} is null and (${sql.raw(input.kind === "message6" ? "f.code_issued_at" : "f.message6_sent_at")})<=clock_timestamp()-${age} and not exists(select 1 from expert_promo_guide_work w where w.user_id=f.user_id and w.status='delivered') and (select count(*) from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id)<2 order by f.code_issued_at,f.user_id limit ${limit} for update of f skip locked`,
         )
       ).rows;
       const claimed: ExpertPromoFunnelTarget[] = [];

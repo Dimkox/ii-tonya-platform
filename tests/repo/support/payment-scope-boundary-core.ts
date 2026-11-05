@@ -627,7 +627,7 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "f5e15ff0e4b71be4b548d4f21d9c0fdc2663c9cccbb2e276772b26fcb3dd0483",
+    "d9150c9898d0d98c5b1ce317169c13ad7309893e6062d61e6617f8528c3124e0",
   ],
   [
     "packages/contracts/src/index.ts",
@@ -746,7 +746,7 @@ const approvedPackageManifestHashes = new Map([
   ],
   [
     "apps/worker/package.json",
-    "8815b7494fbc0e1ccc7f1407f200d4b882328966267a9b34e6d76094cb15f41a",
+    "d64af0fceb5fc9a30413f082f88948df2cc95d232ea9cc9e1ce6cb2d31722a57",
   ],
   [
     "package.json",
@@ -1001,7 +1001,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "engineering/opengrep-reviewed-observations.json",
-    "9e257b307d93fcde14aeadb878862a6a0c74d84513d47c93726ec8fb92f513e4",
+    "bb392f5b48f5961dc07ef02f545e2ac954ce4e3cef34c6f48b1bac22668ef454",
   ],
 
   [
@@ -1391,6 +1391,7 @@ const approvedPackageDependencies = new Map<string, ReadonlySet<string>>([
   [
     "apps/worker/package.json",
     new Set([
+      "@ii-tonya/application",
       "@ii-tonya/config",
       "@ii-tonya/db",
       "@ii-tonya/integrations",

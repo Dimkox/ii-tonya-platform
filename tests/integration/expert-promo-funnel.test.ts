@@ -118,6 +118,14 @@ describe("WAIT-T03 guide delivery authority", () => {
       (await funnel.claimTimer({ kind: "gift", limit: 50 })).map(
         (r) => r.userId,
       ),
+    ).not.toContain(owner.userId);
+    await database.db.execute(
+      sql`update expert_promo_funnel_state set message6_sent_at=message6_sent_at-interval '5 days',last_interaction_at=last_interaction_at where user_id=${owner.userId}::uuid`,
+    );
+    expect(
+      (await funnel.claimTimer({ kind: "gift", limit: 50 })).map(
+        (r) => r.userId,
+      ),
     ).toContain(owner.userId);
     expect(
       (await funnel.claimTimer({ kind: "gift", limit: 50 })).map(
