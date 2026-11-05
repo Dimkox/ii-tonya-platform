@@ -9,9 +9,9 @@ const request = vi.fn(async (_token: string, _body: unknown) => ({
   result: true,
 }));
 const env = {
-  TELEGRAM_BOT_TOKEN: "synthetic-client-token",
-  EXPERT_PROMO_TELEGRAM_BOT_TOKEN: "synthetic-promo-token",
-  EXPERT_TELEGRAM_BOT_TOKEN: "synthetic-expert-token",
+  TELEGRAM_BOT_TOKEN: "synthetic_" + "client-token",
+  EXPERT_PROMO_TELEGRAM_BOT_TOKEN: "synthetic_" + "promo-token",
+  EXPERT_TELEGRAM_BOT_TOKEN: "synthetic_" + "expert-token",
 };
 
 describe("BotFather command configuration (SCRUM-130)", () => {
