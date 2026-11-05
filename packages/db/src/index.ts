@@ -492,3 +492,11 @@ export {
   type PublicExpertRuntimeConfiguration,
   type PublicExpertPaymentRuntime,
 } from "./public-expert-payment-runtime.js";
+export {
+  PostgresPlanerkaServiceMappingAdmin,
+  parsePlanerkaServiceMappingFile,
+  type PlanerkaServiceMappingFile,
+  type PlanerkaServiceMappingInput,
+  type PlanerkaServiceMappingRow,
+  type PlanerkaMappingPlanEntry,
+} from "./repositories/planerka-service-mapping-admin.js";

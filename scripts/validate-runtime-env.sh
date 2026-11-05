@@ -126,4 +126,10 @@ if [[ -n "$release_sha" ]]; then
   if grep -Eiq '(<[^>]+>|placeholder|change[-_]?me|example\.invalid)' "$runtime_env"; then
     fail "placeholder marker found"
   fi
+  # SCRUM-518 activation lock: the native API (apps/api/src/server.ts) has no direct
+  # YooKassa runtime yet, so PAYMENTS_ENABLED=true would stop the API at startup.
+  # Keep the pilot rejected until the checkout runtime is wired and startup-tested.
+  payments_pilot_runtime_wired=false
+  [[ "$(flag_value PAYMENTS_ENABLED)" == false || "$payments_pilot_runtime_wired" == true ]] ||
+    fail "payments pilot activation is locked until the API wires the direct YooKassa runtime"
 fi

@@ -154,6 +154,7 @@ import { createWindowedRateLimiter } from "./rate-limit.js";
 import type { FastifyInstance } from "fastify";
 import type { ExpertPrincipalResolver } from "./expert-principal-resolver.js";
 import { assertClientCapabilityPreflight } from "./client-capability-preflight.js";
+import { createExpertTelegramRuntimeComposition } from "./expert-telegram-runtime-composition.js";
 import { createClientPrincipalResolver } from "./client-principal-resolver.js";
 import { createClientBookingPrincipalResolver } from "./client-booking-principal-resolver.js";
 import { createClientProofVerifierGate } from "./client-proof-verifier-gate.js";
@@ -536,11 +537,14 @@ export const createDefaultLifecycle = (
       config.features.expertTelegramFinancialViews === true ||
       config.features.expertTelegramReferral === true ||
       config.features.expertTelegramCheckout === true;
+    const expertTelegramComposition =
+      options.expertTelegramComposition ??
+      createExpertTelegramRuntimeComposition({ config, db, env: process.env });
     const expertTelegramQueries =
-      options.expertTelegramComposition === undefined
+      expertTelegramComposition === undefined
         ? undefined
         : createExpertTelegramIngress({
-            ...options.expertTelegramComposition,
+            ...expertTelegramComposition,
             enabled: telegramEnabled,
             financialViewsEnabled:
               config.features.expertTelegramFinancialViews === true,
