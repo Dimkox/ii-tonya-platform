@@ -372,7 +372,7 @@ export function createExpertApplicantService(deps: {
           if (result.replay) return { status: "duplicate" };
           return {
             status: "handled",
-            text: `Заявка ${result.applicationId} ожидает проверки менеджером. TODO: Wait for Prompt Spec`,
+            text: `Заявка ${result.applicationId} ожидает проверки менеджером. Мы сообщим решение в этот чат; следующие шаги будут доступны после подтверждения.`,
           };
         }
         if (deps.faq && !input.text.startsWith("/") && input.text.trim()) {
