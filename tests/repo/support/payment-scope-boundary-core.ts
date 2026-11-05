@@ -1001,7 +1001,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "engineering/opengrep-reviewed-observations.json",
-    "394bfc319b311202bb2f325968c4dac8f74f7d84e30f288d1aad57821de22b89",
+    "bb392f5b48f5961dc07ef02f545e2ac954ce4e3cef34c6f48b1bac22668ef454",
   ],
 
   [
