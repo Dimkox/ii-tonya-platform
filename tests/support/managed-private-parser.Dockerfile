@@ -10,3 +10,6 @@ USER 10001:10001
 # periodic probe (it would also spend the 16-pid limit). Explicit opt-out for DS-0026.
 HEALTHCHECK NONE
 ENTRYPOINT ["python", "-I", "/app/managed-private-parser.py"]
+# The harness always overrides this with --user <uid>:<gid>; keep a non-root default.
+USER 65534:65534
+HEALTHCHECK --interval=5s --timeout=3s --retries=6 CMD ["python", "-I", "-c", "import os,sys;sys.exit(0 if os.path.exists('/run/private-parser/s') else 1)"]
