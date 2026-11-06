@@ -6,8 +6,11 @@ import type {
 
 type ProjectionValueType = "string" | "number" | "boolean" | "null";
 
-const topicDataTypes: Readonly<
-  Record<ProjectionTopic, Readonly<Record<string, readonly ProjectionValueType[]>>>
+export const topicDataTypes: Readonly<
+  Record<
+    ProjectionTopic,
+    Readonly<Record<string, readonly ProjectionValueType[]>>
+  >
 > = {
   "reservation_projection.v1": {
     reservationId: ["string"],
@@ -77,7 +80,7 @@ const valueType = (value: unknown): ProjectionValueType | undefined => {
   return undefined;
 };
 
-const isRetryableStatus = (status: number): boolean =>
+export const isRetryableStatus = (status: number): boolean =>
   status === 408 ||
   status === 425 ||
   status === 429 ||
@@ -92,7 +95,7 @@ const invalidProjection = (reasonCode: string): never => {
   throw new MakeProjectionPermanentFailure(reasonCode);
 };
 
-const validatedEvent = (input: ProjectionEvent): ProjectionEvent => {
+export const validatedEvent = (input: ProjectionEvent): ProjectionEvent => {
   if (!isPlainObject(input)) {
     return invalidProjection("invalid_projection_envelope");
   }
@@ -104,7 +107,9 @@ const validatedEvent = (input: ProjectionEvent): ProjectionEvent => {
     throw new MakeProjectionPermanentFailure("invalid_projection_topic");
   }
   if (event.schemaVersion !== 1) {
-    throw new MakeProjectionPermanentFailure("invalid_projection_schema_version");
+    throw new MakeProjectionPermanentFailure(
+      "invalid_projection_schema_version",
+    );
   }
   if (
     [event.eventId, event.occurredAt, event.correlationId].some(
@@ -146,11 +151,12 @@ const validatedEvent = (input: ProjectionEvent): ProjectionEvent => {
   };
 };
 
-const responseStatus = (response: unknown): number | undefined => {
+export const responseStatus = (response: unknown): number | undefined => {
   if (!isPlainObject(response) || !Object.hasOwn(response, "status")) {
     return undefined;
   }
-  return typeof response.status === "number" && Number.isSafeInteger(response.status)
+  return typeof response.status === "number" &&
+    Number.isSafeInteger(response.status)
     ? response.status
     : undefined;
 };
@@ -172,10 +178,17 @@ export class MakeProjectionSink implements ProjectionSink {
     try {
       authorization = this.deps.authorization();
     } catch {
-      throw new MakeProjectionPermanentFailure("invalid_projection_authorization");
+      throw new MakeProjectionPermanentFailure(
+        "invalid_projection_authorization",
+      );
     }
-    if (typeof authorization !== "string" || authorization.trim().length === 0) {
-      throw new MakeProjectionPermanentFailure("invalid_projection_authorization");
+    if (
+      typeof authorization !== "string" ||
+      authorization.trim().length === 0
+    ) {
+      throw new MakeProjectionPermanentFailure(
+        "invalid_projection_authorization",
+      );
     }
     const headerAuthorization = authorization;
 
