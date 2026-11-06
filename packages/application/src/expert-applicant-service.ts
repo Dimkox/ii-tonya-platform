@@ -358,7 +358,7 @@ export function createExpertApplicantService(deps: {
               status: "handled",
               text: deps.waitlistV4
                 ? waitlistV4Text.referralOffer
-                : "TODO: Wait for Prompt Spec",
+                : "Текст согласия ещё не опубликован. Регистрация не начата; менеджер уже может подготовить документ.",
             };
           if (enrollment.kind === "consent_pending")
             return { status: "duplicate" };
@@ -387,7 +387,10 @@ export function createExpertApplicantService(deps: {
               };
             // Preserve the complete approved notice. Never truncate legal text.
             if (text.length > 4096)
-              return { status: "handled", text: "TODO: Wait for Prompt Spec" };
+              return {
+                status: "handled",
+                text: "Текст согласия не помещается в одно сообщение Telegram. Регистрация не начата; отправьте /start после публикации сокращённой версии документа.",
+              };
             return { status: "handled", text };
           }
           const result = await deps.repository.register({
