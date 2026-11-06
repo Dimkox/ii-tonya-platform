@@ -2,6 +2,7 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import type { PlanerkaCandidateServiceRow } from "../../packages/db/src/repositories/planerka-service-mapping-admin.js";
 import { runPlanerkaMappingsCli } from "../../scripts/planerka-service-mappings.js";
 
 const SERVICE = "00000000-0000-4000-8000-000000000001";
@@ -19,6 +20,9 @@ const file = () => {
   return path;
 };
 const fakeAdmin = () => ({
+  listServices: vi.fn(
+    async (): Promise<readonly PlanerkaCandidateServiceRow[]> => [],
+  ),
   list: vi.fn(async () => []),
   plan: vi.fn(async () => [
     {
@@ -38,6 +42,26 @@ const fakeAdmin = () => ({
 });
 
 describe("planerka-service-mappings CLI (SCRUM-519)", () => {
+  it("services lists real UUIDs without changing them", async () => {
+    const admin = fakeAdmin();
+    admin.listServices.mockResolvedValue([
+      {
+        expertServiceId: SERVICE,
+        expertId: "00000000-0000-4000-8000-000000000002",
+        durationMinutes: 60,
+        active: true,
+      },
+    ]);
+    const lines: string[] = [];
+    await expect(
+      runPlanerkaMappingsCli(["services"], {}, (l) => lines.push(l), admin),
+    ).resolves.toBe(0);
+    expect(lines).toEqual([
+      `${SERVICE} expert=00000000-0000-4000-8000-000000000002 duration=60 active=true`,
+    ]);
+    expect(admin.apply).not.toHaveBeenCalled();
+  });
+
   it("plan is read-only", async () => {
     const admin = fakeAdmin();
     const lines: string[] = [];

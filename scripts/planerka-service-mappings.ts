@@ -2,6 +2,7 @@
  * SCRUM-519 operator CLI for planerka_service_mappings.
  *
  *   tsx scripts/planerka-service-mappings.ts list
+ *   tsx scripts/planerka-service-mappings.ts services
  *   tsx scripts/planerka-service-mappings.ts plan    <file.json>
  *   tsx scripts/planerka-service-mappings.ts apply   <file.json> --confirm
  *   tsx scripts/planerka-service-mappings.ts disable <expertServiceId>
@@ -25,13 +26,13 @@ export async function runPlanerkaMappingsCli(
   out: (line: string) => void,
   admin?: Pick<
     PostgresPlanerkaServiceMappingAdmin,
-    "list" | "plan" | "apply" | "setEnabled"
+    "list" | "listServices" | "plan" | "apply" | "setEnabled"
   >,
 ): Promise<number> {
   const [command, arg, flag] = argv;
   const usage = () => {
     out(
-      "usage: list | plan <file> | apply <file> --confirm | disable <id> | enable <id>",
+      "usage: list | services | plan <file> | apply <file> --confirm | disable <id> | enable <id>",
     );
     return 2;
   };
@@ -55,6 +56,13 @@ export async function runPlanerkaMappingsCli(
         for (const row of await repo.list())
           out(
             `${row.expertServiceId} account=${row.accountId} eventType=${row.eventTypeId} duration=${row.durationMinutes} tz=${row.timeZone} enabled=${row.enabled} verifiedAt=${row.verifiedAt}`,
+          );
+        return 0;
+      }
+      case "services": {
+        for (const row of await repo.listServices())
+          out(
+            `${row.expertServiceId} expert=${row.expertId} duration=${row.durationMinutes} active=${row.active}`,
           );
         return 0;
       }
