@@ -6,7 +6,10 @@ const SYNTHETIC_FIXTURE_VALUE_1 =
   "123456:synthetic_synthetic_synthetic_synthetic_";
 
 it("acknowledges a promo callback without putting the bot token in the error", async () => {
-  const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 }));
+  const fetchImpl = vi.fn(
+    async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response("{}", { status: 200 }),
+  );
   const acknowledge = createPromoCallbackAcknowledgement({
     botToken: SYNTHETIC_FIXTURE_VALUE_1,
     fetchImpl,

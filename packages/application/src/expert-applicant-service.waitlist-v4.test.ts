@@ -26,10 +26,15 @@ const setup = () => {
         body: "Текст",
       },
     })),
-    completeEnrollment: vi.fn(async () => ({
-      kind: "granted" as const,
-      replay: false,
-    })),
+    completeEnrollment: vi.fn(
+      async (): Promise<{
+        kind: "granted" | "denied" | "expired";
+        replay: boolean;
+      }> => ({
+        kind: "granted",
+        replay: false,
+      }),
+    ),
     register: vi.fn(async () => ({
       userId: "u",
       refCode: "promo_0123456789abcdef0123456789abcdef",

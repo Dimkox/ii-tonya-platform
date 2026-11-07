@@ -59,9 +59,37 @@ except VerificationCancelled as exc:
     signal_exit = exc.code
 
 
+def _diagnostic_lines(item: dict) -> list[str]:
+    """Keep compiler and test failures visible in the job log and the evidence JSON.
+
+    The full command transcript stays on the check. The Actions summary previously
+    printed only ``exit=2``, so the TypeScript lines existed solely inside one JSON
+    string.
+    """
+    if item.get('status') == 'pass':
+        return []
+    blob = '\n'.join(str(item.get(key) or '') for key in ('stdout', 'stderr'))
+    lines = [line.strip() for line in blob.replace('\r', '\n').split('\n')]
+    lines = [line for line in lines if line and not line.startswith('::')]
+    selected = [
+        line for line in lines
+        if 'error TS' in line or 'ELIFECYCLE' in line or ': error ' in line
+    ]
+    visible = []
+    for line in (selected or lines)[-40:]:
+        if len(line) > 400:
+            line = line[:400] + '...'
+        visible.append(line)
+    return visible
+
+
 def _emit_report():
     report["git_head"] = git_head(root)
     report["ci_run_id"] = os.environ.get("GITHUB_RUN_ID")
+    for item in report.get('checks', []):
+        diagnostics = _diagnostic_lines(item)
+        if diagnostics:
+            item['diagnostics'] = diagnostics
     dump_json(root / ".getzilla/runtime/evidence/verification.json", report)
     if args.json:
         print(json.dumps(report, ensure_ascii=True, indent=2))
@@ -70,6 +98,8 @@ def _emit_report():
             print(f"{item['status'].upper():4} {item['name']}: {item['summary']}")
             for finding in item.get('details', []):
                 print(f"     {finding.get('severity', '').upper()} {finding.get('path')}: {finding.get('message')}")
+            for line in item.get('diagnostics') or []:
+                print(f"     DIAG {line}")
         scope = report.get('verification_scope') or report.get('docs_state_scope') or {}
         print(
             f"RESULT: {report['status'].upper()} | mode={report['mode']} "

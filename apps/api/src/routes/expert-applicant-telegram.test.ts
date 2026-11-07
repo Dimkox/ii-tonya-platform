@@ -1,3 +1,4 @@
+import type { ExpertApplicantReply } from "@ii-tonya/application";
 import Fastify from "fastify";
 import { expect, it, vi } from "vitest";
 import { expertApplicantTelegramRoutes } from "./expert-applicant-telegram.js";
@@ -100,8 +101,8 @@ it.each([
 });
 it("acknowledges a consent callback and returns the next message", async () => {
   const acknowledgeCallback = vi.fn(async () => undefined);
-  const handle = vi.fn(async () => ({
-    status: "handled" as const,
+  const handle = vi.fn(async (): Promise<ExpertApplicantReply> => ({
+    status: "handled",
     text: "Отлично! Добро пожаловать в круг первых.",
     replyMarkup: {
       inline_keyboard: [
