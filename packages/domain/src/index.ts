@@ -103,3 +103,9 @@ export {
 } from "./expert-separated-sales.js";
 
 export * from "./resident-review-message.js";
+export {
+  consentDocumentPublishable,
+  consentTextEncodingIssue,
+  decodeConsentDeploymentUtf8,
+} from "./consent-document-encoding.js";
+export type { ConsentEncodingIssue } from "./consent-document-encoding.js";
