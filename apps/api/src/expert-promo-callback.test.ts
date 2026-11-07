@@ -1,12 +1,14 @@
 import { expect, it, vi } from "vitest";
 import { createPromoCallbackAcknowledgement } from "./expert-promo-callback.js";
 
-const token = `123456:${"synthetic_".repeat(4)}`;
+// Non-production fixture. The literal stays intact; it is not a live bot token.
+const SYNTHETIC_FIXTURE_VALUE_1 =
+  "123456:synthetic_synthetic_synthetic_synthetic_";
 
 it("acknowledges a promo callback without putting the bot token in the error", async () => {
   const fetchImpl = vi.fn(async () => new Response("{}", { status: 200 }));
   const acknowledge = createPromoCallbackAcknowledgement({
-    botToken: token,
+    botToken: SYNTHETIC_FIXTURE_VALUE_1,
     fetchImpl,
   });
   await acknowledge({ callbackQueryId: "query-1" });
