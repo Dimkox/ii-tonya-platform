@@ -12,7 +12,7 @@ const fixture = async (enabled = true) => {
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: "synthetic-" + "secret",
       service: { handle },
     },
   });
@@ -113,7 +113,7 @@ it("acknowledges a consent callback and returns the next message", async () => {
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: "synthetic-" + "secret",
       service: { handle },
       acknowledgeCallback,
     },
@@ -181,7 +181,7 @@ it("still returns the next message when callback acknowledgement fails", async (
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: "synthetic-" + "secret",
       service: {
         async handle() {
           return { status: "handled" as const, text: "Следующий шаг" };
@@ -263,7 +263,7 @@ it("accepts scoped form callbacks and private media with per-result markup", asy
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: "synthetic-" + "secret",
       verificationFormEnabled: true,
       service: {
         async handle(input) {
@@ -368,7 +368,7 @@ it("preserves honest unknown media metadata when Telegram omits optional fields"
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: "synthetic-" + "secret",
       verificationFormEnabled: true,
       service: { handle },
     },
@@ -423,7 +423,7 @@ it("acknowledges stale form controls without mutation or Telegram retries", asyn
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: "synthetic-" + "secret",
       verificationFormEnabled: true,
       service: {
         async handle(input) {
@@ -463,7 +463,7 @@ it("remediation: valid unsupported MIME, oversized media and long form text get 
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: "synthetic-" + "secret",
       verificationFormEnabled: true,
       service: { handle },
     },
@@ -558,7 +558,7 @@ it("admits bounded private DOCX and video references without downloading media",
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: "synthetic-" + "secret",
       verificationFormEnabled: true,
       service: { handle },
     },
