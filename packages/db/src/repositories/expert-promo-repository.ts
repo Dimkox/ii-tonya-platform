@@ -1,3 +1,4 @@
+import { consentDocumentPublishable } from "@ii-tonya/domain";
 import { saveExpertOfferProfileInTransaction } from "./expert-offer-v2.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
@@ -602,6 +603,11 @@ export class PostgresExpertPromoRepository {
         );
       if (await this.replay(tx, input, existing.userId, "enroll"))
         return { kind: "consent_pending" as const };
+      if (
+        document &&
+        !consentDocumentPublishable(document.title, document.body)
+      )
+        return { kind: "consent_text_unavailable" as const };
       if (!document || document.title.length + document.body.length > 3400) {
         await this.saveRequest(tx, input, existing.userId, "enroll");
         return { kind: "waiting_content" as const };

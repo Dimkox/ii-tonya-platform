@@ -13,6 +13,8 @@ export interface ExpertApplicantTelegramCapability {
   botKey: string;
   webhookSecret: string;
   service: Pick<ExpertApplicantService, "handle">;
+  /** Best-effort answerCallbackQuery. Failure does not change the visible reply. */
+  acknowledgeCallback?: (input: { callbackQueryId: string }) => Promise<void>;
 }
 const equal = (a: unknown, b: string) =>
   typeof a === "string" &&
@@ -207,7 +209,18 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
       }
       if (!limiter.consume(`promo:auth:${c.botId}:${userId}`, 30, 60_000))
         return reply.code(429).send({ error: "rate_limited" });
-      if (correction)
+      const callbackId =
+        callback && typeof callback.id === "string" ? callback.id : undefined;
+      const acknowledge = async () => {
+        if (!callbackId || !c.acknowledgeCallback) return;
+        try {
+          await c.acknowledgeCallback({ callbackQueryId: callbackId });
+        } catch {
+          // The next message is the webhook response. A missed spinner ack must not drop it.
+        }
+      };
+      if (correction) {
+        await acknowledge();
         return {
           method: "sendMessage",
           chat_id: chatId,
@@ -215,6 +228,7 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           protect_content: true,
           reply_markup: { remove_keyboard: true },
         };
+      }
       try {
         const rawName =
           typeof from?.first_name === "string" ? from.first_name.trim() : "";
@@ -235,9 +249,12 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
           ...(firstName === undefined ? {} : { firstName }),
           ...(media === undefined ? {} : { media }),
         });
-        if (result.status === "duplicate")
+        if (result.status === "duplicate") {
+          await acknowledge();
           return { accepted: true, duplicate: true };
-        if (result.status === "handled")
+        }
+        if (result.status === "handled") {
+          await acknowledge();
           return {
             method: "sendMessage",
             chat_id: chatId,
@@ -248,10 +265,12 @@ export const expertApplicantTelegramRoutes: FastifyPluginAsync<{
               resize_keyboard: true,
             },
           };
+        }
         if (result.status === "unavailable" || result.status === "disabled")
           return reply
             .code(503)
             .send({ error: "expert_applicant_unavailable" });
+        await acknowledge();
         return { accepted: true, rejected: true };
       } catch {
         return reply.code(503).send({ error: "expert_applicant_unavailable" });

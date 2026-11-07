@@ -19,6 +19,7 @@ import {
   PostgresExpertPersonalOfferRepository,
   type DrizzleDb,
 } from "@ii-tonya/db";
+import { createPromoCallbackAcknowledgement } from "./expert-promo-callback.js";
 import type { ExpertApplicantTelegramCapability } from "./routes/expert-applicant-telegram.js";
 export function assertExpertApplicantCapability(
   config: RuntimeConfig,
@@ -93,6 +94,13 @@ export function createExpertApplicantComposition(
     botId: scope.botId,
     botKey: scope.botKey,
     webhookSecret: scope.webhookSecret,
+    ...(scope.botToken
+      ? {
+          acknowledgeCallback: createPromoCallbackAcknowledgement({
+            botToken: scope.botToken,
+          }),
+        }
+      : {}),
     service: createExpertApplicantService({
       enabled: true,
       faq: true,
