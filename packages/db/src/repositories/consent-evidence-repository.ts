@@ -1,3 +1,4 @@
+import { consentDocumentPublishable } from "@ii-tonya/domain";
 import { createHash, randomBytes } from "node:crypto";
 import { sql } from "drizzle-orm";
 import type { DrizzleDb } from "../client.js";
@@ -125,6 +126,10 @@ export class PostgresConsentEvidenceRepository {
     approvedBy: string;
   }): Promise<ApprovedDocument> {
     this.assertEnabled();
+    // A new row only. Existing versions stay immutable, and this does not
+    // mark caller-authored text approved when the bytes are not intact UTF-8.
+    if (!consentDocumentPublishable(command.title, command.body))
+      throw new ConsentGrantInvariantError("consent_document_encoding_invalid");
     const digest = sha256(command.body);
     return single<ApprovedDocument>(
       await this.db.execute(sql`
@@ -189,6 +194,8 @@ export class PostgresConsentEvidenceRepository {
     `),
       "document_version",
     );
+    if (!consentDocumentPublishable(document.title, document.body))
+      throw new ConsentGrantInvariantError("consent_document_encoding_invalid");
     const stored = single<{
       presentationId: string;
       documentVersionId: string;
@@ -307,6 +314,15 @@ export class PostgresConsentEvidenceRepository {
     if (redeemed.length !== 1)
       throw new ConsentGrantInvariantError("consent_presentation_invalid");
     const presentation = redeemed[0] as (typeof redeemed)[number];
+    const published = single<{ title: string; body: string }>(
+      await tx.execute(sql`
+        select title, body from consent_document_versions
+        where id = ${presentation.documentVersionId}::uuid
+      `),
+      "document_version",
+    );
+    if (!consentDocumentPublishable(published.title, published.body))
+      throw new ConsentGrantInvariantError("consent_document_encoding_invalid");
     const policyVersion = this.policyVersion(
       command.purpose as ConsentPurpose,
       presentation.version,

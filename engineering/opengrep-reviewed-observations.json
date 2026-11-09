@@ -716,8 +716,8 @@
     {
       "rule": "getzilla.sast.rules.getzilla.javascript.sql-injection",
       "path": "packages/db/src/repositories/consent-evidence-repository.ts",
-      "line": "130",
-      "sha256": "d765ffe83afdfe3adc05130597d65df0ae929a711c55c0c42b3f9955a74a57d1",
+      "line": "135",
+      "sha256": "c03584f2c88557309bcd8c88b5d6d8684a8905cebda8ad7778e198c6f368b3e5",
       "category": "parameterized-sql",
       "evidence": "docs/operations/2026-10-30-opengrep-observation-review.md"
     },

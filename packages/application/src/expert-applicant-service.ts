@@ -1,4 +1,7 @@
-import type { ResidentDocument } from "@ii-tonya/domain";
+import {
+  consentDocumentPublishable,
+  type ResidentDocument,
+} from "@ii-tonya/domain";
 import type { ResidentFormInput } from "./resident-verification-service.js";
 import {
   renderPersonalOffer,
@@ -49,7 +52,13 @@ export interface ExpertApplicantRepository {
     },
   ): Promise<{ revision: number; replay: boolean }>;
   beginEnrollment(input: Command & { refCode?: string }): Promise<
-    | { kind: "ready" | "waiting_content" | "consent_pending" }
+    | {
+        kind:
+          | "ready"
+          | "waiting_content"
+          | "consent_pending"
+          | "consent_text_unavailable";
+      }
     | {
         kind: "consent_required";
         token: string;
@@ -66,7 +75,10 @@ export interface ExpertApplicantRepository {
   >;
   completeEnrollment(
     input: Command & { token: string; decision: "granted" | "denied" },
-  ): Promise<{ kind: "granted" | "denied"; replay: boolean }>;
+  ): Promise<{
+    kind: "granted" | "denied" | "expired";
+    replay: boolean;
+  }>;
   resolve(scope: ExpertApplicantScope): Promise<{ userId: string } | null>;
   register(input: Command & { refCode?: string }): Promise<{
     userId: string;
@@ -119,11 +131,29 @@ export type ExpertApplicantReply =
         "disabled" | "unavailable" | "rejected" | "unhandled" | "duplicate";
       text?: never;
     };
+const CONSENT_BUTTON_EXPIRED =
+  "Эта кнопка больше не действует. Согласие не записано. Отправьте /start — пришлём актуальный текст и новую кнопку.";
+const CONSENT_TEXT_UNAVAILABLE =
+  "Текст согласия сейчас нельзя показать: сохранённая версия не проходит проверку кодировки и не используется. Согласие не записано. После публикации исправной версии отправьте /start.";
 const pendingVerification = (): ExpertApplicantReply => ({
   status: "handled",
   text: "Ваша анкета ожидает проверки. Тарифы пока недоступны; сохранённые ответы остаются на месте.",
   replyMarkup: { remove_keyboard: true },
 });
+const recoverableConsentFailure = (error: unknown): boolean => {
+  const message = error instanceof Error ? error.message : "";
+  const cause =
+    error instanceof Error && error.cause instanceof Error
+      ? error.cause.message
+      : "";
+  const text = `${message}\n${cause}`;
+  return [
+    "promo_consent_unavailable",
+    "consent_presentation_invalid",
+    "promo_identity_unavailable",
+    "promo_invalid_request",
+  ].some((code) => text.includes(code));
+};
 const activeResidentText = (url: string | undefined) =>
   url && /^https:\/\/t\.me\/[A-Za-z0-9_]{5,64}$/u.test(url)
     ? `Вы уже активный резидент ии-Тони. Работайте в боте эксперта: ${url}`
@@ -193,6 +223,14 @@ export function createExpertApplicantService(deps: {
         // Pre-launch v4 is an explicit configuration: legacy sales composition is
         // unchanged until the release owner switches this funnel on.
         if (deps.waitlistV4) {
+          // Telegram callbacks arrive with an empty message text. The button
+          // payload is callback_data; without this copy the consent press is ignored.
+          if (
+            input.text.length === 0 &&
+            typeof input.callbackData === "string" &&
+            input.callbackData.startsWith("wl:")
+          )
+            input = { ...input, text: input.callbackData };
           const channelUrl = deps.waitlistV4.channelUrl;
           const consentCallback = /^wl:consent:([A-Za-z0-9_-]{16,128})$/u.exec(
             input.text,
@@ -362,7 +400,16 @@ export function createExpertApplicantService(deps: {
             };
           if (enrollment.kind === "consent_pending")
             return { status: "duplicate" };
+          if (enrollment.kind === "consent_text_unavailable")
+            return { status: "handled", text: CONSENT_TEXT_UNAVAILABLE };
           if (enrollment.kind === "consent_required") {
+            if (
+              !consentDocumentPublishable(
+                enrollment.document.title,
+                enrollment.document.body,
+              )
+            )
+              return { status: "handled", text: CONSENT_TEXT_UNAVAILABLE };
             const text = `${enrollment.document.title}\n${enrollment.document.body}\nСогласиться: /consent ${enrollment.token} granted\nОтказаться: /consent ${enrollment.token} denied`;
             if (deps.waitlistV4)
               return {
@@ -455,22 +502,18 @@ export function createExpertApplicantService(deps: {
             input.text,
           );
         if (consent) {
-          const result = await deps.repository.completeEnrollment({
-            ...command(),
-            token: consent[1]!,
-            decision: consent[2] as "granted" | "denied",
-          });
-          if (result.replay) return { status: "duplicate" };
-          return {
+          const followUp = (
+            kind: "granted" | "denied",
+          ): ExpertApplicantReply => ({
             status: "handled",
             text: deps.waitlistV4
-              ? result.kind === "granted"
+              ? kind === "granted"
                 ? waitlistV4Text.askPromo
                 : waitlistV4Text.declined
-              : result.kind === "granted"
+              : kind === "granted"
                 ? "Согласие сохранено. Есть реферальный код коллеги? Отправьте его сообщением (promo_…). Нет кода — отправьте /start, и вы станете первопроходцем."
                 : "Отказ сохранён. Регистрация и начисления не выполнены.",
-            ...(deps.waitlistV4 && result.kind === "granted"
+            ...(deps.waitlistV4 && kind === "granted"
               ? {
                   replyMarkup: {
                     inline_keyboard: [
@@ -485,7 +528,30 @@ export function createExpertApplicantService(deps: {
                   },
                 }
               : {}),
-          };
+          });
+          try {
+            const result = await deps.repository.completeEnrollment({
+              ...command(),
+              token: consent[1]!,
+              decision: consent[2] as "granted" | "denied",
+            });
+            if (result.kind === "expired")
+              return { status: "handled", text: CONSENT_BUTTON_EXPIRED };
+            // Same update retried after a lost webhook still shows the next step.
+            // The repository replay does not insert a second grant.
+            if (result.replay && !deps.waitlistV4)
+              return { status: "duplicate" };
+            return followUp(result.kind);
+          } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message === "consent_document_encoding_invalid"
+            )
+              return { status: "handled", text: CONSENT_TEXT_UNAVAILABLE };
+            if (recoverableConsentFailure(error))
+              return { status: "handled", text: CONSENT_BUTTON_EXPIRED };
+            throw error;
+          }
         }
         if (input.text === "/tariffs") {
           const result = await deps.repository.listTariffs(command());
@@ -558,6 +624,11 @@ export function createExpertApplicantService(deps: {
           error.message === "resident_verification_required"
         )
           return pendingVerification();
+        if (
+          error instanceof Error &&
+          error.message === "consent_document_encoding_invalid"
+        )
+          return { status: "handled", text: CONSENT_TEXT_UNAVAILABLE };
         return { status: "unavailable" };
       }
     },

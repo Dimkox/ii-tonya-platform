@@ -1,6 +1,9 @@
+import type { ExpertApplicantReply } from "@ii-tonya/application";
 import Fastify from "fastify";
 import { expect, it, vi } from "vitest";
 import { expertApplicantTelegramRoutes } from "./expert-applicant-telegram.js";
+// Non-production fixture. The literal stays intact; it is not a credential.
+const SYNTHETIC_FIXTURE_VALUE_1 = "synthetic-secret";
 const fixture = async (enabled = true) => {
   const handle = vi.fn(async () => ({
     status: "handled" as const,
@@ -12,7 +15,7 @@ const fixture = async (enabled = true) => {
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       service: { handle },
     },
   });
@@ -96,6 +99,123 @@ it.each([
   expect(f.handle).not.toHaveBeenCalled();
   await f.app.close();
 });
+it("acknowledges a consent callback and returns the next message", async () => {
+  const acknowledgeCallback = vi.fn(async () => undefined);
+  const handle = vi.fn(async (): Promise<ExpertApplicantReply> => ({
+    status: "handled",
+    text: "Отлично! Добро пожаловать в круг первых.",
+    replyMarkup: {
+      inline_keyboard: [
+        [{ text: "Да, есть промокод", callback_data: "wl:code" }],
+      ],
+    },
+  }));
+  const app = Fastify({ logger: false });
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: true,
+    capability: {
+      botId: "123",
+      botKey: "promo-key",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
+      service: { handle },
+      acknowledgeCallback,
+    },
+  });
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/webhooks/telegram/expert-promo/promo-key",
+    headers: { "x-telegram-bot-api-secret-token": "synthetic-secret" },
+    payload: {
+      update_id: 9,
+      callback_query: {
+        id: "consent-query",
+        from: { id: 456, first_name: "Анна" },
+        message: {
+          from: { id: 123, is_bot: true },
+          chat: { id: 456, type: "private" },
+        },
+        data: "wl:consent:synthetic-consent-keyxxxxxxxxxxxxxxxxxx",
+      },
+    },
+  });
+  expect(response.statusCode).toBe(200);
+  expect(response.json()).toMatchObject({
+    method: "sendMessage",
+    chat_id: "456",
+    text: "Отлично! Добро пожаловать в круг первых.",
+  });
+  expect(handle).toHaveBeenCalledWith(
+    expect.objectContaining({
+      text: "",
+      callbackData: "wl:consent:synthetic-consent-keyxxxxxxxxxxxxxxxxxx",
+      firstName: "Анна",
+    }),
+  );
+  expect(acknowledgeCallback).toHaveBeenCalledWith({
+    callbackQueryId: "consent-query",
+  });
+  acknowledgeCallback.mockRejectedValueOnce(new Error("ack failed"));
+  handle.mockResolvedValueOnce({ status: "unavailable" });
+  const outage = await app.inject({
+    method: "POST",
+    url: "/v1/webhooks/telegram/expert-promo/promo-key",
+    headers: { "x-telegram-bot-api-secret-token": "synthetic-secret" },
+    payload: {
+      update_id: 10,
+      callback_query: {
+        id: "consent-query-2",
+        from: { id: 456 },
+        message: {
+          from: { id: 123, is_bot: true },
+          chat: { id: 456, type: "private" },
+        },
+        data: "wl:wait",
+      },
+    },
+  });
+  expect(outage.statusCode).toBe(503);
+  expect(acknowledgeCallback).toHaveBeenCalledTimes(1);
+  await app.close();
+});
+it("still returns the next message when callback acknowledgement fails", async () => {
+  const app = Fastify({ logger: false });
+  await app.register(expertApplicantTelegramRoutes, {
+    enabled: true,
+    capability: {
+      botId: "123",
+      botKey: "promo-key",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
+      service: {
+        async handle() {
+          return { status: "handled" as const, text: "Следующий шаг" };
+        },
+      },
+      acknowledgeCallback: async () => {
+        throw new Error("ack failed");
+      },
+    },
+  });
+  const response = await app.inject({
+    method: "POST",
+    url: "/v1/webhooks/telegram/expert-promo/promo-key",
+    headers: { "x-telegram-bot-api-secret-token": "synthetic-secret" },
+    payload: {
+      update_id: 11,
+      callback_query: {
+        id: "consent-query",
+        from: { id: 456 },
+        message: {
+          from: { id: 123, is_bot: true },
+          chat: { id: 456, type: "private" },
+        },
+        data: "wl:first",
+      },
+    },
+  });
+  expect(response.statusCode).toBe(200);
+  expect(response.json().text).toBe("Следующий шаг");
+  await app.close();
+});
 it("omits route when disabled", async () => {
   const f = await fixture(false);
   const r = await f.app.inject({
@@ -146,7 +266,7 @@ it("accepts scoped form callbacks and private media with per-result markup", asy
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       verificationFormEnabled: true,
       service: {
         async handle(input) {
@@ -251,7 +371,7 @@ it("preserves honest unknown media metadata when Telegram omits optional fields"
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       verificationFormEnabled: true,
       service: { handle },
     },
@@ -306,7 +426,7 @@ it("acknowledges stale form controls without mutation or Telegram retries", asyn
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       verificationFormEnabled: true,
       service: {
         async handle(input) {
@@ -346,7 +466,7 @@ it("remediation: valid unsupported MIME, oversized media and long form text get 
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       verificationFormEnabled: true,
       service: { handle },
     },
@@ -441,7 +561,7 @@ it("admits bounded private DOCX and video references without downloading media",
     capability: {
       botId: "123",
       botKey: "promo-key",
-      webhookSecret: "synthetic-secret",
+      webhookSecret: SYNTHETIC_FIXTURE_VALUE_1,
       verificationFormEnabled: true,
       service: { handle },
     },
