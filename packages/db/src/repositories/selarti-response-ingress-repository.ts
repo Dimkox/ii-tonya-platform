@@ -24,6 +24,7 @@ export type SelartiBoundPendingRequest = {
   readonly requestId: string;
   readonly dialogueId: string;
   readonly threadId: string;
+  readonly boundAt: string;
 };
 
 export class PostgresSelartiResponseIngressRepository {
@@ -39,7 +40,10 @@ export class PostgresSelartiResponseIngressRepository {
     if (!/^[^\s\u0000-\u001F\u007F]{1,256}$/u.test(externalChatId))
       return { kind: "none" };
     const rows = (
-      await this.db.execute<{ requestId: string; dialogueId: string }>(sql`
+      await this.db.execute<{
+        requestId: string | null;
+        dialogueId: string | null;
+      }>(sql`
         select o.payload->>'requestId' as "requestId",
                o.payload->>'dialogueId' as "dialogueId"
         from integration_outbox o
@@ -63,17 +67,21 @@ export class PostgresSelartiResponseIngressRepository {
         order by o.created_at desc, o.id desc
         limit 2
       `)
-    ).rows.filter(
-      (row) =>
-        requestIdPattern.test(row.requestId) &&
-        dialogueIdPattern.test(row.dialogueId),
-    );
+    ).rows;
     if (rows.length !== 1)
       return { kind: rows.length === 0 ? "none" : "ambiguous" };
+    const row = rows[0]!;
+    if (
+      row.requestId === null ||
+      row.dialogueId === null ||
+      !requestIdPattern.test(row.requestId) ||
+      !dialogueIdPattern.test(row.dialogueId)
+    )
+      return { kind: "none" };
     return {
       kind: "one",
-      requestId: rows[0]!.requestId,
-      dialogueId: rows[0]!.dialogueId,
+      requestId: row.requestId,
+      dialogueId: row.dialogueId,
     };
   }
 
@@ -87,17 +95,19 @@ export class PostgresSelartiResponseIngressRepository {
         requestId: string;
         dialogueId: string;
         threadId: string;
+        boundAt: Date | string;
       }>(sql`
         select o.payload->>'requestId' as "requestId",
                o.payload->>'dialogueId' as "dialogueId",
-               bound.normalized_reason as "threadId"
+               bound.normalized_reason as "threadId",
+               bound.created_at as "boundAt"
         from integration_outbox o
         join dialogues d on d.id::text = o.payload->>'dialogueId'
           and d.tenant_key = ${this.tenantKey}
           and d.bot_key = ${this.tenantKey}
           and d.provider = 'telegram'
         join lateral (
-          select normalized_reason
+          select normalized_reason, created_at
           from delivery_attempts
           where outbox_id = o.id
             and outcome = 'provider_bound'
@@ -123,12 +133,29 @@ export class PostgresSelartiResponseIngressRepository {
         limit ${bounded}
       `)
     ).rows;
-    return rows.filter(
-      (row) =>
-        requestIdPattern.test(row.requestId) &&
-        dialogueIdPattern.test(row.dialogueId) &&
-        providerThreadId.test(row.threadId),
-    );
+    return rows.flatMap((row) => {
+      const boundAt =
+        row.boundAt instanceof Date
+          ? row.boundAt.toISOString()
+          : typeof row.boundAt === "string"
+            ? row.boundAt
+            : "";
+      if (
+        !requestIdPattern.test(row.requestId) ||
+        !dialogueIdPattern.test(row.dialogueId) ||
+        !providerThreadId.test(row.threadId) ||
+        !Number.isFinite(Date.parse(boundAt))
+      )
+        return [];
+      return [
+        {
+          requestId: row.requestId,
+          dialogueId: row.dialogueId,
+          threadId: row.threadId,
+          boundAt: new Date(boundAt).toISOString(),
+        },
+      ];
+    });
   }
 
   async claim(

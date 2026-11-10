@@ -15,6 +15,7 @@ type BoundRequest = {
   readonly requestId: string;
   readonly dialogueId: string;
   readonly threadId: string;
+  readonly boundAt: string;
 };
 
 type PolledMessage = {
@@ -23,7 +24,18 @@ type PolledMessage = {
   readonly messageType: string;
   readonly taskId: string;
   readonly companyId: string;
+  readonly createdAt?: number;
 };
+
+function createdAfter(createdAt: number | undefined, boundAt: string): boolean {
+  const boundMs = Date.parse(boundAt);
+  if (typeof createdAt !== "number" || !Number.isFinite(createdAt))
+    return false;
+  if (!Number.isFinite(boundMs)) return false;
+  const createdMs =
+    createdAt < 1_000_000_000_000 ? createdAt * 1000 : createdAt;
+  return createdMs > boundMs;
+}
 
 export async function pollSelartiPendingResponses(deps: {
   readonly enabled: boolean;
@@ -60,7 +72,18 @@ export async function pollSelartiPendingResponses(deps: {
   }
   let ingested = 0;
   let skipped = 0;
+  const byThread = new Map<string, BoundRequest[]>();
   for (const request of pending) {
+    const group = byThread.get(request.threadId) ?? [];
+    group.push(request);
+    byThread.set(request.threadId, group);
+  }
+  for (const requests of byThread.values()) {
+    if (requests.length !== 1) {
+      skipped += 1;
+      continue;
+    }
+    const request = requests[0]!;
     let page: Awaited<ReturnType<typeof deps.readMessages>>;
     try {
       page = await deps.readMessages({
@@ -81,7 +104,8 @@ export async function pollSelartiPendingResponses(deps: {
         (message.messageType === "bot" || message.messageType === "operator") &&
         message.taskId === deps.taskId &&
         message.companyId === deps.companyId &&
-        message.text.length > 0,
+        message.text.length > 0 &&
+        createdAfter(message.createdAt, request.boundAt),
     );
     const claimed: { claimId: string; text: string }[] = [];
     let busy = false;

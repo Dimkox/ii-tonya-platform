@@ -35,7 +35,9 @@ function memoryReceipts(): SelartiResponseReceipts {
   };
 }
 
-const pending = [{ requestId, dialogueId, threadId }] as const;
+const boundAt = "2026-11-10T20:00:00.000Z";
+const afterSend = Date.parse("2026-11-10T20:05:00.000Z");
+const pending = [{ requestId, dialogueId, threadId, boundAt }] as const;
 
 describe("Selarti response poller", () => {
   it("stays idle when the flag is off", async () => {
@@ -79,6 +81,7 @@ describe("Selarti response poller", () => {
           taskId,
           companyId,
           threadId,
+          createdAt: afterSend,
         },
       ],
     }));
@@ -135,6 +138,7 @@ describe("Selarti response poller", () => {
             messageType: "bot",
             taskId,
             companyId,
+            createdAt: afterSend,
           },
           {
             id: "bot-2",
@@ -142,6 +146,7 @@ describe("Selarti response poller", () => {
             messageType: "operator",
             taskId,
             companyId,
+            createdAt: afterSend + 1_000,
           },
         ],
       }),
@@ -149,6 +154,67 @@ describe("Selarti response poller", () => {
       receipts: memoryReceipts(),
     });
     expect(result).toEqual({ examined: 1, ingested: 0, skipped: 1 });
+    expect(handle).not.toHaveBeenCalled();
+  });
+
+  it("does not ingest an older reply or a thread with two open requests", async () => {
+    const handle = vi.fn<(raw: unknown) => Promise<{ status: string }>>(
+      async () => ({ status: "accepted" }),
+    );
+    const older = await pollSelartiPendingResponses({
+      enabled: true,
+      taskId,
+      companyId,
+      listPending: async () => pending,
+      readMessages: async () => ({
+        kind: "page",
+        messages: [
+          {
+            id: "old-bot",
+            text: "Старый ответ.",
+            messageType: "bot",
+            taskId,
+            companyId,
+            createdAt: Date.parse("2026-11-10T19:00:00.000Z"),
+          },
+        ],
+      }),
+      responses: { handle },
+      receipts: memoryReceipts(),
+    });
+    expect(older).toEqual({ examined: 1, ingested: 0, skipped: 0 });
+    expect(handle).not.toHaveBeenCalled();
+
+    const shared = await pollSelartiPendingResponses({
+      enabled: true,
+      taskId,
+      companyId,
+      listPending: async () => [
+        pending[0],
+        {
+          requestId: `sha256:${"c".repeat(64)}`,
+          dialogueId: "00000000-0000-4000-8000-000000000778",
+          threadId,
+          boundAt,
+        },
+      ],
+      readMessages: async () => ({
+        kind: "page",
+        messages: [
+          {
+            id: "new-bot",
+            text: "Новый ответ.",
+            messageType: "bot",
+            taskId,
+            companyId,
+            createdAt: afterSend,
+          },
+        ],
+      }),
+      responses: { handle },
+      receipts: memoryReceipts(),
+    });
+    expect(shared).toEqual({ examined: 2, ingested: 0, skipped: 1 });
     expect(handle).not.toHaveBeenCalled();
   });
 

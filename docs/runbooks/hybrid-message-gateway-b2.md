@@ -13,7 +13,7 @@ transport/token is intentionally absent until those gates pass.
 
 ## Rollback
 
-Disable all three flags first. This stops new provider proposals, Telegram dispatch, and
+Disable all four flags first. This stops new provider proposals, the response poller, Telegram dispatch, and
 purge batches without deleting B1/B2 durable state. Do not reverse migration 0035: it is
 additive and B1 rows remain readable; resume through forward recovery after repair.
 

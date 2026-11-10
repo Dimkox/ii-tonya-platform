@@ -55,7 +55,10 @@ SELARTI_WEBHOOK_SECRET=<existing live-adapter secret>
 ```
 
 The poller calls `get_message` for pending requests whose send stored a
-provider thread id. It does not run unless the flag is true, and it does not
+provider thread id. It ingests a bot or operator row only when that row's
+`Created Date` is later than the send and the thread has exactly one open
+request. A page without dates, an older reply, or two open requests on one
+thread is skipped. It does not run unless the flag is true, and it does not
 turn Telegram dispatch on. Leave it false until the webhook path has been
 checked against a non-production task.
 
