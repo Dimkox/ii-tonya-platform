@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { DrizzleDb } from "../client.js";
 import { PostgresSelartiResponseIngressRepository } from "./selarti-response-ingress-repository.js";
 
 const requestId = `sha256:${"a".repeat(64)}`;
@@ -8,7 +9,9 @@ const dialogueId = "00000000-0000-4000-8000-000000000501";
 describe("Selarti pending lookup", () => {
   const repository = (rows: readonly unknown[]) =>
     new PostgresSelartiResponseIngressRepository(
-      { execute: async () => ({ rows }) },
+      {
+        execute: async () => ({ rows }),
+      } as unknown as Pick<DrizzleDb, "execute">,
       "bot-a",
     );
 
