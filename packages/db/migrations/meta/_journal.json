@@ -624,6 +624,13 @@
       "when": 1793152800019,
       "tag": "0088_expert_promo_funnel_gift_timer",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1793152800020,
+      "tag": "0089_referral_first_attribution",
+      "breakpoints": true
     }
   ]
 }

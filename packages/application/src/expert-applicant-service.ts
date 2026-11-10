@@ -89,6 +89,7 @@ export interface ExpertApplicantRepository {
     guideStatus:
       "none" | "waiting_content" | "pending" | "delivered" | "cancelled";
     replay: boolean;
+    attribution?: "created" | "kept" | "ignored_late_start";
   }>;
   listTariffs(input: Command): Promise<{
     tariffs: { id: string; displayName: string }[];
@@ -456,7 +457,15 @@ export function createExpertApplicantService(deps: {
           if (deps.waitlistV4)
             return {
               status: "handled",
-              text: `${start[1] ? waitlistV4Text.accepted : waitlistV4Text.pioneer}\n\n${waitlistV4Text.referralOffer}`,
+              text: `${
+                start[1] &&
+                (result.attribution === "kept" ||
+                  result.attribution === "ignored_late_start")
+                  ? waitlistV4Text.repeatCode
+                  : start[1]
+                    ? waitlistV4Text.accepted
+                    : waitlistV4Text.pioneer
+              }\n\n${waitlistV4Text.referralOffer}`,
               replyMarkup: {
                 inline_keyboard: [
                   [

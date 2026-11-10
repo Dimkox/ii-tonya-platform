@@ -6,6 +6,9 @@ import {
   type ExpertReferralTestDatabase,
 } from "../../packages/db/src/testkit/expert-referral.js";
 import { PostgresExpertPromoRepository } from "../../packages/db/src/repositories/expert-promo-repository.js";
+import { PostgresClientReferralRepository } from "../../packages/db/src/repositories/client-referral-repository.js";
+import { PostgresExpertReferralRepository } from "../../packages/db/src/repositories/expert-referral-repository.js";
+import { ExpertCodeCrypto } from "../../packages/application/src/expert-code-crypto.js";
 import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 let database: ExpertReferralTestDatabase;
 let repo: PostgresExpertPromoRepository;
@@ -646,5 +649,206 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
     expect(rows).toEqual([{ incoming: code, status: "REFERRAL_ACTIVE" }]);
     expect(own).not.toBe(code);
     expect(await repo.isActiveResident(invitee)).toBe(false);
+  });
+  it("does not count a promo visitor who already started the bot", async () => {
+    const owner = await identity();
+    const code = (await repo.register(command(owner))).refCode;
+    const unknown = {
+      botKey: "promo-late-start",
+      botId: "717171",
+      telegramUserId: String(++sequence),
+      chatId: String(sequence),
+    };
+    const presented = await repo.beginEnrollment(command(unknown));
+    if (presented.kind !== "consent_required")
+      throw new Error("fixture_document_missing");
+    await repo.completeEnrollment({
+      ...command(unknown),
+      token: presented.token,
+      decision: "granted",
+    });
+    const registered = await repo.register(command(unknown, code));
+    expect(registered.attribution).toBe("ignored_late_start");
+    expect(registered.referralCount).toBe(0);
+    expect(
+      (
+        await database.db.execute<{
+          referrer_user_id: string | null;
+          counts_for_inviter: boolean | null;
+        }>(
+          sql`select referrer_user_id, counts_for_inviter from expert_promo_registrations where user_id=${registered.userId}::uuid`,
+        )
+      ).rows[0],
+    ).toEqual({ referrer_user_id: null, counts_for_inviter: false });
+    expect(await repo.register(command(owner))).toMatchObject({
+      referralCount: 0,
+      guideStatus: "none",
+    });
+  });
+  it("keeps the first promo inviter and issues the PDF once for two new visitors", async () => {
+    const first = await identity();
+    const second = await identity();
+    const firstCode = (await repo.register(command(first))).refCode;
+    const secondCode = (await repo.register(command(second))).refCode;
+    const invitee = await identity();
+    const other = await identity();
+    expect((await repo.register(command(invitee, firstCode))).attribution).toBe(
+      "created",
+    );
+    expect(await repo.register(command(first))).toMatchObject({
+      referralCount: 1,
+      guideStatus: "none",
+    });
+    await repo.register(command(other, firstCode));
+    expect(await repo.register(command(first))).toMatchObject({
+      referralCount: 2,
+      guideStatus: "waiting_content",
+    });
+    await repo.register(command(other, firstCode));
+    await expect(repo.register(command(other, secondCode))).rejects.toThrow(
+      "promo_attribution_locked",
+    );
+    await expect(
+      repo.register(command(invitee, firstCode)),
+    ).resolves.toMatchObject({
+      attribution: "kept",
+    });
+    expect(
+      (
+        await database.db.execute<{ n: number }>(
+          sql`select count(*)::int n from expert_promo_guide_work where user_id=${first.userId}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(1);
+    expect(
+      (
+        await database.db.execute<{ referrer: string }>(
+          sql`select referrer_user_id as referrer from expert_promo_registrations where user_id=${other.userId}::uuid`,
+        )
+      ).rows[0]?.referrer,
+    ).toBe(first.userId);
+    expect(await repo.register(command(second))).toMatchObject({
+      referralCount: 0,
+      guideStatus: "none",
+    });
+  });
+  it("attributes a client coupon referral once and does not grant a coupon", async () => {
+    const referrals = new PostgresClientReferralRepository(database.db);
+    const inviter = await database.createUser();
+    const other = await database.createUser();
+    const referred = await database.createUser();
+    expect(
+      await referrals.attribute({
+        referredUserId: referred,
+        inviterUserId: inviter,
+      }),
+    ).toEqual({ outcome: "created", inviterUserId: inviter });
+    expect(
+      await referrals.attribute({
+        referredUserId: referred,
+        inviterUserId: inviter,
+      }),
+    ).toEqual({ outcome: "kept", inviterUserId: inviter });
+    expect(
+      await referrals.attribute({
+        referredUserId: referred,
+        inviterUserId: other,
+      }),
+    ).toEqual({ outcome: "kept", inviterUserId: inviter });
+    expect(
+      await referrals.attribute({
+        referredUserId: referred,
+        inviterUserId: referred,
+      }),
+    ).toEqual({ outcome: "self" });
+    expect(
+      (
+        await database.db.execute<{ n: number }>(
+          sql`select count(*)::int n from client_referral_attributions where referred_user_id=${referred}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(1);
+    expect(
+      (
+        await database.db.execute<{ n: number }>(
+          sql`select count(*)::int n from client_coupon_grants where user_id=${referred}::uuid or user_id=${inviter}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(0);
+  });
+  it("keeps the first resident bonus inviter when another code is entered", async () => {
+    await database.enableExpertReferralCommands();
+    const crypto = new ExpertCodeCrypto({
+      currentVersion: "v1",
+      activeVersions: ["v1"],
+      key: () => new Uint8Array(32).fill(11),
+    });
+    const repository = new PostgresExpertReferralRepository(
+      database.db,
+      crypto,
+    );
+    const first = await database.createExpertIdentity();
+    const second = await database.createExpertIdentity();
+    const invitee = await database.createExpertIdentity();
+    const issue = async (inviterExpertId: string) => {
+      const audit = await database.createAdminAudit({
+        action: "expert_referral.batch_generate",
+        objectId: inviterExpertId,
+      });
+      return repository.issueBatch({
+        inviterExpertId,
+        count: 1,
+        issuedByAdminId: audit.adminId,
+        approvalId: audit.approvalId,
+        adminSessionIdHash: audit.sessionIdHash,
+      });
+    };
+    const firstCode = await issue(first.expertId);
+    const secondCode = await issue(second.expertId);
+    await repository.redeemCode({
+      plaintext: firstCode.codes[0]!.plaintext,
+      userId: invitee.userId,
+      provider: invitee.provider,
+      externalId: invitee.externalId,
+    });
+    await expect(
+      repository.redeemCode({
+        plaintext: secondCode.codes[0]!.plaintext,
+        userId: invitee.userId,
+        provider: invitee.provider,
+        externalId: invitee.externalId,
+      }),
+    ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_NOT_ELIGIBLE" });
+    const solo = await database.createExpertIdentity();
+    const soloCode = await issue(solo.expertId);
+    await expect(
+      repository.redeemCode({
+        plaintext: soloCode.codes[0]!.plaintext,
+        userId: solo.userId,
+        provider: solo.provider,
+        externalId: solo.externalId,
+      }),
+    ).rejects.toMatchObject({ code: "EXPERT_REFERRAL_NOT_ELIGIBLE" });
+    expect(
+      (
+        await database.db.execute<{ inviter: string; n: number }>(
+          sql`select inviter_expert_id as inviter, count(*) over()::int as n from expert_referrals where invitee_expert_id=${invitee.expertId}::uuid`,
+        )
+      ).rows,
+    ).toEqual([{ inviter: first.expertId, n: 1 }]);
+    expect(
+      (
+        await database.db.execute<{ status: string }>(
+          sql`select status from expert_referral_codes where id=${secondCode.codes[0]!.id}::uuid`,
+        )
+      ).rows[0]?.status,
+    ).toBe("issued");
+    expect(
+      (
+        await database.db.execute<{ n: number }>(
+          sql`select count(*)::int n from expert_referral_reward_grants g join expert_referrals r on r.id=g.referral_id where r.invitee_expert_id=${invitee.expertId}::uuid`,
+        )
+      ).rows[0]?.n,
+    ).toBe(0);
   });
 });

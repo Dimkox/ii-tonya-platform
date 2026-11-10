@@ -1,4 +1,6 @@
 export { computeReservedUntil, transitionReservation } from "./reservation.js";
+export { decideFirstAttribution } from "./referral-attribution.js";
+export type { ReferralAttribution } from "./referral-attribution.js";
 export {
   calculateExpertCampaignPrice,
   calculateExpertCampaignPriceV2,

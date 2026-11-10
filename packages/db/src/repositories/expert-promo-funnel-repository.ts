@@ -129,7 +129,7 @@ export class PostgresExpertPromoFunnelRepository {
           refCode: string;
           referralCount: number;
         }>(
-          sql`select f.user_id "userId",${this.chat(sql`f.user_id`)} "chatId",i.ref_code "refCode",(select count(*)::int from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id) "referralCount" from expert_promo_funnel_state f join expert_promo_codes i on i.user_id=f.user_id join users u on u.id=f.user_id and u.active where f.status='REFERRAL_ACTIVE' and not f.opt_out_ref and f.${marker} is null and (${sql.raw(input.kind === "message6" ? "f.code_issued_at" : "f.message6_sent_at")})<=clock_timestamp()-${age} and not exists(select 1 from expert_promo_guide_work w where w.user_id=f.user_id and w.status='delivered') and (select count(*) from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id)<2 order by f.code_issued_at,f.user_id limit ${limit} for update of f skip locked`,
+          sql`select f.user_id "userId",${this.chat(sql`f.user_id`)} "chatId",i.ref_code "refCode",(select count(*)::int from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id and r.counts_for_inviter is distinct from false) "referralCount" from expert_promo_funnel_state f join expert_promo_codes i on i.user_id=f.user_id join users u on u.id=f.user_id and u.active where f.status='REFERRAL_ACTIVE' and not f.opt_out_ref and f.${marker} is null and (${sql.raw(input.kind === "message6" ? "f.code_issued_at" : "f.message6_sent_at")})<=clock_timestamp()-${age} and not exists(select 1 from expert_promo_guide_work w where w.user_id=f.user_id and w.status='delivered') and (select count(*) from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id and r.counts_for_inviter is distinct from false)<2 order by f.code_issued_at,f.user_id limit ${limit} for update of f skip locked`,
         )
       ).rows;
       const claimed: ExpertPromoFunnelTarget[] = [];
@@ -156,7 +156,7 @@ export class PostgresExpertPromoFunnelRepository {
         status: string;
         referralCount: number;
       }>(
-        sql`select * from (select f.user_id "userId",f.first_name "firstName",f.gender,f.status,(select count(*)::int from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id) "referralCount",f.crm_synced_referral_count synced from expert_promo_funnel_state f join users u on u.id=f.user_id and u.active) x where x.synced is distinct from x."referralCount" order by x."userId" limit ${n}`,
+        sql`select * from (select f.user_id "userId",f.first_name "firstName",f.gender,f.status,(select count(*)::int from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id and r.counts_for_inviter is distinct from false) "referralCount",f.crm_synced_referral_count synced from expert_promo_funnel_state f join users u on u.id=f.user_id and u.active) x where x.synced is distinct from x."referralCount" order by x."userId" limit ${n}`,
       )
     ).rows.map(({ userId, firstName, gender, status, referralCount }) => ({
       userId,

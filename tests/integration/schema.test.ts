@@ -223,6 +223,7 @@ describe("MVP schema", () => {
       "client_paid_payment_bindings",
       "client_paid_settlements",
       "client_profiles",
+      "client_referral_attributions",
       "client_session_booking_grants",
       "client_sessions",
       "commercial_participants",
