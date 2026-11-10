@@ -594,7 +594,7 @@ it("initial owner schedule joins exact full card review and maps approved servic
   expect(await send("/slots_setup")).toContain("Москва");
   for (const answer of [
     "2",
-    "2026-11-10 2026-11-10",
+    "2026-12-15 2026-12-15",
     "2",
     "09:00-13:00",
     "нет",
