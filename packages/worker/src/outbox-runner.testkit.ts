@@ -22,6 +22,7 @@ interface FakeRow extends OutboxMessage {
 export interface FakeOutboxRepository extends OutboxRepository {
   retryCalls: { id: string; at: string; reasonCode: string }[];
   succeedCalls: string[];
+  providerOperationIds: string[];
   deadLetterCalls: { id: string; reasonCode: string }[];
   makeRetriesDue(): void;
   makeUnknownClaimable(): void;
@@ -69,6 +70,7 @@ export function fakeOutboxRepository(
     `${phase}-claim-${String(++tokenSequence)}`;
   const retryCalls: { id: string; at: string; reasonCode: string }[] = [];
   const succeedCalls: string[] = [];
+  const providerOperationIds: string[] = [];
   const deadLetterCalls: { id: string; reasonCode: string }[] = [];
 
   const requireRow = (id: string): FakeRow => {
@@ -80,6 +82,7 @@ export function fakeOutboxRepository(
   return {
     retryCalls,
     succeedCalls,
+    providerOperationIds,
     deadLetterCalls,
     async claim(limit, owner, leaseDurationMs, maxAttempts) {
       for (const row of rows.values()) {
@@ -122,8 +125,7 @@ export function fakeOutboxRepository(
           row.status = "dead_letter";
           deadLetterCalls.push({
             id: row.id,
-            reasonCode:
-              "unknown_outcome_reconciliation_exhausted_before_claim",
+            reasonCode: "unknown_outcome_reconciliation_exhausted_before_claim",
           });
         }
       }
@@ -205,7 +207,7 @@ export function fakeOutboxRepository(
       delete row.reconciliationOwner;
       row.reconciliationClaimToken = null;
     },
-    async succeed(id, owner, claimToken) {
+    async succeed(id, owner, claimToken, providerOperationId?: string) {
       if (failSuccessWrite) {
         failSuccessWrite = false;
         throw new Error("simulated local acknowledgement failure");
@@ -225,6 +227,8 @@ export function fakeOutboxRepository(
       delete row.dispatchOwner;
       row.dispatchClaimToken = null;
       succeedCalls.push(id);
+      if (providerOperationId !== undefined)
+        providerOperationIds.push(providerOperationId);
     },
     async retry(id, owner, claimToken, nextAttemptAt, reasonCode) {
       const row = requireRow(id);

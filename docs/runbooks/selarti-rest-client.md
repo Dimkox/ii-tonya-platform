@@ -70,9 +70,7 @@ subscription, billing status, answer causality or delivery. The recorded
 did not match the configured AI, so that configuration must remain unavailable.
 This factory does not modify provider configuration or activate a runtime.
 
-Before activation, implement a durable polling bridge binding internal request,
-dialogue and tenant to provider task/chat/thread/message. Preserve consent/cost
-admission, response deadlines, copy/URL checks and internal requestId/threadId
-validation. Ordinary worker composition and polling integration remain unfinished.
-Existing disabled startup guards remain in force. No live generation, provider
-configuration, runtime composition or database change is part of this client.
+The response webhook and optional `get_message` poller are described in
+`docs/operations/selarti-all-messages-webhook.md`. Both stay default-off.
+Polling is not authorization to generate messages, and it does not enable
+Telegram dispatch. This client still does not retry an unknown send.

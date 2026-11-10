@@ -42,6 +42,7 @@ describe("loadEnv", () => {
       telegramEgressConsentGate: false,
       selartiCostAdmission: false,
       selartiResponseIngress: false,
+      selartiResponsePoll: false,
       b2TelegramDispatch: false,
       b2SensitiveRetention: false,
       testExpertPromo: false,

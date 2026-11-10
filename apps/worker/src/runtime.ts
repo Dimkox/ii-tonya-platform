@@ -197,6 +197,7 @@ export interface ProductionWorkerRuntimeDependencies {
   };
   readonly planerkaBookingRunner?: BoundedJob;
   readonly clientAsyncOutboxRunner?: BoundedJob;
+  readonly selartiResponsePoll?: () => Promise<unknown>;
   readonly workerOutboxRegistry?: Readonly<{
     readonly topics: readonly string[];
   }>;
@@ -697,9 +698,11 @@ export function createProductionWorkerRuntime(
       const local = workerOutboxEnabled
         ? await deps.workerOutboxRunner!()
         : await deps.jobsRepository.materializeOperatorCasesBatch(batchSize);
-      return deps.clientAsyncOutboxRunner
+      const delivered = deps.clientAsyncOutboxRunner
         ? { local, clientAsync: await deps.clientAsyncOutboxRunner() }
         : local;
+      if (deps.selartiResponsePoll) await deps.selartiResponsePoll();
+      return delivered;
     },
     processorPrivacy:
       deps.clientCatalogRetention === undefined &&

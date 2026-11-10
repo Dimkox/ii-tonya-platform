@@ -21,13 +21,15 @@ describe("outbox runner", () => {
     async (batchSize) => {
       const repository = fakeOutboxRepository([]);
 
-      await expect(runOutboxBatch({
-        ...baseDeps(),
-        batchSize,
-        repository,
-        dispatcher: { dispatch: vi.fn() },
-        reconciler: { reconcile: vi.fn() },
-      })).rejects.toThrow("batchSize must be a safe integer between 1 and 1000");
+      await expect(
+        runOutboxBatch({
+          ...baseDeps(),
+          batchSize,
+          repository,
+          dispatcher: { dispatch: vi.fn() },
+          reconciler: { reconcile: vi.fn() },
+        }),
+      ).rejects.toThrow("batchSize must be a safe integer between 1 and 1000");
     },
   );
 
@@ -78,6 +80,7 @@ describe("outbox runner", () => {
       },
     ]);
     expect(repository.succeedCalls).toEqual(["o-1"]);
+    expect(repository.providerOperationIds).toEqual(["provider-1"]);
     expect(dispatch).toHaveBeenCalledTimes(2);
   });
 
@@ -235,33 +238,33 @@ describe("outbox runner", () => {
     ]);
   });
 
-  it.each([
-    "1900-01-01T00:00:00.000Z",
-    "2099-01-01T00:00:00.000Z",
-  ])("does not let worker clock %s steal an active database lease", async (workerNow) => {
-    const repository = fakeOutboxRepository([
-      { id: `clock-${workerNow}`, topic: "telegram.send", attempt: 0 },
-    ]);
-    repository.failNextLocalSuccessWrite();
-    const dispatch = vi.fn().mockResolvedValue({
-      kind: "applied",
-      providerOperationId: "provider-clock",
-    });
-    const deps = {
-      ...baseDeps(),
-      repository,
-      dispatcher: { dispatch },
-      reconciler: { reconcile: vi.fn() },
-      now: () => new Date(workerNow),
-    };
+  it.each(["1900-01-01T00:00:00.000Z", "2099-01-01T00:00:00.000Z"])(
+    "does not let worker clock %s steal an active database lease",
+    async (workerNow) => {
+      const repository = fakeOutboxRepository([
+        { id: `clock-${workerNow}`, topic: "telegram.send", attempt: 0 },
+      ]);
+      repository.failNextLocalSuccessWrite();
+      const dispatch = vi.fn().mockResolvedValue({
+        kind: "applied",
+        providerOperationId: "provider-clock",
+      });
+      const deps = {
+        ...baseDeps(),
+        repository,
+        dispatcher: { dispatch },
+        reconciler: { reconcile: vi.fn() },
+        now: () => new Date(workerNow),
+      };
 
-    await expect(runOutboxBatch(deps)).rejects.toThrow(
-      "simulated local acknowledgement failure",
-    );
-    await expect(runOutboxBatch(deps)).resolves.toEqual({
-      reconciled: 0,
-      dispatched: 0,
-    });
-    expect(dispatch).toHaveBeenCalledTimes(1);
-  });
+      await expect(runOutboxBatch(deps)).rejects.toThrow(
+        "simulated local acknowledgement failure",
+      );
+      await expect(runOutboxBatch(deps)).resolves.toEqual({
+        reconciled: 0,
+        dispatched: 0,
+      });
+      expect(dispatch).toHaveBeenCalledTimes(1);
+    },
+  );
 });

@@ -59,7 +59,12 @@ export interface OutboxRepository {
     reasonCode: string,
     nextCheckAt: Date,
   ): Promise<void>;
-  succeed(id: string, owner: string, claimToken: string): Promise<void>;
+  succeed(
+    id: string,
+    owner: string,
+    claimToken: string,
+    providerOperationId?: string,
+  ): Promise<void>;
   retry(
     id: string,
     owner: string,
@@ -522,6 +527,7 @@ async function dispatchPending(
       message.id,
       deps.workerId,
       dispatchToken(message),
+      outcome.providerOperationId,
     );
     record(deps, message.topic, "dispatch", "applied", "internal");
     return;

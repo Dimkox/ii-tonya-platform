@@ -215,6 +215,11 @@ export {
   type AcceptSelartiProposalResult,
 } from "./repositories/selarti-proposal-repository.js";
 export {
+  PostgresSelartiResponseIngressRepository,
+  type SelartiBoundPendingRequest,
+  type SelartiPendingLookup,
+} from "./repositories/selarti-response-ingress-repository.js";
+export {
   PostgresOperatorCaseOutboxRepository,
   type OperatorCaseOutboxMessage,
 } from "./repositories/operator-case-outbox-repository.js";

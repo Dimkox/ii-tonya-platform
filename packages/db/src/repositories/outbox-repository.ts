@@ -1205,10 +1205,38 @@ export class PostgresOutboxRepository {
     });
   }
 
-  async succeed(id: string, owner: string, claimToken: string): Promise<void> {
+  async succeed(
+    id: string,
+    owner: string,
+    claimToken: string,
+    providerOperationId?: string,
+  ): Promise<void> {
     await this.db.transaction(async (tx) => {
       const row = await lockedRow(tx, id);
       requireDispatchLease(row, owner, claimToken);
+      const threadId =
+        row.topic === "selarti.request.v1" &&
+        typeof providerOperationId === "string" &&
+        /^[^\s\u0000-\u001F\u007F]{1,256}$/u.test(providerOperationId)
+          ? providerOperationId
+          : undefined;
+      if (threadId !== undefined) {
+        await tx.execute(sql`
+          insert into delivery_attempts(
+            outbox_id, attempt_id, attempt, provider, outcome,
+            reconciliation_key, normalized_reason
+          )
+          select ${id}::uuid, ${"provider-bound:" + String(row.attempt)},
+            ${row.attempt}, 'selarti', 'provider_bound', reconciliation_key,
+            ${threadId}
+          from integration_outbox
+          where id = ${id}::uuid and topic = 'selarti.request.v1'
+            and not exists (
+              select 1 from delivery_attempts
+              where outbox_id = ${id}::uuid and outcome = 'provider_bound'
+            )
+        `);
+      }
       await this.transitionSucceeded(tx, id);
     });
   }

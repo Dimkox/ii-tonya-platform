@@ -90,6 +90,7 @@ import {
   HybridMessageGateway,
   ClientNavigationGateway,
   createSelartiResponseService,
+  createSelartiAllMessagesBridge,
   TestExpertTelegramService,
 } from "@ii-tonya/application";
 import {
@@ -126,6 +127,7 @@ import {
   PostgresHybridMessageRepository,
   PostgresClientIngressReplayRepository,
   PostgresSelartiProposalRepository,
+  PostgresSelartiResponseIngressRepository,
   PostgresTestExpertTelegramRepository,
   PostgresExpertTrialPricingPolicy,
   PostgresPartnerTrialPricingPolicy,
@@ -716,15 +718,30 @@ export const createDefaultLifecycle = (
               ),
           })
         : undefined;
-    const selartiResponses =
+    const selartiIngress =
       config.features.selartiResponseIngress === true &&
-      config.clientTelegramBotKey !== undefined
-        ? createSelartiResponseService({
-            enabled: true,
-            tenantKey: config.clientTelegramBotKey,
-            allowedUrlHosts: ["ii-tonya.ru"],
-            clock: () => new Date(),
-            proposals: new PostgresSelartiProposalRepository(db),
+      config.clientTelegramBotKey !== undefined &&
+      config.selartiResponseTaskId !== undefined
+        ? new PostgresSelartiResponseIngressRepository(
+            db,
+            config.clientTelegramBotKey,
+          )
+        : undefined;
+    const selartiResponses =
+      selartiIngress !== undefined &&
+      config.clientTelegramBotKey !== undefined &&
+      config.selartiResponseTaskId !== undefined
+        ? createSelartiAllMessagesBridge({
+            taskId: config.selartiResponseTaskId,
+            correlation: selartiIngress,
+            receipts: selartiIngress,
+            responses: createSelartiResponseService({
+              enabled: true,
+              tenantKey: config.clientTelegramBotKey,
+              allowedUrlHosts: ["ii-tonya.ru"],
+              clock: () => new Date(),
+              proposals: new PostgresSelartiProposalRepository(db),
+            }),
           })
         : undefined;
     const clientAccountQueries = createClientBotAccountComposition(db, config);

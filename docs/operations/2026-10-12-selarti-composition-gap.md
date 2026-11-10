@@ -64,23 +64,22 @@ retrieval before activation. Existing injected ports and disabled flags are not
 completed commercial assistance. This remains required by the full-product goal,
 independently of the ongoing calendar implementation.
 
-## Additional startup blocker verified in current source
+## Startup gate replaced
 
-`packages/config/src/env.ts` requires SELARTI_RESPONSE_INGRESS_ENABLED=true
-when TEST_EXPERT_SELARTI_ENABLED=true. The response-ingress branch then always
-throws selarti_response_official_fixture_required, even with otherwise valid
-configuration. Runtime projection also fixes selartiResponseIngress=false.
-Consequently the current expert-AI configuration cannot start successfully;
-supplying credentials or flipping flags does not finish this integration.
+The unconditional `selarti_response_official_fixture_required` throw and the
+hardcoded `selartiResponseIngress=false` projection were replaced by the
+documented all-messages fixture. `SELARTI_RESPONSE_INGRESS_ENABLED=true` can
+start when the shared secret, client bot key, and `SELARTI_TASK_ID` are set.
+The webhook URL and flags are in
+`docs/operations/selarti-all-messages-webhook.md`.
 
-Keep this guard until an authenticated, provider-bound response bridge and its
-official contract evidence exist. Removing only the throw would expose an
-unfinished path. Production composition must wire that bridge to the existing
-proposal service while preserving requestId/threadId binding, copy/URL validation,
-original consent/cost admission, durable outcome uncertainty and response deadline.
-An authenticated polling bridge and a provider webhook are different capabilities;
-do not label an unsigned provider webhook as trusted internal response ingress.
+The bridge still builds the internal proposal (`threadId` equals the sha256
+`requestId`) and keeps copy, URL, consent, and deadline checks. Raw Selarti
+ids stay out of that validator. `B2_TELEGRAM_DISPATCH_ENABLED` remains a
+separate default-off flag. `SELARTI_RESPONSE_POLL_ENABLED` is a separate
+default-off `get_message` fallback and is not a substitute for the webhook.
 
-Required configuration tests: enabled real bridge starts, missing bridge fails,
-wrong task/company/bot fails, duplicate/late/foreign response performs no extra
-delivery or charge. These tests have not been run by this inspection.
+Route and unit tests cover the documented payload, URL and bearer auth,
+ignored user messages, one-chat correlation, message_id idempotency, and extra
+fields. Proposal acceptance, consent, and Telegram dispatch stay on their
+existing paths and flags.

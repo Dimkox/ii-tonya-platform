@@ -318,6 +318,7 @@ describe("server composition", () => {
       displayTimezone: "Europe/Moscow",
       yookassaRecovery: { enabled: false },
       clientTelegramBotKey: "bot-b2",
+      selartiResponseTaskId: "1721129985149x478019552540622850",
       features: {
         workerOutboxDelivery: false,
         clientCatalog: false,

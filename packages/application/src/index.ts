@@ -23,6 +23,7 @@ export * from "./client-commercial-policy.js";
 export * from "./operator-case-service.js";
 export * from "./hybrid-message-gateway.js";
 export * from "./selarti-response-service.js";
+export * from "./selarti-all-messages-bridge.js";
 export * from "./selarti-cost-calculator.js";
 export * from "./partner-commerce.js";
 export * from "./test-expert-warmup.js";

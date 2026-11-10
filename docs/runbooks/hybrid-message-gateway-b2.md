@@ -2,9 +2,12 @@
 
 ## Activation gates
 
-Keep `SELARTI_RESPONSE_INGRESS_ENABLED`, `B2_TELEGRAM_DISPATCH_ENABLED`, and
-`B2_SENSITIVE_RETENTION_ENABLED` false until the official signed/shared-secret Selarti
-fixture, staging delivery/reconciliation, retention, and release approvals are recorded.
+Keep `SELARTI_RESPONSE_INGRESS_ENABLED`, `SELARTI_RESPONSE_POLL_ENABLED`,
+`B2_TELEGRAM_DISPATCH_ENABLED`, and `B2_SENSITIVE_RETENTION_ENABLED` false until
+staging delivery and release approvals are recorded. The response ingress now
+accepts Selarti's documented all-messages webhook (see
+`docs/operations/selarti-all-messages-webhook.md`). Turning that flag on does
+not enable Telegram dispatch.
 The worker capability is implemented, but production registry binding to the Telegram
 transport/token is intentionally absent until those gates pass.
 

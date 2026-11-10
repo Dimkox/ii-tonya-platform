@@ -80,6 +80,8 @@ import {
   PostgresExpertTelegramResidencyCallbackRepository,
   PostgresOperatorCaseOutboxRepository,
   PostgresOutboxRepository,
+  PostgresSelartiProposalRepository,
+  PostgresSelartiResponseIngressRepository,
   PostgresOrderedTelegramOutboxRepository,
   PostgresWorkerJobsRepository,
   PostgresTestExpertTelegramRepository,
@@ -122,7 +124,9 @@ import {
   type OutboxDispatcher,
   type OutboxReconciler,
   reconcileTestExpertTrial,
+  createSelartiResponsePollRunner,
 } from "@ii-tonya/worker";
+import { createSelartiResponseService } from "@ii-tonya/application";
 
 type RuntimeConfig = ReturnType<typeof loadEnv>;
 type BoundedJob = () => Promise<unknown>;
@@ -841,6 +845,50 @@ export function createProductionWorkerRuntimeFactory(
                 ))
             )(db, config.clientBookingConfirmationBufferMs ?? 3_600_000)
           : undefined;
+        const selartiResponsePoll =
+          config.features.selartiResponsePoll === true
+            ? (() => {
+                if (
+                  config.selartiLive === undefined ||
+                  config.clientTelegramBotKey === undefined ||
+                  config.selartiResponseTaskId === undefined ||
+                  config.selartiLive.taskId !== config.selartiResponseTaskId
+                )
+                  throw new Error(
+                    "selarti_response_poll_configuration_incomplete",
+                  );
+                const ingress = new PostgresSelartiResponseIngressRepository(
+                  db,
+                  config.clientTelegramBotKey,
+                );
+                const run = createSelartiResponsePollRunner({
+                  apiKey: config.selartiLive.apiKey,
+                  companyId: config.selartiLive.companyId,
+                  taskId: config.selartiLive.taskId,
+                  aiId: config.selartiLive.aiId,
+                  listPending: (limit) => ingress.listBoundPending(limit),
+                  receipts: ingress,
+                  responses: createSelartiResponseService({
+                    enabled: true,
+                    tenantKey: config.clientTelegramBotKey,
+                    allowedUrlHosts: ["ii-tonya.ru"],
+                    clock: () => new Date(),
+                    proposals: new PostgresSelartiProposalRepository(db),
+                  }),
+                });
+                return async () => {
+                  const result = await run();
+                  if (result.examined > 0 || result.skipped > 0)
+                    logger.info({
+                      event: "selarti_response_poll",
+                      examined: result.examined,
+                      ingested: result.ingested,
+                      skipped: result.skipped,
+                    });
+                  return result;
+                };
+              })()
+            : undefined;
         const workerRuntime = createProductionWorkerRuntime({
           ...(availability === undefined
             ? {}
@@ -958,6 +1006,7 @@ export function createProductionWorkerRuntimeFactory(
           ...(clientDelivery === undefined
             ? {}
             : { clientAsyncOutboxRunner: clientDelivery.run }),
+          ...(selartiResponsePoll === undefined ? {} : { selartiResponsePoll }),
           ...(workerOutbox === undefined
             ? {}
             : {
