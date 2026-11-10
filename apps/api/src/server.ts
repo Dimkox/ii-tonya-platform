@@ -720,19 +720,16 @@ export const createDefaultLifecycle = (
         : undefined;
     const selartiIngress =
       config.features.selartiResponseIngress === true &&
-      config.clientTelegramBotKey !== undefined &&
-      config.selartiResponseTaskId !== undefined
+      config.clientTelegramBotKey !== undefined
         ? new PostgresSelartiResponseIngressRepository(
             db,
             config.clientTelegramBotKey,
           )
         : undefined;
     const selartiResponses =
-      selartiIngress !== undefined &&
-      config.clientTelegramBotKey !== undefined &&
-      config.selartiResponseTaskId !== undefined
+      selartiIngress !== undefined && config.clientTelegramBotKey !== undefined
         ? createSelartiAllMessagesBridge({
-            taskId: config.selartiResponseTaskId,
+            taskId: config.selartiResponseTaskId ?? "unconfigured",
             correlation: selartiIngress,
             receipts: selartiIngress,
             responses: createSelartiResponseService({

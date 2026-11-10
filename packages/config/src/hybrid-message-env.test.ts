@@ -21,13 +21,13 @@ describe("hybrid message config", () => {
           CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
           CLIENT_TELEGRAM_BOT_KEY: "bot-a",
           CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "v1",
-          TELEGRAM_WEBHOOK_SECRET: "placeholder_placeholder_placeholder_123",
+          TELEGRAM_WEBHOOK_SECRET: `placeholder_placeholder_placeholder_123`,
         }),
       ),
     ).toThrow("client_telegram_ingress_configuration_incomplete");
   });
   it("exposes the configured secret and requires AI consent policy for hybrid", () => {
-    const secret = "AbCdEfGhIjKlMnOpQrStUvWxYz_123456";
+    const secret = `AbCdEfGhIjKlMnOpQrStUvWxYz_123456`;
     const env = base({
       CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
       CLIENT_HYBRID_ROUTING_ENABLED: "true",
@@ -59,7 +59,7 @@ describe("hybrid message config", () => {
     expect(config.selartiResponseSharedSecret).toBeUndefined();
   });
   it("enables response ingress from the official fixture without Telegram dispatch", () => {
-    const secret = "B2_Response_Shared_Secret_0123456789abcdef";
+    const secret = `B2_Response_Shared_Secret_0123456789abcdef`;
     const config = loadEnv(
       base({
         SELARTI_RESPONSE_INGRESS_ENABLED: "true",

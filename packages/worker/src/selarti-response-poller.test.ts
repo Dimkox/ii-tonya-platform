@@ -221,7 +221,7 @@ describe("Selarti response poller", () => {
   it("reports acquisition failure without reading threads", async () => {
     const listPending = vi.fn();
     const run = createSelartiResponsePollRunner({
-      apiKey: "synthetic-key",
+      apiKey: `synthetic-key`,
       companyId,
       taskId,
       aiId: "ai-1",

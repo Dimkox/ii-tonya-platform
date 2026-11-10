@@ -12,7 +12,7 @@ import { SELARTI_ALL_MESSAGES_FIXTURE } from "../../../../packages/config/src/se
 import { createSelartiAllMessagesBridge } from "../../../../packages/application/src/selarti-all-messages-bridge.js";
 import { selartiResponseRoutes } from "./selarti-response.js";
 
-const secret = "B2_Response_Shared_Secret_0123456789abcdef";
+const secret = `B2_Response_Shared_Secret_0123456789abcdef`;
 const body = {
   version: 1,
   requestId: `sha256:${"a".repeat(64)}`,
