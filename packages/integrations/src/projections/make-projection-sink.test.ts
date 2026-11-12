@@ -29,15 +29,17 @@ describe("Make projection sink", () => {
 
     await sink.publish(event);
 
-    expect(post).toHaveBeenCalledWith(expect.objectContaining({
-      endpoint: new URL("https://projection.invalid/events"),
-      headers: expect.objectContaining({
-        Authorization: "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
-        "Idempotency-Key": "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__",
+    expect(post).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endpoint: new URL("https://projection.invalid/events"),
+        headers: expect.objectContaining({
+          Authorization: "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+          "Idempotency-Key": "__PLACEHOLDER_PROJECTION_IDEMPOTENCY_KEY__",
+        }),
+        body: event,
+        signal: expect.any(AbortSignal),
       }),
-      body: event,
-      signal: expect.any(AbortSignal),
-    }));
+    );
     expect(post.mock.calls[0]?.[0].signal.aborted).toBe(false);
     expect(JSON.stringify(post.mock.calls[0])).not.toContain("rawConversation");
   });
@@ -53,11 +55,14 @@ describe("Make projection sink", () => {
     await sink.publish(event);
 
     expect(post.mock.calls[0]?.[0].signal).toBeInstanceOf(AbortSignal);
-    expect(() => new MakeProjectionSink({
-      endpoint: new URL("http://projection.invalid/events"),
-      authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
-      post,
-    })).toThrow("make_projection_https_required");
+    expect(
+      () =>
+        new MakeProjectionSink({
+          endpoint: new URL("http://projection.invalid/events"),
+          authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+          post,
+        }),
+    ).toThrow("make_projection_https_required");
   });
 
   it("rejects projection data outside the topic allowlist", async () => {
@@ -67,10 +72,12 @@ describe("Make projection sink", () => {
       post: vi.fn().mockResolvedValue({ status: 202 }),
     });
 
-    await expect(sink.publish({
-      ...event,
-      data: { ...event.data, rawConversation: "never export" },
-    })).rejects.toThrow("invalid_projection_data");
+    await expect(
+      sink.publish({
+        ...event,
+        data: { ...event.data, rawConversation: "never export" },
+      }),
+    ).rejects.toThrow("invalid_projection_data");
   });
 
   it("normalizes retryable and permanent delivery failures", async () => {
@@ -105,9 +112,9 @@ describe("Make projection sink", () => {
       post,
     });
 
-    await expect(sink.publish({ ...event, data } as never)).rejects.toBeInstanceOf(
-      MakeProjectionPermanentFailure,
-    );
+    await expect(
+      sink.publish({ ...event, data } as never),
+    ).rejects.toBeInstanceOf(MakeProjectionPermanentFailure);
     expect(post).not.toHaveBeenCalled();
   });
 
@@ -119,14 +126,20 @@ describe("Make projection sink", () => {
       post,
     });
 
-    await expect(sink.publish({
-      ...event,
-      topic: "package_balance_projection.v1",
-      data: { userId: "u-1", packageId: "p-1", ledgerDerivedBalance: Number.NaN },
-    } as never)).rejects.toBeInstanceOf(MakeProjectionPermanentFailure);
-    await expect(sink.publish({ ...event, topic: "toString", data: {} } as never)).rejects.toBeInstanceOf(
-      MakeProjectionPermanentFailure,
-    );
+    await expect(
+      sink.publish({
+        ...event,
+        topic: "package_balance_projection.v1",
+        data: {
+          userId: "u-1",
+          packageId: "p-1",
+          ledgerDerivedBalance: Number.NaN,
+        },
+      } as never),
+    ).rejects.toBeInstanceOf(MakeProjectionPermanentFailure);
+    await expect(
+      sink.publish({ ...event, topic: "toString", data: {} } as never),
+    ).rejects.toBeInstanceOf(MakeProjectionPermanentFailure);
     expect(post).not.toHaveBeenCalled();
   });
 
@@ -136,21 +149,26 @@ describe("Make projection sink", () => {
     ["undefined", undefined],
     ["function", () => true],
     ["bigint", 1n],
-  ])("rejects feedback escalated with a %s value", async (_label, escalated) => {
-    const post = vi.fn().mockResolvedValue({ status: 202 });
-    const sink = new MakeProjectionSink({
-      endpoint: new URL("https://projection.invalid/events"),
-      authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
-      post,
-    });
+  ])(
+    "rejects feedback escalated with a %s value",
+    async (_label, escalated) => {
+      const post = vi.fn().mockResolvedValue({ status: 202 });
+      const sink = new MakeProjectionSink({
+        endpoint: new URL("https://projection.invalid/events"),
+        authorization: () => "Bearer __PLACEHOLDER_MAKE_PROJECTION_TOKEN__",
+        post,
+      });
 
-    await expect(sink.publish({
-      ...event,
-      topic: "feedback_projection.v1",
-      data: { feedbackId: "f-1", score: 5, escalated },
-    } as never)).rejects.toBeInstanceOf(MakeProjectionPermanentFailure);
-    expect(post).not.toHaveBeenCalled();
-  });
+      await expect(
+        sink.publish({
+          ...event,
+          topic: "feedback_projection.v1",
+          data: { feedbackId: "f-1", score: 5, escalated },
+        } as never),
+      ).rejects.toBeInstanceOf(MakeProjectionPermanentFailure);
+      expect(post).not.toHaveBeenCalled();
+    },
+  );
 
   it.each([
     ["event id", { ...event, eventId: 7 }],
@@ -183,7 +201,9 @@ describe("Make projection sink", () => {
 
     await sink.publish(event);
 
-    expect(post.mock.calls[0]?.[0].endpoint.href).toBe("https://projection.invalid/events");
+    expect(post.mock.calls[0]?.[0].endpoint.href).toBe(
+      "https://projection.invalid/events",
+    );
   });
 
   it("classifies malformed transport results and authorization failures as permanent", async () => {
