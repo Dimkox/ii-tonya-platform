@@ -71,4 +71,5 @@ export {
 export * from "./expert-promo-funnel-jobs.js";
 export * from "./expert-promo-faq.js";
 
+export * from "./resident-onboarding-extraction-prompt.js";
 export * from "./expert-test-prompts.js";

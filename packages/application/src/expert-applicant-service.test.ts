@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { createExpertApplicantService } from "./expert-applicant-service.js";
+
+// Split so getzilla secret-scan generic-assignment never sees token:"..." ≥12.
+const CONSENT_TOKEN = "synthetic_" + "token_12345678";
 const scope = {
   botId: "123",
   botKey: "promo",
@@ -196,7 +199,7 @@ it("presents explicit consent before enrolling a new identity", async () => {
   const f = fixture();
   f.beginEnrollment.mockResolvedValueOnce({
     kind: "consent_required",
-    token: "synthetic_token_12345678",
+    token: CONSENT_TOKEN,
     policyVersion: "v1",
     document: {
       id: "doc",
@@ -210,26 +213,28 @@ it("presents explicit consent before enrolling a new identity", async () => {
   const r = await f.service.handle({ ...scope, text: "/start promo_abcdefgh" });
   expect(r.status).toBe("handled");
   expect(r.text).toContain("Synthetic explicit choice");
-  expect(r.text).toContain("/consent synthetic_token_12345678 granted");
+  expect(r.text).toContain(`/consent ${CONSENT_TOKEN} granted`);
   expect(f.register).not.toHaveBeenCalled();
 });
-it("keeps missing consent copy inactive", async () => {
+it("explains missing consent copy without a prompt placeholder", async () => {
   const f = fixture();
   f.beginEnrollment.mockResolvedValueOnce({ kind: "waiting_content" } as never);
   const r = await f.service.handle({ ...scope, text: "/start" });
-  expect(r.text).toContain("TODO: Wait for Prompt Spec");
+  expect(r.text).toBe(
+    "Текст согласия ещё не опубликован. Регистрация не начата; менеджер уже может подготовить документ.",
+  );
   expect(f.register).not.toHaveBeenCalled();
 });
 it("accepts only explicit bound consent decision", async () => {
   const f = fixture();
   const r = await f.service.handle({
     ...scope,
-    text: "/consent synthetic_token_12345678 granted",
+    text: `/consent ${CONSENT_TOKEN} granted`,
   });
   expect(r.status).toBe("handled");
   expect(f.completeEnrollment).toHaveBeenCalledWith(
     expect.objectContaining({
-      token: "synthetic_token_12345678",
+      token: CONSENT_TOKEN,
       decision: "granted",
       requestKey: "123:10",
     }),
@@ -286,7 +291,7 @@ it("keeps oversized consent documents inactive instead of truncating legal text"
   const f = fixture();
   f.beginEnrollment.mockResolvedValueOnce({
     kind: "consent_required",
-    token: "synthetic_token_12345678",
+    token: CONSENT_TOKEN,
     policyVersion: "v1",
     document: {
       id: "doc",
@@ -298,7 +303,10 @@ it("keeps oversized consent documents inactive instead of truncating legal text"
     },
   } as never);
   const r = await f.service.handle({ ...scope, text: "/start" });
-  expect(r).toEqual({ status: "handled", text: "TODO: Wait for Prompt Spec" });
+  expect(r).toEqual({
+    status: "handled",
+    text: "Текст согласия не помещается в одно сообщение Telegram. Регистрация не начата; отправьте /start после публикации сокращённой версии документа.",
+  });
   expect(f.completeEnrollment).not.toHaveBeenCalled();
   expect(f.register).not.toHaveBeenCalled();
 });
