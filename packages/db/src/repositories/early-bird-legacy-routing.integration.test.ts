@@ -7,6 +7,7 @@ import {
 } from "../testkit/expert-referral.js";
 import { seedClientConsent } from "../testkit/client-consent.js";
 import { PostgresEarlyBirdLegacyRouting } from "./early-bird-legacy-routing.js";
+import { earlyBirdLaunchPeriodClock } from "../testkit/early-bird-clock.js";
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
   db = await startExpertReferralTestDatabase();
@@ -16,9 +17,7 @@ beforeAll(async () => {
   await db.db.execute(
     sql`insert into early_bird_launch_configs(phase,enrollment_start_at,client_start_at,promo_deadline_days,final_call_trigger_at) values ('WAVE_1_EARLY_BIRD','2026-11-01T00:00:00+03:00','2027-01-11T00:00:00+03:00',10,'2026-12-28T10:00:00+03:00')`,
   );
-  await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
-  );
+  await db.db.execute(earlyBirdLaunchPeriodClock());
 }, 120000);
 afterAll(async () => {
   await db?.stop();

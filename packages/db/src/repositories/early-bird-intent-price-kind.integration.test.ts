@@ -4,12 +4,11 @@ import { sql } from "drizzle-orm";
 import { calculateSeparatedSalesTerms } from "@ii-tonya/domain";
 import { type ExpertReferralTestDatabase } from "../testkit/expert-referral.js";
 import { startHistoricalEarlyBirdIntentDatabase } from "../testkit/early-bird-historical-intent.js";
+import { earlyBirdLaunchPeriodClock } from "../testkit/early-bird-clock.js";
 let db: ExpertReferralTestDatabase;
 beforeAll(async () => {
   db = await startHistoricalEarlyBirdIntentDatabase();
-  await db.db.execute(
-    sql`create or replace function early_bird_current_time() returns timestamptz language sql volatile as $$ select clock_timestamp() $$`,
-  );
+  await db.db.execute(earlyBirdLaunchPeriodClock());
 }, 120_000);
 afterAll(async () => {
   await db?.stop();
