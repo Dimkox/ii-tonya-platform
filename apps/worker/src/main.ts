@@ -1,3 +1,4 @@
+import { PostgresExpertResidencyProviderReader } from "./expert-residency-db-reader.js";
 import { createFinalCallScheduler } from "./early-bird-final-call-scheduler.js";
 import { createGatewayWorkerBootstrap } from "./gateway-worker-bootstrap.js";
 import { PostgresWorkerReceiptRetention } from "@ii-tonya/db";
@@ -435,6 +436,7 @@ export function composeB2TelegramDelivery(
 export function selectExpertResidencyProviderReader(
   config: RuntimeConfig,
   yookassaReader?: ExpertResidencyProviderReader,
+  dbReader?: () => ExpertResidencyProviderReader,
 ): ExpertResidencyProviderReader {
   if (config.features.yookassa !== true) {
     if (yookassaReader !== undefined) {
@@ -447,6 +449,9 @@ export function selectExpertResidencyProviderReader(
   }
   if (yookassaReader !== undefined)
     throw new Error("yookassa_unguarded_reader_rejected");
+  // SCRUM-506: provider truth comes from authenticated events in our own DB.
+  // Without a DB reader the worker stays fail-closed (disabled).
+  if (dbReader !== undefined) return dbReader();
   return disabledExpertResidencyProviderReader;
 }
 
@@ -514,10 +519,8 @@ export function createProductionWorkerRuntimeFactory(
       ) {
         throw new Error("worker_outbox_delivery_capability_unavailable");
       }
-      const expertResidencyProviderReader = selectExpertResidencyProviderReader(
-        config,
-        deps.yookassaReader,
-      );
+      // Validate reader capability before opening the DB.
+      selectExpertResidencyProviderReader(config, deps.yookassaReader);
       const db = createDb(config.databaseUrl);
       let publicExpert:
         import("@ii-tonya/db").PublicExpertPaymentRuntime | undefined;
@@ -935,7 +938,12 @@ export function createProductionWorkerRuntimeFactory(
           expertTelegramCheckoutRepository:
             new PostgresExpertTelegramResidencyCallbackRepository(db),
           expertResidencyProviderReader:
-            yookassa?.reader ?? expertResidencyProviderReader,
+            yookassa?.reader ??
+            selectExpertResidencyProviderReader(
+              config,
+              deps.yookassaReader,
+              () => new PostgresExpertResidencyProviderReader(db),
+            ),
           ...(yookassa === undefined
             ? {}
             : { yookassaBoundRecovery: yookassa }),
