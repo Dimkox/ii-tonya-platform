@@ -432,6 +432,31 @@ export function composeB2TelegramDelivery(
   } as const;
 }
 
+type LifecycleKindsEnabled = NonNullable<
+  ConstructorParameters<typeof PostgresLifecycleSchedulerRepository>[3]
+>;
+
+/** SCRUM-512: each lifecycle kind runs only behind its own flag; all default
+ * off. Messaging kinds require the consent policy and client bot key. */
+export function selectLifecycleKinds(
+  config: RuntimeConfig,
+): LifecycleKindsEnabled | undefined {
+  const kinds = {
+    reminders: config.features.lifecycleReminders === true,
+    checkups: config.features.lifecycleCheckups === true,
+    feedback: config.features.lifecycleFeedback === true,
+    couponNotices: config.features.lifecycleCouponNotices === true,
+  };
+  if (!Object.values(kinds).some(Boolean)) return undefined;
+  if (
+    !config.clientMessagingConsentPolicyVersion ||
+    !config.clientTelegramBotKey
+  ) {
+    throw new Error("lifecycle_messaging_capability_unavailable");
+  }
+  return kinds;
+}
+
 export function selectExpertResidencyProviderReader(
   config: RuntimeConfig,
   yookassaReader?: ExpertResidencyProviderReader,
@@ -821,13 +846,16 @@ export function createProductionWorkerRuntimeFactory(
           : undefined;
         const bookingHandoffRevocations =
           new PostgresBookingHandoffRevocationRepository(db);
-        const lifecycleSchedulerRepository = config.features.lifecycleReminders
-          ? new PostgresLifecycleSchedulerRepository(
-              db,
-              config.clientMessagingConsentPolicyVersion!,
-              config.clientTelegramBotKey!,
-            )
-          : undefined;
+        const lifecycleKinds = selectLifecycleKinds(config);
+        const lifecycleSchedulerRepository =
+          lifecycleKinds === undefined
+            ? undefined
+            : new PostgresLifecycleSchedulerRepository(
+                db,
+                config.clientMessagingConsentPolicyVersion!,
+                config.clientTelegramBotKey!,
+                lifecycleKinds,
+              );
         const waitlistRepository = config.features.clientWaitlist
           ? (
               deps.waitlistRepositoryFactory ??
