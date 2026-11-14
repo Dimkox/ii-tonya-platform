@@ -21,13 +21,13 @@ describe("hybrid message config", () => {
           CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
           CLIENT_TELEGRAM_BOT_KEY: "bot-a",
           CLIENT_MESSAGING_CONSENT_POLICY_VERSION: "v1",
-          TELEGRAM_WEBHOOK_SECRET: "placeholder_placeholder_placeholder_123",
+          TELEGRAM_WEBHOOK_SECRET: `placeholder_placeholder_placeholder_123`,
         }),
       ),
     ).toThrow("client_telegram_ingress_configuration_incomplete");
   });
   it("exposes the configured secret and requires AI consent policy for hybrid", () => {
-    const secret = "AbCdEfGhIjKlMnOpQrStUvWxYz_123456";
+    const secret = `AbCdEfGhIjKlMnOpQrStUvWxYz_123456`;
     const env = base({
       CLIENT_TELEGRAM_INGRESS_ENABLED: "true",
       CLIENT_HYBRID_ROUTING_ENABLED: "true",
@@ -53,20 +53,43 @@ describe("hybrid message config", () => {
   it("keeps every B2 provider and retention capability independently off", () => {
     const config = loadEnv(base());
     expect(config.features.selartiResponseIngress).toBe(false);
+    expect(config.features.selartiResponsePoll).toBe(false);
     expect(config.features.b2TelegramDispatch).toBe(false);
     expect(config.features.b2SensitiveRetention).toBe(false);
     expect(config.selartiResponseSharedSecret).toBeUndefined();
   });
-  it("blocks Selarti response activation until an official fixture contract exists", () => {
+  it("enables response ingress from the official fixture without Telegram dispatch", () => {
+    const secret = `B2_Response_Shared_Secret_0123456789abcdef`;
+    const config = loadEnv(
+      base({
+        SELARTI_RESPONSE_INGRESS_ENABLED: "true",
+        SELARTI_RESPONSE_SHARED_SECRET: secret,
+        SELARTI_TASK_ID: "1721129985149x478019552540622850",
+        CLIENT_TELEGRAM_BOT_KEY: "bot-a",
+      }),
+    );
+    expect(config.features.selartiResponseIngress).toBe(true);
+    expect(config.features.selartiResponsePoll).toBe(false);
+    expect(config.features.b2TelegramDispatch).toBe(false);
+    expect(config.selartiResponseTaskId).toBe(
+      "1721129985149x478019552540622850",
+    );
+    expect(config.selartiResponseSharedSecret).toBe(secret);
     expect(() =>
       loadEnv(
         base({
           SELARTI_RESPONSE_INGRESS_ENABLED: "true",
-          SELARTI_RESPONSE_SHARED_SECRET:
-            "B2_Response_Shared_Secret_0123456789abcdef",
+          SELARTI_RESPONSE_SHARED_SECRET: secret,
           CLIENT_TELEGRAM_BOT_KEY: "bot-a",
         }),
       ),
-    ).toThrow("selarti_response_official_fixture_required");
+    ).toThrow("selarti_response_configuration_incomplete");
+    expect(() =>
+      loadEnv(
+        base({
+          SELARTI_RESPONSE_POLL_ENABLED: "true",
+        }),
+      ),
+    ).toThrow("selarti_response_poll_configuration_incomplete");
   });
 });

@@ -197,7 +197,7 @@ export interface AppDependencies {
   selartiResponseSharedSecret?: string;
   selartiResponses?: {
     handle(raw: unknown): Promise<{
-      readonly status: SelartiProposalAcceptResult | "unavailable";
+      readonly status: SelartiProposalAcceptResult | "unavailable" | "ignored";
     }>;
   };
   adminApprovals?: ApprovalPort;

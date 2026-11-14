@@ -28,7 +28,17 @@ const messageSchema = z.object({
   text,
   message_type: id,
   message_status: id,
+  "Created Date": z.unknown().optional(),
 });
+
+function readCreatedAt(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
 const sendResponse = z.object({
   status: z.literal("success"),
   response: z.object({ thread: threadSchema }),
@@ -52,6 +62,7 @@ export interface SelartiRestMessage {
   text: string;
   messageType: string;
   messageStatus: string;
+  createdAt?: number;
 }
 export type SelartiMessagesResult =
   | { kind: "page"; messages: SelartiRestMessage[] }
@@ -144,15 +155,19 @@ export class SelartiRestClient {
         ) {
           return {
             kind: "page",
-            messages: rows.map((row) => ({
-              id: row._id,
-              threadId: row.thread,
-              taskId: row.task,
-              companyId: row.company,
-              text: row.text,
-              messageType: row.message_type,
-              messageStatus: row.message_status,
-            })),
+            messages: rows.map((row) => {
+              const createdAt = readCreatedAt(row["Created Date"]);
+              return {
+                id: row._id,
+                threadId: row.thread,
+                taskId: row.task,
+                companyId: row.company,
+                text: row.text,
+                messageType: row.message_type,
+                messageStatus: row.message_status,
+                ...(createdAt === undefined ? {} : { createdAt }),
+              };
+            }),
           };
         }
       }

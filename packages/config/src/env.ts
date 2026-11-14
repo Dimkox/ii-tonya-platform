@@ -1,3 +1,4 @@
+import { assertSelartiOfficialResponseFixture } from "./selarti-official-response-fixture.js";
 import {
   readResidentLifecycleCompletionConfig,
   type ResidentLifecycleCompletionConfig,
@@ -173,6 +174,7 @@ const schema = z
     SELARTI_RESPONSE_INGRESS_ENABLED: z
       .enum(["true", "false"])
       .default("false"),
+    SELARTI_RESPONSE_POLL_ENABLED: z.enum(["true", "false"]).default("false"),
     B2_TELEGRAM_DISPATCH_ENABLED: z.enum(["true", "false"]).default("false"),
     B2_SENSITIVE_RETENTION_ENABLED: z.enum(["true", "false"]).default("false"),
     TEST_EXPERT_PROMO_ENABLED: z.enum(["true", "false"]).default("false"),
@@ -637,6 +639,8 @@ export type RuntimeConfig = {
     aiId: string;
   };
   selartiResponseSharedSecret?: string;
+  /** Present when SELARTI_RESPONSE_INGRESS_ENABLED=true. */
+  selartiResponseTaskId?: string;
   features: {
     ownerTestPricingAdmin?: boolean;
     clientAccountQueries?: boolean;
@@ -672,6 +676,7 @@ export type RuntimeConfig = {
     clientHybridRouting?: boolean;
     selartiCostAdmission?: boolean;
     selartiResponseIngress?: boolean;
+    selartiResponsePoll?: boolean;
     telegramEgressConsentGate?: boolean;
     b2TelegramDispatch?: boolean;
     b2SensitiveRetention?: boolean;
@@ -1070,11 +1075,19 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     if (
       !value.SELARTI_RESPONSE_SHARED_SECRET ||
       /placeholder/iu.test(value.SELARTI_RESPONSE_SHARED_SECRET) ||
-      !value.CLIENT_TELEGRAM_BOT_KEY
+      !value.CLIENT_TELEGRAM_BOT_KEY ||
+      !selartiBindingId(value.SELARTI_TASK_ID)
     ) {
       throw new Error("selarti_response_configuration_incomplete");
     }
-    throw new Error("selarti_response_official_fixture_required");
+    assertSelartiOfficialResponseFixture();
+  }
+  if (
+    value.SELARTI_RESPONSE_POLL_ENABLED === "true" &&
+    (value.SELARTI_RESPONSE_INGRESS_ENABLED !== "true" ||
+      value.SELARTI_ENABLED !== "true")
+  ) {
+    throw new Error("selarti_response_poll_configuration_incomplete");
   }
 
   if (value.RAW_CONVERSATION_LOGGING === "true") {
@@ -1168,6 +1181,9 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
     ...(value.SELARTI_RESPONSE_SHARED_SECRET === undefined
       ? {}
       : { selartiResponseSharedSecret: value.SELARTI_RESPONSE_SHARED_SECRET }),
+    ...(value.SELARTI_RESPONSE_INGRESS_ENABLED === "true"
+      ? { selartiResponseTaskId: value.SELARTI_TASK_ID! }
+      : {}),
     ...(source.RESIDENT_PRIVATE_JOBS_ENABLED === "true"
       ? { privateVerification: privateVerificationConfig(source) }
       : {}),
@@ -1241,7 +1257,8 @@ export function loadEnv(source: NodeJS.ProcessEnv): RuntimeConfig {
         value.CLIENT_TELEGRAM_NAVIGATION_ENABLED === "true",
       clientHybridRouting: value.CLIENT_HYBRID_ROUTING_ENABLED === "true",
       selartiCostAdmission: value.SELARTI_COST_ADMISSION_ENABLED === "true",
-      selartiResponseIngress: false,
+      selartiResponseIngress: value.SELARTI_RESPONSE_INGRESS_ENABLED === "true",
+      selartiResponsePoll: value.SELARTI_RESPONSE_POLL_ENABLED === "true",
       telegramEgressConsentGate:
         value.TELEGRAM_EGRESS_CONSENT_GATE_ENABLED === "true",
       b2TelegramDispatch: value.B2_TELEGRAM_DISPATCH_ENABLED === "true",

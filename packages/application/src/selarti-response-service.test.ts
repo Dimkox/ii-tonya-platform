@@ -109,6 +109,26 @@ describe("Selarti response application service", () => {
     });
   });
 
+  it("forwards the provider message key into the same accept call", async () => {
+    const proposals = {
+      accept: vi.fn(async () => "accepted" as const),
+    };
+    const service = createSelartiResponseService({
+      enabled: true,
+      tenantKey: "bot-b2",
+      allowedUrlHosts: ["ii-tonya.ru"],
+      clock: () => new Date("2026-08-29T00:00:10.000Z"),
+      proposals,
+    });
+    const messageReceiptKey = `sha256:${"d".repeat(64)}`;
+    await expect(service.handle(valid, { messageReceiptKey })).resolves.toEqual(
+      { status: "accepted" },
+    );
+    expect(proposals.accept).toHaveBeenCalledWith(
+      expect.objectContaining({ messageReceiptKey }),
+    );
+  });
+
   it("rejects prohibited copy at the enabled ingress before repository mutation", async () => {
     const proposals = { accept: vi.fn() };
     const service = createSelartiResponseService({

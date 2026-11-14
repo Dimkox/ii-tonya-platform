@@ -21,6 +21,7 @@ export interface SelartiProposalRepository {
     readonly text: string;
     readonly responsePayloadHash: string;
     readonly receivedAt: string;
+    readonly messageReceiptKey?: string;
   }): Promise<SelartiProposalAcceptResult>;
 }
 
@@ -108,7 +109,10 @@ export function createSelartiResponseService(deps: {
   readonly proposals: SelartiProposalRepository;
 }) {
   return {
-    async handle(raw: unknown): Promise<{
+    async handle(
+      raw: unknown,
+      context?: { readonly messageReceiptKey?: string },
+    ): Promise<{
       readonly status:
         | "accepted"
         | "duplicate"
@@ -142,6 +146,9 @@ export function createSelartiResponseService(deps: {
         tenantKey: deps.tenantKey,
         responsePayloadHash,
         receivedAt: deps.clock().toISOString(),
+        ...(context?.messageReceiptKey
+          ? { messageReceiptKey: context.messageReceiptKey }
+          : {}),
       });
       return { status };
     },
