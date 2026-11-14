@@ -1651,7 +1651,7 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
     expect(ordinary.json().text).not.toContain("Какие даты");
     for (const a of [
       "2",
-      "2026-11-11 2026-11-11",
+      "2026-12-15 2026-12-15",
       "3",
       "09:00-13:00",
       "нет",
@@ -1662,7 +1662,7 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
     while (previous.split("\n").at(-1)!.startsWith("/slots_page"))
       previous = (await send(previous.split("\n").at(-1)!)).json().text;
     const staleConfirmation = previous.split("\n").at(-1)!;
-    const invalidRaw = "2026-11-11 09:00-09:30 Консультация";
+    const invalidRaw = "2026-12-15 09:00-09:30 Консультация";
     expect((await send("/slots_import\n" + invalidRaw)).json().text).toContain(
       "Импорт сохранён",
     );
@@ -1683,7 +1683,7 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
       errors: 1,
     });
     const validRaw =
-      '2026-11-11,09:00,10:00,"Консультация"\n2026-11-11,10:15,11:15,"Консультация"';
+      '2026-12-15,09:00,10:00,"Консультация"\n2026-12-15,10:15,11:15,"Консультация"';
     expect((await send("/slots_import\n" + validRaw)).json().text).toContain(
       "Импорт сохранён",
     );
