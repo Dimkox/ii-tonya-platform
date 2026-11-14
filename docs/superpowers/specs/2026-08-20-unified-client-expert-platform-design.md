@@ -109,10 +109,11 @@ create a second Make/Google Sheets implementation beside the backend.
 - **UCP-COMM-03:** Model coupons as append-only grants, reservations, spends,
   expiries, reversals, and debts. `1 coupon = 1 RUB`, `2x`, `500`, and `90 days`
   are versioned commercial terms pending owner/legal approval.
-- **UCP-COMM-04:** Client referral binding is immutable after the permitted
-  onboarding window. Rewards settle only after authoritative first-payment
-  settlement and reverse on refund/chargeback without producing a negative
-  spendable balance.
+- **UCP-COMM-04:** Client referral binding belongs to the first inviter. A later
+  code does not move attribution or coupons. Rewards settle only after
+  authoritative first-payment settlement and reverse on refund/chargeback
+  without producing a negative spendable balance. Payments stay off until a
+  separate release; `client_referral_attributions` records the lock only.
 
 ### 4.5 Expert residency and referrals
 

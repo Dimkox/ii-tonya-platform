@@ -374,10 +374,11 @@ it("ordinary lifecycle verifies signed proof, issues the real DB bearer and revo
       payload: { identityProof: proof(999999999) },
     });
     expect(denied.statusCode).toBe(401);
+    const ownerProof = proof(123456789);
     const issued = await app.inject({
       method: "POST",
       url: "/v1/expert/sessions",
-      payload: { identityProof: proof(123456789) },
+      payload: { identityProof: ownerProof },
     });
     expect(issued.statusCode).toBe(201);
     const token = issued.json<{ accessToken: string }>().accessToken;
@@ -395,7 +396,7 @@ it("ordinary lifecycle verifies signed proof, issues the real DB bearer and revo
         await app.inject({
           method: "POST",
           url: "/v1/expert/sessions",
-          payload: { identityProof: proof(123456789) },
+          payload: { identityProof: ownerProof },
         })
       ).statusCode,
     ).toBe(401);

@@ -78,6 +78,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/0086_public_onboarding_terminal_projection.sql",
       "packages/db/migrations/0087_expert_promo_funnel_state.sql",
       "packages/db/migrations/0088_expert_promo_funnel_gift_timer.sql",
+      "packages/db/migrations/0089_referral_first_attribution.sql",
       "packages/db/migrations/meta/0018_snapshot.json",
       "packages/db/migrations/meta/0021_snapshot.json",
       "packages/db/migrations/meta/0076_snapshot.json",
@@ -93,6 +94,7 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/meta/0086_snapshot.json",
       "packages/db/migrations/meta/0087_snapshot.json",
       "packages/db/migrations/meta/0088_snapshot.json",
+      "packages/db/migrations/meta/0089_snapshot.json",
       "packages/db/migrations/meta/_journal.json",
       "packages/db/migrations/state/0076_manifest.json",
       "packages/db/migrations/state/0076_sql_objects.json",
@@ -120,6 +122,8 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/state/0087_sql_objects.json",
       "packages/db/migrations/state/0088_manifest.json",
       "packages/db/migrations/state/0088_sql_objects.json",
+      "packages/db/migrations/state/0089_manifest.json",
+      "packages/db/migrations/state/0089_sql_objects.json",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_RELATIONS].sort()).toEqual([
       "booking_handoff_revocation_receipts",
@@ -138,6 +142,7 @@ describe("expert residency referral scope boundary", () => {
       "client_paid_orders",
       "client_paid_payment_bindings",
       "client_paid_settlements",
+      "client_referral_attributions",
       "commercial_participants",
       "dialogue_deliveries",
       "dialogue_inbound",

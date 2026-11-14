@@ -1,4 +1,7 @@
-import { consentDocumentPublishable } from "@ii-tonya/domain";
+import {
+  consentDocumentPublishable,
+  decideFirstAttribution,
+} from "@ii-tonya/domain";
 import { saveExpertOfferProfileInTransaction } from "./expert-offer-v2.js";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
@@ -30,6 +33,7 @@ export interface ExpertPromoRegistration {
   guideStatus:
     "none" | "waiting_content" | "pending" | "delivered" | "cancelled";
   replay: boolean;
+  attribution?: "created" | "kept" | "ignored_late_start";
 }
 const fail = (code: string): never => {
   throw new Error(code);
@@ -181,7 +185,7 @@ export class PostgresExpertPromoRepository {
         superseded: boolean;
         guideStatus: ExpertPromoRegistration["guideStatus"];
       }>(
-        sql`select c.ref_code as "refCode",(select count(*)::int from expert_promo_registrations r join users u on u.id=r.user_id and u.active=true where r.referrer_user_id=c.user_id) as "referralCount", exists(select 1 from expert_promo_bonus_indications b where b.user_id=c.user_id) as "hasBonus", (exists(select 1 from expert_referral_reward_grants g join experts e on e.id=g.expert_id where e.user_id=c.user_id and g.amount_minor=100000) OR exists(select 1 from expert_referral_reward_maturities m join experts e on e.id=m.inviter_expert_id where e.user_id=c.user_id)) as superseded, coalesce((select status from expert_promo_guide_work w where w.user_id=c.user_id),'none') as "guideStatus" from expert_promo_codes c where c.user_id=${userId}::uuid`,
+        sql`select c.ref_code as "refCode",(select count(*)::int from expert_promo_registrations r join users u on u.id=r.user_id and u.active=true where r.referrer_user_id=c.user_id and r.counts_for_inviter is distinct from false) as "referralCount", exists(select 1 from expert_promo_bonus_indications b where b.user_id=c.user_id) as "hasBonus", (exists(select 1 from expert_referral_reward_grants g join experts e on e.id=g.expert_id where e.user_id=c.user_id and g.amount_minor=100000) OR exists(select 1 from expert_referral_reward_maturities m join experts e on e.id=m.inviter_expert_id where e.user_id=c.user_id)) as superseded, coalesce((select status from expert_promo_guide_work w where w.user_id=c.user_id),'none') as "guideStatus" from expert_promo_codes c where c.user_id=${userId}::uuid`,
       )
     ).rows[0];
     if (!row) return fail("promo_registration_unavailable");
@@ -293,8 +297,12 @@ export class PostgresExpertPromoRepository {
         )
       ).rows[0];
       const registered = (
-        await tx.execute<{ userId: string; referrerId: string | null }>(
-          sql`select user_id as "userId",referrer_user_id as "referrerId" from expert_promo_registrations where identity_digest=${identityDigest} or user_id=${userId}::uuid`,
+        await tx.execute<{
+          userId: string;
+          referrerId: string | null;
+          countsForInviter: boolean | null;
+        }>(
+          sql`select user_id as "userId",referrer_user_id as "referrerId",counts_for_inviter as "countsForInviter" from expert_promo_registrations where identity_digest=${identityDigest} or user_id=${userId}::uuid`,
         )
       ).rows;
       if (
@@ -302,14 +310,15 @@ export class PostgresExpertPromoRepository {
         (registered[0] && registered[0].userId !== userId)
       )
         fail("promo_identity_conflict");
+      const prior = registered[0];
       // The pending entry candidate is consumed only by the first registration.
       // Later plain /start must still work after the inviter/code is erased.
-      if (!registered.length && enrollment?.refCode) {
+      if (!prior && enrollment?.refCode) {
         if (refCode && refCode !== enrollment.refCode)
           fail("promo_attribution_locked");
         refCode = enrollment.refCode;
       }
-      let referrerId: string | null = null;
+      let requestedInviterId: string | null = null;
       if (refCode) {
         const owner = (
           await tx.execute<{ userId: string }>(
@@ -317,14 +326,41 @@ export class PostgresExpertPromoRepository {
           )
         ).rows[0];
         if (!owner) fail("promo_code_unavailable");
-        referrerId = owner!.userId;
-        if (referrerId === userId) fail("promo_self_referral");
-        if (registered[0] && registered[0].referrerId !== referrerId)
+        requestedInviterId = owner!.userId;
+        if (requestedInviterId === userId) fail("promo_self_referral");
+        if (prior && prior.referrerId !== requestedInviterId)
           fail("promo_attribution_locked");
       }
-      if (!registered.length) {
+      const decision = decideFirstAttribution({
+        referredId: userId,
+        requestedInviterId,
+        existingInviterId: prior?.referrerId ?? null,
+        alreadyRegistered: Boolean(prior),
+        priorStartWithoutCode: false,
+      });
+      if (decision.kind === "self") fail("promo_self_referral");
+      const referrerId =
+        decision.kind === "created" ? decision.inviterId : null;
+      // A plain /start keeps the stored first inviter and must not copy that
+      // UUID back into reward work. An erased inviter is inactive; recreating
+      // guide, bonus, or ready-log rows would undo privacy erasure.
+      const rewardInviterId =
+        decision.kind === "created"
+          ? decision.inviterId
+          : decision.kind === "kept" &&
+              requestedInviterId !== null &&
+              requestedInviterId === decision.inviterId
+            ? requestedInviterId
+            : null;
+      const attribution =
+        decision.kind === "created"
+          ? "created"
+          : decision.kind === "ignored_late_start"
+            ? "ignored_late_start"
+            : "kept";
+      if (!prior) {
         await tx.execute(
-          sql`insert into expert_promo_registrations(identity_digest,user_id,referrer_user_id) values(${identityDigest},${userId}::uuid,${referrerId}::uuid)`,
+          sql`insert into expert_promo_registrations(identity_digest,user_id,referrer_user_id,counts_for_inviter) values(${identityDigest},${userId}::uuid,${referrerId}::uuid,${decision.kind === "created"}) on conflict(user_id) do nothing`,
         );
       }
       await tx.execute(
@@ -335,21 +371,29 @@ export class PostgresExpertPromoRepository {
       await tx.execute(
         sql`insert into expert_promo_funnel_state(user_id,incoming_referrer_code) values(${userId}::uuid,${registered.length ? null : (refCode ?? null)}) on conflict(user_id) do update set last_interaction_at=greatest(expert_promo_funnel_state.last_interaction_at,clock_timestamp())`,
       );
-      if (referrerId) {
+      const rewardInviterActive =
+        rewardInviterId === null
+          ? false
+          : (
+              await tx.execute<{ active: boolean }>(
+                sql`select active from users where id=${rewardInviterId}::uuid`,
+              )
+            ).rows[0]?.active === true;
+      if (rewardInviterId && rewardInviterActive) {
         // Owner serialization is separate from consent locks, avoiding cross-referral
         // lock-order cycles. READ COMMITTED sees the winner after this wait.
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`promo-referrer:${referrerId}`},0))`,
+          sql`select pg_advisory_xact_lock(hashtextextended(${`promo-referrer:${rewardInviterId}`},0))`,
         );
         const count = (
           await tx.execute<{ count: number }>(
-            sql`select count(*)::int count from expert_promo_registrations r join users u on u.id=r.user_id and u.active=true where r.referrer_user_id=${referrerId}::uuid`,
+            sql`select count(*)::int count from expert_promo_registrations r join users u on u.id=r.user_id and u.active=true where r.referrer_user_id=${rewardInviterId}::uuid and r.counts_for_inviter is distinct from false`,
           )
         ).rows[0]!.count;
         if (count >= 2) {
           const created = (
             await tx.execute<{ userId: string }>(
-              sql`insert into expert_promo_guide_work(user_id,content_slot) values(${referrerId}::uuid,'TODO: Wait for PDF') on conflict do nothing returning user_id as "userId"`,
+              sql`insert into expert_promo_guide_work(user_id,content_slot) values(${rewardInviterId}::uuid,'TODO: Wait for PDF') on conflict do nothing returning user_id as "userId"`,
             )
           ).rows[0];
           if (created) {
@@ -358,16 +402,19 @@ export class PostgresExpertPromoRepository {
               sql`insert into expert_promo_ready_logs(id,event) values(${eventId}::uuid,'Ready to send')`,
             );
             await tx.execute(
-              sql`update expert_promo_guide_work set ready_log_event_id=${eventId}::uuid where user_id=${referrerId}::uuid`,
+              sql`update expert_promo_guide_work set ready_log_event_id=${eventId}::uuid where user_id=${rewardInviterId}::uuid`,
             );
           }
           await tx.execute(
-            sql`insert into expert_promo_bonus_indications(user_id) values(${referrerId}::uuid) on conflict do nothing`,
+            sql`insert into expert_promo_bonus_indications(user_id) values(${rewardInviterId}::uuid) on conflict do nothing`,
           );
         }
       }
       await this.saveRequest(tx, input, userId, "register");
-      return this.status(tx, userId, false);
+      return {
+        ...(await this.status(tx, userId, false)),
+        attribution,
+      };
     });
   }
   async listTariffs(raw: ExpertPromoCommand) {

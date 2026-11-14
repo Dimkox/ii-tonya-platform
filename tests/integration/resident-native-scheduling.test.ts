@@ -286,6 +286,12 @@ beforeAll(async () => {
         .split("--> statement-breakpoint")[0]!,
     ),
   );
+  await database.db.execute(
+    sql`alter table expert_promo_registrations add column counts_for_inviter boolean`,
+  );
+  await database.db.execute(
+    sql`alter table expert_promo_registrations add constraint expert_promo_counts_for_inviter check (counts_for_inviter is not true or referrer_user_id is not null)`,
+  );
   expect(
     (await database.db.execute(sql`show server_version_num`)).rows[0]
       ?.server_version_num,
@@ -373,8 +379,10 @@ beforeAll(async () => {
         .digest("hex"),
     })),
   ).toEqual(manifest.migrations);
-  // Remove the fixture-only funnel table so the real 0087 migration applies.
-  await database.db.execute(sql`drop table expert_promo_funnel_state`);
+  // Remove the fixture-only funnel table and column so the real migrations apply.
+  await database.db.execute(
+    sql`drop table expert_promo_funnel_state; alter table expert_promo_registrations drop constraint expert_promo_counts_for_inviter; alter table expert_promo_registrations drop column counts_for_inviter`,
+  );
   for (const entry of journal.entries.filter((entry) => entry.idx > 75))
     await database.db.execute(
       sql.raw(readFileSync(`packages/db/migrations/${entry.tag}.sql`, "utf8")),

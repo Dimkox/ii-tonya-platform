@@ -11,7 +11,7 @@ Seven new relations are explicitly registered in both residency and database rel
 inventories:
 
 - `expert_promo_codes`: reusable `promo_` namespace, independent of qualified codes/coupons.
-- `expert_promo_registrations`: unique Telegram identity digest and immutable attribution.
+- `expert_promo_registrations`: unique Telegram identity digest and immutable first-inviter attribution. A later code does not move the row. `counts_for_inviter` counts only a new visitor toward the one-time PDF.
 - `expert_promo_requests`: bot-scoped durable operation replay.
 - `expert_promo_guide_work`: pending content/delivery work; no fake PDF success.
 - `expert_promo_bonus_indications`: one frozen 100-point nonfinancial indication,

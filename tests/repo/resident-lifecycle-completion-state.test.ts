@@ -51,13 +51,6 @@ it("reconstructs lifecycle75 from SQL with owned deferred delivery authority and
   expect(journal[75].when).toBeGreaterThan(journal[74].when);
   expect(journal.slice(-5)).toEqual([
     {
-      idx: 84,
-      version: "7",
-      when: 1793152800015,
-      tag: "0084_public_expert_payment_gateway",
-      breakpoints: true,
-    },
-    {
       idx: 85,
       version: "7",
       when: 1793152800016,
@@ -83,6 +76,13 @@ it("reconstructs lifecycle75 from SQL with owned deferred delivery authority and
       version: "7",
       when: 1793152800019,
       tag: "0088_expert_promo_funnel_gift_timer",
+      breakpoints: true,
+    },
+    {
+      idx: 89,
+      version: "7",
+      when: 1793152800020,
+      tag: "0089_referral_first_attribution",
       breakpoints: true,
     },
   ]);

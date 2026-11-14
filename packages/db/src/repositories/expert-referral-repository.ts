@@ -8,7 +8,10 @@ import {
 } from "../schema/expert-residency.js";
 import { PostgresExpertReferralControlRepository } from "./expert-referral-control-repository.js";
 import { withSerializableRetry } from "./message-repository.js";
-import { assertTrustedExpertReferralTransaction, type TrustedExpertReferralTransaction } from "./expert-referral-transaction-capability.js";
+import {
+  assertTrustedExpertReferralTransaction,
+  type TrustedExpertReferralTransaction,
+} from "./expert-referral-transaction-capability.js";
 
 const BASE_ISSUANCE_QUOTA = 1000;
 
@@ -81,10 +84,7 @@ export interface MaskedExpertReferralCode extends Record<string, unknown> {
 }
 
 export type ExpertReferralBatchStatus =
-  | "issued"
-  | "partially_redeemed"
-  | "fully_redeemed"
-  | "revoked";
+  "issued" | "partially_redeemed" | "fully_redeemed" | "revoked";
 
 type ExpertReferralCodeStatus = "issued" | "redeemed" | "revoked";
 
@@ -325,7 +325,8 @@ export class PostgresExpertReferralRepository {
     assertBatchSize(command.count);
     return withReferralTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (!transactionOwnedReferrals.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedReferrals.has(this))
+          await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
@@ -457,7 +458,8 @@ export class PostgresExpertReferralRepository {
   ): Promise<{ id: string; status: "revoked" }> {
     return withReferralTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (!transactionOwnedReferrals.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedReferrals.has(this))
+          await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
@@ -518,7 +520,8 @@ export class PostgresExpertReferralRepository {
     const candidates = this.crypto.digestCandidates(command.plaintext);
     return withReferralTransactionRetry(this, () =>
       this.db.transaction(async (tx) => {
-        if (!transactionOwnedReferrals.has(this)) await tx.execute(sql`set transaction isolation level serializable`);
+        if (!transactionOwnedReferrals.has(this))
+          await tx.execute(sql`set transaction isolation level serializable`);
         const control = await this.#controls.lockFeatureControl(tx);
         if (!control.newCommandsEnabled) {
           throw new ExpertReferralCommandError(
@@ -655,13 +658,15 @@ export class PostgresExpertReferralRepository {
           ) values (
             ${code.id}::uuid, ${code.inviterExpertId}::uuid,
             ${invitee.id}::uuid, transaction_timestamp()
-          ) returning id as "referralId", bound_at as "boundAt"
+          )
+          on conflict (invitee_expert_id) do nothing
+          returning id as "referralId", bound_at as "boundAt"
         `);
         const binding = referral.rows[0];
         if (binding === undefined) {
           throw new ExpertReferralCommandError(
-            "EXPERT_REFERRAL_COMMAND_CONFLICT",
-            "Expert referral binding was not created",
+            "EXPERT_REFERRAL_NOT_ELIGIBLE",
+            "Expert referral invitee already has a first inviter",
           );
         }
         await this.refreshBatchStatus(tx, code.batchId);
@@ -840,7 +845,8 @@ export class PostgresExpertReferralRepository {
   }
 }
 
-const transactionOwnedReferrals = new WeakSet<PostgresExpertReferralRepository>();
+const transactionOwnedReferrals =
+  new WeakSet<PostgresExpertReferralRepository>();
 
 function withReferralTransactionRetry<T>(
   repository: PostgresExpertReferralRepository,
@@ -858,7 +864,10 @@ export function createTransactionOwnedExpertReferralRepository(
   capability: TrustedExpertReferralTransaction,
 ): PostgresExpertReferralRepository {
   assertTrustedExpertReferralTransaction(capability, tx);
-  const repository = new PostgresExpertReferralRepository(tx as unknown as DrizzleDb, crypto);
+  const repository = new PostgresExpertReferralRepository(
+    tx as unknown as DrizzleDb,
+    crypto,
+  );
   transactionOwnedReferrals.add(repository);
   return repository;
 }

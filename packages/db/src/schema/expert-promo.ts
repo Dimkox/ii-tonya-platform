@@ -43,6 +43,9 @@ export const expertPromoRegistrations = pgTable(
     identityDigest: text("identity_digest").unique(),
     erasedAt: timestamp("erased_at", { withTimezone: true }),
     referrerUserId: uuid("referrer_user_id").references(() => users.id),
+    // NULL keeps a legacy first attribution in the PDF count. True is a new
+    // visitor. False is a later code that must not count or move the inviter.
+    countsForInviter: boolean("counts_for_inviter"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -57,6 +60,10 @@ export const expertPromoRegistrations = pgTable(
     check(
       "expert_promo_no_self",
       sql`${t.userId} IS DISTINCT FROM ${t.referrerUserId}`,
+    ),
+    check(
+      "expert_promo_counts_for_inviter",
+      sql`${t.countsForInviter} is not true or ${t.referrerUserId} is not null`,
     ),
     index("expert_promo_referrer_idx").on(t.referrerUserId),
   ],

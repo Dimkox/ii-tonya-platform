@@ -144,10 +144,14 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0089_referral_first_attribution.sql",
+  "packages/db/migrations/meta/0089_snapshot.json",
   "packages/db/migrations/0088_expert_promo_funnel_gift_timer.sql",
   "packages/db/migrations/meta/0088_snapshot.json",
   "packages/db/migrations/state/0088_manifest.json",
   "packages/db/migrations/state/0088_sql_objects.json",
+  "packages/db/migrations/state/0089_manifest.json",
+  "packages/db/migrations/state/0089_sql_objects.json",
 
   "packages/db/migrations/0087_expert_promo_funnel_state.sql",
   "packages/db/migrations/meta/0087_snapshot.json",
@@ -437,6 +441,7 @@ export const EXPERT_RESIDENCY_ALLOWED_RELATIONS = new Set([
   "client_paid_payment_bindings",
   "client_coupon_grants",
   "client_paid_settlements",
+  "client_referral_attributions",
   "planerka_service_mappings",
   "planerka_availability_refreshes",
   "planerka_booking_operations",
@@ -635,7 +640,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "packages/db/src/schema/index.ts",
-    "6feaf37da800ae379f968ee450cbee9d41a2ab5dd3fa76195331928384b19c89",
+    "c7e55802f066bdd3eaf113e5ced74dfe476b10d709ff0af3f55ce7d4370dac65",
   ],
   [
     "apps/api/src/routes/public-client-catalog.ts",
@@ -1532,6 +1537,14 @@ const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/state/0088_sql_objects.json",
     "ea78ab1ad0c488e16f6cb0b954059809a297d8ca73bcfe62f30a4806707e49e3",
+  ],
+  [
+    "packages/db/migrations/state/0089_manifest.json",
+    "edeb8b977b82ee70abbc830abe6806b2bf9dac7d1c24a1f56fee3be35e03c928",
+  ],
+  [
+    "packages/db/migrations/state/0089_sql_objects.json",
+    "2fd80b2badcc45a81bb450530844c91fcfb0bac12375f321dfe3ac3ea03acecf",
   ],
   [
     "packages/db/migrations/0087_expert_promo_funnel_state.sql",
@@ -2548,7 +2561,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "3a01baaa77beb20e4b85a352ad19311aeb2ce9ad1dde85201313cc6c37d7f57c",
+    "2acd7b02a5a9c5bb437f4a41a503d39f3753f16c5e2b212f1c7ebddb0ac03950",
   ],
   [
     "packages/db/migrations/meta/0000_snapshot.json",
@@ -2627,8 +2640,16 @@ const approvedMigrationHashes = new Map([
     "e62da7882f0319512589b1bf0ad88f44f69e6ec1e29d89b299b2e9aafd44ec16",
   ],
   [
+    "packages/db/migrations/0089_referral_first_attribution.sql",
+    "a7dd22f66dbcc494977cb23a871e0e98530dcff1df126b44b3840c9356dda297",
+  ],
+  [
+    "packages/db/migrations/meta/0089_snapshot.json",
+    "efa64b626c7180be48ca02d9dfa1d69972ac931cfdba5b619679c350f66df1c9",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "3a01baaa77beb20e4b85a352ad19311aeb2ce9ad1dde85201313cc6c37d7f57c",
+    "2acd7b02a5a9c5bb437f4a41a503d39f3753f16c5e2b212f1c7ebddb0ac03950",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -3829,7 +3850,9 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0089_snapshot.json", 1166334],
     ["packages/db/migrations/meta/0088_snapshot.json", 1200906],
+    ["packages/db/migrations/state/0089_sql_objects.json", 1874750],
     ["packages/db/migrations/state/0088_sql_objects.json", 1890684],
 
     ["packages/db/migrations/meta/0087_snapshot.json", 1200523],

@@ -12,6 +12,34 @@ Status: feature-off operating procedure. This runbook does not authorize staging
 
 Every activation, override, replay, key rotation, or incident action must identify the responsible human in the change record. Synthetic examples below are not production identifiers.
 
+## First inviter
+
+A referred person is attributed once, to the first inviter. A later code, promo
+link, or another resident's code does not move that attribution, the resident
+bonus, or client coupons. The rule is stored in PostgreSQL:
+
+- `expert_referrals_invitee_unique` and `ON CONFLICT (invitee_expert_id) DO NOTHING`
+- `expert_promo_registrations` primary key and `ON CONFLICT (user_id) DO NOTHING`
+- `client_referral_attributions` primary key and `ON CONFLICT (referred_user_id) DO NOTHING`
+
+The promo bot PDF is issued once, when two new visitors qualify.
+`counts_for_inviter` is true only for a person attributed on their first bot
+contact. Someone who already started the bot, or who was already attributed,
+does not count. NULL keeps a legacy row in the count. This migration does not
+rewrite existing inviters.
+
+`client_referral_attributions` records the client coupon program's first inviter
+only. It does not insert `client_coupon_grants` and does not enable payments.
+
+No stored row can name two inviters for one referred person: the unique keys
+above already forbid it. This change does not scan or repair production data.
+A row that would violate the new flag is:
+
+```sql
+select count(*) from expert_promo_registrations
+where counts_for_inviter is true and referrer_user_id is null;
+```
+
 ## Default state
 
 `EXPERT_REFERRAL_ENABLED=false` and `EXPERT_RESIDENCY_BILLING_ENABLED=false` remain the default. No live payment-provider client is composed. New issuance, redemption, checkout, and reward grants remain blocked until the approved feature control and release gate both permit them. Existing verified settlement/refund/reversal, order expiry/release, reconciliation, debt processing, and controlled held-reward replay must remain operable.

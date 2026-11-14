@@ -21,6 +21,10 @@ the source of truth, financial state is ledger-derived, provider callbacks are
 untrusted until verified, and an LLM cannot mutate balances, referrals,
 residencies, tariffs, or payments.
 
+A referred expert is attributed once, to the first inviter. Entering another
+resident's code later does not move the bonus. The database enforces this with
+`expert_referrals_invitee_unique` and `ON CONFLICT (invitee_expert_id) DO NOTHING`.
+
 ## 2. Brownfield boundary
 
 The source document describes client `500/500` coupons, but current `main`

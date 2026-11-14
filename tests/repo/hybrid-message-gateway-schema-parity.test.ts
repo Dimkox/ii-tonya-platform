@@ -57,13 +57,6 @@ describe("B1 schema/migration parity", () => {
     ]);
     expect(journal.entries.slice(-5)).toEqual([
       {
-        idx: 84,
-        version: "7",
-        when: 1793152800015,
-        tag: "0084_public_expert_payment_gateway",
-        breakpoints: true,
-      },
-      {
         idx: 85,
         version: "7",
         when: 1793152800016,
@@ -89,6 +82,13 @@ describe("B1 schema/migration parity", () => {
         version: "7",
         when: 1793152800019,
         tag: "0088_expert_promo_funnel_gift_timer",
+        breakpoints: true,
+      },
+      {
+        idx: 89,
+        version: "7",
+        when: 1793152800020,
+        tag: "0089_referral_first_attribution",
         breakpoints: true,
       },
     ]);

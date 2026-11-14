@@ -393,6 +393,7 @@ const HAND_SQL_TRIGGERS = [
   "client_paid_orders_immutable",
   "client_paid_settlements_immutable",
   "client_paid_settlements_integrity",
+  "client_referral_attributions_immutable",
   "consent_document_versions_append_only",
   "consents_append_only",
   "delivery_attempts_append_only",
@@ -728,7 +729,7 @@ describe("migration history integrity", () => {
         .filter((entry) => existsSync(snapshotPath(entry.idx)))
         .map((entry) => entry.idx),
     );
-    expect(newest).toBe(88);
+    expect(newest).toBe(89);
     expect(newest).toBeLessThanOrEqual(
       Math.max(...journal.entries.map((entry) => entry.idx)),
     );
@@ -868,6 +869,6 @@ describe("migration history integrity", () => {
       "every pgTable must be created by a migration and every migrated table must be declared",
     ).toEqual({ tables: migrated.size, onlyDeclared: [], onlyMigrated: [] });
     // Native lifecycle plus early-bird policy tables.
-    expect(declared.size).toBe(282);
+    expect(declared.size).toBe(283);
   });
 });

@@ -78,7 +78,9 @@ export {
   resolveRewardReversal,
   rewardExpiresAt,
   settlementBeforeDeadline,
+  decideFirstAttribution,
 } from "./expert-referral.js";
+export type { ReferralAttribution } from "./expert-referral.js";
 export { calculatePartnerShadowQuote } from "./partner-pricing.js";
 export type {
   ParticipantOnboardingState,
