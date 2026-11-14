@@ -11,26 +11,16 @@ const threadId = "1731336491572x316716105037601100";
 const taskId = "1721129985149x478019552540622850";
 const companyId = "1708251850060x460235863640434700";
 
-function memoryReceipts(): SelartiResponseReceipts {
-  const state = new Map<string, "processing" | "complete" | "failed">();
-  let sequence = 0;
+function memoryReceipts(): SelartiResponseReceipts & {
+  markComplete(messageKey: string): void;
+} {
+  const complete = new Set<string>();
   return {
-    async claim(messageKey) {
-      const current = state.get(messageKey);
-      if (current === "complete") return { kind: "duplicate" };
-      if (current === "processing") return { kind: "busy" };
-      state.set(messageKey, "processing");
-      return { kind: "claimed", claimId: `poll-${String(++sequence)}` };
+    markComplete(messageKey) {
+      complete.add(messageKey);
     },
-    async complete() {
-      for (const [key, status] of state) {
-        if (status === "processing") state.set(key, "complete");
-      }
-    },
-    async release() {
-      for (const [key, status] of state) {
-        if (status === "processing") state.set(key, "failed");
-      }
+    async lookup(messageKey) {
+      return complete.has(messageKey) ? "complete" : "absent";
     },
   };
 }
@@ -59,10 +49,17 @@ describe("Selarti response poller", () => {
   });
 
   it("ingests one unseen bot reply as an internal proposal and skips user rows", async () => {
-    const handle = vi.fn<(raw: unknown) => Promise<{ status: string }>>(
-      async () => ({ status: "accepted" }),
-    );
     const receipts = memoryReceipts();
+    const handle = vi.fn<
+      (
+        raw: unknown,
+        context?: { messageReceiptKey?: string },
+      ) => Promise<{ status: string }>
+    >(async (_raw, context) => {
+      if (context?.messageReceiptKey)
+        receipts.markComplete(context.messageReceiptKey);
+      return { status: "accepted" };
+    });
     const readMessages = vi.fn(async () => ({
       kind: "page" as const,
       messages: [
@@ -216,6 +213,38 @@ describe("Selarti response poller", () => {
     });
     expect(shared).toEqual({ examined: 2, ingested: 0, skipped: 1 });
     expect(handle).not.toHaveBeenCalled();
+  });
+
+  it("keeps a bot reply timestamped in the same second as the send", async () => {
+    const handle = vi.fn<(raw: unknown) => Promise<{ status: string }>>(
+      async () => ({ status: "accepted" }),
+    );
+    const sentAt = "2026-11-10T20:00:00.500Z";
+    const result = await pollSelartiPendingResponses({
+      enabled: true,
+      taskId,
+      companyId,
+      listPending: async () => [
+        { requestId, dialogueId, threadId, boundAt: sentAt },
+      ],
+      readMessages: async () => ({
+        kind: "page",
+        messages: [
+          {
+            id: "fast-bot",
+            text: "Быстрый ответ.",
+            messageType: "bot",
+            taskId,
+            companyId,
+            createdAt: Date.parse("2026-11-10T20:00:00.000Z"),
+          },
+        ],
+      }),
+      responses: { handle },
+      receipts: memoryReceipts(),
+    });
+    expect(result).toEqual({ examined: 1, ingested: 1, skipped: 0 });
+    expect(handle).toHaveBeenCalledTimes(1);
   });
 
   it("reports acquisition failure without reading threads", async () => {

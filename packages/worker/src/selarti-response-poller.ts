@@ -34,7 +34,8 @@ function createdAfter(createdAt: number | undefined, boundAt: string): boolean {
   if (!Number.isFinite(boundMs)) return false;
   const createdMs =
     createdAt < 1_000_000_000_000 ? createdAt * 1000 : createdAt;
-  return createdMs > boundMs;
+  // Same-second replies are kept: the provider clock is coarser than the send start.
+  return Math.floor(createdMs / 1000) >= Math.floor(boundMs / 1000);
 }
 
 export async function pollSelartiPendingResponses(deps: {
@@ -51,7 +52,10 @@ export async function pollSelartiPendingResponses(deps: {
     | { readonly kind: "error" }
   >;
   readonly responses: {
-    handle(raw: unknown): Promise<{ readonly status: string }>;
+    handle(
+      raw: unknown,
+      context?: { readonly messageReceiptKey?: string },
+    ): Promise<{ readonly status: string }>;
   };
   readonly receipts: SelartiResponseReceipts;
   readonly limit?: number;
@@ -107,31 +111,28 @@ export async function pollSelartiPendingResponses(deps: {
         message.text.length > 0 &&
         createdAfter(message.createdAt, request.boundAt),
     );
-    const claimed: { claimId: string; text: string }[] = [];
+    const unseen: { key: string; text: string }[] = [];
     let busy = false;
     for (const message of replies) {
-      let claim: Awaited<ReturnType<SelartiResponseReceipts["claim"]>>;
+      const key = selartiMessageReceiptKey(message.id);
+      let seen: Awaited<ReturnType<SelartiResponseReceipts["lookup"]>>;
       try {
-        claim = await deps.receipts.claim(selartiMessageReceiptKey(message.id));
+        seen = await deps.receipts.lookup(key);
       } catch {
         busy = true;
         break;
       }
-      if (claim.kind === "busy") {
+      if (seen === "busy") {
         busy = true;
         break;
       }
-      if (claim.kind === "claimed")
-        claimed.push({ claimId: claim.claimId, text: message.text });
+      if (seen === "absent") unseen.push({ key, text: message.text });
     }
-    if (busy || claimed.length !== 1) {
-      await Promise.all(
-        claimed.map((item) => deps.receipts.release(item.claimId)),
-      );
-      if (busy || claimed.length > 1) skipped += 1;
+    if (busy || unseen.length !== 1) {
+      if (busy || unseen.length > 1) skipped += 1;
       continue;
     }
-    const only = claimed[0]!;
+    const only = unseen[0]!;
     try {
       const result = await deps.responses.handle(
         internalSelartiProposalBody({
@@ -139,17 +140,15 @@ export async function pollSelartiPendingResponses(deps: {
           dialogueId: request.dialogueId,
           text: only.text,
         }),
+        { messageReceiptKey: only.key },
       );
       if (result.status === "unavailable") {
-        await deps.receipts.release(only.claimId);
         skipped += 1;
         continue;
       }
-      await deps.receipts.complete(only.claimId);
       if (result.status === "accepted" || result.status === "duplicate")
         ingested += 1;
     } catch {
-      await deps.receipts.release(only.claimId).catch(() => undefined);
       skipped += 1;
     }
   }
@@ -163,7 +162,10 @@ export function createSelartiResponsePollRunner(deps: {
   readonly aiId: string;
   readonly listPending: (limit: number) => Promise<readonly BoundRequest[]>;
   readonly responses: {
-    handle(raw: unknown): Promise<{ readonly status: string }>;
+    handle(
+      raw: unknown,
+      context?: { readonly messageReceiptKey?: string },
+    ): Promise<{ readonly status: string }>;
   };
   readonly receipts: SelartiResponseReceipts;
   readonly acquire?: typeof createAuthenticatedSelartiClient;

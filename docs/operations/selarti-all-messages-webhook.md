@@ -1,7 +1,12 @@
 # Selarti all-messages response webhook
 
-Selarti's integration form accepts only a URL. Paste this webhook, with the
-real shared secret in place of `<SECRET>`:
+The live path today is the Selarti Telegram channel on `@ii_tonya_expert_bot`,
+task `ii-tonya-expert`. This webhook is the alternative API path. It stays
+off until `SELARTI_RESPONSE_INGRESS_ENABLED=true`. The default is false.
+
+To enable it, put the shared secret in the URL. Selarti's form has no header
+field. Add an integration of type «Another», webhook type «All messages»,
+and paste this URL with the real shared secret in place of `<SECRET>`:
 
 ```text
 https://ii-tonya.ru/v1/webhooks/selarti/responses/<SECRET>
@@ -12,9 +17,10 @@ accepted. The secret is `SELARTI_RESPONSE_SHARED_SECRET`: 32–256 characters
 from `[A-Za-z0-9_-]`, not a placeholder. `Authorization: Bearer <SECRET>`
 still works for callers that can set a header. Selarti's form cannot.
 
-In Selarti, use a channel of type «Page messenger», a task of type «Web», and
-an integration of type «Another» with webhook type «All messages». Copy that
-task's id into `SELARTI_TASK_ID`. Outbound user messages use
+When this alternative is turned on, the Selarti task is type «Web» with a
+channel of type «Page messenger», and the integration above is type
+«Another» / «All messages». Copy that task's id into `SELARTI_TASK_ID`.
+Outbound user messages use
 `POST https://selarti.com/api/1.1/wf/send_message_external` with that `task_id`
 and `chat_id` equal to the dialogue `external_chat_id`. Selarti then POSTs
 `wh_type=all_messages`. `external_chat_id` is our `chat_id`.
@@ -55,12 +61,15 @@ SELARTI_WEBHOOK_SECRET=<existing live-adapter secret>
 ```
 
 The poller calls `get_message` for pending requests whose send stored a
-provider thread id. It ingests a bot or operator row only when that row's
-`Created Date` is later than the send and the thread has exactly one open
-request. A page without dates, an older reply, or two open requests on one
-thread is skipped. It does not run unless the flag is true, and it does not
-turn Telegram dispatch on. Leave it false until the webhook path has been
-checked against a non-production task.
+provider thread id. The clock it compares is the `started` delivery attempt
+written before the outbound HTTP call, not the later row that stores the
+thread id. It ingests a bot or operator row when that row's `Created Date`
+is in the same second as that send start, or later, and the thread has
+exactly one open request across the whole pending set. A page without dates,
+an older reply, or two open requests on one thread is skipped. It does not
+run unless the flag is true, and it does not turn Telegram dispatch on.
+Leave it false until the webhook path has been checked against a
+non-production task.
 
 ## Rollback
 

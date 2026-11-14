@@ -11,37 +11,15 @@ const requestId = `sha256:${"a".repeat(64)}`;
 const dialogueId = "00000000-0000-4000-8000-000000000501";
 
 function memoryReceipts(): SelartiResponseReceipts & {
-  readonly completed: string[];
+  markComplete(messageKey: string): void;
 } {
-  const state = new Map<
-    string,
-    { status: "processing" | "complete" | "failed"; claimId: string }
-  >();
-  let sequence = 0;
-  const completed: string[] = [];
+  const complete = new Set<string>();
   return {
-    completed,
-    async claim(messageKey) {
-      const current = state.get(messageKey);
-      if (current?.status === "complete") return { kind: "duplicate" };
-      if (current?.status === "processing") return { kind: "busy" };
-      const claimId = `claim-${String(++sequence)}`;
-      state.set(messageKey, { status: "processing", claimId });
-      return { kind: "claimed", claimId };
+    markComplete(messageKey) {
+      complete.add(messageKey);
     },
-    async complete(claimId) {
-      for (const entry of state.values()) {
-        if (entry.claimId === claimId && entry.status === "processing") {
-          entry.status = "complete";
-          completed.push(claimId);
-        }
-      }
-    },
-    async release(claimId) {
-      for (const entry of state.values()) {
-        if (entry.claimId === claimId && entry.status === "processing")
-          entry.status = "failed";
-      }
+    async lookup(messageKey) {
+      return complete.has(messageKey) ? "complete" : "absent";
     },
   };
 }
@@ -53,7 +31,14 @@ function bridge(options?: {
 }) {
   const receipts = memoryReceipts();
   const handle = vi.fn(
-    options?.handle ?? (async () => ({ status: "accepted" as const })),
+    async (raw: unknown, context?: { messageReceiptKey?: string }) => {
+      const result = options?.handle
+        ? await options.handle(raw)
+        : { status: "accepted" as const };
+      if (context?.messageReceiptKey && result.status !== "unavailable")
+        receipts.markComplete(context.messageReceiptKey);
+      return result;
+    },
   );
   const findPending = vi.fn(
     async (): Promise<PendingSelartiRequest> =>
@@ -159,6 +144,15 @@ describe("Selarti all_messages bridge", () => {
     expect(first).toEqual({ status: "accepted" });
     expect(second).toEqual({ status: "duplicate" });
     expect(once.handle).toHaveBeenCalledTimes(1);
+    expect(once.findPending).toHaveBeenCalledTimes(1);
+    once.findPending.mockResolvedValue({
+      kind: "one",
+      requestId: `sha256:${"b".repeat(64)}`,
+      dialogueId: "00000000-0000-4000-8000-000000000502",
+    });
+    await once.ingress.handle(SELARTI_ALL_MESSAGES_FIXTURE);
+    expect(once.handle).toHaveBeenCalledTimes(1);
+    expect(once.findPending).toHaveBeenCalledTimes(1);
 
     let pending: PendingSelartiRequest = { kind: "ambiguous" };
     const ambiguous = bridge();

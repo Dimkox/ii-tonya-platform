@@ -117,7 +117,7 @@ describe("Selarti all_messages route", () => {
   const inner = vi.fn<(raw: unknown) => Promise<{ status: "accepted" }>>(
     async () => ({ status: "accepted" }),
   );
-  const receipts = new Map<string, "processing" | "complete" | "failed">();
+  const receipts = new Set<string>();
   const ingress = createSelartiAllMessagesBridge({
     taskId: SELARTI_ALL_MESSAGES_FIXTURE.task_id,
     correlation: {
@@ -126,23 +126,16 @@ describe("Selarti all_messages route", () => {
       },
     },
     receipts: {
-      async claim(messageKey) {
-        const current = receipts.get(messageKey);
-        if (current === "complete") return { kind: "duplicate" as const };
-        if (current === "processing") return { kind: "busy" as const };
-        receipts.set(messageKey, "processing");
-        return { kind: "claimed" as const, claimId: messageKey };
-      },
-      async complete(claimId) {
-        if (receipts.get(claimId) === "processing")
-          receipts.set(claimId, "complete");
-      },
-      async release(claimId) {
-        if (receipts.get(claimId) === "processing")
-          receipts.set(claimId, "failed");
+      async lookup(messageKey) {
+        return receipts.has(messageKey) ? "complete" : "absent";
       },
     },
-    responses: { handle: inner },
+    responses: {
+      async handle(raw, context) {
+        if (context?.messageReceiptKey) receipts.add(context.messageReceiptKey);
+        return inner(raw);
+      },
+    },
   });
   let app: Awaited<ReturnType<typeof build>>;
 

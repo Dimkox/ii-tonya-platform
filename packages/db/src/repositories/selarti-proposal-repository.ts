@@ -15,9 +15,30 @@ export type AcceptSelartiProposalCommand = {
   readonly text: string;
   readonly responsePayloadHash: string;
   readonly receivedAt: string;
+  /** sha256 of the provider message id. Sealed in the same transaction as the decision. */
+  readonly messageReceiptKey?: string;
 };
 export type AcceptSelartiProposalResult =
   "accepted" | "duplicate" | "conflict" | "rejected" | "late";
+
+const messageReceiptKeyPattern = /^sha256:[0-9a-f]{64}$/u;
+
+/** Same-transaction record that this provider message was decided for one request. */
+export async function sealSelartiMessageReceipt(
+  tx: Pick<DrizzleDb, "execute">,
+  messageReceiptKey: string | undefined,
+): Promise<void> {
+  if (!messageReceiptKey || !messageReceiptKeyPattern.test(messageReceiptKey))
+    return;
+  const claimId = randomUUID();
+  await tx.execute(sql`
+    insert into webhook_inbox (provider, external_event_id, status, claim_id, lease_until)
+    values ('selarti_response', ${messageReceiptKey}, 'complete', ${claimId}::uuid, null)
+    on conflict (provider, external_event_id) do update
+    set status = 'complete', lease_until = null, updated_at = now()
+    where webhook_inbox.status <> 'complete'
+  `);
+}
 
 type RequestBinding = {
   id: string;
@@ -52,6 +73,10 @@ export class PostgresSelartiProposalRepository {
     const receivedAt = new Date(input.receivedAt);
     if (!Number.isFinite(receivedAt.getTime())) return "rejected";
     return this.db.transaction(async (tx) => {
+      const finish = async (status: AcceptSelartiProposalResult) => {
+        await sealSelartiMessageReceipt(tx, input.messageReceiptKey);
+        return status;
+      };
       const candidate = (
         await tx.execute<{ userId: string }>(sql`
         select d.user_id::text as "userId" from integration_outbox o
@@ -60,7 +85,7 @@ export class PostgresSelartiProposalRepository {
         where o.idempotency_key=${input.requestId} and o.topic='selarti.request.v1'
       `)
       ).rows[0];
-      if (!candidate) return "rejected";
+      if (!candidate) return finish("rejected");
       await lockClientConsentSubject(tx, candidate.userId);
       // Shared with the immutable usage writer, before any request/proposal row locks.
       await tx.execute(
@@ -85,7 +110,7 @@ export class PostgresSelartiProposalRepository {
         request.userId !== candidate.userId ||
         request.tenantKey !== input.tenantKey
       )
-        return "rejected";
+        return finish("rejected");
       const existing = (
         await tx.execute<{
           responsePayloadHash: string;
@@ -104,17 +129,19 @@ export class PostgresSelartiProposalRepository {
           existing.dialogueId !== input.dialogueId ||
           existing.tenantKey !== input.tenantKey
         )
-          return "rejected";
-        return existing.responsePayloadHash === input.responsePayloadHash
-          ? "duplicate"
-          : "conflict";
+          return finish("rejected");
+        return finish(
+          existing.responsePayloadHash === input.responsePayloadHash
+            ? "duplicate"
+            : "conflict",
+        );
       }
       if (
         request.requestId !== input.requestId ||
         request.dialogueId !== input.dialogueId ||
         request.payload.userId !== candidate.userId
       )
-        return "rejected";
+        return finish("rejected");
       const consentAuthority = await validateClientConsentAuthority(
         tx,
         request.payload.consentAuthority,
@@ -126,7 +153,7 @@ export class PostgresSelartiProposalRepository {
         consentAuthority.subjectId !== candidate.userId ||
         typeof request.payload.text !== "string"
       )
-        return "rejected";
+        return finish("rejected");
       const facts = (
         await tx.execute<{ started: boolean; notApplied: boolean }>(sql`
         select exists(select 1 from delivery_attempts where outbox_id=${request.id}::uuid
@@ -136,9 +163,9 @@ export class PostgresSelartiProposalRepository {
           or exists(select 1 from selarti_actual_usage_facts where request_id=${input.requestId} and outcome='not_applied')) as "notApplied"
       `)
       ).rows[0]!;
-      if (!facts.started) return "rejected";
+      if (!facts.started) return finish("rejected");
       if (facts.notApplied || request.reason === "provider_not_applied")
-        return "late";
+        return finish("late");
       const trialReservation = (
         await tx.execute<{
           id: string;
@@ -151,7 +178,7 @@ export class PostgresSelartiProposalRepository {
           for update
         `)
       ).rows[0];
-      if (trialReservation?.status === "not_applied") return "late";
+      if (trialReservation?.status === "not_applied") return finish("late");
       const now = (
         await tx.execute<{ now: Date | string }>(
           sql`select clock_timestamp() as now`,
@@ -160,7 +187,7 @@ export class PostgresSelartiProposalRepository {
       const acceptedAt = new Date(now.now);
       const deadline = new Date(request.deadline);
       if (!Number.isFinite(deadline.getTime()) || acceptedAt >= deadline)
-        return "late";
+        return finish("late");
       const proposal = (
         await tx.execute<{ id: string }>(sql`
           insert into selarti_response_proposals(
@@ -184,9 +211,11 @@ export class PostgresSelartiProposalRepository {
             for update
           `)
         ).rows[0];
-        return raced?.responsePayloadHash === input.responsePayloadHash
-          ? "duplicate"
-          : "conflict";
+        return finish(
+          raced?.responsePayloadHash === input.responsePayloadHash
+            ? "duplicate"
+            : "conflict",
+        );
       }
       const sequenceRow = (
         await tx.execute<{ sequence: bigint }>(sql`
@@ -259,7 +288,7 @@ export class PostgresSelartiProposalRepository {
           values(${trialReservation.redemptionId}::uuid,${trialReservation.id}::uuid,'outcome_applied',${input.responsePayloadHash})
         `);
       }
-      return "accepted";
+      return finish("accepted");
     });
   }
 }

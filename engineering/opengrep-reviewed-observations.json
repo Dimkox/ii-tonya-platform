@@ -29,7 +29,7 @@
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
       "line": "877",
-      "sha256": "ee8239d13a5704b84559dd4aa2ffe208a1674bed116cc94bde87ba2e89f30c55",
+      "sha256": "7671a97ff9e954d5726ae0edb9b2b5b5d74b6a07d1e1ff9cf9ac14b7901eb74a",
       "category": "json-or-cli-output",
       "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     },
@@ -37,7 +37,7 @@
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
       "line": "899",
-      "sha256": "ee8239d13a5704b84559dd4aa2ffe208a1674bed116cc94bde87ba2e89f30c55",
+      "sha256": "7671a97ff9e954d5726ae0edb9b2b5b5d74b6a07d1e1ff9cf9ac14b7901eb74a",
       "category": "json-or-cli-output",
       "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     },
@@ -45,7 +45,7 @@
       "rule": "getzilla.sast.rules.getzilla.javascript.reflected-xss",
       "path": "apps/api/src/app.ts",
       "line": "921",
-      "sha256": "ee8239d13a5704b84559dd4aa2ffe208a1674bed116cc94bde87ba2e89f30c55",
+      "sha256": "7671a97ff9e954d5726ae0edb9b2b5b5d74b6a07d1e1ff9cf9ac14b7901eb74a",
       "category": "json-or-cli-output",
       "evidence": "docs/operations/2026-11-05-opengrep-observation-review.md"
     },

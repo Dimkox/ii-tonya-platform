@@ -10,15 +10,7 @@ export type SelartiIngressStatus =
   | "ignored";
 
 export interface SelartiResponseReceipts {
-  claim(
-    messageKey: string,
-  ): Promise<
-    | { readonly kind: "claimed"; readonly claimId: string }
-    | { readonly kind: "duplicate" }
-    | { readonly kind: "busy" }
-  >;
-  complete(claimId: string): Promise<void>;
-  release(claimId: string): Promise<void>;
+  lookup(messageKey: string): Promise<"complete" | "absent" | "busy">;
 }
 
 export type PendingSelartiRequest =
@@ -112,7 +104,10 @@ export function createSelartiAllMessagesBridge(deps: {
   };
   readonly receipts: SelartiResponseReceipts;
   readonly responses: {
-    handle(raw: unknown): Promise<{ readonly status: string }>;
+    handle(
+      raw: unknown,
+      context?: { readonly messageReceiptKey?: string },
+    ): Promise<{ readonly status: string }>;
   };
 }) {
   if (!visibleId.test(deps.taskId))
@@ -127,21 +122,19 @@ export function createSelartiAllMessagesBridge(deps: {
       if (parsed.kind === "rejected") return { status: "rejected" };
       if (!sameSecret(parsed.taskId, deps.taskId)) return { status: "ignored" };
       const key = selartiMessageReceiptKey(parsed.messageId);
-      let claim: Awaited<ReturnType<SelartiResponseReceipts["claim"]>>;
+      let seen: Awaited<ReturnType<SelartiResponseReceipts["lookup"]>>;
       try {
-        claim = await deps.receipts.claim(key);
+        seen = await deps.receipts.lookup(key);
       } catch {
         return { status: "unavailable" };
       }
-      if (claim.kind === "duplicate") return { status: "duplicate" };
-      if (claim.kind === "busy") return { status: "unavailable" };
-      const claimId = claim.claimId;
+      if (seen === "complete") return { status: "duplicate" };
+      if (seen === "busy") return { status: "unavailable" };
       try {
         const pending = await deps.correlation.findPending(
           parsed.externalChatId,
         );
         if (pending.kind !== "one") {
-          await deps.receipts.release(claimId);
           return {
             status: pending.kind === "ambiguous" ? "rejected" : "ignored",
           };
@@ -152,6 +145,7 @@ export function createSelartiAllMessagesBridge(deps: {
             dialogueId: pending.dialogueId,
             text: parsed.messageText,
           }),
+          { messageReceiptKey: key },
         );
         if (
           result.status !== "accepted" &&
@@ -161,17 +155,10 @@ export function createSelartiAllMessagesBridge(deps: {
           result.status !== "late" &&
           result.status !== "unavailable"
         ) {
-          await deps.receipts.release(claimId);
           return { status: "unavailable" };
         }
-        if (result.status === "unavailable") {
-          await deps.receipts.release(claimId);
-          return { status: "unavailable" };
-        }
-        await deps.receipts.complete(claimId);
         return { status: result.status };
       } catch {
-        await deps.receipts.release(claimId).catch(() => undefined);
         return { status: "unavailable" };
       }
     },

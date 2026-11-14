@@ -40,3 +40,10 @@ until separately reviewed. No rules, ignores, or inline suppressions changed.
 ## 2026-11-05 follow-up: merged line shift (waitlist #160)
 
 After #148 merged, the two `payments-pilot.ts` sinks moved by six lines (162 to 168, 189 to 195) and the file digest changed. The code at each line is the same Fastify JSON reply reviewed above. Line numbers and source sha256 were refreshed so classify no longer raises `stale source` on `feat/waitlist-v4-channel`.
+
+## 2026-11-14 hash refresh (`apps/api/src/app.ts`)
+
+Selarti response ingress widened a status union earlier in `apps/api/src/app.ts`.
+The three reviewed sinks stayed `reply.send(response.rawPayload)` at lines
+877, 899, and 921. Only the file sha256 changed. No rule, ignore, or
+suppression changed.
