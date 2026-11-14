@@ -1,6 +1,4 @@
 export { computeReservedUntil, transitionReservation } from "./reservation.js";
-export { decideFirstAttribution } from "./referral-attribution.js";
-export type { ReferralAttribution } from "./referral-attribution.js";
 export {
   calculateExpertCampaignPrice,
   calculateExpertCampaignPriceV2,
@@ -80,7 +78,9 @@ export {
   resolveRewardReversal,
   rewardExpiresAt,
   settlementBeforeDeadline,
+  decideFirstAttribution,
 } from "./expert-referral.js";
+export type { ReferralAttribution } from "./expert-referral.js";
 export { calculatePartnerShadowQuote } from "./partner-pricing.js";
 export type {
   ParticipantOnboardingState,

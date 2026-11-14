@@ -311,8 +311,6 @@ export class PostgresExpertPromoRepository {
       )
         fail("promo_identity_conflict");
       const prior = registered[0];
-      const priorStartWithoutCode =
-        !prior && Boolean(enrollment) && !enrollment?.refCode;
       // The pending entry candidate is consumed only by the first registration.
       // Later plain /start must still work after the inviter/code is erased.
       if (!prior && enrollment?.refCode) {
@@ -320,8 +318,6 @@ export class PostgresExpertPromoRepository {
           fail("promo_attribution_locked");
         refCode = enrollment.refCode;
       }
-      // Someone who already opened the bot without a code is not a new visitor.
-      if (priorStartWithoutCode) refCode = undefined;
       let requestedInviterId: string | null = null;
       if (refCode) {
         const owner = (
@@ -340,14 +336,21 @@ export class PostgresExpertPromoRepository {
         requestedInviterId,
         existingInviterId: prior?.referrerId ?? null,
         alreadyRegistered: Boolean(prior),
-        priorStartWithoutCode,
+        priorStartWithoutCode: false,
       });
       if (decision.kind === "self") fail("promo_self_referral");
       const referrerId =
+        decision.kind === "created" ? decision.inviterId : null;
+      // A plain /start keeps the stored first inviter and must not copy that
+      // UUID back into reward work. An erased inviter is inactive; recreating
+      // guide, bonus, or ready-log rows would undo privacy erasure.
+      const rewardInviterId =
         decision.kind === "created"
           ? decision.inviterId
-          : decision.kind === "kept"
-            ? decision.inviterId
+          : decision.kind === "kept" &&
+              requestedInviterId !== null &&
+              requestedInviterId === decision.inviterId
+            ? requestedInviterId
             : null;
       const attribution =
         decision.kind === "created"
@@ -368,21 +371,29 @@ export class PostgresExpertPromoRepository {
       await tx.execute(
         sql`insert into expert_promo_funnel_state(user_id,incoming_referrer_code) values(${userId}::uuid,${registered.length ? null : (refCode ?? null)}) on conflict(user_id) do update set last_interaction_at=greatest(expert_promo_funnel_state.last_interaction_at,clock_timestamp())`,
       );
-      if (referrerId) {
+      const rewardInviterActive =
+        rewardInviterId === null
+          ? false
+          : (
+              await tx.execute<{ active: boolean }>(
+                sql`select active from users where id=${rewardInviterId}::uuid`,
+              )
+            ).rows[0]?.active === true;
+      if (rewardInviterId && rewardInviterActive) {
         // Owner serialization is separate from consent locks, avoiding cross-referral
         // lock-order cycles. READ COMMITTED sees the winner after this wait.
         await tx.execute(
-          sql`select pg_advisory_xact_lock(hashtextextended(${`promo-referrer:${referrerId}`},0))`,
+          sql`select pg_advisory_xact_lock(hashtextextended(${`promo-referrer:${rewardInviterId}`},0))`,
         );
         const count = (
           await tx.execute<{ count: number }>(
-            sql`select count(*)::int count from expert_promo_registrations r join users u on u.id=r.user_id and u.active=true where r.referrer_user_id=${referrerId}::uuid and r.counts_for_inviter is distinct from false`,
+            sql`select count(*)::int count from expert_promo_registrations r join users u on u.id=r.user_id and u.active=true where r.referrer_user_id=${rewardInviterId}::uuid and r.counts_for_inviter is distinct from false`,
           )
         ).rows[0]!.count;
         if (count >= 2) {
           const created = (
             await tx.execute<{ userId: string }>(
-              sql`insert into expert_promo_guide_work(user_id,content_slot) values(${referrerId}::uuid,'TODO: Wait for PDF') on conflict do nothing returning user_id as "userId"`,
+              sql`insert into expert_promo_guide_work(user_id,content_slot) values(${rewardInviterId}::uuid,'TODO: Wait for PDF') on conflict do nothing returning user_id as "userId"`,
             )
           ).rows[0];
           if (created) {
@@ -391,11 +402,11 @@ export class PostgresExpertPromoRepository {
               sql`insert into expert_promo_ready_logs(id,event) values(${eventId}::uuid,'Ready to send')`,
             );
             await tx.execute(
-              sql`update expert_promo_guide_work set ready_log_event_id=${eventId}::uuid where user_id=${referrerId}::uuid`,
+              sql`update expert_promo_guide_work set ready_log_event_id=${eventId}::uuid where user_id=${rewardInviterId}::uuid`,
             );
           }
           await tx.execute(
-            sql`insert into expert_promo_bonus_indications(user_id) values(${referrerId}::uuid) on conflict do nothing`,
+            sql`insert into expert_promo_bonus_indications(user_id) values(${rewardInviterId}::uuid) on conflict do nothing`,
           );
         }
       }

@@ -150,6 +150,8 @@ export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
   "packages/db/migrations/meta/0088_snapshot.json",
   "packages/db/migrations/state/0088_manifest.json",
   "packages/db/migrations/state/0088_sql_objects.json",
+  "packages/db/migrations/state/0089_manifest.json",
+  "packages/db/migrations/state/0089_sql_objects.json",
 
   "packages/db/migrations/0087_expert_promo_funnel_state.sql",
   "packages/db/migrations/meta/0087_snapshot.json",
@@ -1535,6 +1537,14 @@ const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/state/0088_sql_objects.json",
     "ea78ab1ad0c488e16f6cb0b954059809a297d8ca73bcfe62f30a4806707e49e3",
+  ],
+  [
+    "packages/db/migrations/state/0089_manifest.json",
+    "edeb8b977b82ee70abbc830abe6806b2bf9dac7d1c24a1f56fee3be35e03c928",
+  ],
+  [
+    "packages/db/migrations/state/0089_sql_objects.json",
+    "2fd80b2badcc45a81bb450530844c91fcfb0bac12375f321dfe3ac3ea03acecf",
   ],
   [
     "packages/db/migrations/0087_expert_promo_funnel_state.sql",
@@ -3842,6 +3852,7 @@ export function isApprovedLargeScopeArtifact(
   const approvedSizes = new Map<string, number>([
     ["packages/db/migrations/meta/0089_snapshot.json", 1166334],
     ["packages/db/migrations/meta/0088_snapshot.json", 1200906],
+    ["packages/db/migrations/state/0089_sql_objects.json", 1874750],
     ["packages/db/migrations/state/0088_sql_objects.json", 1890684],
 
     ["packages/db/migrations/meta/0087_snapshot.json", 1200523],

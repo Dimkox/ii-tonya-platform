@@ -460,6 +460,22 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
         )
       ).rows[0]?.referrer_user_id,
     ).toBe(owner.userId);
+    await repo.register(command(invitee));
+    await repo.register(command(second));
+    expect(
+      (
+        await database.db.execute(
+          sql`select (select count(*)::int from expert_promo_guide_work where user_id=${owner.userId}::uuid) guides,(select count(*)::int from expert_promo_bonus_indications where user_id=${owner.userId}::uuid) bonuses,(select count(*)::int from expert_promo_ready_logs l join expert_promo_guide_work w on w.ready_log_event_id=l.id where w.user_id=${owner.userId}::uuid) logs`,
+        )
+      ).rows[0],
+    ).toEqual({ guides: 0, bonuses: 0, logs: 0 });
+    expect(
+      (
+        await database.db.execute(
+          sql`select referrer_user_id from expert_promo_registrations where user_id=${invitee.userId}::uuid`,
+        )
+      ).rows[0]?.referrer_user_id,
+    ).toBe(owner.userId);
     expect(await repo.beginEnrollment(originalStart)).toEqual({
       kind: "consent_pending",
     });
@@ -650,11 +666,13 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
     expect(own).not.toBe(code);
     expect(await repo.isActiveResident(invitee)).toBe(false);
   });
-  it("does not count a promo visitor who already started the bot", async () => {
+  it("attributes the first code after consent and does not move it later", async () => {
     const owner = await identity();
+    const other = await identity();
     const code = (await repo.register(command(owner))).refCode;
+    const otherCode = (await repo.register(command(other))).refCode;
     const unknown = {
-      botKey: "promo-late-start",
+      botKey: "promo-first-code",
       botId: "717171",
       telegramUserId: String(++sequence),
       chatId: String(sequence),
@@ -668,8 +686,7 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
       decision: "granted",
     });
     const registered = await repo.register(command(unknown, code));
-    expect(registered.attribution).toBe("ignored_late_start");
-    expect(registered.referralCount).toBe(0);
+    expect(registered.attribution).toBe("created");
     expect(
       (
         await database.db.execute<{
@@ -679,10 +696,19 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
           sql`select referrer_user_id, counts_for_inviter from expert_promo_registrations where user_id=${registered.userId}::uuid`,
         )
       ).rows[0],
-    ).toEqual({ referrer_user_id: null, counts_for_inviter: false });
+    ).toEqual({
+      referrer_user_id: owner.userId,
+      counts_for_inviter: true,
+    });
+    await expect(repo.register(command(unknown, otherCode))).rejects.toThrow(
+      "promo_attribution_locked",
+    );
     expect(await repo.register(command(owner))).toMatchObject({
-      referralCount: 0,
+      referralCount: 1,
       guideStatus: "none",
+    });
+    expect(await repo.register(command(other))).toMatchObject({
+      referralCount: 0,
     });
   });
   it("keeps the first promo inviter and issues the PDF once for two new visitors", async () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   allocateCreditFifo,
   applyRewardToDebt,
+  decideFirstAttribution,
   nextResidencyInterval,
   quoteResidency,
   resolveRewardReversal,
@@ -139,5 +140,59 @@ describe("expert referral residency rules", () => {
   it("rejects deadline equality", () => {
     const deadline = new Date("2026-08-03T00:00:00.000Z");
     expect(settlementBeforeDeadline(deadline, deadline)).toBe(false);
+  });
+});
+
+describe("first inviter attribution", () => {
+  const referred = "referred";
+  const first = "first-inviter";
+  const second = "second-inviter";
+
+  it("attributes a new visitor to the first inviter", () => {
+    expect(
+      decideFirstAttribution({
+        referredId: referred,
+        requestedInviterId: first,
+        existingInviterId: null,
+        alreadyRegistered: false,
+        priorStartWithoutCode: false,
+      }),
+    ).toEqual({ kind: "created", inviterId: first });
+  });
+
+  it("keeps the first inviter when another code is entered", () => {
+    expect(
+      decideFirstAttribution({
+        referredId: referred,
+        requestedInviterId: second,
+        existingInviterId: first,
+        alreadyRegistered: true,
+        priorStartWithoutCode: false,
+      }),
+    ).toEqual({ kind: "kept", inviterId: first });
+  });
+
+  it("does not count a person who already started without a code", () => {
+    expect(
+      decideFirstAttribution({
+        referredId: referred,
+        requestedInviterId: first,
+        existingInviterId: null,
+        alreadyRegistered: false,
+        priorStartWithoutCode: true,
+      }),
+    ).toEqual({ kind: "ignored_late_start" });
+  });
+
+  it("rejects self-referral", () => {
+    expect(
+      decideFirstAttribution({
+        referredId: referred,
+        requestedInviterId: referred,
+        existingInviterId: null,
+        alreadyRegistered: false,
+        priorStartWithoutCode: false,
+      }),
+    ).toEqual({ kind: "self" });
   });
 });

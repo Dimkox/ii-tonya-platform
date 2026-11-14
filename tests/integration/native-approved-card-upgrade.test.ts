@@ -402,6 +402,12 @@ it("normal migrateDb backfills a genuinely approved main73 rich service and pres
         ).split("--> statement-breakpoint")[0]!,
       ),
     );
+    await database.db.execute(
+      sql`alter table expert_promo_registrations add column counts_for_inviter boolean`,
+    );
+    await database.db.execute(
+      sql`alter table expert_promo_registrations add constraint expert_promo_counts_for_inviter check (counts_for_inviter is not true or referrer_user_id is not null)`,
+    );
     // Current card approval also records the 0075 lifecycle subject and work
     // notice; model only the columns it writes and drop it before migrateDb creates it.
     await database.db.execute(
@@ -411,7 +417,7 @@ it("normal migrateDb backfills a genuinely approved main73 rich service and pres
       approved = await f.approve();
     expect(approved.reviewId).toBeTruthy();
     await database.db.execute(
-      sql`alter table expert_card_drafts drop column initial_schedule; alter table resident_card_versions drop column initial_schedule; drop table expert_promo_funnel_state; drop table resident_lifecycle_subjects; drop table resident_work_notices`,
+      sql`alter table expert_card_drafts drop column initial_schedule; alter table resident_card_versions drop column initial_schedule; drop table expert_promo_funnel_state; alter table expert_promo_registrations drop constraint expert_promo_counts_for_inviter; alter table expert_promo_registrations drop column counts_for_inviter; drop table resident_lifecycle_subjects; drop table resident_work_notices`,
     );
     const mainState = JSON.parse(
       await readFile(join(source, "state/0073_sql_objects.json"), "utf8"),

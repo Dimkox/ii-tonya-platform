@@ -122,6 +122,8 @@ describe("expert residency referral scope boundary", () => {
       "packages/db/migrations/state/0087_sql_objects.json",
       "packages/db/migrations/state/0088_manifest.json",
       "packages/db/migrations/state/0088_sql_objects.json",
+      "packages/db/migrations/state/0089_manifest.json",
+      "packages/db/migrations/state/0089_sql_objects.json",
     ]);
     expect([...EXPERT_RESIDENCY_ALLOWED_RELATIONS].sort()).toEqual([
       "booking_handoff_revocation_receipts",

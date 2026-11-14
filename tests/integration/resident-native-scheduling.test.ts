@@ -286,6 +286,12 @@ beforeAll(async () => {
         .split("--> statement-breakpoint")[0]!,
     ),
   );
+  await database.db.execute(
+    sql`alter table expert_promo_registrations add column counts_for_inviter boolean`,
+  );
+  await database.db.execute(
+    sql`alter table expert_promo_registrations add constraint expert_promo_counts_for_inviter check (counts_for_inviter is not true or referrer_user_id is not null)`,
+  );
   expect(
     (await database.db.execute(sql`show server_version_num`)).rows[0]
       ?.server_version_num,
@@ -373,8 +379,10 @@ beforeAll(async () => {
         .digest("hex"),
     })),
   ).toEqual(manifest.migrations);
-  // Remove the fixture-only funnel table so the real 0087 migration applies.
-  await database.db.execute(sql`drop table expert_promo_funnel_state`);
+  // Remove the fixture-only funnel table and column so the real migrations apply.
+  await database.db.execute(
+    sql`drop table expert_promo_funnel_state; alter table expert_promo_registrations drop constraint expert_promo_counts_for_inviter; alter table expert_promo_registrations drop column counts_for_inviter`,
+  );
   for (const entry of journal.entries.filter((entry) => entry.idx > 75))
     await database.db.execute(
       sql.raw(readFileSync(`packages/db/migrations/${entry.tag}.sql`, "utf8")),
@@ -594,7 +602,7 @@ it("initial owner schedule joins exact full card review and maps approved servic
   expect(await send("/slots_setup")).toContain("Москва");
   for (const answer of [
     "2",
-    "2026-11-10 2026-11-10",
+    "2026-12-15 2026-12-15",
     "2",
     "09:00-13:00",
     "нет",
@@ -1651,7 +1659,7 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
     expect(ordinary.json().text).not.toContain("Какие даты");
     for (const a of [
       "2",
-      "2026-11-11 2026-11-11",
+      "2026-12-16 2026-12-16",
       "3",
       "09:00-13:00",
       "нет",
@@ -1662,7 +1670,7 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
     while (previous.split("\n").at(-1)!.startsWith("/slots_page"))
       previous = (await send(previous.split("\n").at(-1)!)).json().text;
     const staleConfirmation = previous.split("\n").at(-1)!;
-    const invalidRaw = "2026-11-11 09:00-09:30 Консультация";
+    const invalidRaw = "2026-12-16 09:00-09:30 Консультация";
     expect((await send("/slots_import\n" + invalidRaw)).json().text).toContain(
       "Импорт сохранён",
     );
@@ -1683,7 +1691,7 @@ it("actual authenticated work ingress keeps ordinary profile input and exposes c
       errors: 1,
     });
     const validRaw =
-      '2026-11-11,09:00,10:00,"Консультация"\n2026-11-11,10:15,11:15,"Консультация"';
+      '2026-12-16,09:00,10:00,"Консультация"\n2026-12-16,10:15,11:15,"Консультация"';
     expect((await send("/slots_import\n" + validRaw)).json().text).toContain(
       "Импорт сохранён",
     );
