@@ -154,7 +154,7 @@ describe("planerka-service-mappings CLI (SCRUM-519)", () => {
   it("ships a javascript release entry that does not need tsx", () => {
     const entry = readFileSync("scripts/planerka-service-mappings.mjs", "utf8");
     expect(entry).not.toMatch(/\btsx\b/);
-    expect(entry).toContain("packages/db/dist/index.js");
+    expect(entry).toContain('from "../packages/db/dist/index.js"');
     expect(readFileSync("scripts/build-native-release.sh", "utf8")).toContain(
       'cp scripts/planerka-service-mappings.mjs "$work_dir/release/scripts/planerka-service-mappings.mjs"',
     );
