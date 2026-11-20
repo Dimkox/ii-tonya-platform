@@ -39,18 +39,36 @@ export const experts = pgTable(
   ],
 );
 
-export const expertServices = pgTable("expert_services", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  expertId: uuid("expert_id")
-    .notNull()
-    .references(() => experts.id),
-  name: text("name").notNull(),
-  code: text("code"),
-  language: text("language"),
-  active: boolean("active").notNull().default(true),
-  durationMinutes: integer("duration_minutes").notNull(),
-  ...mutableTimestamps,
-});
+export const expertServices = pgTable(
+  "expert_services",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    expertId: uuid("expert_id")
+      .notNull()
+      .references(() => experts.id),
+    name: text("name").notNull(),
+    code: text("code"),
+    language: text("language"),
+    active: boolean("active").notNull().default(true),
+    durationMinutes: integer("duration_minutes").notNull(),
+    priceMinor: integer("price_minor"),
+    currency: text("currency").notNull().default("RUB"),
+    format: text("format"),
+    location: text("location"),
+    ...mutableTimestamps,
+  },
+  (table) => [
+    check(
+      "expert_services_price_minor_nonnegative",
+      sql`${table.priceMinor} IS NULL OR ${table.priceMinor} >= 0`,
+    ),
+    check("expert_services_currency_rub", sql`${table.currency} IN ('RUB')`),
+    check(
+      "expert_services_format_known",
+      sql`${table.format} IS NULL OR ${table.format} IN ('online', 'offline', 'hybrid')`,
+    ),
+  ],
+);
 
 export const slots = pgTable(
   "slots",

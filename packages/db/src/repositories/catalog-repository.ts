@@ -1,3 +1,4 @@
+import { projectExpertServiceOffer } from "@ii-tonya/contracts";
 import { sql, type SQL } from "drizzle-orm";
 
 import type { DrizzleDb } from "../client.js";
@@ -110,13 +111,25 @@ export class PostgresCatalogRepository {
     }
     const serviceCode = input.serviceCode ?? null;
     const language = input.language ?? null;
-    const result = await this.db.execute<PublicCatalogServiceRecord>(sql`
+    const result = await this.db.execute<
+      PublicCatalogServiceRecord & {
+        priceMinor: number | string | null;
+        currency: string | null;
+        format: string | null;
+        location: string | null;
+        serviceTitle: string | null;
+      }
+    >(sql`
       select
         es.id as "sourceKey",
         coalesce(nullif(e.public_display_name, ''), 'Эксперт') as "displayName",
         es.code as "serviceCode",
         (case when exists(select 1 from resident_service_mappings m where m.expert_service_id=es.id) then es.name else null end) as "serviceTitle",
-        es.language
+        es.language,
+        es.price_minor as "priceMinor",
+        es.currency,
+        es.format,
+        es.location
       from expert_services es
       join experts e on e.id = es.expert_id
       where e.active = true
@@ -132,12 +145,22 @@ export class PostgresCatalogRepository {
       limit ${input.limit}
     `);
     return result.rows.map((row) => {
-      if (row.serviceTitle === null) {
-        const legacy = { ...row };
-        delete legacy.serviceTitle;
-        return legacy;
-      }
-      return row;
+      const offer = projectExpertServiceOffer({
+        priceMinor: row.priceMinor,
+        currency: row.currency,
+        format: row.format,
+        location: row.location,
+      });
+      const projected: PublicCatalogServiceRecord = {
+        sourceKey: String(row.sourceKey),
+        displayName: String(row.displayName),
+        serviceCode: String(row.serviceCode),
+        language: String(row.language),
+        ...offer,
+      };
+      if (typeof row.serviceTitle === "string")
+        return { ...projected, serviceTitle: row.serviceTitle };
+      return projected;
     });
   }
 

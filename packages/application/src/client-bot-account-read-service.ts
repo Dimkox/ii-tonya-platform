@@ -1,6 +1,7 @@
-import type {
-  ClientBotAccountReadRepository,
-  ClientBotAccountQuery,
+import {
+  formatExpertServiceOfferLine,
+  type ClientBotAccountReadRepository,
+  type ClientBotAccountQuery,
 } from "@ii-tonya/contracts";
 export type ClientBotAccountReply =
   | {
@@ -144,14 +145,26 @@ export function createClientBotAccountReadService(deps: {
                   `${o.handle}: ${o.packageCode}, ${money(o.priceMinor)}, ${o.state === "paid" ? "оплачен" : "оплата не подтверждена"}, ${time(o.createdAt)}`,
               )
               .join("\n") || "Заказов нет.";
-        if (p.kind === "reservations")
-          out =
+        if (p.kind === "reservations") {
+          const lines = p.bookings.map((b) => {
+            const base = `${b.bookingHandle}: ${time(b.startsAt)}. ${bookingState(b.state, b.reservedUntil)}`;
+            const offer = formatExpertServiceOfferLine(b);
+            return offer ? `${base} ${offer}` : base;
+          });
+          const withOffer = lines.join("\n") || "Активных записей нет.";
+          const withoutOffer =
             p.bookings
               .map(
                 (b) =>
                   `${b.bookingHandle}: ${time(b.startsAt)}. ${bookingState(b.state, b.reservedUntil)}`,
               )
               .join("\n") || "Активных записей нет.";
+          const suffix = p.nextCursor
+            ? `\nДалее: /reservations ${p.nextCursor}`
+            : "";
+          out =
+            withOffer.length + suffix.length <= 3900 ? withOffer : withoutOffer;
+        }
         if ((p.kind === "orders" || p.kind === "reservations") && p.nextCursor)
           out += `\nДалее: /${p.kind === "orders" ? "orders" : "reservations"} ${p.nextCursor}`;
         if (out.length > 3900) throw Error("projection_too_large");

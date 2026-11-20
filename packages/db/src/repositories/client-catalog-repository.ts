@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { projectExpertServiceOffer } from "@ii-tonya/contracts";
 import { sql } from "drizzle-orm";
 
 import type { DrizzleDb } from "../client.js";
@@ -15,6 +16,10 @@ export type ClientCatalogCard = Readonly<{
   language: string;
   availability: "catalog_only" | "fresh_slots";
   slots: readonly ClientCatalogSlot[];
+  priceMinor?: number;
+  currency?: "RUB";
+  format?: "online" | "offline" | "hybrid";
+  location?: string;
 }>;
 export type ClientCatalogSnapshot =
   | Readonly<{ catalogRequestId: string; state: "pending" }>
@@ -81,6 +86,7 @@ const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const CHOICE_HANDLE_PATTERN = /^ch1\.[A-Za-z0-9_-]{43}$/u;
 const CONTROL_PATTERN = /[\u0000-\u001f\u007f]/u;
+const OFFER_KEYS = ["priceMinor", "currency", "format", "location"] as const;
 
 const optionalFilter = (
   value: string | undefined,
@@ -125,7 +131,9 @@ export const validateClientCatalogCards = (
       typeof card !== "object" ||
       card === null ||
       Array.isArray(card) ||
-      Object.keys(card).length !== (card.serviceTitle === undefined ? 5 : 6) ||
+      Object.keys(card).length !==
+        (card.serviceTitle === undefined ? 5 : 6) +
+          OFFER_KEYS.filter((key) => key in card).length ||
       !Object.keys(card).every((key) =>
         [
           "displayName",
@@ -134,6 +142,7 @@ export const validateClientCatalogCards = (
           "language",
           "availability",
           "slots",
+          ...OFFER_KEYS,
         ].includes(key),
       ) ||
       typeof card.displayName !== "string" ||
@@ -173,6 +182,23 @@ export const validateClientCatalogCards = (
       ) {
         throw new Error("client_catalog_snapshot_invalid");
       }
+    }
+    let offer: ReturnType<typeof projectExpertServiceOffer>;
+    try {
+      offer = projectExpertServiceOffer(card);
+    } catch {
+      throw new Error("client_catalog_snapshot_invalid");
+    }
+    const present = OFFER_KEYS.filter((key) => key in card);
+    if (
+      present.length !== Object.keys(offer).length ||
+      present.some(
+        (key) =>
+          (card as Record<string, unknown>)[key] !==
+          (offer as Record<string, unknown>)[key],
+      )
+    ) {
+      throw new Error("client_catalog_snapshot_invalid");
     }
   }
   return cards as readonly ClientCatalogCard[];

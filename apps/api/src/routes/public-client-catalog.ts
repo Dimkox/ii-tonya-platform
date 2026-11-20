@@ -18,6 +18,60 @@ const processLoad: PublicCatalogLoadState = {
   inFlight: 0,
 };
 
+const publicOffer = (
+  row: Record<string, unknown>,
+): {
+  priceMinor?: number;
+  currency?: "RUB";
+  format?: "online" | "offline" | "hybrid";
+  location?: string;
+} => {
+  const { priceMinor, currency, format, location } = row;
+  if (priceMinor !== undefined && priceMinor !== null) {
+    if (
+      typeof priceMinor !== "number" ||
+      !Number.isSafeInteger(priceMinor) ||
+      priceMinor < 0 ||
+      priceMinor > 2_147_483_647 ||
+      currency !== "RUB"
+    )
+      throw new Error("invalid_catalog");
+  }
+  if (
+    format !== undefined &&
+    format !== null &&
+    format !== "online" &&
+    format !== "offline" &&
+    format !== "hybrid"
+  )
+    throw new Error("invalid_catalog");
+  if (
+    location !== undefined &&
+    location !== null &&
+    (typeof location !== "string" ||
+      location.length < 1 ||
+      location.length > 500 ||
+      /[\u0000-\u001f\u007f]/u.test(location))
+  )
+    throw new Error("invalid_catalog");
+  if (
+    (format === "offline" || format === "hybrid") &&
+    typeof location !== "string"
+  )
+    throw new Error("invalid_catalog");
+  const knownFormat =
+    format === "online" || format === "offline" || format === "hybrid"
+      ? format
+      : undefined;
+  return {
+    ...(typeof priceMinor === "number"
+      ? { priceMinor, currency: "RUB" as const }
+      : {}),
+    ...(knownFormat === undefined ? {} : { format: knownFormat }),
+    ...(typeof location === "string" ? { location } : {}),
+  };
+};
+
 const validText = (value: unknown, max: number): value is string =>
   typeof value === "string" &&
   value.replace(
@@ -113,6 +167,10 @@ export const publicClientCatalogRoutes: FastifyPluginAsync<{
           serviceCode: string;
           serviceTitle?: string;
           language: string;
+          priceMinor?: number;
+          currency?: "RUB";
+          format?: "online" | "offline" | "hybrid";
+          location?: string;
         }[] = [];
         for (const row of rows) {
           if (!row || typeof row !== "object" || Array.isArray(row))
@@ -131,6 +189,7 @@ export const publicClientCatalogRoutes: FastifyPluginAsync<{
             serviceCode,
             language,
             ...(typeof serviceTitle === "string" ? { serviceTitle } : {}),
+            ...publicOffer(row as Record<string, unknown>),
           });
         }
         return { items };

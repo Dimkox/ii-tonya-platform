@@ -510,4 +510,8 @@ export {
   type PlanerkaTestPurgeResult,
 } from "./repositories/planerka-test-purge.js";
 export { runPlanerkaMappingsCli } from "./planerka-service-mappings-cli.js";
+export {
+  PostgresExpertServiceOfferRepository,
+  type ExpertServiceOfferPatch,
+} from "./repositories/expert-service-offer.js";
 export * from "./repositories/expert-promo-funnel-repository.js";

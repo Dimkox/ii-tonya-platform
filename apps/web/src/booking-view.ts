@@ -9,6 +9,7 @@ import {
   type PrivacyClient,
 } from "./privacy-client.js";
 import { PublicCatalogClient } from "./catalog-client.js";
+import { formatExpertServiceOfferLine } from "./expert-service-offer.js";
 
 const escape = (value: string) =>
   value.replace(
@@ -25,18 +26,22 @@ const time = (value: string) =>
     timeZone: "Europe/Moscow",
   }).format(new Date(value));
 export function bookingStateText(row: ActiveBooking): string {
-  switch (row.state) {
-    case "calendar_pending":
-      return "Эксперт согласовал встречу. Ожидаем подтверждения календаря.";
-    case "confirmation_unverified":
-      return "Подтверждение этой записи в календаре ещё не проверено. Требуется проверка поддержки.";
-    case "cancellation_pending":
-      return "Запись отменена у нас. Проверяем отмену в календаре.";
-    case "reserved":
-      return `Резерв до ${time(row.reservedUntil)}. Встреча ещё не подтверждена.`;
-    case "booked":
-      return "Встреча подтверждена. Статус оплаты здесь не определяется.";
-  }
+  const state = (() => {
+    switch (row.state) {
+      case "calendar_pending":
+        return "Эксперт согласовал встречу. Ожидаем подтверждения календаря.";
+      case "confirmation_unverified":
+        return "Подтверждение этой записи в календаре ещё не проверено. Требуется проверка поддержки.";
+      case "cancellation_pending":
+        return "Запись отменена у нас. Проверяем отмену в календаре.";
+      case "reserved":
+        return `Резерв до ${time(row.reservedUntil)}. Встреча ещё не подтверждена.`;
+      case "booked":
+        return "Встреча подтверждена. Статус оплаты здесь не определяется.";
+    }
+  })();
+  const offer = formatExpertServiceOfferLine(row);
+  return offer ? `${state} ${offer}` : state;
 }
 export function renderBookingChoices(
   cards: BookingCard[],
@@ -47,7 +52,7 @@ export function renderBookingChoices(
   return cards
     .map(
       (card, index) =>
-        `<section class="consent-card"><h3>${escape(card.displayName)}</h3><p>${escape(card.serviceTitle ?? card.serviceCode)} · ${escape(card.language)}</p>${
+        `<section class="consent-card"><h3>${escape(card.displayName)}</h3><p>${escape(card.serviceTitle ?? card.serviceCode)} · ${escape(card.language)}</p>${formatExpertServiceOfferLine(card) ? `<p>${escape(formatExpertServiceOfferLine(card))}</p>` : ""}${
           card.availability !== "fresh_slots" ||
           !card.slots.some((slot) => slot.choiceHandle)
             ? "<p>Нет доступного времени для записи.</p>"

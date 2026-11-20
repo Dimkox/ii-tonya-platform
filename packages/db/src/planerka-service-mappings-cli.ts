@@ -4,6 +4,8 @@
  * the built package and does not need tsx.
  */
 import { readFileSync } from "node:fs";
+import type { ExpertServiceOfferPatch } from "./repositories/expert-service-offer.js";
+import { PostgresExpertServiceOfferRepository } from "./repositories/expert-service-offer.js";
 import {
   PostgresPlanerkaServiceMappingAdmin,
   parsePlanerkaServiceMappingFile,
@@ -16,6 +18,42 @@ type MappingAdmin = Pick<
   "list" | "listServices" | "plan" | "apply" | "setEnabled" | "remove"
 >;
 type PurgeAdmin = Pick<PostgresPlanerkaTestPurge, "purgeInactiveTestExpert">;
+type OfferAdmin = Pick<PostgresExpertServiceOfferRepository, "updateOffer">;
+
+const offerText = (value: number | string | null): string =>
+  value === null || value === "" ? "-" : String(value);
+
+export function parseExpertServiceOfferFlags(
+  argv: readonly string[],
+): ExpertServiceOfferPatch {
+  if (argv.length === 0 || argv.length % 2 !== 0)
+    throw new Error("expert_service_offer_invalid:flags");
+  let priceMinor: number | null | undefined;
+  let format: ExpertServiceOfferPatch["format"];
+  let location: string | null | undefined;
+  for (let index = 0; index < argv.length; index += 2) {
+    const flag = argv[index];
+    const value = argv[index + 1]!;
+    if (flag === "--price-minor") {
+      if (value === "null") priceMinor = null;
+      else if (!/^(?:0|[1-9]\d*)$/u.test(value))
+        throw new Error("expert_service_offer_invalid:price");
+      else priceMinor = Number(value);
+    } else if (flag === "--format") {
+      if (value === "null") format = null;
+      else if (value === "online" || value === "offline" || value === "hybrid")
+        format = value;
+      else throw new Error("expert_service_offer_invalid:format");
+    } else if (flag === "--location") {
+      location = value === "null" ? null : value;
+    } else throw new Error("expert_service_offer_invalid:flags");
+  }
+  return {
+    ...(priceMinor === undefined ? {} : { priceMinor }),
+    ...(format === undefined ? {} : { format }),
+    ...(location === undefined ? {} : { location }),
+  };
+}
 
 export async function runPlanerkaMappingsCli(
   argv: readonly string[],
@@ -23,11 +61,12 @@ export async function runPlanerkaMappingsCli(
   out: (line: string) => void,
   admin?: MappingAdmin,
   purge?: PurgeAdmin,
+  offers?: OfferAdmin,
 ): Promise<number> {
   const [command, arg, flag] = argv;
   const usage = () => {
     out(
-      "usage: list | services | plan <file> | apply <file> --confirm | disable <id> | enable <id> | remove <id> --confirm | purge-test-expert <expertId> --confirm",
+      "usage: list | services | plan <file> | apply <file> --confirm | disable <id> | enable <id> | remove <id> --confirm | purge-test-expert <expertId> --confirm | set-offer <id> [--price-minor <kopecks|null>] [--format <online|offline|hybrid|null>] [--location <text|null>]",
     );
     return 2;
   };
@@ -69,7 +108,7 @@ export async function runPlanerkaMappingsCli(
       case "services": {
         for (const row of await repo.listServices())
           out(
-            `${row.expertServiceId} expert=${row.expertId} duration=${row.durationMinutes} active=${row.active}`,
+            `${row.expertServiceId} expert=${row.expertId} duration=${row.durationMinutes} active=${row.active} priceMinor=${offerText(row.priceMinor)} currency=${row.currency} format=${offerText(row.format)} location=${offerText(row.location)}`,
           );
         return 0;
       }
@@ -103,6 +142,42 @@ export async function runPlanerkaMappingsCli(
         const removed = await repo.remove(arg!);
         out(`remove ${arg} ${removed ? "removed" : "absent"}`);
         return 0;
+      }
+      case "set-offer": {
+        if (!arg) return usage();
+        let patch: ExpertServiceOfferPatch;
+        try {
+          patch = parseExpertServiceOfferFlags(argv.slice(2));
+        } catch (error) {
+          out(
+            error instanceof Error
+              ? error.message
+              : "expert_service_offer_invalid:flags",
+          );
+          return 2;
+        }
+        const writer =
+          offers ??
+          new PostgresExpertServiceOfferRepository(
+            db ??
+              (() => {
+                if (!env.DATABASE_URL) throw new Error("database_url_required");
+                db = createDb(env.DATABASE_URL);
+                return db;
+              })(),
+          );
+        try {
+          const result = await writer.updateOffer(arg, patch);
+          out(`set-offer ${arg} ${result}`);
+          return result === "updated" ? 0 : 1;
+        } catch (error) {
+          out(
+            error instanceof Error
+              ? error.message
+              : "expert_service_offer_invalid",
+          );
+          return 2;
+        }
       }
       case "purge-test-expert": {
         if (!purger) {

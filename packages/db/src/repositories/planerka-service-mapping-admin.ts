@@ -110,6 +110,10 @@ export type PlanerkaCandidateServiceRow = {
   readonly expertId: string;
   readonly durationMinutes: number;
   readonly active: boolean;
+  readonly priceMinor: number | null;
+  readonly currency: string;
+  readonly format: string | null;
+  readonly location: string | null;
 };
 
 export type PlanerkaMappingPlanAction = "insert" | "update" | "unchanged";
@@ -137,7 +141,7 @@ export class PostgresPlanerkaServiceMappingAdmin {
   async listServices(): Promise<readonly PlanerkaCandidateServiceRow[]> {
     return (
       await this.db.execute<PlanerkaCandidateServiceRow>(
-        sql`select s.id as "expertServiceId",s.expert_id as "expertId",s.duration_minutes as "durationMinutes",s.active from expert_services s order by s.expert_id,s.id`,
+        sql`select s.id as "expertServiceId",s.expert_id as "expertId",s.duration_minutes as "durationMinutes",s.active,s.price_minor as "priceMinor",s.currency,s.format,s.location from expert_services s order by s.expert_id,s.id`,
       )
     ).rows;
   }

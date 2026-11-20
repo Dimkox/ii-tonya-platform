@@ -25,6 +25,10 @@ type PublicService = Readonly<{
   serviceCode: string;
   serviceTitle?: string;
   language: string;
+  priceMinor?: number;
+  currency?: "RUB";
+  format?: "online" | "offline" | "hybrid";
+  location?: string;
 }>;
 
 export interface ClientCatalogPublicSource {
@@ -174,6 +178,28 @@ function decodeCatalogPayload(value: unknown): CatalogPayload {
 const finiteDate = (value: unknown): value is Date =>
   value instanceof Date && Number.isFinite(value.getTime());
 
+const offerOf = (service: PublicService) => {
+  if (
+    service.priceMinor !== undefined &&
+    (!Number.isSafeInteger(service.priceMinor) ||
+      service.priceMinor < 0 ||
+      service.currency !== "RUB")
+  )
+    throw new Error("client_catalog_offer_invalid");
+  if (
+    (service.format === "offline" || service.format === "hybrid") &&
+    (service.location === undefined || service.location.length < 1)
+  )
+    throw new Error("client_catalog_offer_invalid");
+  return {
+    ...(service.priceMinor === undefined
+      ? {}
+      : { priceMinor: service.priceMinor, currency: "RUB" as const }),
+    ...(service.format === undefined ? {} : { format: service.format }),
+    ...(service.location === undefined ? {} : { location: service.location }),
+  };
+};
+
 function catalogOnly(service: PublicService): ClientCatalogCard {
   return {
     displayName: service.displayName,
@@ -182,6 +208,7 @@ function catalogOnly(service: PublicService): ClientCatalogCard {
     language: service.language,
     availability: "catalog_only",
     slots: [],
+    ...offerOf(service),
   };
 }
 
@@ -194,6 +221,7 @@ function publicService(value: PublicService): PublicService {
       ? {}
       : { serviceTitle: boundedString(value.serviceTitle, 160) }),
     language: boundedString(value.language, 32),
+    ...offerOf(value),
   };
 }
 
@@ -312,6 +340,7 @@ export function createClientCatalogSourceReader(
                 language: service.language,
                 availability: "fresh_slots",
                 slots,
+                ...offerOf(service),
               };
         }),
       );
@@ -394,6 +423,7 @@ export function createClientCatalogSourceReader(
             language: service.language,
             availability: "fresh_slots",
             slots,
+            ...offerOf(service),
           };
         }),
       );

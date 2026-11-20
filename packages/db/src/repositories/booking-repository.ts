@@ -10,6 +10,7 @@ import {
   type ReservationAction,
   type ReservationStatus,
 } from "@ii-tonya/domain";
+import { projectExpertServiceOffer } from "@ii-tonya/contracts";
 import type { DrizzleDb } from "../client.js";
 import { currentExpertResidencyVisibleSql } from "./catalog-repository.js";
 import { currentConsentSatisfiedSql } from "./consent-current.js";
@@ -2243,6 +2244,10 @@ export async function readOwnedActiveBookingsInTransaction(
           | "confirmation_unverified";
         startsAt: Date;
         reservedUntil: Date;
+        priceMinor?: number;
+        currency?: "RUB";
+        format?: "online" | "offline" | "hybrid";
+        location?: string;
       }[];
     }
 > {
@@ -2267,6 +2272,10 @@ export async function readOwnedActiveBookingsInTransaction(
         | "confirmation_unverified";
       startsAt: Date | string;
       reservedUntil: Date | string;
+      priceMinor: number | string | null;
+      currency: string | null;
+      format: string | null;
+      location: string | null;
     }>(sql`
       with anchor as (
         select b.created_at,b.booking_handle
@@ -2277,7 +2286,8 @@ export async function readOwnedActiveBookingsInTransaction(
         select (${command.after === undefined} or exists(select 1 from anchor)) as valid
       )
       select authority.valid as "anchorFound", page.booking_handle as "bookingHandle",
-        page.status as state, page.starts_at as "startsAt", page.reserved_until as "reservedUntil"
+        page.status as state, page.starts_at as "startsAt", page.reserved_until as "reservedUntil",
+        page.price_minor as "priceMinor", page.currency, page.format, page.location
       from authority
       left join lateral (
         select b.booking_handle,b.created_at,
@@ -2285,12 +2295,14 @@ export async function readOwnedActiveBookingsInTransaction(
             when l.reservation_id is not null and l.resolved_at is null and r.status in ('cancelled_by_client','cancelled_by_expert','expired') then 'cancellation_pending'
             when r.status='booked' and o.provider_uid is null and not exists(select 1 from resident_native_confirmations nc where nc.reservation_id=r.id and nc.slot_id=r.slot_id) then 'confirmation_unverified'
             when r.status='reserved' and o.id is not null then 'calendar_pending'
-            else r.status::text end as status,s.starts_at,r.reserved_until
+            else r.status::text end as status,s.starts_at,r.reserved_until,
+          es.price_minor,es.currency,es.format,es.location
         from client_booking_receipts b
         join reservations r on r.id=b.reservation_id and r.user_id=b.user_id
         left join planerka_booking_operations o on o.reservation_id=r.id
         left join planerka_legacy_booking_reviews l on l.reservation_id=r.id
         join slots s on s.id=r.slot_id
+        join expert_services es on es.id=r.expert_service_id
         join users u on u.id=b.user_id and u.active
         where authority.valid and b.user_id=${command.userId}::uuid
           and (r.status in ('reserved','booked') or (
@@ -2322,6 +2334,7 @@ export async function readOwnedActiveBookingsInTransaction(
                 row.reservedUntil,
                 "reservations.reserved_until",
               ),
+              ...projectExpertServiceOffer(row),
             },
           ],
     ),

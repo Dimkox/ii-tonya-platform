@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 
+import { projectExpertServiceOffer } from "@ii-tonya/contracts";
 import type { ReservationStatus } from "@ii-tonya/domain";
 
 import type { ClientPrincipal } from "./ports.js";
@@ -38,6 +39,10 @@ export interface ProtectedClientBookingRepository {
             | "confirmation_unverified";
           startsAt: Date;
           reservedUntil: Date;
+          priceMinor?: number;
+          currency?: "RUB";
+          format?: "online" | "offline" | "hybrid";
+          location?: string;
         }[];
       }
   >;
@@ -82,6 +87,10 @@ export interface ClientActiveBooking {
     | "confirmation_unverified";
   startsAt: string;
   reservedUntil: string;
+  priceMinor?: number;
+  currency?: "RUB";
+  format?: "online" | "offline" | "hybrid";
+  location?: string;
 }
 
 export interface ClientBookingPage {
@@ -241,6 +250,7 @@ export function createClientBookingService(deps: {
             state: row.state,
             startsAt: publicInstant(row.startsAt),
             reservedUntil: publicInstant(row.reservedUntil),
+            ...projectExpertServiceOffer(row),
           };
         });
       return {

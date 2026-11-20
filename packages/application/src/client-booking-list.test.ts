@@ -15,7 +15,16 @@ const row = (index: number) => ({
   reservedUntil: new Date("2026-10-09T12:00:00Z"),
   internalId: "must-not-escape",
 });
-const setup = (rows = [row(1)], kind: "found" | "not_found" = "found") => {
+type BookingRow = ReturnType<typeof row> & {
+  priceMinor?: number;
+  currency?: "RUB";
+  format?: "online" | "offline" | "hybrid";
+  location?: string;
+};
+const setup = (
+  rows: readonly BookingRow[] = [row(1)],
+  kind: "found" | "not_found" = "found",
+) => {
   const listOwnedActive = vi.fn(async () =>
     kind === "found" ? { kind, bookings: rows } : { kind },
   );
@@ -57,6 +66,23 @@ describe("owner booking page projection", () => {
     expect(listOwnedActive).toHaveBeenCalledWith({
       userId: principal.userId,
       after: handle(0),
+    });
+  });
+  it("keeps a display-only offer on the public booking row", async () => {
+    const { service } = setup([
+      {
+        ...row(1),
+        priceMinor: 300_000,
+        currency: "RUB",
+        format: "offline",
+        location: "Москва",
+      },
+    ]);
+    expect((await service.list(principal)).bookings[0]).toMatchObject({
+      priceMinor: 300_000,
+      currency: "RUB",
+      format: "offline",
+      location: "Москва",
     });
   });
   it("rejects an absent or foreign cursor identically", async () => {
