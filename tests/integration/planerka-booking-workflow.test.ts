@@ -6,6 +6,8 @@ import {
   PostgresPlanerkaBookingRepository,
   type PlanerkaOperation,
 } from "../../packages/db/src/repositories/planerka-booking-repository.js";
+import { PostgresPlanerkaTestPurge } from "../../packages/db/src/repositories/planerka-test-purge.js";
+import { PostgresPlanerkaServiceMappingAdmin } from "../../packages/db/src/repositories/planerka-service-mapping-admin.js";
 import { PostgresWorkerJobsRepository } from "../../packages/db/src/repositories/worker-jobs-repository.js";
 import {
   startTestPostgres,
@@ -87,6 +89,8 @@ async function fixture(mapped = true) {
     id,
     accountId,
     userId,
+    expertId: identity.expertId,
+    serviceId: identity.serviceId,
     bookings,
     repository,
     approval,
@@ -112,7 +116,7 @@ async function fixture(mapped = true) {
       ).rows.length,
   };
 }
-function booking(op: PlanerkaOperation): PlanerkaBooking {
+function booking(op: PlanerkaOperation, meetingUrl = ""): PlanerkaBooking {
   return {
     id: 1,
     uid: `uid_${op.id}`,
@@ -134,7 +138,7 @@ function booking(op: PlanerkaOperation): PlanerkaBooking {
     ],
     attendees: [
       {
-        name: "Клиент",
+        name: op.request.attendee.name,
         email: "",
         displayEmail: "",
         timeZone: "UTC",
@@ -144,7 +148,7 @@ function booking(op: PlanerkaOperation): PlanerkaBooking {
     title: "",
     description: "",
     location: "",
-    meetingUrl: "",
+    meetingUrl,
     absentHost: false,
     createdAt: op.request.start,
     updatedAt: op.request.start,
@@ -658,3 +662,96 @@ for (const state of ["pending", "sending", "booked"] as const) {
     ).toEqual({ moved: false });
   });
 }
+
+it("persists the Planerka video link and the client display name (SCRUM-522, SCRUM-523)", async () => {
+  const f = await fixture();
+  await database.db.execute(
+    sql`insert into client_profiles(user_id, display_name, timezone) values(${f.userId}::uuid, 'Мария', 'Europe/Moscow')`,
+  );
+  await f.approve();
+  const op = (await f.repository.claim(f.accountId, true))!;
+  expect(op.request.attendee.name).toBe("Мария");
+  expect(await f.repository.admitSend(op)).toBe(true);
+  const link = "https://video.planerka.app/room-maria";
+  expect(
+    await f.repository.complete(op, { ...booking(op), meetingUrl: link }),
+  ).toBe(true);
+  expect(
+    (
+      await database.db.execute<{ meeting_url: string; payload_url: string }>(
+        sql`select r.meeting_url, o.payload->>'meetingUrl' as payload_url from reservations r join integration_outbox o on o.topic='client.booking_confirmed' and o.payload->>'reservationId'=r.id::text where r.id=${f.id}::uuid`,
+      )
+    ).rows[0],
+  ).toEqual({ meeting_url: link, payload_url: link });
+});
+
+const errorText = (error: unknown): string => {
+  const parts: string[] = [];
+  let current: unknown = error;
+  for (let depth = 0; current instanceof Error && depth < 6; depth += 1) {
+    parts.push(current.message);
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return parts.join("\n");
+};
+
+it("removes a mapping and purges only an inactive unverified expert (SCRUM-524, SCRUM-525)", async () => {
+  const f = await fixture();
+  const admin = new PostgresPlanerkaServiceMappingAdmin(database.db);
+  expect(await admin.remove(f.serviceId)).toBe(true);
+  expect(await admin.remove(f.serviceId)).toBe(false);
+  await database.db.execute(
+    sql`insert into planerka_service_mappings(expert_service_id,account_id,event_type_id,duration_minutes,time_zone,enabled,verified_at) values(${f.serviceId}::uuid,${f.accountId},1,60,'UTC',true,clock_timestamp())`,
+  );
+  await database.db.execute(
+    sql`update slots set observed_at=${f.approval.now} where expert_service_id=${f.serviceId}::uuid`,
+  );
+  await f.approve();
+  await expect(
+    database.db.execute(
+      sql`delete from planerka_booking_operations where reservation_id=${f.id}::uuid`,
+    ),
+  ).rejects.toSatisfy((error: unknown) =>
+    errorText(error).includes("planerka_operation_retained"),
+  );
+  await expect(
+    database.db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select set_config('ii_tonya.planerka_test_purge', ${`expert:${f.expertId}`}, true)`,
+      );
+      await tx.execute(
+        sql`delete from planerka_booking_operations where reservation_id=${f.id}::uuid`,
+      );
+    }),
+  ).rejects.toSatisfy((error: unknown) =>
+    errorText(error).includes("planerka_operation_retained"),
+  );
+  const purge = new PostgresPlanerkaTestPurge(database.db);
+  await expect(purge.purgeInactiveTestExpert(f.expertId)).rejects.toThrow(
+    "planerka_test_purge_refused",
+  );
+  await database.db.execute(
+    sql`update reservations set status='cancelled_by_client' where id=${f.id}::uuid`,
+  );
+  await database.db.execute(
+    sql`update experts set active=false, verified=false where id=${f.expertId}::uuid`,
+  );
+  const result = await purge.purgeInactiveTestExpert(f.expertId);
+  expect(result.operations).toBe(1);
+  expect(result.reservations).toBe(1);
+  expect(
+    (
+      await database.db.execute(
+        sql`select id from planerka_booking_operations where reservation_id=${f.id}::uuid`,
+      )
+    ).rows,
+  ).toEqual([]);
+  expect(
+    (
+      await database.db.execute(
+        sql`select id from reservations where id=${f.id}::uuid`,
+      )
+    ).rows,
+  ).toEqual([]);
+  expect(await admin.remove(f.serviceId)).toBe(false);
+});

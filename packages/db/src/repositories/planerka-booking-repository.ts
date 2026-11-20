@@ -28,6 +28,24 @@ export interface PlanerkaOperation {
   cancelRequested: boolean;
 }
 const projection = sql`id,reservation_id as "reservationId",account_id as "accountId",event_type_id as "eventTypeId",request,request_fingerprint as "requestFingerprint",state,provider_uid as "providerUid",lease_token as "leaseToken",cancel_requested as "cancelRequested"`;
+const MEETING_URL = /^https:\/\/[^\s]+$/u;
+/** Planerka returns the video link on the booking. Empty means the provider sent none. */
+export function planerkaMeetingUrl(
+  value: string | null | undefined,
+): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (!MEETING_URL.test(value) || value.length > 2048)
+    throw new Error("planerka_binding_mismatch");
+  return value;
+}
+/** Real profile name when it is safe to send; otherwise the neutral label. */
+export function planerkaAttendeeName(value: string | null | undefined): string {
+  const cleaned = (value ?? "")
+    .replace(/[\u0000-\u001f\u007f]/gu, "")
+    .trim()
+    .slice(0, 1024);
+  return cleaned.length > 0 ? cleaned : "Клиент";
+}
 export const planerkaRequestFingerprint = (
   request: PlanerkaOperation["request"],
 ): string =>
@@ -58,11 +76,13 @@ export async function enqueuePlanerkaBooking(
       timeZone: string;
       startsAt: Date | string;
       endsAt: Date | string;
+      clientName: string | null;
     }>(sql`
-    select m.account_id as "accountId",m.event_type_id as "eventTypeId",m.duration_minutes as duration,m.time_zone as "timeZone",s.starts_at as "startsAt",s.ends_at as "endsAt"
+    select m.account_id as "accountId",m.event_type_id as "eventTypeId",m.duration_minutes as duration,m.time_zone as "timeZone",s.starts_at as "startsAt",s.ends_at as "endsAt",cp.display_name as "clientName"
     from reservations r join slots s on s.id=r.slot_id
     join expert_services es on es.id=r.expert_service_id
     join planerka_service_mappings m on m.expert_service_id=es.id
+    left join client_profiles cp on cp.user_id=r.user_id
     where r.id=${reservationId}::uuid and m.enabled and s.provider='planerka'
       and es.expert_id=r.expert_id and m.duration_minutes=es.duration_minutes
       and extract(epoch from (s.ends_at-s.starts_at))=m.duration_minutes*60
@@ -76,7 +96,10 @@ export async function enqueuePlanerkaBooking(
     eventTypeId: row.eventTypeId,
     start: new Date(row.startsAt).toISOString(),
     lengthInMinutes: row.duration,
-    attendee: { name: "Клиент", timeZone: row.timeZone },
+    attendee: {
+      name: planerkaAttendeeName(row.clientName),
+      timeZone: row.timeZone,
+    },
   };
   // A unique reservation key rejects a second approval even with a fresh version.
   await tx.execute(sql`insert into planerka_booking_operations(reservation_id,account_id,event_type_id,request,request_fingerprint,starts_at,ends_at)
@@ -246,6 +269,7 @@ export class PostgresPlanerkaBookingRepository {
       status: string;
       hosts: readonly { id: number }[];
       attendees: readonly { name: string; timeZone: string }[];
+      meetingUrl?: string | null;
     },
   ): Promise<boolean> {
     if (
@@ -262,6 +286,7 @@ export class PostgresPlanerkaBookingRepository {
       planerkaRequestFingerprint(op.request) !== op.requestFingerprint
     )
       throw new Error("planerka_binding_mismatch");
+    const meetingUrl = planerkaMeetingUrl(booking.meetingUrl);
     return this.db.transaction(async (tx) => {
       await lockBookingNotificationReservation(tx, op.reservationId);
       const r = (
@@ -299,9 +324,15 @@ export class PostgresPlanerkaBookingRepository {
       );
       if (!cancelled) {
         await tx.execute(
-          sql`update reservations set status='booked',version=version+1,updated_at=clock_timestamp() where id=${op.reservationId}::uuid`,
+          sql`update reservations set status='booked',meeting_url=coalesce(${meetingUrl},meeting_url),version=version+1,updated_at=clock_timestamp() where id=${op.reservationId}::uuid`,
         );
-        await this.publish(tx, op, "client.booking_confirmed");
+        await this.publish(
+          tx,
+          op,
+          "client.booking_confirmed",
+          undefined,
+          meetingUrl,
+        );
       }
       await flushBookingNotificationCapture(tx);
       return true;
@@ -325,11 +356,13 @@ export class PostgresPlanerkaBookingRepository {
     op: PlanerkaOperation,
     topic: string,
     version?: number,
+    meetingUrl?: string | null,
   ) {
     const payload = JSON.stringify({
       reservationId: op.reservationId,
       charge: 0,
       ...(version === undefined ? {} : { version }),
+      ...(meetingUrl ? { meetingUrl } : {}),
     });
     const source = await tx.execute<{ id: string }>(
       sql`insert into integration_outbox(idempotency_key,topic,payload,correlation_id,reconciliation_key,payload_hash) values(${version === undefined ? `${op.id}:${topic}` : `${op.reservationId}:${version}:${topic}`},${topic},${payload}::jsonb,${`planerka:${op.id}`},${`planerka:${op.id}`},${createHash("sha256").update(payload).digest("hex")}) on conflict(idempotency_key) do nothing returning id`,

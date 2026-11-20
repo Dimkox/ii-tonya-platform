@@ -68,7 +68,12 @@ export function renderBookingNotification(
         } as never,
       };
     case "client.booking_confirmed":
-      return result("client", `Запись подтверждена на ${time}.`);
+      return result(
+        view.audience === "expert" ? "expert" : "client",
+        view.meetingUrl
+          ? `Запись подтверждена на ${time}.\nСсылка: ${view.meetingUrl}`
+          : `Запись подтверждена на ${time}.`,
+      );
     case "telegram.booking_cancelled":
       return result(
         "expert",

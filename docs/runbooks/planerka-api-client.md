@@ -104,8 +104,10 @@ Operators must supply genuine `planerka_service_mappings` entries for real
 expert services; no migration seeds experts, slots or mappings. Verify event
 ownership, duration, profile timezone, one-person capacity, no provider approval,
 no provider-side payment and the event's ability to accept only the minimum
-attendee name/timezone. Current requests use the neutral label `Клиент`, never
-consultation text, email, phone, Telegram identity or medical information. Types
+attendee name/timezone. The attendee name is the client profile display name,
+trimmed and without control characters. When that name is missing the request
+uses the neutral label `Клиент`. Requests never include consultation text,
+email, phone, Telegram identity or medical information. Types
 requiring contact/custom answers are unsuitable until separately implemented.
 Availability import/cache and genuine inventory provisioning are not supplied by
 this workflow: an empty catalogue stays empty. Changing provider settings requires
@@ -263,6 +265,29 @@ pnpm exec tsx scripts/planerka-service-mappings.ts plan mappings.json           
 pnpm exec tsx scripts/planerka-service-mappings.ts apply mappings.json --confirm  # one transaction
 pnpm exec tsx scripts/planerka-service-mappings.ts disable <expertServiceId>
 pnpm exec tsx scripts/planerka-service-mappings.ts enable <expertServiceId>
+pnpm exec tsx scripts/planerka-service-mappings.ts remove <expertServiceId> --confirm
+```
+
+A built release has no tsx. After `pnpm build`, from the repository or from a
+native release (the worker package supplies `@ii-tonya/db`):
+
+```
+node scripts/planerka-service-mappings.mjs list
+node scripts/planerka-service-mappings.mjs remove <expertServiceId> --confirm
+```
+
+## Purging inactive test bookings (SCRUM-525)
+
+`planerka_operation_retained` still blocks deletion of real Planerka operations.
+`purge-test-expert` is the only exception. It runs in one transaction and only
+for an expert who is both inactive and unverified, has no residency order, and
+whose reservations are already `cancelled_by_client`, `cancelled_by_expert` or
+`expired`. It writes an `audit_events` row `planerka.test_purge`. An active or
+verified expert is refused. Notification deliveries, notification contexts and
+reschedule facts block the purge instead of being deleted.
+
+```
+node scripts/planerka-service-mappings.mjs purge-test-expert <expertId> --confirm
 ```
 
 File format (strict; unknown fields and duplicates are rejected):

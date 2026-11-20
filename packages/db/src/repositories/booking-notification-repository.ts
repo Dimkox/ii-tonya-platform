@@ -134,6 +134,12 @@ const roleFor = (topic: BookingNotificationTopic): Role =>
   topic.startsWith("telegram.") || topic.startsWith("expert.")
     ? "expert"
     : "client";
+const httpsMeetingUrl = (value: unknown): string | undefined =>
+  typeof value === "string" &&
+  /^https:\/\/[^\s]+$/u.test(value) &&
+  value.length <= 2048
+    ? value
+    : undefined;
 
 /** Caller holds the authority barriers before reservation/provider locks. No later context capture. */
 export async function captureBookingNotificationIntents(
@@ -323,6 +329,38 @@ async function prepareCapture(
       ).rows[0]?.id;
       if (id) {
         if (checked.reason) await suppress(tx, id, checked.reason);
+      }
+      if (
+        topic === "client.booking_confirmed" &&
+        role === "client" &&
+        context.expert_original_identity_id &&
+        context.expert_external_user_id &&
+        context.expert_external_chat_id
+      ) {
+        const link = httpsMeetingUrl(
+          (
+            await tx.execute<{ meeting_url: string | null }>(
+              sql`select meeting_url from reservations where id=${payload.reservationId}::uuid`,
+            )
+          ).rows[0]?.meeting_url,
+        );
+        if (link) {
+          const expert: Delivery = {
+            ...candidate,
+            recipient_role: "expert",
+            recipient_user_id: context.expert_user_id,
+            original_identity_id: context.expert_original_identity_id,
+            external_user_id: context.expert_external_user_id,
+            external_chat_id: context.expert_external_chat_id,
+          };
+          const expertChecked = await validate(tx, expert, context);
+          if (!expertChecked.reason) {
+            await tx.execute(sql`insert into booking_notification_deliveries(source_outbox_id,reservation_id,recipient_role,recipient_user_id,recipient_identity_id,original_identity_id,bot_key,external_user_id,external_chat_id,kind,source_version,provider_operation_id)
+              select ${sourceOutboxId}::uuid,r.id,'expert',${context.expert_user_id}::uuid,${context.expert_identity_id}::uuid,${context.expert_original_identity_id}::uuid,${context.bot_key},${context.expert_external_user_id},${context.expert_external_chat_id},${topic},${version},${operationId}::uuid
+              from reservations r where r.id=${payload.reservationId}::uuid
+              on conflict(source_outbox_id,recipient_role) do nothing`);
+          }
+        }
       }
       // Accounted means an intent exists, not that a human received it.
       const exists = (
@@ -753,11 +791,30 @@ export class PostgresBookingNotificationRepository {
           const terminal =
             d.kind === "client.booking_completed" ||
             d.kind === "client.booking_no_show";
+          const meetingUrl =
+            d.kind === "client.booking_confirmed" &&
+            checked.calendar === "verified_booked"
+              ? httpsMeetingUrl(
+                  (
+                    await tx.execute<{ meeting_url: string | null }>(
+                      sql`select meeting_url from reservations where id=${d.reservation_id}::uuid`,
+                    )
+                  ).rows[0]?.meeting_url,
+                )
+              : undefined;
           const view = bookingNotificationViewSchema.parse({
             kind: "ready",
             topic: d.kind,
             startsAt: checked.startsAt,
             status: checked.status,
+            ...(meetingUrl === undefined
+              ? {}
+              : {
+                  meetingUrl,
+                  ...(d.recipient_role === "expert"
+                    ? { audience: "expert" as const }
+                    : {}),
+                }),
             ...(d.kind === "telegram.reservation_request"
               ? {
                   callbacks: {

@@ -505,4 +505,9 @@ export {
   type PlanerkaServiceMappingRow,
   type PlanerkaMappingPlanEntry,
 } from "./repositories/planerka-service-mapping-admin.js";
+export {
+  PostgresPlanerkaTestPurge,
+  type PlanerkaTestPurgeResult,
+} from "./repositories/planerka-test-purge.js";
+export { runPlanerkaMappingsCli } from "./planerka-service-mappings-cli.js";
 export * from "./repositories/expert-promo-funnel-repository.js";
