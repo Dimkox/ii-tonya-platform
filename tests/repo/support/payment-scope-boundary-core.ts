@@ -2668,6 +2668,14 @@ const approvedMigrationHashes = new Map([
     "4c9b2714c0ffbdec0954539d2451399754c0e0987382fd9308009a70e137c558",
   ],
   [
+    "packages/db/migrations/state/0091_manifest.json",
+    "ba1e129ad02ef0fa4cd0811dca49fa45e4de60a44c78f963b1d8ca933933f33b",
+  ],
+  [
+    "packages/db/migrations/state/0091_sql_objects.json",
+    "93b4d9ff95732782f1f53320eed98d91e2558cbb56b8112d3859c7743c2fc83b",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
     "0f841c13ecb950393535a147665552e25613ad49fefd6f05ad43932565b70b8d",
   ],
@@ -3879,6 +3887,7 @@ export function isApprovedLargeScopeArtifact(
 ): boolean {
   const approvedSizes = new Map<string, number>([
     ["packages/db/migrations/meta/0091_snapshot.json", 1204804],
+    ["packages/db/migrations/state/0091_sql_objects.json", 1895463],
     ["packages/db/migrations/meta/0090_snapshot.json", 1166334],
     ["packages/db/migrations/state/0090_sql_objects.json", 1875053],
     ["packages/db/migrations/meta/0089_snapshot.json", 1166334],
