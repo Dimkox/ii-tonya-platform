@@ -15,7 +15,16 @@ const row = (index: number) => ({
   reservedUntil: new Date("2026-10-09T12:00:00Z"),
   internalId: "must-not-escape",
 });
-const setup = (rows = [row(1)], kind: "found" | "not_found" = "found") => {
+type BookingRow = ReturnType<typeof row> & {
+  priceMinor?: number;
+  currency?: "RUB";
+  format?: "online" | "offline" | "hybrid";
+  location?: string;
+};
+const setup = (
+  rows: readonly BookingRow[] = [row(1)],
+  kind: "found" | "not_found" = "found",
+) => {
   const listOwnedActive = vi.fn(async () =>
     kind === "found" ? { kind, bookings: rows } : { kind },
   );
