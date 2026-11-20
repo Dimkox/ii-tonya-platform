@@ -27,6 +27,43 @@ it("routes exact protected private reads without accepting forwarded context", a
   ).toBe("invalid");
   expect(read).toHaveBeenCalledOnce();
 });
+it("includes price, format and location in a reservation reply", async () => {
+  const read = vi.fn().mockResolvedValue({
+    kind: "reservations",
+    nextCursor: null,
+    bookings: [
+      {
+        bookingHandle: `bk1.${"a".repeat(43)}`,
+        state: "booked",
+        startsAt: "2026-11-20T09:00:00.000Z",
+        reservedUntil: "2026-11-20T08:00:00.000Z",
+        priceMinor: 300_000,
+        currency: "RUB",
+        format: "offline",
+        location: "Москва",
+      },
+    ],
+  });
+  const service = createClientBotAccountReadService({
+    botId: "123",
+    botKey: "assistant",
+    repository: { read },
+  });
+  const result = await service.handle({
+    update_id: 3,
+    message: {
+      from: { id: 7, is_bot: false },
+      chat: { id: 7, type: "private" },
+      text: "/reservations",
+    },
+  });
+  expect(result.status).toBe("reply");
+  if (result.status !== "reply") throw new Error("missing reply");
+  expect(result.reply.text).toContain("Встреча подтверждена");
+  expect(result.reply.text).toContain("3 000 ₽");
+  expect(result.reply.text).toContain("Офлайн");
+  expect(result.reply.text).toContain("Москва");
+});
 it("leaves other commands untouched and acknowledges duplicates", async () => {
   const read = vi.fn().mockResolvedValue({ kind: "duplicate" });
   const service = createClientBotAccountReadService({

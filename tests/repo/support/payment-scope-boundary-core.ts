@@ -636,11 +636,11 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "1d9a9b53b93719bad4bfcb1aa293c94f4c122d8e503607b54d05338c0574f342",
+    "403c7513fecd6f399d91fade239f57da99e72f6e54f36a03df4dfed8dfa61633",
   ],
   [
     "packages/contracts/src/index.ts",
-    "b26ce919866a6b94ba398bfff3b1a9f8a46e4cac4829e81c9ee4437da960f10c",
+    "3373c4d1bf04ad10390e278d16f1a08784c7b32bba66280fa8192f97f6c8695f",
   ],
   [
     "packages/db/src/schema/index.ts",
@@ -648,7 +648,7 @@ const approvedPaymentBoundaryHashes = new Map([
   ],
   [
     "apps/api/src/routes/public-client-catalog.ts",
-    "e3940fbc4a7d9fea289ae937cb22dfd5e3d92eb3658b92e2929e9b3428aa0f30",
+    "50d89363874ac251d94664e13723dce390358c245f50376ad1660f7260faa134",
   ],
   [
     "apps/api/src/expert-card-telegram-ingress.ts",
@@ -2669,7 +2669,15 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "64ea22eecdf4f2e0b5aded7af27afddcdbdf7b195436dcf782f836896d432ef9",
+    "0f841c13ecb950393535a147665552e25613ad49fefd6f05ad43932565b70b8d",
+  ],
+  [
+    "packages/db/migrations/0091_expert_service_offer.sql",
+    "fd6424c977730ce127a4b54c3d1b44989696e0b64ecf9d7d17934fa7fd251ddd",
+  ],
+  [
+    "packages/db/migrations/meta/0091_snapshot.json",
+    "38f30fea2c6ad252159bc978db38b95af3105a1b6d18ae26348b2a55af9c673d",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -3870,6 +3878,7 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0091_snapshot.json", 1204804],
     ["packages/db/migrations/meta/0090_snapshot.json", 1166334],
     ["packages/db/migrations/state/0090_sql_objects.json", 1875053],
     ["packages/db/migrations/meta/0089_snapshot.json", 1166334],

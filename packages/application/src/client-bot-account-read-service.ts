@@ -1,6 +1,7 @@
-import type {
-  ClientBotAccountReadRepository,
-  ClientBotAccountQuery,
+import {
+  formatExpertServiceOfferLine,
+  type ClientBotAccountReadRepository,
+  type ClientBotAccountQuery,
 } from "@ii-tonya/contracts";
 export type ClientBotAccountReply =
   | {
@@ -147,10 +148,10 @@ export function createClientBotAccountReadService(deps: {
         if (p.kind === "reservations")
           out =
             p.bookings
-              .map(
-                (b) =>
-                  `${b.bookingHandle}: ${time(b.startsAt)}. ${bookingState(b.state, b.reservedUntil)}`,
-              )
+              .map((b) => {
+                const offer = formatExpertServiceOfferLine(b);
+                return `${b.bookingHandle}: ${time(b.startsAt)}. ${bookingState(b.state, b.reservedUntil)}${offer ? ` ${offer}` : ""}`;
+              })
               .join("\n") || "Активных записей нет.";
         if ((p.kind === "orders" || p.kind === "reservations") && p.nextCursor)
           out += `\nДалее: /${p.kind === "orders" ? "orders" : "reservations"} ${p.nextCursor}`;

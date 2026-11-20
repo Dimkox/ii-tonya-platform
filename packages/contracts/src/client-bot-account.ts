@@ -39,6 +39,10 @@ export type ClientBotAccountProjection =
         state: string;
         startsAt: string;
         reservedUntil: string | null;
+        priceMinor?: number;
+        currency?: "RUB";
+        format?: "online" | "offline" | "hybrid";
+        location?: string;
       }[];
       nextCursor: string | null;
     };

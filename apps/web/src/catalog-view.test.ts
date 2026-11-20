@@ -73,6 +73,24 @@ it("distinguishes genuinely empty inventory from filters with no matches", () =>
   );
   expect(html).not.toContain("нет опубликованных");
 });
+it("shows price, Russian format and location, and hides nulls", () => {
+  const html = renderCatalogResults([
+    {
+      displayName: "Alpha",
+      serviceCode: "career",
+      language: "ru",
+      priceMinor: 300_000,
+      currency: "RUB",
+      format: "offline",
+      location: "Москва <центр>",
+    },
+    { displayName: "Beta", serviceCode: "career", language: "en" },
+  ]);
+  expect(html).toContain("3 000 ₽");
+  expect(html).toContain("Офлайн");
+  expect(html).toContain("Москва &lt;центр&gt;");
+  expect(html.match(/3 000 ₽/gu)).toHaveLength(1);
+});
 it("escapes every public field and offers no fabricated booking, price or availability", () => {
   const html = renderCatalogResults([
     {

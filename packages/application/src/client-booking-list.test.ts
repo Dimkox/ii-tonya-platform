@@ -59,6 +59,23 @@ describe("owner booking page projection", () => {
       after: handle(0),
     });
   });
+  it("keeps a display-only offer on the public booking row", async () => {
+    const { service } = setup([
+      {
+        ...row(1),
+        priceMinor: 300_000,
+        currency: "RUB",
+        format: "offline",
+        location: "Москва",
+      },
+    ]);
+    expect((await service.list(principal)).bookings[0]).toMatchObject({
+      priceMinor: 300_000,
+      currency: "RUB",
+      format: "offline",
+      location: "Москва",
+    });
+  });
   it("rejects an absent or foreign cursor identically", async () => {
     await expect(
       setup([], "not_found").service.list(principal, handle(0)),

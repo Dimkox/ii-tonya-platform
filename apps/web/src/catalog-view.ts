@@ -2,6 +2,7 @@ import {
   PublicCatalogClient,
   type PublicCatalogItem,
 } from "./catalog-client.js";
+import { formatExpertServiceOfferLine } from "./expert-service-offer.js";
 import { renderDemoCatalog } from "./demo-catalog.js";
 
 const escape = (text: string) =>
@@ -50,7 +51,12 @@ export function renderCatalogResults(
   const visible = matchingItems(items, filters);
   if (!visible.length)
     return "<p>Среди загруженных услуг нет совпадений по выбранным фильтрам. Попробуй изменить или сбросить фильтры.</p>";
-  return `<ul class="catalog-list">${visible.map((item) => `<li class="catalog-card" data-catalog-item><h2>${escape(item.displayName)}</h2><p>Услуга: ${escape(item.serviceTitle ?? item.serviceCode)}</p><p>Язык: ${escape(item.language)}</p></li>`).join("")}</ul>`;
+  return `<ul class="catalog-list">${visible
+    .map((item) => {
+      const offer = formatExpertServiceOfferLine(item);
+      return `<li class="catalog-card" data-catalog-item><h2>${escape(item.displayName)}</h2><p>Услуга: ${escape(item.serviceTitle ?? item.serviceCode)}</p><p>Язык: ${escape(item.language)}</p>${offer ? `<p>${escape(offer)}</p>` : ""}</li>`;
+    })
+    .join("")}</ul>`;
 }
 
 export function bindCatalogActions(

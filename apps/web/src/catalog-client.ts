@@ -1,4 +1,9 @@
-export interface PublicCatalogItem {
+import {
+  readExpertServiceOffer,
+  type ExpertServiceOfferView,
+} from "./expert-service-offer.js";
+
+export interface PublicCatalogItem extends ExpertServiceOfferView {
   displayName: string;
   serviceCode: string;
   serviceTitle?: string;
@@ -81,11 +86,18 @@ function decodeCatalog(value: unknown): PublicCatalogItem[] {
       !validText(language, 32)
     )
       throw new Error("invalid_catalog");
+    let offer: ExpertServiceOfferView;
+    try {
+      offer = readExpertServiceOffer(row as Record<string, unknown>);
+    } catch {
+      throw new Error("invalid_catalog");
+    }
     return {
       displayName,
       serviceCode,
       language,
       ...(typeof serviceTitle === "string" ? { serviceTitle } : {}),
+      ...offer,
     };
   });
 }

@@ -1,6 +1,8 @@
 import { PrivacyClient } from "./privacy-client.js";
 
-export interface BookingCard {
+import type { ExpertServiceOfferView } from "./expert-service-offer.js";
+
+export interface BookingCard extends ExpertServiceOfferView {
   displayName: string;
   serviceCode: string;
   serviceTitle?: string;
@@ -8,7 +10,7 @@ export interface BookingCard {
   availability: "catalog_only" | "fresh_slots";
   slots: { startsAt: string; choiceHandle?: string }[];
 }
-export interface ActiveBooking {
+export interface ActiveBooking extends ExpertServiceOfferView {
   bookingHandle: string;
   state:
     | "reserved"

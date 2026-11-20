@@ -55,3 +55,4 @@ export * from "./resident-semantic-tags.js";
 export * from "./resident-schedule.js";
 
 export * from "./resident-lifecycle-completion.js";
+export * from "./expert-service-offer.js";

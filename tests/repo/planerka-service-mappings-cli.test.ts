@@ -51,6 +51,10 @@ describe("planerka-service-mappings CLI (SCRUM-519)", () => {
         expertId: "00000000-0000-4000-8000-000000000002",
         durationMinutes: 60,
         active: true,
+        priceMinor: null,
+        currency: "RUB",
+        format: null,
+        location: null,
       },
     ]);
     const lines: string[] = [];
@@ -58,7 +62,7 @@ describe("planerka-service-mappings CLI (SCRUM-519)", () => {
       runPlanerkaMappingsCli(["services"], {}, (l) => lines.push(l), admin),
     ).resolves.toBe(0);
     expect(lines).toEqual([
-      `${SERVICE} expert=00000000-0000-4000-8000-000000000002 duration=60 active=true`,
+      `${SERVICE} expert=00000000-0000-4000-8000-000000000002 duration=60 active=true priceMinor=- currency=RUB format=- location=-`,
     ]);
     expect(admin.apply).not.toHaveBeenCalled();
   });
@@ -172,6 +176,48 @@ describe("planerka-service-mappings CLI (SCRUM-519)", () => {
     await expect(
       runPlanerkaMappingsCli(["oops"], {}, () => undefined, admin),
     ).resolves.toBe(2);
+  });
+
+  it("set-offer writes price, format and location and rejects a bad price", async () => {
+    const offers = { updateOffer: vi.fn(async () => "updated" as const) };
+    const lines: string[] = [];
+    await expect(
+      runPlanerkaMappingsCli(
+        [
+          "set-offer",
+          SERVICE,
+          "--price-minor",
+          "300000",
+          "--format",
+          "offline",
+          "--location",
+          "Москва",
+        ],
+        {},
+        (line) => lines.push(line),
+        fakeAdmin(),
+        undefined,
+        offers,
+      ),
+    ).resolves.toBe(0);
+    expect(offers.updateOffer).toHaveBeenCalledWith(SERVICE, {
+      priceMinor: 300000,
+      format: "offline",
+      location: "Москва",
+    });
+    expect(lines).toEqual([`set-offer ${SERVICE} updated`]);
+    const rejected: string[] = [];
+    await expect(
+      runPlanerkaMappingsCli(
+        ["set-offer", SERVICE, "--price-minor", "-1"],
+        {},
+        (line) => rejected.push(line),
+        fakeAdmin(),
+        undefined,
+        offers,
+      ),
+    ).resolves.toBe(2);
+    expect(rejected[0]).toContain("expert_service_offer_invalid:price");
   });
 
   it("needs DATABASE_URL without an injected admin", async () => {
