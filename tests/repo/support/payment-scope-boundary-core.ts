@@ -144,6 +144,10 @@ export const SANDBOX_PAYMENT_ALLOWED_RELATIONS = new Set([
 ]);
 
 export const EXPERT_RESIDENCY_ALLOWED_MIGRATION_PATHS = new Set([
+  "packages/db/migrations/0090_planerka_test_purge.sql",
+  "packages/db/migrations/meta/0090_snapshot.json",
+  "packages/db/migrations/state/0090_manifest.json",
+  "packages/db/migrations/state/0090_sql_objects.json",
   "packages/db/migrations/0089_referral_first_attribution.sql",
   "packages/db/migrations/meta/0089_snapshot.json",
   "packages/db/migrations/0088_expert_promo_funnel_gift_timer.sql",
@@ -632,7 +636,7 @@ const approvedPaymentBoundaryHashes = new Map([
   // Native scheduling: exact entrypoint/barrel review; no classifier exemption.
   [
     "packages/db/src/index.ts",
-    "354a0ea278f7986b02f37f1998f9bb22be15c4b94ad68c2abc2420c94936b79d",
+    "1d9a9b53b93719bad4bfcb1aa293c94f4c122d8e503607b54d05338c0574f342",
   ],
   [
     "packages/contracts/src/index.ts",
@@ -1258,7 +1262,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "scripts/build-native-release.sh",
-    "bae33e338e21801ee2e5fbf3abd68b0e1bec91839a90766ac6d814e4f4d83b50",
+    "5952634ddb9a7a25d1dc59be4b66cf669290f8e1e06495289f861eb4525407bd",
   ],
   [
     // 87f6270 switched the release signature check to `cosign verify-blob --bundle` (the
@@ -2644,12 +2648,28 @@ const approvedMigrationHashes = new Map([
     "a7dd22f66dbcc494977cb23a871e0e98530dcff1df126b44b3840c9356dda297",
   ],
   [
+    "packages/db/migrations/0090_planerka_test_purge.sql",
+    "60d2a7094327081879fc0612c6fdaeab18a2652a8472efa2a29de82eb0aa18e4",
+  ],
+  [
     "packages/db/migrations/meta/0089_snapshot.json",
     "efa64b626c7180be48ca02d9dfa1d69972ac931cfdba5b619679c350f66df1c9",
   ],
   [
+    "packages/db/migrations/meta/0090_snapshot.json",
+    "b4efd4e598e1806e51d08f0e3e14d8f2b2872247aaf8353bb604a844ae9a1287",
+  ],
+  [
+    "packages/db/migrations/state/0090_manifest.json",
+    "52ac7fcea690f7f2c77ca3a59a7437d27d06fae380f04bbc0cd160cac32f84e5",
+  ],
+  [
+    "packages/db/migrations/state/0090_sql_objects.json",
+    "4c9b2714c0ffbdec0954539d2451399754c0e0987382fd9308009a70e137c558",
+  ],
+  [
     "packages/db/migrations/meta/_journal.json",
-    "2acd7b02a5a9c5bb437f4a41a503d39f3753f16c5e2b212f1c7ebddb0ac03950",
+    "64ea22eecdf4f2e0b5aded7af27afddcdbdf7b195436dcf782f836896d432ef9",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -3850,6 +3870,8 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0090_snapshot.json", 1166334],
+    ["packages/db/migrations/state/0090_sql_objects.json", 1875053],
     ["packages/db/migrations/meta/0089_snapshot.json", 1166334],
     ["packages/db/migrations/meta/0088_snapshot.json", 1200906],
     ["packages/db/migrations/state/0089_sql_objects.json", 1874750],

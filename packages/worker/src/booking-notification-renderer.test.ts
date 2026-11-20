@@ -119,12 +119,16 @@ describe("strict booking producer contracts", () => {
         { meetingUrl: "https://example.test" },
         { consent: true },
       ]) {
+        const providerConfirmation =
+          event.topic === "client.booking_confirmed" &&
+          extra.meetingUrl !== undefined &&
+          !("action" in event.payload);
         expect(
           bookingNotificationEventSchema.safeParse({
             ...event,
             payload: { ...event.payload, ...extra },
           }).success,
-        ).toBe(false);
+        ).toBe(providerConfirmation);
       }
       expect(
         bookingNotificationEventSchema.safeParse({
@@ -262,6 +266,19 @@ describe("minimal truthful lifecycle renderer", () => {
         { startsAt: "2026-02-30T12:30:00Z" },
         { startsAt: "<b>https://example.test</b>" },
       ]) {
+        if (
+          view.topic === "client.booking_confirmed" &&
+          extra.meetingUrl === "https://example.test"
+        ) {
+          expect(
+            renderBookingNotification({ ...view, ...extra }),
+          ).toMatchObject({
+            kind: "rendered",
+            recipient: "client",
+            text: "Запись подтверждена на 2026-10-15 12:30 UTC.\nСсылка: https://example.test",
+          });
+          continue;
+        }
         expect(renderBookingNotification({ ...view, ...extra })).toEqual({
           kind: "suppressed",
           reason: "invalid_view",
@@ -269,6 +286,24 @@ describe("minimal truthful lifecycle renderer", () => {
       }
     },
   );
+  it("gives the expert the same Planerka link and rejects a non-https link", () => {
+    const view = ready("client.booking_confirmed", "booked", {
+      calendar: "verified_booked",
+      meetingUrl: "https://video.planerka.app/room",
+      audience: "expert",
+    });
+    expect(renderBookingNotification(view)).toMatchObject({
+      kind: "rendered",
+      recipient: "expert",
+      text: "Запись подтверждена на 2026-10-15 12:30 UTC.\nСсылка: https://video.planerka.app/room",
+    });
+    expect(
+      renderBookingNotification({
+        ...view,
+        meetingUrl: "http://video.planerka.app/room",
+      }),
+    ).toEqual({ kind: "suppressed", reason: "invalid_view" });
+  });
   it.each([
     "not_created",
     "cancelled",

@@ -184,6 +184,16 @@ export class PostgresPlanerkaServiceMappingAdmin {
     return result.rows.length === 1;
   }
 
+  /** Deletes one mapping. Availability refresh marks its slots stale. */
+  async remove(expertServiceId: string): Promise<boolean> {
+    if (!UUID.test(expertServiceId))
+      throw new Error("planerka_mapping_file_invalid:expert_service_id");
+    const result = await this.db.execute<{ id: string }>(
+      sql`delete from planerka_service_mappings where expert_service_id=${expertServiceId}::uuid returning expert_service_id as id`,
+    );
+    return result.rows.length === 1;
+  }
+
   private async compute(
     db: DrizzleDb,
     file: PlanerkaServiceMappingFile,

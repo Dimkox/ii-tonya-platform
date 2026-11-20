@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -39,6 +39,7 @@ const fakeAdmin = () => ({
     },
   ]),
   setEnabled: vi.fn(async () => true),
+  remove: vi.fn(async () => true),
 });
 
 describe("planerka-service-mappings CLI (SCRUM-519)", () => {
@@ -99,6 +100,64 @@ describe("planerka-service-mappings CLI (SCRUM-519)", () => {
         fakeAdmin(),
       ),
     ).rejects.toThrow("account_mismatch");
+  });
+
+  it("remove and purge-test-expert require --confirm", async () => {
+    const admin = fakeAdmin();
+    const purge = {
+      purgeInactiveTestExpert: vi.fn(async () => ({
+        operations: 1,
+        reservations: 1,
+        slots: 1,
+        services: 1,
+        expert: "removed" as const,
+        user: "retained" as const,
+      })),
+    };
+    const lines: string[] = [];
+    await expect(
+      runPlanerkaMappingsCli(["remove", SERVICE], {}, () => undefined, admin),
+    ).resolves.toBe(2);
+    expect(admin.remove).not.toHaveBeenCalled();
+    await expect(
+      runPlanerkaMappingsCli(
+        ["remove", SERVICE, "--confirm"],
+        {},
+        (line) => lines.push(line),
+        admin,
+      ),
+    ).resolves.toBe(0);
+    expect(admin.remove).toHaveBeenCalledWith(SERVICE);
+    expect(lines).toEqual([`remove ${SERVICE} removed`]);
+    await expect(
+      runPlanerkaMappingsCli(
+        ["purge-test-expert", SERVICE],
+        {},
+        () => undefined,
+        admin,
+        purge,
+      ),
+    ).resolves.toBe(2);
+    expect(purge.purgeInactiveTestExpert).not.toHaveBeenCalled();
+    await expect(
+      runPlanerkaMappingsCli(
+        ["purge-test-expert", SERVICE, "--confirm"],
+        {},
+        (line) => lines.push(line),
+        admin,
+        purge,
+      ),
+    ).resolves.toBe(0);
+    expect(purge.purgeInactiveTestExpert).toHaveBeenCalledWith(SERVICE);
+  });
+
+  it("ships a javascript release entry that does not need tsx", () => {
+    const entry = readFileSync("scripts/planerka-service-mappings.mjs", "utf8");
+    expect(entry).not.toMatch(/\btsx\b/);
+    expect(entry).toContain('from "../packages/db/dist/index.js"');
+    expect(readFileSync("scripts/build-native-release.sh", "utf8")).toContain(
+      'cp scripts/planerka-service-mappings.mjs "$work_dir/release/scripts/planerka-service-mappings.mjs"',
+    );
   });
 
   it("disable/enable toggle a mapping; unknown command prints usage", async () => {

@@ -14,8 +14,16 @@ export type BookingNotificationTopic =
   (typeof BOOKING_NOTIFICATION_TOPICS)[number];
 
 const reference = { reservationId: z.uuid(), charge: z.literal(0) };
+const meetingUrl = z
+  .string()
+  .regex(/^https:\/\/[^\s]+$/u)
+  .max(2048);
 const version = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 const providerPayload = z.strictObject(reference);
+const providerConfirmationPayload = z.strictObject({
+  ...reference,
+  meetingUrl: meetingUrl.optional(),
+});
 const expiryPayload = z.strictObject({ ...reference, version });
 const transitionPayload = <A extends string, S extends string>(
   action: A,
@@ -45,7 +53,7 @@ export const bookingNotificationEventSchema = z.discriminatedUnion("topic", [
   event(
     "client.booking_confirmed",
     z.union([
-      providerPayload,
+      providerConfirmationPayload,
       transitionPayload("expert_confirm", "booked").extend({
         source: z.literal("resident_native"),
       }),
@@ -128,6 +136,8 @@ const readyView = z.discriminatedUnion("topic", [
     topic: z.literal("client.booking_confirmed"),
     status: z.literal("booked"),
     calendar: z.enum(["verified_booked", "native_booked"]),
+    meetingUrl: meetingUrl.optional(),
+    audience: z.enum(["client", "expert"]).optional(),
   }),
   z.strictObject({
     ...readyFields,

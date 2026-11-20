@@ -28,6 +28,9 @@ pnpm --offline --frozen-lockfile --trust-lockfile --filter @ii-tonya/app-worker 
 cp scripts/migrate-native.mjs "$work_dir/release/api/migrate-native.mjs"
 mkdir -p "$work_dir/release/scripts"
 cp scripts/validate-runtime-env.sh "$work_dir/release/scripts/validate-runtime-env.sh"
+cp scripts/planerka-service-mappings.mjs "$work_dir/release/scripts/planerka-service-mappings.mjs"
+mkdir -p "$work_dir/release/packages/db"
+cp -R packages/db/dist "$work_dir/release/packages/db/dist"
 mkdir -p "$work_dir/release/scripts/sql"
 cp scripts/provision-early-bird-runtime-roles.mjs \
   scripts/early-bird-role-capabilities.json "$work_dir/release/scripts/"
