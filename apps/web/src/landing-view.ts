@@ -42,7 +42,8 @@ function renderDemos(): string {
 }
 
 // The public promotional destination is product-owned, not an environment override.
-export function renderLanding(_config: PublicConfig): string {
+export function renderLanding(config: PublicConfig): string {
+  void config;
   const copy = websiteContent;
   const { operator } = landingContent;
   const categories = copy.directions
