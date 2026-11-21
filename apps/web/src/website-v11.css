@@ -1,0 +1,544 @@
+/* Public-page scopes keep account, catalogue and legal-page styles independent. */
+:is(.website-header, .website-v11, .website-footer) {
+  --paper: #ffffff;
+  --paper-deep: #e9e4f6;
+  --paper-light: #ffffff;
+  --ink: #2d1b4e;
+  --muted: #2d1b4e;
+  --line: #9b72aa;
+  --terracotta: #2d1b4e;
+  --terracotta-dark: #2d1b4e;
+  --forest: #2d1b4e;
+  --forest-dark: #2d1b4e;
+  --white: #ffffff;
+  --gold: #f5b041;
+  --peach: #f8d7c4;
+  --radius-sm: 1rem;
+  --radius-md: 1.25rem;
+  --radius-lg: 1.5rem;
+  --section-pad: clamp(2.5rem, 6vw, 5rem);
+  font-family: Montserrat, ui-sans-serif, system-ui, sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.website-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  padding: 1rem var(--page-pad);
+}
+
+.website-header > div {
+  min-width: 0;
+}
+
+.website-header > div > p {
+  margin: 0.5rem 0 0;
+  font-size: 0.875rem;
+}
+
+.website-header > nav {
+  flex: 1 1 30rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.website-header :is(.brand, .brand span),
+.website-footer :is(.brand, .brand span) {
+  color: inherit;
+  font-family: inherit;
+  font-style: normal;
+}
+
+.website-header :is(nav a, .header-action),
+.website-footer nav a {
+  font-size: 0.875rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.website-header .header-action {
+  min-height: 2.75rem;
+  border-radius: var(--radius-sm);
+}
+
+.website-v11 :is(h1, h2, h3, h4) {
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.website-v11 h1 {
+  max-width: 24ch;
+  font-size: clamp(2rem, 4.4vw, 4rem);
+}
+
+.website-v11 h2 {
+  max-width: 35ch;
+  font-size: clamp(1.625rem, 3.4vw, 2.75rem);
+}
+
+.website-v11 h3 {
+  font-size: clamp(1.25rem, 2vw, 1.625rem);
+}
+
+.website-v11 h4 {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+}
+
+.website-v11 .hero {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  min-height: auto;
+  padding-block: var(--section-pad);
+}
+
+.website-v11 .hero::before,
+.website-v11 .expert-panel::after,
+.website-v11 .portrait-frame::after {
+  display: none;
+}
+
+.website-v11 .hero-subtitle {
+  font-family: inherit;
+}
+
+.website-v11 .hero-proof li {
+  color: var(--ink);
+  background: var(--paper-deep);
+  border-color: var(--paper-deep);
+  border-radius: var(--radius-sm);
+}
+
+.website-v11 .portrait-frame {
+  aspect-ratio: auto;
+  overflow: visible;
+  background: var(--paper-light);
+  border-color: var(--paper-deep);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+
+.website-v11 .portrait-frame picture {
+  display: block;
+}
+
+.website-v11 .portrait-frame img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  object-position: center;
+}
+
+.website-v11 .hero-portrait figcaption {
+  position: static;
+  display: block;
+  margin-top: 0.75rem;
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.website-v11 .section-heading {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 2rem;
+}
+
+.website-v11 :is(.about, .client-path) {
+  background: var(--paper-light);
+}
+
+.website-v11 .boundary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 2rem 0;
+}
+
+.website-v11 .category-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.website-v11 .category-grid li {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.website-v11 .category-grid li:last-child {
+  grid-column: auto;
+}
+
+.website-v11 .category-grid :is(h3, h4, strong) {
+  font-size: 1.125rem;
+}
+
+.website-v11 .category-grid p {
+  font-size: 1rem;
+}
+
+.website-v11 .expert-steps {
+  gap: 1rem;
+  margin: 2rem 0;
+  border: 0;
+}
+
+.website-v11 .expert-steps li {
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--paper-deep);
+}
+
+.website-v11 .expert-steps span {
+  display: block;
+  margin-bottom: 0.75rem;
+  color: var(--ink);
+  font-size: 1rem;
+}
+
+.website-v11 .expert-steps p {
+  margin-top: 0.75rem;
+}
+
+.website-v11 .expert-steps h3 {
+  font-size: 1.125rem;
+}
+
+.website-v11 .message-packages {
+  margin: 1.5rem 0;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  color: var(--ink);
+  background: var(--paper-light);
+}
+
+.website-v11 .dialog-bubble {
+  width: auto;
+  max-width: none;
+  color: var(--ink);
+  background: var(--paper-deep);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+  font-size: 1rem;
+}
+
+.website-v11 .message-packages > p:last-child {
+  margin: 1rem 0 0;
+}
+
+.website-v11 .expert-path {
+  color: var(--white);
+  background: var(--ink);
+}
+
+.website-v11 .expert-panel h2 {
+  max-width: 35ch;
+}
+
+.website-v11 .benefit-list li {
+  display: block;
+}
+
+.website-v11 .expert-panel :is(h3, ol, .contract-boundary) {
+  margin-block: 1.5rem;
+}
+
+.website-v11 .faq {
+  background: var(--paper-deep);
+}
+
+.website-v11 .faq-list {
+  margin: 1.5rem 0 2rem;
+}
+
+.website-v11 summary {
+  display: list-item;
+  min-height: 2.75rem;
+  padding: 1rem 0.5rem;
+  list-style: disclosure-closed inside;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.website-v11 details[open] > summary {
+  list-style-type: disclosure-open;
+}
+
+.website-v11 summary::-webkit-details-marker {
+  display: inline;
+}
+
+.website-v11 details > p {
+  margin: 0 0 1.25rem;
+  padding: 0 0.5rem;
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.65;
+}
+
+.website-v11 .contact {
+  color: var(--ink);
+  background: var(--peach);
+}
+
+.website-v11 .button {
+  min-height: 2.75rem;
+  border-radius: var(--radius-sm);
+  letter-spacing: normal;
+  line-height: 1.5;
+  text-align: left;
+  text-transform: none;
+  transform: none;
+}
+
+.website-v11 :is(.button.primary, .button.light-button) {
+  color: var(--ink);
+  background: var(--gold);
+}
+
+.website-v11 :is(.button.primary, .button.light-button):hover {
+  color: var(--ink);
+  background: var(--peach);
+}
+
+.website-v11 .button.dark-button {
+  color: var(--white);
+  background: var(--ink);
+}
+
+.website-v11 .button.ghost {
+  color: var(--ink);
+  background: var(--paper-light);
+  border-color: var(--ink);
+}
+
+.website-footer {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2rem;
+  color: var(--white);
+  background: var(--ink);
+}
+
+.website-footer > * {
+  min-width: 0;
+}
+
+.website-footer :is(p, nav a, .operator p) {
+  color: inherit;
+  font-size: 0.9375rem;
+}
+
+:is(.website-header, .website-v11) :focus-visible {
+  outline: 3px solid #2d1b4e;
+  outline-offset: 4px;
+}
+
+.website-v11 .expert-path :focus-visible,
+.website-footer :focus-visible {
+  outline: 3px solid #f5b041;
+  outline-offset: 4px;
+}
+
+@media (max-width: 768px) {
+  .website-header > nav {
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .website-v11 :is(.hero, .section-heading) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .website-v11 :is(.expert-steps, .boundary) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .website-footer {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .website-header .header-action {
+    flex: 1 1 100%;
+  }
+
+  .website-v11 :is(.category-grid, .expert-steps, .boundary),
+  .website-footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .website-v11 .hero-actions .button,
+  .website-v11 .contact-actions .button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .website-header *,
+  .website-v11 *,
+  .website-footer * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.website-legal {
+  width: 100%;
+  max-width: none;
+  min-height: 70vh;
+  padding: clamp(1.25rem, 5vw, 4rem) var(--page-pad);
+  color: #2d1b4e;
+  background: #ffffff;
+  font-family: Montserrat, ui-sans-serif, system-ui, sans-serif;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.website-legal > * {
+  max-width: 72ch;
+  margin-inline: auto;
+}
+
+.website-legal :is(h1, h2, h3) {
+  color: #2d1b4e;
+  font-family: inherit;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: normal;
+}
+
+.website-legal h1 {
+  max-width: 32ch;
+  font-size: clamp(1.875rem, 4vw, 3rem);
+  margin-inline: 0;
+}
+
+.website-legal h2 {
+  margin-block: 2rem 1rem;
+  font-size: 1.25rem;
+  scroll-margin-top: 1rem;
+}
+
+.website-legal :is(.legal-document, .legal-document p, .legal-bullet) {
+  color: inherit;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.website-legal .legal-revision,
+.website-legal .eyebrow {
+  color: #2d1b4e;
+}
+
+.website-legal .legal-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  font-size: 0.9375rem;
+}
+
+.website-legal .legal-toc {
+  padding: 1rem clamp(1rem, 3vw, 2rem);
+  border: 1px solid #9b72aa;
+  border-radius: 1.25rem;
+  background: #e9e4f6;
+}
+
+.website-legal .legal-toc h2 {
+  margin-top: 0;
+}
+
+.website-legal .legal-toc ol {
+  padding-left: 1.5rem;
+}
+
+.website-legal a {
+  color: #2d1b4e;
+  text-decoration: underline;
+}
+
+.website-legal a:hover {
+  text-decoration-thickness: 0.15em;
+}
+
+.website-legal :focus-visible {
+  outline: 3px solid #2d1b4e;
+  outline-offset: 4px;
+}
+
+@media (min-width: 1024px) {
+  .website-v11 #directions .category-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has(.website-v11),
+  html:has(.website-legal) {
+    scroll-behavior: auto;
+  }
+
+  .website-legal * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media print {
+  body:has(.website-legal) {
+    background: #ffffff;
+    color: #000000;
+  }
+
+  body:has(.website-legal) :is(.website-header, .website-footer, .skip-link),
+  .website-legal .legal-tools {
+    display: none;
+  }
+
+  .website-legal {
+    padding: 0;
+    min-height: 0;
+    color: #000000;
+    background: #ffffff;
+  }
+
+  .website-legal > * {
+    max-width: none;
+  }
+
+  .website-legal :is(h1, h2, h3) {
+    color: #000000;
+    break-after: avoid;
+  }
+
+  .website-legal .legal-toc {
+    background: #ffffff;
+    border-color: #000000;
+  }
+
+  .website-legal p {
+    orphans: 3;
+    widows: 3;
+  }
+}
