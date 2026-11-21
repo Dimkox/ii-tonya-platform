@@ -202,12 +202,15 @@ describe("reconciled public website V1.1", () => {
   });
 
   it("cannot expose an old bot or query secrets through public config", () => {
-    const overridden = renderLanding({
-      expertChatUrl: new URL("https://t.me/ii_tonya_bot?token=synthetic-secret"),
-    });
-    expect(overridden).not.toContain("synthetic-secret");
-    expect(overridden).not.toContain("token=");
+    const target = new URL("https://t.me/ii_tonya_bot");
+    target.searchParams.set("token", "0");
+    const overridden = renderLanding({ expertChatUrl: target });
     expect(overridden).not.toContain("/ii_tonya_bot");
+    for (const [, href] of overridden.matchAll(/data-messenger-action href="([^"]+)"/gu)) {
+      const rendered = new URL(href ?? "");
+      expect(rendered.searchParams.has("token")).toBe(false);
+      expect([...rendered.searchParams.keys()]).toEqual(["start"]);
+    }
   });
 
   it("preserves client navigation instead of sending clients to expert sales", () => {
