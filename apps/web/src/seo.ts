@@ -1,9 +1,11 @@
 import { landingContent } from "./content.js";
+import { websiteContent } from "./website-content.js";
 
 const canonicalUrl = "https://ii-tonya.ru/";
 
 export function renderStructuredData(): string {
-  const { operator, faq } = landingContent;
+  // Stable: organization identity is shared with the rest of the application.
+  const { operator } = landingContent;
   const graph = {
     "@context": "https://schema.org",
     "@graph": [
@@ -32,7 +34,7 @@ export function renderStructuredData(): string {
       {
         "@type": "FAQPage",
         "@id": `${canonicalUrl}#faq`,
-        mainEntity: faq.map(([question, answer]) => ({
+        mainEntity: websiteContent.generalFaq.map(([question, answer]) => ({
           "@type": "Question",
           name: question,
           acceptedAnswer: {

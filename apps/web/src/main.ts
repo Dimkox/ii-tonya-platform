@@ -1,9 +1,11 @@
 import "./styles.css";
+import "./website-v11.css";
 
 const app = document.querySelector<HTMLElement>("#app");
 if (app === null) throw new Error("web_root_missing");
 const root = app;
 
+// Stable: route initialization separates account and legal flows from the public landing.
 const route = window.location.pathname.replace(/\/+$/u, "") || "/";
 const legalRoute: "oferta" | "privacy" | undefined =
   route === "/oferta" ? "oferta" : route === "/privacy" ? "privacy" : undefined;
