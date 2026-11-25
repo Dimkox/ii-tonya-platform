@@ -1,9 +1,11 @@
+import { waitlistDisplayRefCode } from "./waitlist-funnel-v4.js";
+
 /** WAIT-T03: PDF guide delivery through the promo bot's existing Telegram channel. */
 export interface ExpertPromoGuideDeliveryPorts {
   claimGuideDeliveries(input: {
     contentSlot: string;
     limit: number;
-  }): Promise<{ userId: string; chatId: string }[]>;
+  }): Promise<{ userId: string; chatId: string; courtesy?: boolean }[]>;
   markGuideDelivered(input: {
     userId: string;
     receipt: string;
@@ -33,7 +35,9 @@ export async function runExpertPromoGuideDelivery(
       const sent = await ports.sendDocument({
         chatId: target.chatId,
         document: config.document,
-        caption: GUIDE_CAPTION,
+        caption: target.courtesy
+          ? "Ваш подарок — гайд в этом PDF."
+          : GUIDE_CAPTION,
       });
       if (
         await ports.markGuideDelivered({
@@ -54,7 +58,7 @@ export async function runExpertPromoGuideDelivery(
 export const FUNNEL_TIMER_TEXT = {
   message6:
     "Привет! 👋\n\nВидим, что вы пока не торопитесь приглашать коллег. Возможно, хотите сначала разобраться сами? Это нормально.\n\nЧтобы помочь вам принять решение, мы решили запустить мини-акцию:\n**Подарим тот самый авторитетный гид «Как получить теплых целевых клиентов» за всего двух приглашенных партнеров.**\n\n✅ Новые клиенты без таргета — сервис приводит людей, готовых купить услугу.\n✅ Свобода от рутины — умный ассистент поможет с переписками, напоминаниями и записью.\n✅ Выгодные партнёрства и взаимный обмен аудиторией.\n✅ Внутренние купоны и бонусы для снижения стоимости размещения.\n✅ Юридическая безопасность работы через сервис.\n✅ Стратегия входа до основного потока участников.\n\nКак только второй новый человек зарегистрируется по вашему коду, бот автоматически пришлет вам файл.\n\nВ зачёт идут только новые люди: они ещё не запускали бота и не приходили по чужому коду. PDF придёт один раз, когда таких будет двое.",
-  gift: "Привет! 👋\n\nМы видим, что вы пока не успели собрать двух партнеров. Ничего страшного — возможно, сейчас неподходящее время или мало свободного пространства.\n\nЧтобы вы не оставались в неведении, мы решили просто подарить вам наш главный гид **«Как получить теплых целевых клиентов на свои услуги с помощью нового сервиса ии-Тоня»**.\n\n🗺 Как Тоня фильтрует шум соцсетей и приводит готовых купить клиентов.\n💰 Как монетизировать пустые слоты через взаимный обмен аудиторией.\n🛡 Почему это легально и безопасно для вашего личного бренда.\n🚀 Какие шаги сделать первыми, чтобы войти в систему с преимуществами.\n\nИзучите информацию в спокойном режиме. PDF придёт следующим сообщением.",
+  gift: "Привет! 👋\n\nМы видим, что вы пока не успели собрать двух партнеров. Ничего страшного — возможно, сейчас неподходящее время или мало свободного пространства.\n\nЧтобы вы не оставались в неведении, мы решили просто подарить вам наш главный гид **«Как получить теплых целевых клиентов на свои услуги с помощью нового сервиса ии-Тоня»**.\n\n🗺 Как Тоня фильтрует шум соцсетей и приводит готовых купить клиентов.\n💰 Как монетизировать пустые слоты через взаимный обмен аудиторией.\n🛡 Почему это легально и безопасно для вашего личного бренда.\n🚀 Какие шаги сделать первыми, чтобы войти в систему с преимуществами.\n\nИзучите информацию в спокойном режиме. Нажмите «Скачать PDF», чтобы получить гайд в этом чате.",
 } as const;
 export async function runExpertPromoFunnelTimers(
   ports: {
@@ -62,15 +66,19 @@ export async function runExpertPromoFunnelTimers(
       {
         userId: string;
         chatId: string;
-        refCode?: string;
-        referralCount?: number;
+        refCode: string;
+        referralCount: number;
       }[]
     >;
     sendMessage(input: {
       chatId: string;
       text: string;
       replyMarkup?: unknown;
-    }): Promise<unknown>;
+    }): Promise<{ messageId: string }>;
+    confirmFirstReminder(input: {
+      userId: string;
+      messageId: string;
+    }): Promise<boolean>;
     sendPhoto?(input: { chatId: string; photo: string }): Promise<unknown>;
   },
   config: { limit?: number; banner?: string } = {},
@@ -87,12 +95,12 @@ export async function runExpertPromoFunnelTimers(
             chatId: target.chatId,
             photo: config.banner,
           });
-        const count = target.referralCount ?? 0;
+        const count = target.referralCount;
         const dynamic =
           kind === "message6"
             ? `\n\nСейчас по вашему коду зарегистрировано: **${count}** человек.\nОсталось пригласить ещё **${Math.max(0, 2 - count)}**!`
-            : `\n\nВаш личный промокод ${target.refCode ?? ""} всегда активен. Напишите слово **«ПРОМОКОД»**, и я снова дам готовые тексты для рассылки.`;
-        await ports.sendMessage({
+            : `\n\nВаш личный промокод ${waitlistDisplayRefCode(target.userId, target.refCode)} всегда активен. Напишите слово **«ПРОМОКОД»**, и я снова дам готовые тексты для рассылки.`;
+        const sent = await ports.sendMessage({
           chatId: target.chatId,
           text: FUNNEL_TIMER_TEXT[kind] + dynamic,
           ...(kind === "message6"
@@ -114,8 +122,24 @@ export async function runExpertPromoFunnelTimers(
                   ],
                 },
               }
-            : {}),
+            : {
+                replyMarkup: {
+                  inline_keyboard: [
+                    [{ text: "Скачать PDF", callback_data: "wl:guide" }],
+                  ],
+                },
+              }),
         });
+        if (
+          kind === "message6" &&
+          !(await ports.confirmFirstReminder({
+            userId: target.userId,
+            messageId: sent.messageId,
+          }))
+        ) {
+          result.failed++;
+          continue;
+        }
         result[kind]++;
       } catch {
         result.failed++;

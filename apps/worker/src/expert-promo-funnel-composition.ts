@@ -48,15 +48,23 @@ export function createExpertPromoFunnelRunner(
       ok?: boolean;
       result?: { message_id?: number };
     };
-    if (value.ok !== true || !Number.isSafeInteger(value.result?.message_id))
+    const messageId = value.result?.message_id;
+    if (
+      value.ok !== true ||
+      typeof messageId !== "number" ||
+      !Number.isSafeInteger(messageId) ||
+      messageId <= 0
+    )
       throw new Error("expert_promo_telegram_receipt");
-    return { messageId: String(value.result!.message_id) };
+    return { messageId: String(messageId) };
   };
   return {
     async runOnce() {
       const timers = await runExpertPromoFunnelTimers(
         {
           claimTimer: repository.claimTimer.bind(repository),
+          confirmFirstReminder:
+            repository.confirmFirstReminder.bind(repository),
           sendMessage: ({ chatId, text, replyMarkup }) =>
             send("sendMessage", {
               chat_id: chatId,

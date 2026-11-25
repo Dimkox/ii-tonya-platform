@@ -232,6 +232,10 @@ export const expertPromoFunnelState = pgTable(
       .notNull()
       .defaultNow(),
     message6SentAt: timestamp("message6_sent_at", { withTimezone: true }),
+    message6ConfirmedAt: timestamp("message6_confirmed_at", {
+      withTimezone: true,
+    }),
+    message6MessageId: text("message6_message_id"),
     giftSentAt: timestamp("gift_sent_at", { withTimezone: true }),
     lastInteractionAt: timestamp("last_interaction_at", { withTimezone: true })
       .notNull()
@@ -258,6 +262,14 @@ export const expertPromoFunnelState = pgTable(
     check(
       "expert_promo_funnel_times",
       sql`isfinite(${t.codeIssuedAt}) AND isfinite(${t.lastInteractionAt}) AND (${t.message6SentAt} IS NULL OR (isfinite(${t.message6SentAt}) AND ${t.message6SentAt}>=${t.codeIssuedAt}))`,
+    ),
+    check(
+      "expert_promo_message6_receipt",
+      sql`(${t.message6ConfirmedAt} IS NULL AND ${t.message6MessageId} IS NULL) OR
+          (${t.message6ConfirmedAt} IS NOT NULL AND ${t.message6MessageId} IS NOT NULL
+           AND ${t.message6SentAt} IS NOT NULL AND isfinite(${t.message6ConfirmedAt})
+           AND ${t.message6ConfirmedAt} >= ${t.message6SentAt}
+           AND ${t.message6MessageId} ~ '^[1-9][0-9]{0,19}$')`,
     ),
     check(
       "expert_promo_funnel_gift_time",

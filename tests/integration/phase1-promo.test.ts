@@ -9,6 +9,7 @@ import { PostgresExpertPromoRepository } from "../../packages/db/src/repositorie
 import { PostgresClientReferralRepository } from "../../packages/db/src/repositories/client-referral-repository.js";
 import { PostgresExpertReferralRepository } from "../../packages/db/src/repositories/expert-referral-repository.js";
 import { ExpertCodeCrypto } from "../../packages/application/src/expert-code-crypto.js";
+import { waitlistDisplayRefCode } from "../../packages/application/src/waitlist-funnel-v4.js";
 import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 let database: ExpertReferralTestDatabase;
 let repo: PostgresExpertPromoRepository;
@@ -406,13 +407,26 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
     ).toBe(0);
   });
   it("erases direct promo identity and queued work while preserving once-bound UUID tombstones", async () => {
-    const owner = await identity();
+    const erasedId = "64846484-4ccd-4000-8000-000000000001";
+    const survivingId = "64846484-4ccd-4000-8000-000000000002";
+    await database.db.execute(
+      sql`insert into users(id) values(${erasedId}::uuid),(${survivingId}::uuid)`,
+    );
+    await seedClientConsent(database.db, erasedId, "client_messaging");
+    await seedClientConsent(database.db, survivingId, "client_messaging");
+    const owner = await identity("promo-fixture", undefined, erasedId);
     const originalStart = command(owner);
     const code = (await repo.register(originalStart)).refCode;
     const invitee = await identity();
     await repo.register(command(invitee, code));
-    const second = await identity();
-    await repo.register(command(second, code));
+    const second = await identity("promo-fixture", undefined, survivingId);
+    const secondCode = (await repo.register(command(second, code))).refCode;
+    const publicCode = waitlistDisplayRefCode(owner.userId, code);
+    expect(waitlistDisplayRefCode(second.userId, secondCode)).toBe(publicCode);
+    const newcomer = await identity();
+    await expect(repo.register(command(newcomer, publicCode))).rejects.toThrow(
+      "promo_invalid_request",
+    );
     const { PostgresPrivacyRepository } =
       await import("../../packages/db/src/repositories/privacy-repository.js");
     const privacy = new PostgresPrivacyRepository(database.db, {
@@ -446,6 +460,10 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
         )
       ).rows[0],
     ).toEqual({ identity_digest: null, erased: true });
+    await expect(repo.register(command(newcomer, publicCode))).rejects.toThrow(
+      "promo_invalid_request",
+    );
+    expect((await repo.register(command(second))).referralCount).toBe(0);
     expect(
       (
         await database.db.execute(
@@ -711,6 +729,89 @@ describe("Phase1 applicant promo PostgreSQL authority", () => {
       referralCount: 0,
     });
   });
+  it("identifies only the current pending private consent prompt", async () => {
+    const scope = {
+      botKey: "promo-consent-scope",
+      botId: "717171",
+      telegramUserId: String(++sequence),
+      chatId: String(sequence),
+    };
+    expect(await repo.hasPendingEnrollmentConsent(scope)).toBe(false);
+    const notice = await repo.beginEnrollment(command(scope));
+    if (notice.kind !== "consent_required") throw new Error("missing consent");
+    expect(await repo.hasPendingEnrollmentConsent(scope)).toBe(true);
+    expect(
+      await repo.hasPendingEnrollmentConsent({ ...scope, botId: "99999" }),
+    ).toBe(false);
+    expect(
+      await repo.hasPendingEnrollmentConsent({
+        ...scope,
+        botKey: "another-bot",
+      }),
+    ).toBe(false);
+    expect(
+      await repo.hasPendingEnrollmentConsent({ ...scope, chatId: "99998" }),
+    ).toBe(false);
+    await database.db.execute(sql`
+      update consent_presentations set created_at=now()-interval '2 days',expires_at=now()-interval '1 day'
+      where token_digest=${"sha256:" + digest(notice.token)}`);
+    expect(await repo.hasPendingEnrollmentConsent(scope)).toBe(false);
+    const renewed = await repo.beginEnrollment(command(scope));
+    if (renewed.kind !== "consent_required") throw new Error("missing consent");
+    expect(await repo.hasPendingEnrollmentConsent(scope)).toBe(true);
+    await repo.completeEnrollment({
+      ...command(scope),
+      token: renewed.token,
+      decision: "granted",
+    });
+    expect(await repo.hasPendingEnrollmentConsent(scope)).toBe(false);
+  });
+  it.each(["deep link", "typed after consent"])(
+    "accepts the public code from a waitlist invitation via %s",
+    async (entry) => {
+      const owner = await identity();
+      const { refCode } = await repo.register(command(owner));
+      const publicCode = waitlistDisplayRefCode(owner.userId, refCode);
+      const guest = {
+        botKey: "promo-public-code",
+        botId: "717171",
+        telegramUserId: String(++sequence),
+        chatId: String(sequence),
+      };
+      const start = command(
+        guest,
+        entry === "deep link" ? publicCode : undefined,
+      );
+      const notice = await repo.beginEnrollment(start);
+      expect(notice.kind).toBe("consent_required");
+      if (notice.kind !== "consent_required")
+        throw new Error("missing consent");
+      expect((await repo.register(command(owner))).referralCount).toBe(0);
+      await repo.completeEnrollment({
+        ...command(guest),
+        token: notice.token,
+        decision: "granted",
+      });
+      const registration = await repo.register(
+        command(guest, entry === "deep link" ? undefined : publicCode),
+      );
+      expect(registration.attribution).toBe("created");
+      expect(
+        (await repo.register(command(guest, publicCode))).attribution,
+      ).toBe("kept");
+      expect((await repo.register(command(owner))).referralCount).toBe(1);
+      const other = await identity();
+      const otherCode = await repo.register(command(other));
+      await expect(
+        repo.register(
+          command(
+            guest,
+            waitlistDisplayRefCode(other.userId, otherCode.refCode),
+          ),
+        ),
+      ).rejects.toThrow("promo_attribution_locked");
+    },
+  );
   it("keeps the first promo inviter and issues the PDF once for two new visitors", async () => {
     const first = await identity();
     const second = await identity();

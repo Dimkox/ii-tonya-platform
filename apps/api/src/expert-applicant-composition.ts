@@ -12,6 +12,7 @@ import {
 } from "@ii-tonya/config";
 import {
   PostgresEarlyBirdPaidStatus,
+  PostgresExpertPromoFunnelRepository,
   PostgresExpertPromoRepository,
   PostgresExpertSeparatedSalesRepository,
   PostgresResidentVerificationRepository,
@@ -79,6 +80,9 @@ export function createExpertApplicantComposition(
   if (config.features.expertApplicant !== true) return undefined;
   const scope = config.expertApplicant!;
   const sales = new PostgresExpertSeparatedSalesRepository(db, scope);
+  const promoFunnel = scope.waitlistV4Enabled
+    ? new PostgresExpertPromoFunnelRepository(db, scope)
+    : undefined;
   const privateDocuments = config.features.residentPrivateJobs
     ? new PostgresResidentPrivateJobsRepository(db, scope)
     : undefined;
@@ -104,8 +108,10 @@ export function createExpertApplicantComposition(
     service: createExpertApplicantService({
       enabled: true,
       faq: true,
-      ...(scope.waitlistV4Enabled
+      ...(promoFunnel
         ? {
+            requestOfferedGuide: (input) =>
+              promoFunnel.requestOfferedGuide(input),
             waitlistV4: {
               channelUrl:
                 scope.telegramChannelUrl ??

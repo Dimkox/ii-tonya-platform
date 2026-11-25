@@ -12,7 +12,7 @@ let database: ExpertReferralTestDatabase;
 let promo: PostgresExpertPromoRepository;
 let funnel: PostgresExpertPromoFunnelRepository;
 let sequence = 920000;
-const botKey = "promo-fixture";
+const botKey = "promo.v4-fixture";
 async function identity() {
   const userId = await database.createUser();
   const telegramUserId = String(++sequence);
@@ -96,7 +96,8 @@ describe("WAIT-T03 guide delivery authority", () => {
   });
   it("WAIT-T04 fires 48h and 5d timers once, honours opt-out and count>=2", async () => {
     const owner = await identity();
-    await promo.register(command(owner));
+    const { refCode } = await promo.register(command(owner));
+    await promo.register(command(await identity(), refCode));
     const quiet = await identity();
     await promo.register(command(quiet));
     const qualified = await qualifiedOwner();
@@ -106,7 +107,19 @@ describe("WAIT-T03 guide delivery authority", () => {
     expect(await promo.optOutReferral(quiet)).toBe(true);
     const m6 = await funnel.claimTimer({ kind: "message6", limit: 50 });
     const ids = m6.map((r) => r.userId);
-    expect(ids).toContain(owner.userId);
+    const expectedTarget = {
+      userId: owner.userId,
+      chatId: owner.chatId,
+      refCode,
+      referralCount: 1,
+    };
+    expect(m6).toContainEqual(expectedTarget);
+    expect(
+      await funnel.confirmFirstReminder({
+        userId: owner.userId,
+        messageId: "4",
+      }),
+    ).toBe(true);
     expect(ids).not.toContain(quiet.userId);
     expect(ids).not.toContain(qualified.userId);
     expect(
@@ -120,13 +133,11 @@ describe("WAIT-T03 guide delivery authority", () => {
       ),
     ).not.toContain(owner.userId);
     await database.db.execute(
-      sql`update expert_promo_funnel_state set message6_sent_at=message6_sent_at-interval '5 days',last_interaction_at=last_interaction_at where user_id=${owner.userId}::uuid`,
+      sql`update expert_promo_funnel_state set message6_sent_at=message6_sent_at-interval '5 days',message6_confirmed_at=message6_confirmed_at-interval '5 days' where user_id=${owner.userId}::uuid`,
     );
-    expect(
-      (await funnel.claimTimer({ kind: "gift", limit: 50 })).map(
-        (r) => r.userId,
-      ),
-    ).toContain(owner.userId);
+    expect(await funnel.claimTimer({ kind: "gift", limit: 50 })).toContainEqual(
+      expectedTarget,
+    );
     expect(
       (await funnel.claimTimer({ kind: "gift", limit: 50 })).map(
         (r) => r.userId,
@@ -144,6 +155,70 @@ describe("WAIT-T03 guide delivery authority", () => {
       )
     ).rows;
     expect(rows).toEqual([{ status: "open" }]);
+  });
+  it("queues a five-day guide only for its recipient and delivers once across both reward paths", async () => {
+    const owner = await identity();
+    const { refCode } = await promo.register(command(owner));
+    const other = await identity();
+    await promo.register(command(other));
+    expect(await funnel.requestOfferedGuide(owner)).toBe("unavailable");
+    await database.db.execute(
+      sql`update expert_promo_funnel_state set code_issued_at=now()-interval '8 days',message6_sent_at=now()-interval '6 days',message6_confirmed_at=now()-interval '6 days',message6_message_id='5',gift_sent_at=clock_timestamp() where user_id=${owner.userId}::uuid`,
+    );
+    expect(await funnel.requestOfferedGuide(other)).toBe("unavailable");
+    expect(
+      await funnel.requestOfferedGuide({ ...owner, chatId: other.chatId }),
+    ).toBe("unavailable");
+    expect(
+      await funnel.requestOfferedGuide({ ...owner, botKey: "other-bot" }),
+    ).toBe("unavailable");
+    expect(
+      await Promise.all([
+        funnel.requestOfferedGuide(owner),
+        funnel.requestOfferedGuide(owner),
+      ]),
+    ).toEqual(["queued", "queued"]);
+    expect(await funnel.pdfSent(owner.userId)).toBe(false);
+    await promo.register(command(await identity(), refCode));
+    await promo.register(command(await identity(), refCode));
+    const reward = (
+      await database.db.execute<{ logged: boolean; earned: boolean }>(sql`
+      select w.ready_log_event_id is not null as logged,
+        exists(select 1 from expert_promo_bonus_indications b where b.user_id=w.user_id) as earned
+      from expert_promo_guide_work w where w.user_id=${owner.userId}::uuid
+    `)
+    ).rows;
+    expect(reward).toEqual([{ logged: true, earned: true }]);
+    const claim = () =>
+      funnel.claimGuideDeliveries({ contentSlot: "test-guide", limit: 50 });
+    expect(await claim()).toContainEqual({
+      userId: owner.userId,
+      chatId: owner.chatId,
+      courtesy: true,
+    });
+    expect((await claim()).some((t) => t.userId === owner.userId)).toBe(false);
+    expect(
+      await funnel.markGuideDelivered({
+        userId: owner.userId,
+        receipt: "telegram:5",
+      }),
+    ).toBe(true);
+    expect(await funnel.requestOfferedGuide(owner)).toBe("delivered");
+  });
+  it("honours a referral opt-out between a courtesy guide request and dispatch", async () => {
+    const owner = await identity();
+    await promo.register(command(owner));
+    await database.db.execute(
+      sql`update expert_promo_funnel_state set code_issued_at=now()-interval '8 days',message6_sent_at=now()-interval '6 days',message6_confirmed_at=now()-interval '6 days',message6_message_id='5',gift_sent_at=clock_timestamp() where user_id=${owner.userId}::uuid`,
+    );
+    expect(await funnel.requestOfferedGuide(owner)).toBe("queued");
+    await promo.optOutReferral(owner);
+    expect(await funnel.requestOfferedGuide(owner)).toBe("unavailable");
+    const targets = await funnel.claimGuideDeliveries({
+      contentSlot: "test-guide",
+      limit: 50,
+    });
+    expect(targets.some((t) => t.userId === owner.userId)).toBe(false);
   });
   it("WAIT-T06 stores profile fields and syncs CRM marker idempotently", async () => {
     const owner = await identity();
