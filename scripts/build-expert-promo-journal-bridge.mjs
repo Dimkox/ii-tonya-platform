@@ -72,7 +72,7 @@ async function startApi() {
   });
   let api;
   try {
-    api = await import(entry);
+    api = await import("./dist/server.js");
   } finally {
     hook.deregister();
   }
