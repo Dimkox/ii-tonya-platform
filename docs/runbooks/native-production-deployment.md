@@ -1,5 +1,46 @@
 # Native dedicated-server deployment
 
+## SCRUM-530 two-stage schema transition
+
+The intermediate release runs the archived `cf8bab32` API, worker, and
+dependencies. Its migration service reads the journal; its package still ships
+0000–0090. The API's ordinary bootstrap retains the gateway and direct payment
+composition. Its startup adapter replaces only that entrypoint's `migrateDb`
+import with the same read-only check. The worker holds the archived V4 gift
+and reminder dispatcher for the duration of the bridge. Its other jobs and the
+API's consent and referral flows retain the configured settings.
+
+Prepare the bridge in a clean checkout of the separately reviewed and merged
+bridge commit. Verify the archived cf8 checksum manifest against its release
+signature and check the archive, SBOM, and provenance hashes. The builder also
+checks the fixed SHA-256 of the cf8 archive and its complete 91-row journal.
+Use a new local output directory.
+
+```sh
+SOURCE_SHA="$(git rev-parse HEAD)" OLD_RELEASE_ARCHIVE="$CF8_ARCHIVE" \
+  OUTPUT_DIR="$BRIDGE_OUTPUT" node scripts/build-expert-promo-journal-bridge.mjs build
+```
+
+The output contains the native tarball, SPDX SBOM, checksum manifest, and
+provenance identifying both the prior runtime and the reviewed 0092 journal.
+Use the normal release signing and verification procedure for this new
+manifest. Verify the installed unit entrypoints in the rehearsal and at target
+acceptance. Record both transitions with their own artifact SHA and migration
+manifest digest in the deployment controller's compatibility evidence.
+
+1. Switch from cf8 to the bridge on the unchanged 91-row database. Verify
+   live/ready and the worker heartbeat, the ordinary payment bootstrap, and
+   that the journal and pending promotions are unchanged. Rehearse rollback
+   to cf8 on this schema.
+2. Switch from the bridge to the separately signed business release, which
+   owns migrations 0091 and 0092. Verify the new 93-row journal and business
+   flows. Rehearse rollback to the bridge on the 93-row database. The bridge
+   rejects incomplete, reordered, changed, and unknown journals.
+
+Once 0091 or 0092 has been applied, automatic rollback to cf8 is unavailable.
+If only one migration has completed, keep the services stopped and use the
+native deployment recovery procedure.
+
 Read-only observation2026-10-12: native production runtime `current` is
 `43a93e2131cde6bb09a6825fc5b83dfbf91fc600`;
 `.previous-release` is `48009f9ce4de9f8258eede8d59b950899eafd0a8`.
