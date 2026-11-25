@@ -1,4 +1,6 @@
-import { EventEmitter } from "node:events";
+import { EventEmitter, once } from "node:events";
+import { createRequire } from "node:module";
+import { createServer, type AddressInfo, type Socket } from "node:net";
 import type { Pool, PoolClient } from "pg";
 import { describe, expect, it, vi } from "vitest";
 import type { DrizzleDb } from "../client.js";
@@ -14,6 +16,113 @@ const container = () => ({
   getConnectionUri: () => "postgres://test",
   stop: vi.fn(async () => undefined),
 });
+
+it("registers cleanup under a fresh Ryuk session when the previous socket is unreachable", async () => {
+  const projectRequire = createRequire(import.meta.url);
+  const dependency = createRequire(
+    projectRequire.resolve("@testcontainers/postgresql"),
+  );
+  const modulePath = dependency.resolve("testcontainers/build/reaper/reaper");
+  const previousModule = dependency.cache[modulePath];
+  delete dependency.cache[modulePath];
+  type RyukContainer = {
+    createOpts: { Labels: Record<string, string> };
+    start(this: RyukContainer): Promise<unknown>;
+  };
+  const { GenericContainer } = dependency("testcontainers") as {
+    GenericContainer: { prototype: RyukContainer };
+  };
+  const { getReaper } = dependency(modulePath) as {
+    getReaper(
+      client: typeof runtime,
+    ): Promise<{ sessionId: string; containerId: string }>;
+  };
+  const oldSession = "6fb35777ce56";
+  const old = {
+    Id: "old",
+    State: "running",
+    Labels: {
+      "org.testcontainers.ryuk": "true",
+      "org.testcontainers.session-id": oldSession,
+    },
+    Ports: [] as { PrivatePort: number; PublicPort: number }[],
+  };
+  const list = vi.fn(async () => [old]);
+  const runtime = {
+    container: { list },
+    info: {
+      containerRuntime: {
+        host: "127.0.0.1",
+        remoteSocketPath: "/fixture.sock",
+      },
+    },
+  };
+  const server = createServer();
+  const stale = createServer();
+  let peer: Socket | undefined;
+  const registration = new Promise<string>((resolve) => {
+    server.once("connection", (socket) => {
+      peer = socket;
+      socket.once("data", (chunk: Buffer) => resolve(chunk.toString()));
+    });
+  });
+  const start = vi.spyOn(GenericContainer.prototype, "start");
+  vi.stubEnv("TESTCONTAINERS_RYUK_DISABLED", "false");
+  try {
+    await Promise.all(
+      [server, stale].map(async (s) => {
+        s.listen(0, "127.0.0.1");
+        await once(s, "listening");
+      }),
+    );
+    const freshPort = (server.address() as AddressInfo).port;
+    const stalePort = (stale.address() as AddressInfo).port;
+    await new Promise<void>((resolve) => stale.close(() => resolve()));
+    start.mockResolvedValue({
+      getHost: () => "127.0.0.1",
+      getMappedPort: () => freshPort,
+      getId: () => "fresh",
+    });
+
+    const discoveryFailure = new Error("Docker list failed");
+    list.mockRejectedValueOnce(discoveryFailure);
+    await expect(getReaper(runtime)).rejects.toBe(discoveryFailure);
+    await expect(getReaper(runtime)).rejects.toThrow(
+      "Expected Reaper to map exposed port 8080",
+    );
+    expect(start).not.toHaveBeenCalled();
+
+    const createFailure = new Error("Docker could not start Ryuk");
+    list.mockResolvedValueOnce([]);
+    start.mockRejectedValueOnce(createFailure);
+    await expect(getReaper(runtime)).rejects.toBe(createFailure);
+    start.mockClear();
+
+    old.Ports.push({ PrivatePort: 8080, PublicPort: stalePort });
+    const reaper = await getReaper(runtime);
+    expect(start).toHaveBeenCalledOnce();
+    expect(reaper.containerId).toBe("fresh");
+    expect(reaper.sessionId).toMatch(/^[\da-f]{12}$/u);
+    expect(reaper.sessionId).not.toBe(oldSession);
+    expect(
+      start.mock.contexts[0]?.createOpts.Labels["org.testcontainers.session-id"],
+    ).toBe(reaper.sessionId);
+    expect(await registration).toBe(
+      `label=org.testcontainers.session-id=${reaper.sessionId}\r\n`,
+    );
+    expect(await getReaper(runtime)).toBe(reaper);
+  } finally {
+    vi.unstubAllEnvs();
+    start.mockRestore();
+    peer?.destroy();
+    if (server.listening)
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    if (stale.listening)
+      await new Promise<void>((resolve) => stale.close(() => resolve()));
+    if (previousModule) dependency.cache[modulePath] = previousModule;
+    else delete dependency.cache[modulePath];
+  }
+}, 15_000);
 
 describe("PostgreSQL testkit lifecycle", () => {
   it("wraps replay-ledger reset and trigger verification in one transaction", async () => {

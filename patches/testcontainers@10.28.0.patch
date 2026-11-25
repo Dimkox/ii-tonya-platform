@@ -1,0 +1,28 @@
+diff --git a/build/reaper/reaper.js b/build/reaper/reaper.js
+index 85ea6061c8ebce6d823ef19e03322ff38113dd2a..9916ae740c9a3eb940054b82b2168e8d5c175e04 100644
+--- a/build/reaper/reaper.js
++++ b/build/reaper/reaper.js
+@@ -23,11 +23,19 @@ async function getReaper(client) {
+             return new DisabledReaper(sessionId, "");
+         }
+         else if (reaperContainer) {
+-            return await useExistingReaper(reaperContainer, sessionId, client.info.containerRuntime.host);
+-        }
+-        else {
+-            return await createNewReaper(sessionId, client.info.containerRuntime.remoteSocketPath);
++            try {
++                return await useExistingReaper(reaperContainer, sessionId, client.info.containerRuntime.host);
++            }
++            catch (error) {
++                // Backport testcontainers-node#1233 for a stale Ryuk socket during reuse.
++                if (!(error instanceof Error) || error.message !== "Failed to connect to Reaper") {
++                    throw error;
++                }
++                common_1.log.warn("Existing Reaper is unreachable; starting a new session.", { containerId: reaperContainer.Id });
++                sessionId = new common_1.RandomUuid().nextUuid();
++            }
+         }
++        return await createNewReaper(sessionId, client.info.containerRuntime.remoteSocketPath);
+     });
+     reaper.addSession(sessionId);
+     return reaper;
