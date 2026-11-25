@@ -77,9 +77,12 @@ The administrator must approve a private GitHub repository and its readers befor
 retaining the archive there. The public project can retain the identities above.
 Rebuilding the same source can change the result when upstream packages change.
 
-1. Preserve the measured file above. Record its identities, the source SHA, and
-   the private repository, release tag, and asset name in the approved recovery
-   record when the administrator retains the file. Keep it outside the Git tree.
+1. Preserve the measured file above. Before uploading, the administrator checks
+   that `gh repo view "$RECOVERY_REPO" --json visibility --jq .visibility` returns
+   `PRIVATE` and verifies the repository's effective readers, including inherited
+   organization and team access, against the approved recipient list. Record the
+   identities, source SHA, private repository, release tag, and asset name in the
+   recovery record. Keep the archive outside the Git tree.
 2. Request the retained file or access to its private release from the Claw
    administrator. Once the private release is available, download its named asset with
    `gh release download "$RELEASE_TAG" --repo "$RECOVERY_REPO" --pattern "$ASSET" --dir "$RESTORE_DIR"`.
@@ -101,8 +104,22 @@ Rebuilding the same source can change the result when upstream packages change.
 
 3. Load the verified file in an isolated Docker daemon using
    `docker --context "$DISPOSABLE_CONTEXT" image load --input "$archive"`.
-   Verify the restored temporary tag's full `.Id`, the three tool versions, and
-   the dependency seed there. A different ID requires investigation.
+   Verify the full `.Id`, seed and installed tools in the same disposable context.
+
+   ```bash
+   probe=ii-tonya-test-recovery-probe:29993b4f-20261126
+   test "$(docker --context "$DISPOSABLE_CONTEXT" image inspect "$probe" --format '{{.Id}}')" = "sha256:$manifest"
+   docker --context "$DISPOSABLE_CONTEXT" run --rm --network none --read-only --entrypoint sh "$probe" -eu -c '
+     test "$(cat /seed/.source-sha)" = 29993b4fe96facf8c07781833dc7f2d5f560aa7e
+     echo "36a526e89848dbc73444db204cbd6eebfa8638dde4c9bf7b1d18e64b48a5cc05  /seed/pnpm-lock.yaml" | sha256sum -c -
+     test -d /seed/node_modules
+     test -d /seed/.pnpm-store
+     test "$(node --version)" = v24.18.0
+     test "$(pnpm --version)" = 11.9.0
+     docker --version | grep -F "Docker version 29.7.0,"
+   '
+   ```
+
 4. The Claw administrator installs the verified image under
    `ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e` after approval.
    Verify its full `.Id` on that engine before running the gates.
