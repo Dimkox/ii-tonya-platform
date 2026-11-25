@@ -40,7 +40,7 @@ compose_root="${CLAW_COMPOSE_ROOT:-/home/pall/app-stack}"
 claw_store=$compose_root/ii-tonya-test-workspace/.pnpm-store
 test_image=29993b4fe96facf8c07781833dc7f2d5f560aa7e
 test_image_ref="ii-tonya-test:$test_image"
-expected_test_image_id=sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63
+expected_test_image_id=sha256:e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b430693ab7831b0a6892
 test -d "$claw_store"
 test "$(docker image inspect "$test_image_ref" --format '{{.Id}}')" = "$expected_test_image_id"
 claw_syft=""

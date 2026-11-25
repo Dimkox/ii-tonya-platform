@@ -42,8 +42,10 @@ exact image ID before execution. Database concurrency
 each test or suite runs once. GitHub stores the resulting commit and PR; sanitized
 exact-SHA evidence is committed in the repository.
 
-The server-imitation image is retained between runs. Rebuild it only when its pinned
-source/toolchain changes. Compose v5.4.0 has no `docker compose prune` command; after a
+The server-imitation image is retained between runs. Restore the approved image
+from a verified archive when possible. A toolchain change or a lost image that
+cannot be recovered requires a separately reviewed infrastructure change.
+Compose v5.4.0 has no `docker compose prune` command; after a
 real rebuild, compare dangling image IDs before and after and remove only new unused
 layers created by that ii-tonya build. Never run a global Docker prune on the shared Claw
 host.
@@ -51,8 +53,59 @@ host.
 Production release uses the checksummed native bundle from the release gate and
 `scripts/deploy-native-remote.sh`. It does not reuse this container, Docker, or Compose.
 
-Current server-imitation image source is `29993b4fe96facf8c07781833dc7f2d5f560aa7e`
-with image ID
-`sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63`.
-Current native release evidence is
+The replacement was built from clean, published Git source
+`29993b4fe96facf8c07781833dc7f2d5f560aa7e`. The following identities were
+measured on the Claw Docker 29.10 engine.
+
+| Identity                                                                       | Value                                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------- |
+| Gate value (`docker image inspect --format '{{.Id}}'`) and OCI manifest digest | `sha256:e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b430693ab7831b0a6892` |
+| Image configuration digest referenced by that manifest                         | `sha256:760af4b2e39630627da8c14e8978139c7aedae9c5ce1fbfbf3f9d1ed925fe0a5` |
+| Layer count                                                                    | 12                                                                        |
+| Tools in the image                                                             | Node 24.18.0, pnpm 11.9.0, Docker CLI 29.7.0                              |
+| Retained file                                                                  | `ii-tonya-ci-runner-29993b4f-linux-amd64.oci.tar` (292445184 bytes)       |
+| Retained file SHA-256                                                          | `9b71b03e8a6d07f0e749cc5260fde6637100b5fa4fd4570bf0a586dc6fc000eb`        |
+
+The CI and offline sandbox builders both check the full gate value. The config
+and manifest are different OCI blobs. An exported archive also has its own
+checksum, calculated from the actual file.
+
+### Retaining and restoring the image
+
+The seed contains the historical project checkout, Git objects and package store.
+The administrator must approve a private GitHub repository and its readers before
+retaining the archive there. The public project can retain the identities above.
+Rebuilding the same source can change the result when upstream packages change.
+
+1. Preserve the measured file above. Record its identities, the source SHA, and
+   the private repository, release tag, and asset name in the approved recovery
+   record when the administrator retains the file. Keep it outside the Git tree.
+2. Request the retained file or access to its private release from the Claw
+   administrator. Once the private release is available, download its named asset with
+   `gh release download "$RELEASE_TAG" --repo "$RECOVERY_REPO" --pattern "$ASSET" --dir "$RESTORE_DIR"`.
+   Verify the downloaded archive and its named OCI blobs before import. In Bash,
+   run the following from the download directory.
+
+   ```bash
+   set -euo pipefail
+   archive=ii-tonya-ci-runner-29993b4f-linux-amd64.oci.tar
+   manifest=e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b430693ab7831b0a6892
+   config=760af4b2e39630627da8c14e8978139c7aedae9c5ce1fbfbf3f9d1ed925fe0a5
+   echo "9b71b03e8a6d07f0e749cc5260fde6637100b5fa4fd4570bf0a586dc6fc000eb  $archive" | sha256sum -c -
+   for digest in "$manifest" "$config"; do
+     test "$(tar -xOf "$archive" "blobs/sha256/$digest" | sha256sum | cut -d' ' -f1)" = "$digest"
+   done
+   tar -xOf "$archive" "blobs/sha256/$manifest" |
+     jq -e --arg config "sha256:$config" '.config.digest == $config and (.layers | length) == 12' >/dev/null
+   ```
+
+3. Load the verified file in an isolated Docker daemon using
+   `docker --context "$DISPOSABLE_CONTEXT" image load --input "$archive"`.
+   Verify the restored temporary tag's full `.Id`, the three tool versions, and
+   the dependency seed there. A different ID requires investigation.
+4. The Claw administrator installs the verified image under
+   `ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e` after approval.
+   Verify its full `.Id` on that engine before running the gates.
+
+Historical native release evidence is
 [`887c462065bc8d4f480b5474135638a5bc063b8c`](../test-evidence/claw/887c462065bc8d4f480b5474135638a5bc063b8c/release.md).
