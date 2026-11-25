@@ -80,9 +80,10 @@ export function createExpertApplicantComposition(
   if (config.features.expertApplicant !== true) return undefined;
   const scope = config.expertApplicant!;
   const sales = new PostgresExpertSeparatedSalesRepository(db, scope);
-  const promoFunnel = scope.waitlistV4Enabled
-    ? new PostgresExpertPromoFunnelRepository(db, scope)
-    : undefined;
+  const promoFunnel =
+    scope.waitlistV4Enabled && scope.guideFileId
+      ? new PostgresExpertPromoFunnelRepository(db, scope)
+      : undefined;
   const privateDocuments = config.features.residentPrivateJobs
     ? new PostgresResidentPrivateJobsRepository(db, scope)
     : undefined;
@@ -112,6 +113,10 @@ export function createExpertApplicantComposition(
         ? {
             requestOfferedGuide: (input) =>
               promoFunnel.requestOfferedGuide(input),
+          }
+        : {}),
+      ...(scope.waitlistV4Enabled
+        ? {
             waitlistV4: {
               channelUrl:
                 scope.telegramChannelUrl ??

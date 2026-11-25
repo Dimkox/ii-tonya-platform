@@ -64,6 +64,7 @@ export function readExpertApplicantConfig(
   if (!["true", "false"].includes(enabled))
     throw new Error("expert_applicant_configuration_invalid");
   if (enabled !== "true") return undefined;
+  const guideFileId = source.EXPERT_PROMO_GUIDE_FILE_ID?.trim();
   const config = {
     ...(source.EXPERT_PROMO_TELEGRAM_BOT_TOKEN
       ? { botToken: source.EXPERT_PROMO_TELEGRAM_BOT_TOKEN }
@@ -79,9 +80,7 @@ export function readExpertApplicantConfig(
     ...(source.WAITLIST_FUNNEL_V4_ENABLED === "true"
       ? { waitlistV4Enabled: true }
       : {}),
-    ...(source.EXPERT_PROMO_GUIDE_FILE_ID
-      ? { guideFileId: source.EXPERT_PROMO_GUIDE_FILE_ID }
-      : {}),
+    ...(guideFileId ? { guideFileId } : {}),
     ...(source.EXPERT_PROMO_GIFT_BANNER_FILE_ID
       ? { giftBannerFileId: source.EXPERT_PROMO_GIFT_BANNER_FILE_ID }
       : {}),

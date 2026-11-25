@@ -1,11 +1,13 @@
 # Waitlist gift assets
 
-`warm-clients-guide.pdf` and `gift-banner.png` are the approved waitlist gift.
-They ship with the worker and are uploaded to Telegram as multipart files;
-there is no public URL and no Telegram file_id bootstrap requirement.
+Leave `EXPERT_PROMO_GUIDE_FILE_ID` empty on the API and worker to hold PDF
+offers and delivery. Referral codes and the first reminder remain available.
+After the guide is approved, set the same Telegram file ID on both services
+or select `local:warm-clients-guide-v1` to upload the packaged
+`warm-clients-guide.pdf` as a multipart file.
 
-If `EXPERT_PROMO_GUIDE_FILE_ID` or `EXPERT_PROMO_GIFT_BANNER_FILE_ID` is set,
-that existing Telegram file_id takes precedence over the corresponding file.
+The worker uploads the packaged `gift-banner.png` unless
+`EXPERT_PROMO_GIFT_BANNER_FILE_ID` selects an existing Telegram file ID.
 
 Update the versioned local slot in `expert-promo-local-assets.ts` when replacing
 the PDF: queued guide work uses the slot to move from `waiting_content` to

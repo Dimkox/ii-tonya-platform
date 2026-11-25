@@ -85,6 +85,7 @@ export function createExpertPromoFunnelRunner(
         },
         {
           limit: 20,
+          guideAvailable: Boolean(scope.guideFileId),
           banner:
             scope.giftBannerFileId || EXPERT_PROMO_LOCAL_ASSETS.banner.slot,
         },
@@ -108,7 +109,7 @@ export function createExpertPromoFunnelRunner(
               : send("sendDocument", { chat_id: chatId, document, caption }),
         },
         {
-          document: scope.guideFileId || EXPERT_PROMO_LOCAL_ASSETS.guide.slot,
+          ...(scope.guideFileId ? { document: scope.guideFileId } : {}),
           limit: 20,
         },
       );

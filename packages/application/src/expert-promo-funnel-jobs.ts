@@ -81,16 +81,17 @@ export async function runExpertPromoFunnelTimers(
     }): Promise<boolean>;
     sendPhoto?(input: { chatId: string; photo: string }): Promise<unknown>;
   },
-  config: { limit?: number; banner?: string } = {},
+  config: { limit?: number; banner?: string; guideAvailable?: boolean } = {},
 ) {
   const result = { message6: 0, gift: 0, failed: 0 };
   for (const kind of ["message6", "gift"] as const) {
+    if (kind === "gift" && config.guideAvailable === false) continue;
     for (const target of await ports.claimTimer({
       kind,
       limit: config.limit ?? 20,
     })) {
       try {
-        if (config.banner && ports.sendPhoto)
+        if (config.guideAvailable !== false && config.banner && ports.sendPhoto)
           await ports.sendPhoto({
             chatId: target.chatId,
             photo: config.banner,
@@ -102,7 +103,10 @@ export async function runExpertPromoFunnelTimers(
             : `\n\nВаш личный промокод ${waitlistDisplayRefCode(target.userId, target.refCode)} всегда активен. Напишите слово **«ПРОМОКОД»**, и я снова дам готовые тексты для рассылки.`;
         const sent = await ports.sendMessage({
           chatId: target.chatId,
-          text: FUNNEL_TIMER_TEXT[kind] + dynamic,
+          text:
+            kind === "message6" && config.guideAvailable === false
+              ? `Привет! 👋 Вы можете продолжать приглашать коллег по вашему промокоду. Сейчас по вашему коду зарегистрировано: **${count}**. Гайд пока недоступен.`
+              : FUNNEL_TIMER_TEXT[kind] + dynamic,
           ...(kind === "message6"
             ? {
                 replyMarkup: {
