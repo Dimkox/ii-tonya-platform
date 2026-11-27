@@ -33,6 +33,32 @@ test project checked 3,432 files with TypeScript 5.9.3 and used 1.50 GiB of
 swap at peak. The CI step gives Node a 3 GiB heap and runs the complete
 `pnpm typecheck`, including the workspace packages and the test project.
 
+### PDF, payment and browser fixtures in the direct CI gate
+
+Direct `ci` uses the local image `ii-tonya-test:scrum530-native-fixtures-v1`.
+It extends the pinned Claw seed and adds Python 3.11, the PostgreSQL 15.20
+client, nginx and Google Chrome 158.0.8127.88. The PostgreSQL test server stays
+at 17.5. The CI adapter verifies the seed and the actual image selected by
+Compose before running any tests. Its expected fixture image ID is
+`sha256:f1aa2639d87b18f4e0c5c76f67db064a480f564d297b735f81991dfef433d341`.
+The database and release modes use the original seed.
+
+The recipe is `deploy/claw/Dockerfile.fixtures`. The retained private archive
+`native-fixtures-v1.oci.tar` has SHA-256
+`1ddfd1083b7ac6e9a6476483cf9f344bfff57de3c443b092fd635c44d111c5b1`.
+For restoration, verify that checksum, run `docker image load -i native-fixtures-v1.oci.tar`
+and compare the loaded tag's full ID. An intentional rebuild uses
+`docker build --provenance=false --pull=false -t ii-tonya-test:scrum530-native-fixtures-v1 - < deploy/claw/Dockerfile.fixtures`
+after the seed ID has been verified. Distribution updates may change the resulting ID.
+Review and record the new image before changing the gate pin.
+
+For real payment fixtures, temporary PostgreSQL servers listen on loopback
+inside the current test runner's network namespace. Python uses native
+`psql` there. For PDF parsing, the isolated parser receives its socket
+directory through the checkout path confirmed by the Docker daemon. Shell
+recovery fixtures use a separate 256-MiB executable tmpfs owned by the CI
+user. Each runner has its own mount. The normal `/tmp` keeps its `noexec` setting.
+
 The image pins Node 24.18.0, pnpm 11.9.0, and Docker CLI 29.7.0, loads no production env
 file or application credential, and resolves the app-stack proxy to a numeric address
 before creating its runtime-only proxy configuration. Evidence is

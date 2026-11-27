@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import { setImmediate, setTimeout as delay } from "node:timers/promises";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { ExperimentalGatewayIpc } from "@ii-tonya/integrations";
+import { getTestPostgresPorts } from "../../../../tests/support/test-docker-runner.mjs";
 import {
   createPublicExpertPaymentRuntime,
   publicExpertConnectionNames,
@@ -18,49 +19,51 @@ const factories: Awaited<
 >[] = [];
 beforeAll(async () => {
   const credential = randomBytes(24).toString("hex");
-  container = "public-principals-" + randomBytes(8).toString("hex");
-  execFileSync(
+  const ports = await getTestPostgresPorts();
+  const containerId = execFileSync(
     "docker",
     [
       "run",
       "-d",
       "--name",
-      container,
-      "-p",
-      "127.0.0.1::5432",
+      "public-principals-" + randomBytes(8).toString("hex"),
+      ...ports.dockerArgs,
       "-e",
       "POSTGRES_PASSWORD",
       "-e",
       "POSTGRES_DB=principals_fixture",
+      "-e",
+      "POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256",
       "postgres:17.5-bookworm",
+      "postgres",
+      ...ports.postgresArgs,
     ],
     {
       encoding: "utf8",
       timeout: 60_000,
       env: { ...process.env, POSTGRES_PASSWORD: credential },
     },
-  );
-  const port = execFileSync(
-    "docker",
-    [
-      "inspect",
-      "--format",
-      '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}',
-      container,
-    ],
-    { encoding: "utf8", timeout: 15_000 },
   ).trim();
-  database = createDb(
-    `postgresql://postgres:${credential}@127.0.0.1:${port}/principals_fixture`,
-    { max: 3, connectionTimeoutMillis: 1000 },
-  );
+  if (!/^[a-f0-9]{64}$/u.test(containerId))
+    throw new Error("principals_fixture_container_id_invalid");
+  container = containerId;
+  const port = ports.clientPort(containerId);
+  const connectionString = `postgresql://postgres:${credential}@127.0.0.1:${port}/principals_fixture`;
+  database = createDb(connectionString, {
+    max: 3,
+    connectionTimeoutMillis: 1000,
+  });
   const deadline = Date.now() + 30_000;
   for (;;) {
     try {
-      expect(
-        (await database.$client.query("show server_version_num")).rows[0]!
-          .server_version_num,
-      ).toBe("170005");
+      const authenticated = await database.$client.query(
+        "select current_setting('server_version_num') as version, session_user as login, current_database() as database",
+      );
+      expect(authenticated.rows[0]).toEqual({
+        version: "170005",
+        login: "postgres",
+        database: "principals_fixture",
+      });
       break;
     } catch (error) {
       if (Date.now() >= deadline)
@@ -69,6 +72,21 @@ beforeAll(async () => {
         });
       await delay(200);
     }
+  }
+  const wrongPasswordUrl = new URL(connectionString);
+  wrongPasswordUrl.password = "incorrect-fixture-password";
+  const unauthenticated = createDb(wrongPasswordUrl.toString(), {
+    max: 1,
+    connectionTimeoutMillis: 1000,
+  });
+  try {
+    await expect(
+      unauthenticated.$client.query("select 1"),
+    ).rejects.toMatchObject({
+      code: "28P01",
+    });
+  } finally {
+    await unauthenticated.$client.end();
   }
   await migrateDb(database, "packages/db/migrations");
 }, 120_000);

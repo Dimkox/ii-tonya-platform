@@ -1,0 +1,6 @@
+services:
+  ii-tonya-test:
+    image: "${CLAW_CI_FIXTURE_IMAGE_ID:?CI fixture image ID is required}"
+    pull_policy: never
+    tmpfs:
+      - /ci-fixtures:rw,exec,nosuid,nodev,size=256m,uid=1000,gid=1000,mode=0700

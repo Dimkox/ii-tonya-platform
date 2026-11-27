@@ -3,6 +3,10 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import {
+  getTestPostgresPorts,
+  startTestPsqlClient,
+} from "./test-docker-runner.mjs";
 
 // This is the ONLY destination seam: both gateway sockets verify a local TLS
 // certificate. Production fixed-host transport and PgAuthority are unmodified.
@@ -82,14 +86,14 @@ from bound_gateway import BoundGateway
 from nonce_registry import NonceRegistry
 from pg_authority import PgAuthority
 from provider_reader import ProviderReader as OriginalProviderReader
-base,address,port,cert,node_pid=sys.argv[1:];port=int(port);node_pid=int(node_pid)
+base,address,port,cert,node_pid,psql=sys.argv[1:];port=int(port);node_pid=int(node_pid)
 client_ctx=ssl.create_default_context(cafile=cert)
 def prepare():return client_ctx.wrap_socket(socket.create_connection(('127.0.0.1',port),timeout=3),server_hostname='localhost')
 original_https=http.client.HTTPSConnection
 def connection(*args,**kwargs):return original_https('localhost',port,timeout=3,context=client_ctx)
 class LocalProviderReader(OriginalProviderReader):
  def __init__(self,merchant_auth,**options):super().__init__(merchant_auth,factory=connection,**options)
-authority=PgAuthority(psql_path=os.path.join(base,'psql'),service='fixture',service_file=os.path.join(base,'service'),pass_file=os.path.join(base,'pass'),timeout=8)
+authority=PgAuthority(psql_path=psql,service='fixture',service_file=os.path.join(base,'service'),pass_file=os.path.join(base,'pass'),timeout=8)
 runtime=BoundGateway(os.path.join(base,'state'),authority=authority,require_existing=True)
 if not runtime.resume_from_authority():raise RuntimeError('authority readiness failed')
 path=os.path.join(base,'nonce')
@@ -104,7 +108,7 @@ registry.close();runtime.close()
 """
 import subprocess,select
 def start_gateway_process():
- process=subprocess.Popen([sys.executable,'-c',gateway_program,base,sys.argv[2],str(port),helper.cert,str(os.getppid())],stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True)
+ process=subprocess.Popen([sys.executable,'-c',gateway_program,base,sys.argv[2],str(port),helper.cert,str(os.getppid()),sys.argv[4]],stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True)
  if not select.select([process.stdout],[],[],10)[0]:process.kill();process.wait();raise RuntimeError('gateway child readiness timeout')
  line=process.stdout.readline()
  if not line or not json.loads(line).get('ready'):process.wait();raise RuntimeError('gateway child startup failed')
@@ -147,44 +151,33 @@ export async function startPublicExpertGatewayProvider(
 ) {
   const directory = await mkdtemp(join(tmpdir(), "public-expert-journey-"));
   const url = new URL(connectionString);
+  const host = url.searchParams.get("host") || url.hostname;
+  const port = url.searchParams.get("port") || url.port || "5432";
   await writeFile(
     join(directory, "service"),
-    `[fixture]\nhost=${url.hostname}\nport=${url.port}\ndbname=${url.pathname.slice(1)}\nuser=${login}\nconnect_timeout=3\noptions=-c statement_timeout=3000 -c lock_timeout=1500\n`,
+    `[fixture]\nhost=${host}\nport=${port}\ndbname=${url.pathname.slice(1)}\nuser=${login}\nconnect_timeout=3\noptions=-c statement_timeout=3000 -c lock_timeout=1500\n`,
     { mode: 0o600 },
   );
   await writeFile(
     join(directory, "pass"),
-    `${url.hostname}:${url.port}:${url.pathname.slice(1)}:${login}:${password}\n`,
+    `${host}:${port}:${url.pathname.slice(1)}:${login}:${password}\n`,
     { mode: 0o600 },
   );
-  let container;
+  let psqlClient;
   let child;
   try {
-    container = execFileSync(
-      "docker",
-      [
-        "run",
-        "-d",
-        "--network=host",
-        "--mount",
-        `type=bind,src=${directory},dst=${directory},readonly`,
-        "postgres:17.5-bookworm",
-        "sleep",
-        "infinity",
-      ],
-      { encoding: "utf8" },
-    ).trim();
-    if (!/^[a-f0-9]{64}$/u.test(container))
-      throw Error("invalid test container");
-    await writeFile(
-      join(directory, "psql"),
-      `#!/bin/sh\nexec /usr/bin/docker exec -i -e PGSERVICE -e PGSERVICEFILE -e PGPASSFILE ${container} /usr/bin/psql "$@"\n`,
-      { mode: 0o700 },
-    );
+    psqlClient = await startTestPsqlClient(directory);
     const address = "\0public-expert-journey-" + randomUUID();
     child = spawn(
       "python3",
-      ["-c", program, directory, address.slice(1), String(offsetSeconds)],
+      [
+        "-c",
+        program,
+        directory,
+        address.slice(1),
+        String(offsetSeconds),
+        psqlClient.psqlPath,
+      ],
       { detached: true, stdio: ["pipe", "pipe", "pipe"] },
     );
     let buffer = "",
@@ -240,7 +233,7 @@ export async function startPublicExpertGatewayProvider(
             });
           });
         }
-        execFileSync("docker", ["rm", "-f", container], { stdio: "ignore" });
+        psqlClient.stop();
         await rm(directory, { recursive: true, force: true });
         if (stderr) throw Error("local gateway stderr: " + stderr);
       },
@@ -248,8 +241,7 @@ export async function startPublicExpertGatewayProvider(
   } catch (error) {
     if (child?.pid && child.exitCode === null)
       process.kill(-child.pid, "SIGTERM");
-    if (container)
-      execFileSync("docker", ["rm", "-f", container], { stdio: "ignore" });
+    psqlClient?.stop();
     await rm(directory, { recursive: true, force: true });
     throw error;
   }
@@ -298,12 +290,16 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
           "sh",
         ]
       : ["-e", `FAKETIME=${fakeOffset}`];
+    const ports = await getTestPostgresPorts();
+    const password = randomUUID();
     const command = advanceable
       ? [
           "-c",
-          `printf %s "$JOURNEY_CLOCK" > ${clockFile} && exec docker-entrypoint.sh postgres`,
+          `printf %s "$JOURNEY_CLOCK" > ${clockFile} && exec docker-entrypoint.sh postgres "$@"`,
+          "sh",
+          ...ports.postgresArgs,
         ]
-      : [];
+      : ["postgres", ...ports.postgresArgs];
     container = execFileSync(
       "docker",
       [
@@ -312,10 +308,11 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
         ...clockArgs,
         "--user",
         "postgres",
-        "-p",
-        "127.0.0.1::5432",
+        ...ports.dockerArgs,
         "-e",
-        "POSTGRES_PASSWORD=synthetic-journey-only",
+        "POSTGRES_PASSWORD",
+        "-e",
+        "POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256",
         "-e",
         "POSTGRES_USER=journey_admin",
         "-e",
@@ -329,19 +326,13 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
         image,
         ...command,
       ],
-      { encoding: "utf8" },
+      {
+        encoding: "utf8",
+        env: { ...process.env, POSTGRES_PASSWORD: password },
+      },
     ).trim();
-    const port = execFileSync(
-      "docker",
-      [
-        "inspect",
-        "--format",
-        '{{(index (index .NetworkSettings.Ports "5432/tcp") 0).HostPort}}',
-        container,
-      ],
-      { encoding: "utf8" },
-    ).trim();
-    const connectionString = `postgresql://journey_admin:synthetic-journey-only@127.0.0.1:${port}/journey`;
+    const port = ports.clientPort(container);
+    const connectionString = `postgresql://journey_admin:${password}@127.0.0.1:${port}/journey`;
     const deadline = Date.now() + 30000;
     for (;;) {
       try {
@@ -350,9 +341,14 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
           [
             "exec",
             container,
-            "pg_isready",
+            "sh",
+            "-ec",
+            'export PGPASSWORD="$POSTGRES_PASSWORD"; exec psql -XAtw -c "select 1" "$@"',
+            "sh",
             "-h",
             "127.0.0.1",
+            "-p",
+            String(ports.serverPort),
             "-U",
             "journey_admin",
             "-d",
