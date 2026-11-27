@@ -151,7 +151,7 @@ case "$CLAW_GATE_MODE" in
     step format pnpm format:check
     step deploy-contract pnpm verify:deploy
     step lint pnpm lint
-    step typecheck env NODE_OPTIONS=--max-old-space-size=1024 pnpm typecheck
+    step typecheck env NODE_OPTIONS=--max-old-space-size=3072 pnpm typecheck
     step coverage pnpm exec vitest run --coverage --maxWorkers=1
     step gitleaks docker run --rm \
       -v "$CLAW_HOST_SOURCE_ROOT:/repo:ro" \

@@ -41,6 +41,9 @@ describe("direct Claw verification semantics", () => {
 
   it("runs CI and database gates directly on Claw without Actions context", () => {
     const runner = read("scripts/run-claw-ci.sh");
+    expect(runner).toContain(
+      "step typecheck env NODE_OPTIONS=--max-old-space-size=3072 pnpm typecheck",
+    );
     expect(runner).toContain("<ci|database|release|client-booking>");
     expect(runner).toContain(
       'source_root="$(realpath "${SOURCE_ROOT:?SOURCE_ROOT is required}")"',
