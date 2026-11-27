@@ -44,8 +44,8 @@ expected_test_image_id=sha256:e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b43069
 test -d "$claw_store"
 test "$(docker image inspect "$test_image_ref" --format '{{.Id}}')" = "$expected_test_image_id"
 if [[ "$mode" == ci ]]; then
-  ci_image=scrum530-native-fixtures-v1
-  ci_image_id=sha256:f1aa2639d87b18f4e0c5c76f67db064a480f564d297b735f81991dfef433d341
+  ci_image=scrum530-native-fixtures-v2
+  ci_image_id=sha256:b371f78cb15b7f49d9ccd83d933b2e7d047ea3e0838f9f8a2767b65c55138dae
   effective_id=$(docker image inspect "ii-tonya-test:$ci_image" --format '{{.Id}}')
   test "$effective_id" = "$ci_image_id"
   export CLAW_CI_FIXTURE_IMAGE_ID="$effective_id"

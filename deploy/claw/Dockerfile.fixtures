@@ -15,3 +15,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && google-chrome --version
 USER node
+HEALTHCHECK --interval=5m --timeout=15s --start-period=20s --retries=2 \
+    CMD python3 -c 'import ssl, tempfile; ssl.create_default_context(); tempfile.TemporaryFile(dir="/ci-fixtures").close()' \
+    && /usr/bin/psql --version >/dev/null \
+    && /usr/sbin/nginx -v 2>/dev/null \
+    && google-chrome --version >/dev/null \
+    && openssl version >/dev/null

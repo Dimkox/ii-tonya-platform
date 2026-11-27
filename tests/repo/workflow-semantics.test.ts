@@ -122,9 +122,11 @@ describe("direct Claw verification semantics", () => {
     expect(fixtureImage).toContain(
       "FROM ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e",
     );
-    expect(runner).toContain("ci_image=scrum530-native-fixtures-v1");
+    expect(fixtureImage).toMatch(/^HEALTHCHECK --interval=/mu);
+    expect(fixtureImage).toContain('TemporaryFile(dir="/ci-fixtures")');
+    expect(runner).toContain("ci_image=scrum530-native-fixtures-v2");
     expect(runner).toContain(
-      "ci_image_id=sha256:f1aa2639d87b18f4e0c5c76f67db064a480f564d297b735f81991dfef433d341",
+      "ci_image_id=sha256:b371f78cb15b7f49d9ccd83d933b2e7d047ea3e0838f9f8a2767b65c55138dae",
     );
     expect(runner).toContain('test "$effective_id" = "$ci_image_id"');
     expect(runner).toContain('test "$effective_ref" = "$ci_image_id"');

@@ -35,20 +35,23 @@ swap at peak. The CI step gives Node a 3 GiB heap and runs the complete
 
 ### PDF, payment and browser fixtures in the direct CI gate
 
-Direct `ci` uses the local image `ii-tonya-test:scrum530-native-fixtures-v1`.
+Direct `ci` uses the local image `ii-tonya-test:scrum530-native-fixtures-v2`.
 It extends the pinned Claw seed and adds Python 3.11, the PostgreSQL 15.20
 client, nginx and Google Chrome 158.0.8127.88. The PostgreSQL test server stays
 at 17.5. The CI adapter verifies the seed and the actual image selected by
 Compose before running any tests. Its expected fixture image ID is
-`sha256:f1aa2639d87b18f4e0c5c76f67db064a480f564d297b735f81991dfef433d341`.
+`sha256:b371f78cb15b7f49d9ccd83d933b2e7d047ea3e0838f9f8a2767b65c55138dae`.
+The image health check opens a temporary file in the runner's private
+`/ci-fixtures` mount, initializes Python's TLS context and verifies that
+psql, nginx, Chrome and OpenSSL start under the CI user.
 The database and release modes use the original seed.
 
 The recipe is `deploy/claw/Dockerfile.fixtures`. The retained private archive
-`native-fixtures-v1.oci.tar` has SHA-256
-`1ddfd1083b7ac6e9a6476483cf9f344bfff57de3c443b092fd635c44d111c5b1`.
-For restoration, verify that checksum, run `docker image load -i native-fixtures-v1.oci.tar`
+`native-fixtures-v2.oci.tar` has SHA-256
+`da6cc6725d950598f9a5ca86549ec0d4680289ba79d646db6986dfc39bb2213c`.
+For restoration, verify that checksum, run `docker image load -i native-fixtures-v2.oci.tar`
 and compare the loaded tag's full ID. An intentional rebuild uses
-`docker build --provenance=false --pull=false -t ii-tonya-test:scrum530-native-fixtures-v1 - < deploy/claw/Dockerfile.fixtures`
+`docker build --provenance=false --pull=false -t ii-tonya-test:scrum530-native-fixtures-v2 - < deploy/claw/Dockerfile.fixtures`
 after the seed ID has been verified. Distribution updates may change the resulting ID.
 Review and record the new image before changing the gate pin.
 
