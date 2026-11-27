@@ -195,20 +195,19 @@ describe("Selarti native REST client", () => {
         expect(body.length).toBeLessThan(65536);
         expect(bytes.length).toBeGreaterThan(65536);
       }
-      const client = new SelartiRestClient(
-        "token",
-        async () =>
-          new Response(
-            new ReadableStream<Uint8Array>({
-              start(controller) {
-                // One-byte chunks deliberately split every multibyte code point.
-                for (let i = 0; i < bytes.length; i += 1)
-                  controller.enqueue(bytes.subarray(i, i + 1));
-                controller.close();
-              },
-            }),
-          ),
-      );
+      const client = new SelartiRestClient("token", async () => {
+        let offset = 0;
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            pull(controller) {
+              // One-byte chunks deliberately split every multibyte code point.
+              controller.enqueue(bytes.subarray(offset, offset + 1));
+              offset += 1;
+              if (offset === bytes.length) controller.close();
+            },
+          }),
+        );
+      });
       expect(await client.sendExternal(send)).toMatchObject({
         kind: oversized ? "unknown" : "accepted",
       });

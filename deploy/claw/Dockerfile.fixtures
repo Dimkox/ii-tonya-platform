@@ -1,0 +1,23 @@
+FROM ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e
+
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 postgresql-client-15 nginx \
+    && rm -rf /var/lib/apt/lists/* \
+    && python3 -c 'import ssl, socket, subprocess, unittest.mock' \
+    && /usr/bin/psql --version \
+    && openssl version \
+    && /usr/sbin/nginx -v
+ADD --checksum=sha256:a656b2db00a8cb7f13a1d754f6aad91f84014906452c6dfb7f3ead93035da03b https://dl.google.com/linux/chrome-stable/deb/pool/main/g/google-chrome-stable/google-chrome-stable_158.0.8127.88-1_amd64.deb /tmp/google-chrome-stable.deb
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends /tmp/google-chrome-stable.deb \
+    && rm -f /tmp/google-chrome-stable.deb \
+    && rm -rf /var/lib/apt/lists/* \
+    && google-chrome --version
+USER node
+HEALTHCHECK --interval=5m --timeout=15s --start-period=20s --retries=2 \
+    CMD python3 -c 'import ssl, tempfile; ssl.create_default_context(); tempfile.TemporaryFile(dir="/ci-fixtures").close()' \
+    && /usr/bin/psql --version >/dev/null \
+    && /usr/sbin/nginx -v 2>/dev/null \
+    && google-chrome --version >/dev/null \
+    && openssl version >/dev/null

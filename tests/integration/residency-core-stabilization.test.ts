@@ -25,6 +25,7 @@ import {
 import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 import { createExpertCardService } from "../../packages/application/src/expert-card-service.js";
 
+const workWebhookSecret = randomUUID();
 const promoScope = { botId: "717171", botKey: "core-promo" };
 const workScope = { botId: "818181", botKey: "core-work" };
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -275,7 +276,7 @@ async function workHttp(
   });
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
-    secret: "synthetic-core-webhook-secret",
+    secret: workWebhookSecret,
     clientIngressEnabled: false,
     clientHybridRoutingEnabled: false,
     clientBotKey: "disabled-client",
@@ -294,7 +295,7 @@ async function workHttp(
     expertCardEnabled: true,
     expertCard: {
       ...{ workBotId: workScope.botId, workBotKey: workScope.botKey },
-      webhookSecret: "synthetic-core-webhook-secret",
+      webhookSecret: workWebhookSecret,
       service,
       legacyReplay: { read: async () => "absent" },
       ...(answerTagCallback ? { answerTagCallback } : {}),
@@ -698,7 +699,7 @@ describe("residency core stabilization PG17.5", () => {
         method: "POST",
         url: "/v1/webhooks/telegram",
         headers: {
-          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+          "x-telegram-bot-api-secret-token": workWebhookSecret,
         },
         payload,
       });
@@ -879,8 +880,7 @@ print(json.dumps({'pdf':base64.b64encode(pdf.tobytes()).decode(),'docx':base64.b
             method: "POST",
             url: "/v1/webhooks/telegram",
             headers: {
-              "x-telegram-bot-api-secret-token":
-                "synthetic-core-webhook-secret",
+              "x-telegram-bot-api-secret-token": workWebhookSecret,
             },
             payload: {
               update_id: ++sequence,
@@ -936,7 +936,7 @@ print(json.dumps({'pdf':base64.b64encode(pdf.tobytes()).decode(),'docx':base64.b
         method: "POST",
         url: "/v1/webhooks/telegram",
         headers: {
-          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+          "x-telegram-bot-api-secret-token": workWebhookSecret,
         },
         payload: {
           update_id: ++sequence,
@@ -1225,7 +1225,7 @@ print(json.dumps({'pdf':base64.b64encode(pdf.tobytes()).decode(),'docx':base64.b
         method: "POST",
         url: "/v1/webhooks/telegram",
         headers: {
-          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+          "x-telegram-bot-api-secret-token": workWebhookSecret,
         },
         payload,
       });
@@ -1369,83 +1369,94 @@ print(json.dumps({'pdf':base64.b64encode(pdf.tobytes()).decode(),'docx':base64.b
       await database.db.execute(sql`update hashtags_db set is_active=true`);
     }
   });
-  it("R9 exposes inactive selected tags for owned removal then replacement at limit20", async () => {
-    const f = await linked();
-    const all = (
-      await database.db.execute<{ id: string }>(
-        sql`select id from hashtags_db order by parent_category,sub_category,tag_value,id limit 21`,
-      )
-    ).rows;
-    for (let revision = 0; revision < 20; revision++)
-      await f.card.toggleDraftTag({
-        ...event(f.work),
-        expectedRevision: revision,
-        tagId: all[revision]!.id,
-      });
-    await database.db.execute(
-      sql`update hashtags_db set is_active=false where id=${all[0]!.id}::uuid`,
-    );
-    const app = await workHttp(f.card);
-    const post = (payload: Record<string, unknown>) =>
-      app.inject({
-        method: "POST",
-        url: "/v1/webhooks/telegram",
-        headers: {
-          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
-        },
-        payload,
-      });
-    try {
-      const menu = (
-        await post({
-          update_id: ++sequence,
-          message: {
-            from: { id: Number(f.work.telegramUserId) },
-            chat: { id: Number(f.work.chatId), type: "private" },
-            text: "/tags",
-          },
-        })
-      ).json();
-      const button = menu.reply_markup.inline_keyboard
-        .flat()
-        .find((b: { callback_data: string }) =>
-          b.callback_data.endsWith(all[0]!.id),
-        );
-      expect(button).toBeDefined();
-      expect(button.text).toContain("неактивен");
-      expect(menu.text).toContain("20/20");
-      const removal = {
-        update_id: ++sequence,
-        callback_query: {
-          id: "remove-inactive",
-          data: button.callback_data,
-          from: { id: Number(f.work.telegramUserId) },
-          message: {
-            from: { id: Number(workScope.botId), is_bot: true },
-            chat: { id: Number(f.work.chatId), type: "private" },
-            text: "Теги",
-          },
-        },
-      };
-      expect((await post(removal)).json().text).toContain("19/20");
-      expect((await post(removal)).json()).toMatchObject({ duplicate: true });
-      await f.card.toggleDraftTag({
-        ...event(f.work),
-        expectedRevision: 21,
-        tagId: all[20]!.id,
-      });
-      expect((await f.card.getDraftTags(f.work)).tags_array).toHaveLength(20);
-      await expect(
-        f.card.toggleDraftTag({
+  describe("selected tags at the card limit", () => {
+    let f: Awaited<ReturnType<typeof linked>>;
+    let all: { id: string }[];
+
+    beforeAll(async () => {
+      f = await linked();
+      all = (
+        await database.db.execute<{ id: string }>(
+          sql`select id from hashtags_db order by parent_category,sub_category,tag_value,id limit 21`,
+        )
+      ).rows;
+    }, 5_000);
+
+    beforeAll(async () => {
+      for (let revision = 0; revision < 20; revision++)
+        await f.card.toggleDraftTag({
           ...event(f.work),
-          expectedRevision: 22,
-          tagId: all[0]!.id,
-        }),
-      ).rejects.toThrow("card_invalid_tags");
-    } finally {
-      await app.close();
-      await database.db.execute(sql`update hashtags_db set is_active=true`);
-    }
+          expectedRevision: revision,
+          tagId: all[revision]!.id,
+        });
+    }, 5_000);
+
+    it("R9 exposes inactive selected tags for owned removal then replacement at limit20", async () => {
+      await database.db.execute(
+        sql`update hashtags_db set is_active=false where id=${all[0]!.id}::uuid`,
+      );
+      const app = await workHttp(f.card);
+      const post = (payload: Record<string, unknown>) =>
+        app.inject({
+          method: "POST",
+          url: "/v1/webhooks/telegram",
+          headers: {
+            "x-telegram-bot-api-secret-token": workWebhookSecret,
+          },
+          payload,
+        });
+      try {
+        const menu = (
+          await post({
+            update_id: ++sequence,
+            message: {
+              from: { id: Number(f.work.telegramUserId) },
+              chat: { id: Number(f.work.chatId), type: "private" },
+              text: "/tags",
+            },
+          })
+        ).json();
+        const button = menu.reply_markup.inline_keyboard
+          .flat()
+          .find((b: { callback_data: string }) =>
+            b.callback_data.endsWith(all[0]!.id),
+          );
+        expect(button).toBeDefined();
+        expect(button.text).toContain("неактивен");
+        expect(menu.text).toContain("20/20");
+        const removal = {
+          update_id: ++sequence,
+          callback_query: {
+            id: "remove-inactive",
+            data: button.callback_data,
+            from: { id: Number(f.work.telegramUserId) },
+            message: {
+              from: { id: Number(workScope.botId), is_bot: true },
+              chat: { id: Number(f.work.chatId), type: "private" },
+              text: "Теги",
+            },
+          },
+        };
+        expect((await post(removal)).json().text).toContain("19/20");
+        expect((await post(removal)).json()).toMatchObject({ duplicate: true });
+        await f.card.toggleDraftTag({
+          ...event(f.work),
+          expectedRevision: 21,
+          tagId: all[20]!.id,
+        });
+        expect((await f.card.getDraftTags(f.work)).tags_array).toHaveLength(20);
+        await expect(
+          f.card.toggleDraftTag({
+            ...event(f.work),
+            expectedRevision: 22,
+            tagId: all[0]!.id,
+          }),
+        ).rejects.toThrow("card_invalid_tags");
+      } finally {
+        await app.close();
+        await database.db.execute(sql`update hashtags_db set is_active=true`);
+      }
+    });
   });
   it("R13 concurrent independent connection claims produce exactly one durable attempt/send", async () => {
     const f = await paid();

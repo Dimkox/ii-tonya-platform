@@ -116,6 +116,28 @@ describe("direct Claw verification semantics", () => {
     expect(dockerfile).not.toContain("pnpm install --frozen-lockfile;");
   });
 
+  it("checks the complete CI fixture image before running the suite", () => {
+    const runner = read("scripts/run-claw-ci.sh");
+    const fixtureImage = read("deploy/claw/Dockerfile.fixtures");
+    expect(fixtureImage).toContain(
+      "FROM ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e",
+    );
+    expect(fixtureImage).toMatch(/^HEALTHCHECK --interval=/mu);
+    expect(fixtureImage).toContain('TemporaryFile(dir="/ci-fixtures")');
+    expect(runner).toContain("ci_image=scrum530-native-fixtures-v2");
+    expect(runner).toContain(
+      "ci_image_id=sha256:b371f78cb15b7f49d9ccd83d933b2e7d047ea3e0838f9f8a2767b65c55138dae",
+    );
+    expect(runner).toContain('test "$effective_id" = "$ci_image_id"');
+    expect(runner).toContain('test "$effective_ref" = "$ci_image_id"');
+    expect(runner).toContain(
+      'test "$actual_fixture_image" = "$CLAW_CI_FIXTURE_IMAGE_ID"',
+    );
+    expect(read("deploy/claw/compose.ci-fixtures.yaml")).toContain(
+      'image: "${CLAW_CI_FIXTURE_IMAGE_ID:?CI fixture image ID is required}"',
+    );
+  });
+
   it("runs every database suite once without a repeat adapter", () => {
     const runner = read("scripts/run-claw-ci.sh");
     expect(runner).not.toContain("pnpm test:repeat");
