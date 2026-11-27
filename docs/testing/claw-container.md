@@ -26,6 +26,13 @@ service. The native release rehearsal alone reuses one persistent
 instances retain their existing isolation policy. Production tables and credentials are
 never exposed to the test process.
 
+For direct CI, set `memswap_limit: 4g` on the test service in the active
+Claw Compose configuration. This sets the combined RAM and swap ceiling.
+Keep the existing RAM limit at 1 GiB. On 2026-11-27 the single TypeScript
+test project checked 3,432 files with TypeScript 5.9.3 and used 1.50 GiB of
+swap at peak. The CI step gives Node a 3 GiB heap and runs the complete
+`pnpm typecheck`, including the workspace packages and the test project.
+
 The image pins Node 24.18.0, pnpm 11.9.0, and Docker CLI 29.7.0, loads no production env
 file or application credential, and resolves the app-stack proxy to a numeric address
 before creating its runtime-only proxy configuration. Evidence is

@@ -1258,7 +1258,7 @@ const approvedAutomationArtifactHashes = new Map([
     // truncated, and wrapped the release gate body in step() so the artifact build is
     // recorded with an exit code and a duration. Registered in the same change as the runner.
     "scripts/run-claw-ci.sh",
-    "f13156903af574dd30e6c9a5d174adfa13311dfbb428aeba6315395784da03cc",
+    "23e2ea0bb341cce09e4f06a5b5b3238fb3747702b817d8089be02f00e31816d3",
   ],
   [
     "scripts/build-native-release.sh",
