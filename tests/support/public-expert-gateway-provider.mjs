@@ -340,11 +340,13 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
           "docker",
           [
             "exec",
+            "--env",
+            "PGPASSWORD",
             container,
-            "sh",
-            "-ec",
-            'export PGPASSWORD="$POSTGRES_PASSWORD"; exec psql -XAtw -c "select 1" "$@"',
-            "sh",
+            "psql",
+            "-XAtw",
+            "-c",
+            "select 1",
             "-h",
             "127.0.0.1",
             "-p",
@@ -354,7 +356,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends libfaketime
             "-d",
             "journey",
           ],
-          { stdio: "pipe" },
+          { stdio: "pipe", env: { ...process.env, PGPASSWORD: password } },
         );
         break;
       } catch (error) {

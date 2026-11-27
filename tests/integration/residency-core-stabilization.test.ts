@@ -25,6 +25,7 @@ import {
 import { seedClientConsent } from "../../packages/db/src/testkit/client-consent.js";
 import { createExpertCardService } from "../../packages/application/src/expert-card-service.js";
 
+const workWebhookSecret = randomUUID();
 const promoScope = { botId: "717171", botKey: "core-promo" };
 const workScope = { botId: "818181", botKey: "core-work" };
 const hash = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -275,7 +276,7 @@ async function workHttp(
   });
   const app = Fastify({ logger: false });
   await app.register(telegramWebhookRoutes, {
-    secret: "synthetic-core-webhook-secret",
+    secret: workWebhookSecret,
     clientIngressEnabled: false,
     clientHybridRoutingEnabled: false,
     clientBotKey: "disabled-client",
@@ -294,7 +295,7 @@ async function workHttp(
     expertCardEnabled: true,
     expertCard: {
       ...{ workBotId: workScope.botId, workBotKey: workScope.botKey },
-      webhookSecret: "synthetic-core-webhook-secret",
+      webhookSecret: workWebhookSecret,
       service,
       legacyReplay: { read: async () => "absent" },
       ...(answerTagCallback ? { answerTagCallback } : {}),
@@ -698,7 +699,7 @@ describe("residency core stabilization PG17.5", () => {
         method: "POST",
         url: "/v1/webhooks/telegram",
         headers: {
-          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+          "x-telegram-bot-api-secret-token": workWebhookSecret,
         },
         payload,
       });
@@ -879,8 +880,7 @@ print(json.dumps({'pdf':base64.b64encode(pdf.tobytes()).decode(),'docx':base64.b
             method: "POST",
             url: "/v1/webhooks/telegram",
             headers: {
-              "x-telegram-bot-api-secret-token":
-                "synthetic-core-webhook-secret",
+              "x-telegram-bot-api-secret-token": workWebhookSecret,
             },
             payload: {
               update_id: ++sequence,
@@ -936,7 +936,7 @@ print(json.dumps({'pdf':base64.b64encode(pdf.tobytes()).decode(),'docx':base64.b
         method: "POST",
         url: "/v1/webhooks/telegram",
         headers: {
-          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+          "x-telegram-bot-api-secret-token": workWebhookSecret,
         },
         payload: {
           update_id: ++sequence,
@@ -1225,7 +1225,7 @@ print(json.dumps({'pdf':base64.b64encode(pdf.tobytes()).decode(),'docx':base64.b
         method: "POST",
         url: "/v1/webhooks/telegram",
         headers: {
-          "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+          "x-telegram-bot-api-secret-token": workWebhookSecret,
         },
         payload,
       });
@@ -1401,7 +1401,7 @@ print(json.dumps({'pdf':base64.b64encode(pdf.tobytes()).decode(),'docx':base64.b
           method: "POST",
           url: "/v1/webhooks/telegram",
           headers: {
-            "x-telegram-bot-api-secret-token": "synthetic-core-webhook-secret",
+            "x-telegram-bot-api-secret-token": workWebhookSecret,
           },
           payload,
         });

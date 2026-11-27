@@ -74,7 +74,7 @@ beforeAll(async () => {
     }
   }
   const wrongPasswordUrl = new URL(connectionString);
-  wrongPasswordUrl.password = "incorrect-fixture-password";
+  wrongPasswordUrl.password = randomBytes(16).toString("hex");
   const unauthenticated = createDb(wrongPasswordUrl.toString(), {
     max: 1,
     connectionTimeoutMillis: 1000,
