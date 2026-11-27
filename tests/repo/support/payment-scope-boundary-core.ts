@@ -1312,7 +1312,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "deploy/claw/compose.ci-fixtures.yaml",
-    "49ee4fbe52dacaebe9a390482185ae27b6614d32572d2a13d8f8d8b6834632e3",
+    "a01c8313d1fa5794893e6d1b2deb6b2846a68cd914bb94956e4bbfaf23539d57",
   ],
   // Host-side Claw drivers. They were the single unversioned copy of the test ladder that
   // repeats a suite and uses the container's proxy egress - neither of which

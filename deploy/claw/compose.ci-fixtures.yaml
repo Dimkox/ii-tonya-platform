@@ -4,3 +4,5 @@ services:
     pull_policy: never
     tmpfs:
       - /ci-fixtures:rw,exec,nosuid,nodev,size=256m,uid=1000,gid=1000,mode=0700
+      - /var/lib/nginx:rw,nosuid,nodev,noexec,size=32m,uid=1000,gid=1000,mode=0700
+      - /var/log/nginx:rw,nosuid,nodev,noexec,size=4m,uid=1000,gid=1000,mode=0700
