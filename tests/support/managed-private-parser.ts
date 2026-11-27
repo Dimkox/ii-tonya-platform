@@ -9,7 +9,8 @@ import {
   rm,
   stat,
 } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
+import { hostname } from "node:os";
 import { randomUUID } from "node:crypto";
 
 const execute = promisify(execFile);
@@ -25,6 +26,29 @@ async function docker(args: string[], phase: string, timeout = 30_000) {
   } catch {
     throw new Error(`managed_private_parser_${phase}_failed`);
   }
+}
+
+async function dockerSocketDirectory(directory: string) {
+  const hostRoot = process.env.CLAW_HOST_SOURCE_ROOT;
+  if (hostRoot === undefined) return directory;
+  if (process.cwd() !== "/workspace/source" || resolve(hostRoot) !== hostRoot)
+    throw new Error("managed_private_parser_source_mount_mismatch");
+  // The sibling parser's bind source is resolved by the host daemon. Only accept
+  // the checkout which the daemon actually mounted into this CI container.
+  const { stdout } = await docker(
+    [
+      "inspect",
+      "--type",
+      "container",
+      "--format",
+      '{{range .Mounts}}{{if and (eq .Type "bind") (eq .Destination "/workspace/source")}}{{.Source}}{{end}}{{end}}',
+      hostname(),
+    ],
+    "source_mount",
+  );
+  if (stdout !== `${hostRoot}\n`)
+    throw new Error("managed_private_parser_source_mount_mismatch");
+  return join(hostRoot, relative(process.cwd(), directory));
 }
 
 /** Linux-only real parser fixture; owns its image, container and socket directory. */
@@ -87,6 +111,7 @@ export async function startManagedPrivateParserFixture() {
       );
   };
   try {
+    const bindDirectory = await dockerSocketDirectory(socketDirectory);
     await mkdir(context, { mode: 0o700 });
     await mkdir(socketDirectory, { mode: 0o700 });
     for (const file of ["requirements.txt", "helper.py", "socket_server.py"])
@@ -131,7 +156,7 @@ export async function startManagedPrivateParserFixture() {
         "--user",
         `${uid}:${gid}`,
         "--mount",
-        `type=bind,source=${socketDirectory},target=/run/private-parser`,
+        `type=bind,"source=${bindDirectory.replaceAll('"', '""')}",target=/run/private-parser`,
         "--tmpfs",
         "/tmp:size=8m,mode=1777,noexec,nosuid",
         image,

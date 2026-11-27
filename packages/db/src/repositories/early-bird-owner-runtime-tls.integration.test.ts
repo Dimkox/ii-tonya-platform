@@ -14,6 +14,7 @@ import { sql } from "drizzle-orm";
 import { createDb, type DrizzleDb } from "../client.js";
 import { startExpertReferralTestDatabase } from "../testkit/expert-referral.js";
 import { startPublicExpertFuturePostgres } from "../../../../tests/support/public-expert-gateway-provider.mjs";
+import { startTestPsqlClient } from "../../../../tests/support/test-docker-runner.mjs";
 import { buildEarlyBirdRoleProvisioningSql } from "../../../../scripts/provision-early-bird-runtime-roles.mjs";
 import { createEarlyBirdOwnerJourney } from "../testkit/early-bird-owner-journey.js";
 import { createEarlyBirdOwnerRuntimeComposition } from "../../../../apps/api/src/expert-early-bird-runtime-composition.js";
@@ -23,7 +24,7 @@ import { openEarlyBirdOwnerRequest } from "../../../integrations/src/yookassa/ea
 
 let f: Awaited<ReturnType<typeof createEarlyBirdOwnerJourney>> | undefined;
 let child: ChildProcessWithoutNullStreams | undefined;
-let clientContainer: string | undefined;
+let psqlClient: Awaited<ReturnType<typeof startTestPsqlClient>> | undefined;
 let temp: string | undefined;
 const principalPools: DrizzleDb[] = [];
 let database:
@@ -45,8 +46,7 @@ afterAll(async () => {
     });
   }
   await Promise.all(principalPools.map((db) => db.$client.end()));
-  if (clientContainer)
-    execFileSync("docker", ["rm", "-f", clientContainer], { stdio: "ignore" });
+  psqlClient?.stop();
   if (temp) rmSync(temp, { recursive: true, force: true });
   try {
     await database?.stop();
@@ -197,30 +197,9 @@ it("runs approved owner checkout through PG admission, authenticated IPC, real T
     `${url.hostname}:${url.port}:${url.pathname.slice(1)}:runtime_gateway:${gatewayPassword}\n`,
     { mode: 0o600 },
   );
-  clientContainer = execFileSync(
-    "docker",
-    [
-      "run",
-      "-d",
-      "--network=host",
-      "--mount",
-      `type=bind,src=${temp},dst=${temp},readonly`,
-      "postgres:17.5-bookworm",
-      "sleep",
-      "infinity",
-    ],
-    { encoding: "utf8" },
-  ).trim();
-  if (!/^[a-f0-9]{64}$/u.test(clientContainer))
-    throw new Error("invalid test container");
-  const wrapper = join(temp, "psql");
-  writeFileSync(
-    wrapper,
-    `#!/bin/sh\nexec /usr/bin/docker exec -i -e PGSERVICE -e PGSERVICEFILE -e PGPASSFILE ${clientContainer} /usr/bin/psql "$@"\n`,
-    { mode: 0o700 },
-  );
+  psqlClient = await startTestPsqlClient(temp);
   const readinessOutput = execFileSync(
-    wrapper,
+    psqlClient.psqlPath,
     ["-X", "-qAt", "-v", "ON_ERROR_STOP=1"],
     {
       input: readinessSQL,
@@ -279,7 +258,7 @@ from provider_reader import ProviderReader as OriginalProviderReader
 def local_provider_reader(merchant_auth,**options):return OriginalProviderReader(merchant_auth,factory=reader_connection,**options)
 state=os.path.join(base,'state');os.mkdir(state,0o700)
 initial=DurableState(state);initial.close()
-authority=PgAuthority(psql_path=os.path.join(base,'psql'),service='fixture',service_file=os.path.join(base,'service'),pass_file=os.path.join(base,'pass'),timeout=8)
+authority=PgAuthority(psql_path=sys.argv[4],service='fixture',service_file=os.path.join(base,'service'),pass_file=os.path.join(base,'pass'),timeout=8)
 runtime=BoundGateway(state,authority=authority,require_existing=True)
 if not runtime.resume_from_authority():raise RuntimeError('gateway authority readiness failed')
 registry=NonceRegistry.initialize(os.path.join(base,'nonce'),b'a'*32)
@@ -296,7 +275,14 @@ registry.close();runtime.close();httpd.shutdown();httpd.server_close();test_gate
 `;
   child = spawn(
     "python3",
-    ["-c", program, temp, address.slice(1), String(clock.offsetSeconds)],
+    [
+      "-c",
+      program,
+      temp,
+      address.slice(1),
+      String(clock.offsetSeconds),
+      psqlClient.psqlPath,
+    ],
     {
       stdio: ["pipe", "pipe", "pipe"],
     },

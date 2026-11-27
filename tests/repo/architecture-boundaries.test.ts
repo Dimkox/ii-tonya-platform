@@ -1,22 +1,28 @@
 import { globSync, readFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { describe, expect, it } from "vitest";
 import { findProjectionImportViolations } from "./support/projection-architecture-boundary.js";
 
 describe("projection architecture boundary", () => {
-  it("allows projection imports only in worker delivery composition", () => {
-    const violations: string[] = [];
-    for (const file of globSync(["apps/**/*.ts", "packages/**/*.ts"], {
-      exclude: ["**/dist/**", "**/*.test.ts", "**/*.testkit.ts"],
-    })) {
-      violations.push(
-        ...findProjectionImportViolations({
+  const filesByDirectory: Record<string, string[]> = {};
+  for (const file of globSync(["apps/**/*.ts", "packages/**/*.ts"], {
+    exclude: ["**/dist/**", "**/*.test.ts", "**/*.testkit.ts"],
+  })) {
+    (filesByDirectory[dirname(file)] ??= []).push(file);
+  }
+
+  it.each(Object.entries(filesByDirectory))(
+    "allows projection imports only in worker delivery composition (%s)",
+    (_directory, files) => {
+      const violations = files.flatMap((file) =>
+        findProjectionImportViolations({
           path: file,
           content: readFileSync(file, "utf8"),
         }),
       );
-    }
-    expect(violations).toEqual([]);
-  });
+      expect(violations).toEqual([]);
+    },
+  );
 
   it.each([
     [

@@ -1,11 +1,22 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { access, stat } from "node:fs/promises";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import { createIsolatedDocumentParser } from "../../packages/integrations/src/documents/isolated-document-parser.js";
 import { startManagedPrivateParserFixture } from "./managed-private-parser.js";
 
 const execute = promisify(execFile);
+
+it("rejects a Claw source directory that is not the current Docker bind", async () => {
+  vi.stubEnv("CLAW_HOST_SOURCE_ROOT", "/unrelated-parser-checkout");
+  try {
+    await expect(startManagedPrivateParserFixture()).rejects.toThrow(
+      "managed_private_parser_source_mount_mismatch",
+    );
+  } finally {
+    vi.unstubAllEnvs();
+  }
+}, 180_000);
 
 it("owns a real isolated parser fixture and removes its Docker and filesystem resources", async () => {
   const fixture = await startManagedPrivateParserFixture();

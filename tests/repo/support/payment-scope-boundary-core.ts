@@ -1258,7 +1258,7 @@ const approvedAutomationArtifactHashes = new Map([
     // truncated, and wrapped the release gate body in step() so the artifact build is
     // recorded with an exit code and a duration. Registered in the same change as the runner.
     "scripts/run-claw-ci.sh",
-    "23e2ea0bb341cce09e4f06a5b5b3238fb3747702b817d8089be02f00e31816d3",
+    "845d8233d33aa89484dc6424c2a9097ae06df5933071e68bb6c0760b5f86ef98",
   ],
   [
     "scripts/build-native-release.sh",
@@ -1305,6 +1305,14 @@ const approvedAutomationArtifactHashes = new Map([
   [
     "deploy/claw/dockerfile.test.dockerignore",
     "a1f042b49a3c339792d3dc7f0c7202af94bfd2ce77a5f0f08384367b687dbaea",
+  ],
+  [
+    "deploy/claw/dockerfile.fixtures",
+    "711916f3a2434fea3e448474d4af57b0bc1d1ec692d2f9f2ff29d9bdf5f22001",
+  ],
+  [
+    "deploy/claw/compose.ci-fixtures.yaml",
+    "a01c8313d1fa5794893e6d1b2deb6b2846a68cd914bb94956e4bbfaf23539d57",
   ],
   // Host-side Claw drivers. They were the single unversioned copy of the test ladder that
   // repeats a suite and uses the container's proxy egress - neither of which

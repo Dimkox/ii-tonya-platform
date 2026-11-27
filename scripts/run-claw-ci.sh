@@ -43,6 +43,16 @@ test_image_ref="ii-tonya-test:$test_image"
 expected_test_image_id=sha256:e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b430693ab7831b0a6892
 test -d "$claw_store"
 test "$(docker image inspect "$test_image_ref" --format '{{.Id}}')" = "$expected_test_image_id"
+if [[ "$mode" == ci ]]; then
+  ci_image=scrum530-native-fixtures-v2
+  ci_image_id=sha256:b371f78cb15b7f49d9ccd83d933b2e7d047ea3e0838f9f8a2767b65c55138dae
+  effective_id=$(docker image inspect "ii-tonya-test:$ci_image" --format '{{.Id}}')
+  test "$effective_id" = "$ci_image_id"
+  export CLAW_CI_FIXTURE_IMAGE_ID="$effective_id"
+  export COMPOSE_FILE="${COMPOSE_FILE:-$compose_root/docker-compose.yml}:$source_root/deploy/claw/compose.ci-fixtures.yaml"
+  effective_ref=$(cd "$compose_root" && II_TONYA_SOURCE_SHA="$test_image" docker compose --profile test config --images ii-tonya-test)
+  test "$effective_ref" = "$ci_image_id"
+fi
 claw_syft=""
 if [[ "$mode" == release ]]; then
   claw_syft="$(bash "$source_root/scripts/provision-claw-syft.sh")"
@@ -98,6 +108,16 @@ cat > "$container_script" <<'SCRIPT'
 set -Eeuo pipefail
 cd /workspace/source
 export CI=true
+if [[ "$CLAW_GATE_MODE" == ci ]]; then
+  # Recovery tests execute their generated service stubs. Keep /tmp mounted noexec.
+  export TMPDIR=/ci-fixtures
+  test "$(findmnt -n -o FSTYPE "$TMPDIR")" = tmpfs
+  test "$(stat -c '%u:%a' "$TMPDIR")" = "$(id -u):700"
+  actual_fixture_image=$(docker container inspect --format '{{.Image}}' "$(hostname)")
+  test "$actual_fixture_image" = "$CLAW_CI_FIXTURE_IMAGE_ID"
+  export XDG_CONFIG_HOME="$TMPDIR/config" XDG_DATA_HOME="$TMPDIR/data" XDG_CACHE_HOME="$TMPDIR/cache"
+  mkdir -m 0700 "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_CACHE_HOME"
+fi
 
 # Evidence goes into the mounted source tree so that a gate which dies half-way still
 # leaves a checkable bundle instead of silence.
@@ -133,6 +153,7 @@ step() {
 {
   printf 'source_sha=%s\n' "$CLAW_SOURCE_SHA"
   printf 'gate_mode=%s\n' "$CLAW_GATE_MODE"
+  if [[ "$CLAW_GATE_MODE" == ci ]]; then printf 'ci_fixture_image_id=%s\n' "$actual_fixture_image"; fi
   printf 'container_hostname=%s\n' "$(hostname -s)"
   printf 'node=%s\n' "$(node --version)"
   printf 'pnpm=%s\n' "$(pnpm --version)"
@@ -271,7 +292,7 @@ chmod 0700 "$container_script"
 started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 cd "$compose_root"
 compose_args=(
-  --profile test run --rm --no-deps
+  --profile test run --rm --no-deps --pull never
   -e CI=true
   -e "CLAW_GATE_MODE=$mode"
   -e "CLAW_SOURCE_SHA=$source_sha"
@@ -286,6 +307,9 @@ compose_args=(
 )
 if [[ -n "$claw_syft" ]]; then
   compose_args+=( -v "$claw_syft:/usr/local/bin/syft:ro" )
+fi
+if [[ "$mode" == ci ]]; then
+  compose_args+=( -e "CLAW_CI_FIXTURE_IMAGE_ID=$effective_id" )
 fi
 if [[ "$mode" == client-booking ]]; then
   compose_args+=( -e II_TONYA_TEST_POSTGRES_ADMIN_URL )
