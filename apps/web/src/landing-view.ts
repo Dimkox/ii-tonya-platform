@@ -92,7 +92,7 @@ export function renderLanding(config: PublicConfig): string {
       <section class="section client-path" id="clients" aria-labelledby="clients-title" data-website-block="S06">
         <div class="section-heading"><h2 id="clients-title">Клиентам</h2><p>Начните с опубликованных услуг. Для просмотра каталога не нужно описывать личную ситуацию.</p></div>
         <h3>Планируемые возможности сопровождения</h3><p>Ниже — направления развития сервиса, а не обещание уже включённых функций. Фактическую доступность и условия уточняйте у команды.</p>
-        <ul class="category-grid" data-feature-status="planned">${copy.clientBenefits.map(([title, text]) => `<li><div><h4>${escapeHtml(title)}</h4><p>${escapeHtml(text)}</p></div></li>`).join("")}</ul>
+        <ul class="category-grid" data-feature-status="planned">${copy.clientBenefits.map(([title, text]) => `<li><div><h4>${escapeHtml(title)}</h4> <p>${escapeHtml(text)}</p></div></li>`).join("")}</ul>
         <p>Не отправляйте личную историю, сведения о здоровье, документы или данные других людей через публичный сайт.</p>
         <div class="hero-actions"><a class="button primary" href="/catalog">Посмотреть услуги</a><a class="button ghost" href="/account">Личный кабинет</a></div><p>Кабинет доступен после авторизации, если вход включён. Просмотр услуг не означает подтверждённую запись или оплату.</p>
       </section>

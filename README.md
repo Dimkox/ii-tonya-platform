@@ -103,7 +103,7 @@ CI and Database Gate run directly on Claw inside the constrained `ii-tonya-test`
 container, which imitates the dedicated server runtime without becoming a production
 deployment target. The current gate image is pinned to source
 `29993b4fe96facf8c07781833dc7f2d5f560aa7e` and immutable image ID
-`sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63`.
+`sha256:e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b430693ab7831b0a6892`.
 GitHub Actions provide hosted CI and Database Gate for this public repository.
 Direct Claw evidence is also written under `docs/test-evidence/claw/`.
 Final aggregate verification, independent reviews, and human/release approvals remain
