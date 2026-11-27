@@ -1308,7 +1308,7 @@ const approvedAutomationArtifactHashes = new Map([
   ],
   [
     "deploy/claw/dockerfile.fixtures",
-    "3e8ab8166e14bb6901ce74e9adf66800227ccaca0181c9abbd0bf8b63b29e743",
+    "711916f3a2434fea3e448474d4af57b0bc1d1ec692d2f9f2ff29d9bdf5f22001",
   ],
   [
     "deploy/claw/compose.ci-fixtures.yaml",
