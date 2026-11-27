@@ -1,21 +1,64 @@
+import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import {
-  startDisposableTestPostgres,
-  type TestDatabase,
-} from "../../../packages/db/src/testkit/postgres.js";
+import { getTestPostgresPorts } from "../../../tests/support/test-docker-runner.mjs";
 import { PostgresWorkerReceiptRetention } from "../../../packages/db/src/repositories/early-bird-worker-receipt-retention.js";
 import { requireDeferredPrincipal } from "../../../packages/db/src/repositories/early-bird-deferred-principal.js";
-import { createDb, closeDb } from "../../../packages/db/src/client.js";
+import {
+  closeDb,
+  createDb,
+  migrateDb,
+  type DrizzleDb,
+} from "../../../packages/db/src/client.js";
 import { createGatewayWorkerBootstrap } from "./gateway-worker-bootstrap.js";
 import type { RuntimeConfig } from "@ii-tonya/config";
-let fixture: TestDatabase;
+const roleCredential = randomBytes(24).toString("hex");
+let database: DrizzleDb;
+let container: string;
 let temp: string;
 beforeAll(async () => {
-  fixture = await startDisposableTestPostgres();
-  await fixture.migrate();
+  const ports = await getTestPostgresPorts();
+  const credential = randomBytes(24).toString("hex");
+  container = execFileSync(
+    "docker",
+    [
+      "run",
+      "-d",
+      ...ports.dockerArgs,
+      "-e",
+      "POSTGRES_PASSWORD",
+      "-e",
+      "POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256",
+      "postgres:17.5-bookworm",
+      "postgres",
+      ...ports.postgresArgs,
+    ],
+    {
+      encoding: "utf8",
+      timeout: 60_000,
+      env: { ...process.env, POSTGRES_PASSWORD: credential },
+    },
+  ).trim();
+  const url = new URL(
+    `postgresql://postgres@127.0.0.1:${ports.clientPort(container)}/postgres`,
+  );
+  url.password = credential;
+  database = createDb(url.toString(), { connectionTimeoutMillis: 1000 });
+  const deadline = Date.now() + 30_000;
+  for (;;) {
+    try {
+      await database.$client.query("select 1");
+      break;
+    } catch (error) {
+      if (Date.now() >= deadline) throw error;
+      await delay(200);
+    }
+  }
+  await migrateDb(database, "packages/db/migrations");
   for (const signature of [
     "public.early_bird_wave_retention_list(integer)",
     "public.early_bird_worker_review_list(uuid,integer)",
@@ -23,13 +66,13 @@ beforeAll(async () => {
     "public.early_bird_publication_worker(text,jsonb)",
     "public.early_bird_launch_kit_worker(text,jsonb)",
   ]) {
-    const present = await fixture.db.$client.query(
+    const present = await database.$client.query(
       "select to_regprocedure($1) is not null as present",
       [signature],
     );
     expect(present.rows[0]?.present).toBe(true);
   }
-  await fixture.db.$client.query(`
+  await database.$client.query(`
     create role ii_tonya_worker_review_source nologin noinherit;
     create role ii_tonya_deferred_account_writer nologin noinherit;
     do $$ begin if not exists (select 1 from pg_roles where rolname='ii_tonya_wave_final_call_worker') then create role ii_tonya_wave_final_call_worker nologin noinherit; end if; end $$;
@@ -45,18 +88,29 @@ beforeAll(async () => {
     grant execute on function early_bird_deferred_retention_list(integer),early_bird_deferred_retention_expire(uuid,uuid) to ii_tonya_worker_deferred_retention;
     grant execute on function early_bird_publication_worker(text,jsonb) to ii_tonya_wave_publication_worker;
     grant execute on function early_bird_launch_kit_worker(text,jsonb) to ii_tonya_wave_launch_kit_worker;
-    create role worker_review_source login password 'synthetic'; grant ii_tonya_worker_review_source to worker_review_source;
-    create role worker_review_prepare login password 'synthetic'; grant ii_tonya_deferred_account_writer to worker_review_prepare;
-    create role worker_final_call login password 'synthetic'; grant ii_tonya_wave_final_call_worker to worker_final_call;
-    create role worker_wave_retention login password 'synthetic'; grant ii_tonya_worker_wave_retention to worker_wave_retention;
-    create role worker_deferred_retention login password 'synthetic'; grant ii_tonya_worker_deferred_retention to worker_deferred_retention;
-    create role worker_publication login password 'synthetic'; grant ii_tonya_wave_publication_worker to worker_publication;
-    create role worker_launch_kit login password 'synthetic'; grant ii_tonya_wave_launch_kit_worker to worker_launch_kit;
+    create role worker_review_source login password '${roleCredential}'; grant ii_tonya_worker_review_source to worker_review_source;
+    create role worker_review_prepare login password '${roleCredential}'; grant ii_tonya_deferred_account_writer to worker_review_prepare;
+    create role worker_final_call login password '${roleCredential}'; grant ii_tonya_wave_final_call_worker to worker_final_call;
+    create role worker_wave_retention login password '${roleCredential}'; grant ii_tonya_worker_wave_retention to worker_wave_retention;
+    create role worker_deferred_retention login password '${roleCredential}'; grant ii_tonya_worker_deferred_retention to worker_deferred_retention;
+    create role worker_publication login password '${roleCredential}'; grant ii_tonya_wave_publication_worker to worker_publication;
+    create role worker_launch_kit login password '${roleCredential}'; grant ii_tonya_wave_launch_kit_worker to worker_launch_kit;
   `);
 }, 120000);
 afterAll(async () => {
-  if (temp) rmSync(temp, { recursive: true, force: true });
-  await fixture?.stop();
+  try {
+    if (temp) rmSync(temp, { recursive: true, force: true });
+  } finally {
+    try {
+      if (database) await closeDb(database);
+    } finally {
+      if (container)
+        execFileSync("docker", ["rm", "-fv", container], {
+          stdio: "ignore",
+          timeout: 60_000,
+        });
+    }
+  }
 }, 120000);
 it("starts the worker capabilities with seven distinct database logins and closes them", async () => {
   temp = mkdtempSync(join(tmpdir(), "worker-real-roles-"));
@@ -65,7 +119,7 @@ it("starts the worker capabilities with seven distinct database logins and close
     writeFileSync(p, value, { mode: 0o600 });
     return p;
   };
-  const initial = fixture.db.$client.options.connectionString!;
+  const initial = database.$client.options.connectionString!;
   const users = {
     reviewSource: "worker_review_source",
     reviewPrepare: "worker_review_prepare",
@@ -79,7 +133,7 @@ it("starts the worker capabilities with seven distinct database logins and close
     Object.entries(users).map(([name, login]) => {
       const url = new URL(initial);
       url.username = login;
-      url.password = "synthetic";
+      url.password = roleCredential;
       return [name, { login, urlFile: file(name, url.toString()) }];
     }),
   );
@@ -113,7 +167,7 @@ it("starts the worker capabilities with seven distinct database logins and close
   const bootstrap = await createGatewayWorkerBootstrap(config);
   const prepareUrl = new URL(initial);
   prepareUrl.username = users.reviewPrepare;
-  prepareUrl.password = "synthetic";
+  prepareUrl.password = roleCredential;
   const prepareDb = createDb(prepareUrl.toString());
   try {
     await prepareDb.transaction((tx) =>
