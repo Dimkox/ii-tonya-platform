@@ -10,7 +10,7 @@ git_source_sha="$SOURCE_SHA"
 source_archive_sha256="$(sha256sum "$SOURCE_ARCHIVE" | cut -d' ' -f1)"
 [[ "$git_source_sha" =~ ^[0-9a-f]{40}$ ]]
 test "$SOURCE_ARCHIVE_SHA" = "$source_archive_sha256"
-test "$(docker image inspect ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e --format '{{.Id}}')" = "sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63"
+test "$(docker image inspect ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e --format '{{.Id}}')" = "sha256:e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b430693ab7831b0a6892"
 
 build_root="${SANDBOX_BUILD_ROOT:-${TMPDIR:-/tmp}}"
 mkdir -p "$build_root"
