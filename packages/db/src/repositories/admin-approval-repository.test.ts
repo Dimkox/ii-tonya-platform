@@ -3,6 +3,7 @@ import {
   canonicalAdminPayload,
   canonicalAdminPayloadHash,
   requiredApprovalObjectType,
+  requiredApprovalRole,
 } from "./admin-approval-repository.js";
 
 describe("admin approval canonical payload", () => {
@@ -76,4 +77,9 @@ describe("admin approval object mappings", () => {
     );
     expect(requiredApprovalObjectType("package.grant")).toBeNull();
   });
+});
+
+it("requires security administrators for grant and revoke approvals", () => {
+  expect(requiredApprovalRole("owner_test_pricing.grant")).toBe("security_admin");
+  expect(requiredApprovalRole("owner_test_pricing.revoke")).toBe("security_admin");
 });

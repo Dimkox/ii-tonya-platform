@@ -21,6 +21,9 @@ overrides:
   glob@<14.0.2: 14.0.3
   minimatch@<11.0.1: 11.0.4
 
+patchedDependencies:
+  testcontainers@10.28.0: f5ffac87cd119b340e2da5792d36d779f7cb2e701181e536342a566c9b1796a5
+
 importers:
   .:
     devDependencies:
@@ -4890,7 +4893,7 @@ snapshots:
 
   "@testcontainers/postgresql@10.28.0(supports-color@7.2.0)":
     dependencies:
-      testcontainers: 10.28.0(supports-color@7.2.0)
+      testcontainers: 10.28.0(patch_hash=f5ffac87cd119b340e2da5792d36d779f7cb2e701181e536342a566c9b1796a5)(supports-color@7.2.0)
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -6199,7 +6202,7 @@ snapshots:
       - bare-abort-controller
       - react-native-b4a
 
-  testcontainers@10.28.0(supports-color@7.2.0):
+  testcontainers@10.28.0(patch_hash=f5ffac87cd119b340e2da5792d36d779f7cb2e701181e536342a566c9b1796a5)(supports-color@7.2.0):
     dependencies:
       "@balena/dockerignore": 1.0.2
       "@types/dockerode": 3.3.47

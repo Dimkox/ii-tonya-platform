@@ -48,3 +48,6 @@ minimumReleaseAgeExclude:
   - "@aws-sdk/token-providers@3.1157.0"
   - "@smithy/core@3.37.0"
   - "@smithy/node-http-handler@4.13.0"
+
+patchedDependencies:
+  testcontainers@10.28.0: patches/testcontainers@10.28.0.patch

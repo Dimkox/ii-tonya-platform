@@ -41,6 +41,9 @@ describe("direct Claw verification semantics", () => {
 
   it("runs CI and database gates directly on Claw without Actions context", () => {
     const runner = read("scripts/run-claw-ci.sh");
+    expect(runner).toContain(
+      "step typecheck env NODE_OPTIONS=--max-old-space-size=3072 pnpm typecheck",
+    );
     expect(runner).toContain("<ci|database|release|client-booking>");
     expect(runner).toContain(
       'source_root="$(realpath "${SOURCE_ROOT:?SOURCE_ROOT is required}")"',
@@ -68,7 +71,7 @@ describe("direct Claw verification semantics", () => {
       "test_image=29993b4fe96facf8c07781833dc7f2d5f560aa7e",
     );
     expect(runner).toContain(
-      "expected_test_image_id=sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63",
+      "expected_test_image_id=sha256:e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b430693ab7831b0a6892",
     );
     expect(runner).toContain(
       'test "$(docker image inspect "$test_image_ref" --format \'{{.Id}}\')" = "$expected_test_image_id"',
@@ -133,7 +136,7 @@ describe("direct Claw verification semantics", () => {
       "ii-tonya-test:29993b4fe96facf8c07781833dc7f2d5f560aa7e",
     );
     expect(builder).toContain(
-      "sha256:fd31ecb001fea3e4c6d044a420ce2b607586dfa4441ee98b3f7ae6e20abedd63",
+      "sha256:e85b16af3029a69ea6324bdcb5c6575d0486cc6ea7f3b430693ab7831b0a6892",
     );
   });
 
