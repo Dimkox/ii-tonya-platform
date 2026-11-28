@@ -5,12 +5,17 @@ import {
   lockClientConsentSubject,
 } from "./client-consent-authority.js";
 
+const courtesyGuideSlot = "waitlist:five-day-guide";
+
 /** Telegram target resolved only from the promo bot's own active private chat. */
 export interface ExpertPromoFunnelTarget {
   userId: string;
   chatId: string;
-  refCode?: string;
-  referralCount?: number;
+}
+
+interface ExpertPromoTimerTarget extends ExpertPromoFunnelTarget {
+  refCode: string;
+  referralCount: number;
 }
 
 /**
@@ -25,7 +30,7 @@ export class PostgresExpertPromoFunnelRepository {
       messagingConsentPolicyVersion: string;
     },
   ) {
-    if (!/^[A-Za-z0-9_-]{1,64}$/u.test(options.botKey))
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(options.botKey))
       throw new Error("expert_promo_funnel_configuration_required");
   }
 
@@ -50,28 +55,99 @@ export class PostgresExpertPromoFunnelRepository {
     );
   }
 
-  /** T03: claim earned guides (count>=2 already inserted the work row). */
+  /** A five-day offer can enqueue the same one-time guide as two referrals. */
+  async requestOfferedGuide(scope: {
+    botKey: string;
+    telegramUserId: string;
+    chatId: string;
+  }): Promise<"queued" | "delivered" | "unavailable"> {
+    const { botKey, telegramUserId, chatId } = scope;
+    if (botKey !== this.options.botKey || chatId !== telegramUserId)
+      return "unavailable";
+    return this.db.transaction(async (tx) => {
+      const user = (
+        await tx.execute<{ userId: string }>(sql`
+        select c.user_id "userId" from channel_identities c
+        join expert_promo_funnel_state f on f.user_id=c.user_id
+        where c.provider='telegram' and c.bot_key=${botKey} and c.status='active'
+          and c.external_chat_id=${chatId} and c.external_id=${telegramUserId}
+          and f.gift_sent_at is not null
+      `)
+      ).rows[0];
+      if (!user || !(await this.consented(tx, user.userId, chatId)))
+        return "unavailable";
+      const state = (
+        await tx.execute<{ status: string }>(sql`
+        select status from expert_promo_funnel_state
+        where user_id=${user.userId}::uuid and not opt_out_ref
+          and gift_sent_at >= message6_confirmed_at + interval '5 days'
+        for share skip locked
+      `)
+      ).rows[0];
+      if (!state) return "unavailable";
+      if (state.status === "REFERRAL_ACTIVE")
+        await tx.execute(sql`
+          insert into expert_promo_guide_work(user_id,content_slot)
+          values(${user.userId}::uuid,${courtesyGuideSlot}) on conflict(user_id) do nothing
+        `);
+      const work = (
+        await tx.execute<{ status: string }>(sql`
+        select status from expert_promo_guide_work where user_id=${user.userId}::uuid
+      `)
+      ).rows[0];
+      if (work?.status === "delivered") return "delivered";
+      if (work?.status === "waiting_content" || work?.status === "pending")
+        return "queued";
+      return "unavailable";
+    });
+  }
+
+  /** Claim each earned or explicitly requested guide once before transport. */
   async claimGuideDeliveries(input: {
     contentSlot: string;
     limit: number;
-  }): Promise<ExpertPromoFunnelTarget[]> {
+  }): Promise<(ExpertPromoFunnelTarget & { courtesy?: boolean })[]> {
     if (!/^[A-Za-z0-9:_./-]{1,200}$/u.test(input.contentSlot))
       throw new Error("expert_promo_guide_content_invalid");
     const limit = Math.max(1, Math.min(50, Math.trunc(input.limit)));
     return this.db.transaction(async (tx) => {
       const rows = (
-        await tx.execute<{ userId: string; chatId: string | null }>(
-          sql`select w.user_id "userId",${this.chat(sql`w.user_id`)} "chatId" from expert_promo_guide_work w join users u on u.id=w.user_id and u.active where w.status='waiting_content' order by w.created_at,w.user_id limit ${limit} for update of w skip locked`,
+        await tx.execute<{
+          userId: string;
+          chatId: string | null;
+          courtesy: boolean;
+        }>(
+          sql`select w.user_id "userId",${this.chat(sql`w.user_id`)} "chatId",
+            w.content_slot=${courtesyGuideSlot} as courtesy
+            from expert_promo_guide_work w join users u on u.id=w.user_id and u.active
+            where w.status='waiting_content' and (w.content_slot<>${courtesyGuideSlot} or exists(
+              select 1 from expert_promo_funnel_state f where f.user_id=w.user_id and not f.opt_out_ref
+            ) or exists(select 1 from expert_promo_bonus_indications b where b.user_id=w.user_id))
+            order by w.created_at,w.user_id limit ${limit} for update of w skip locked`,
         )
       ).rows;
-      const claimed: ExpertPromoFunnelTarget[] = [];
+      const claimed: (ExpertPromoFunnelTarget & { courtesy?: boolean })[] = [];
       for (const row of rows) {
         if (!row.chatId || !(await this.consented(tx, row.userId, row.chatId)))
           continue;
+        if (row.courtesy) {
+          // Opt-out may commit while the consent lock is being acquired.
+          const eligible = await tx.execute(sql`
+            select 1 from expert_promo_funnel_state f where f.user_id=${row.userId}::uuid
+            and (not f.opt_out_ref or exists(
+              select 1 from expert_promo_bonus_indications b where b.user_id=f.user_id
+            )) for share of f skip locked
+          `);
+          if (!eligible.rows.length) continue;
+        }
         await tx.execute(
           sql`update expert_promo_guide_work set status='pending',content_slot=${input.contentSlot} where user_id=${row.userId}::uuid and status='waiting_content'`,
         );
-        claimed.push({ userId: row.userId, chatId: row.chatId });
+        claimed.push({
+          userId: row.userId,
+          chatId: row.chatId,
+          ...(row.courtesy ? { courtesy: true } : {}),
+        });
       }
       return claimed;
     });
@@ -105,6 +181,23 @@ export class PostgresExpertPromoFunnelRepository {
     return r.rows[0]?.sent === true;
   }
 
+  /** Record Telegram's text receipt without reopening a claimed send for retry. */
+  async confirmFirstReminder(input: {
+    userId: string;
+    messageId: string;
+  }): Promise<boolean> {
+    if (!/^[1-9][0-9]{0,19}$/u.test(input.messageId)) return false;
+    const result = await this.db.execute(sql`
+      update expert_promo_funnel_state
+      set message6_confirmed_at=coalesce(message6_confirmed_at,clock_timestamp()),
+          message6_message_id=${input.messageId}
+      where user_id=${input.userId}::uuid and message6_sent_at is not null
+        and (message6_message_id is null or message6_message_id=${input.messageId})
+      returning user_id
+    `);
+    return result.rows.length === 1;
+  }
+
   /**
    * T04 timers: message 6 at 48h after code issue, gift 5d later. Each claim
    * rechecks status, opt-out, pdf_sent, count<2 and consent, then stamps the
@@ -113,7 +206,7 @@ export class PostgresExpertPromoFunnelRepository {
   async claimTimer(input: {
     kind: "message6" | "gift";
     limit: number;
-  }): Promise<ExpertPromoFunnelTarget[]> {
+  }): Promise<ExpertPromoTimerTarget[]> {
     const limit = Math.max(1, Math.min(50, Math.trunc(input.limit)));
     const marker = sql.raw(
       input.kind === "message6" ? "message6_sent_at" : "gift_sent_at",
@@ -129,17 +222,17 @@ export class PostgresExpertPromoFunnelRepository {
           refCode: string;
           referralCount: number;
         }>(
-          sql`select f.user_id "userId",${this.chat(sql`f.user_id`)} "chatId",i.ref_code "refCode",(select count(*)::int from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id and r.counts_for_inviter is distinct from false) "referralCount" from expert_promo_funnel_state f join expert_promo_codes i on i.user_id=f.user_id join users u on u.id=f.user_id and u.active where f.status='REFERRAL_ACTIVE' and not f.opt_out_ref and f.${marker} is null and (${sql.raw(input.kind === "message6" ? "f.code_issued_at" : "f.message6_sent_at")})<=clock_timestamp()-${age} and not exists(select 1 from expert_promo_guide_work w where w.user_id=f.user_id and w.status='delivered') and (select count(*) from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id and r.counts_for_inviter is distinct from false)<2 order by f.code_issued_at,f.user_id limit ${limit} for update of f skip locked`,
+          sql`select f.user_id "userId",${this.chat(sql`f.user_id`)} "chatId",i.ref_code "refCode",(select count(*)::int from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id and r.counts_for_inviter is distinct from false) "referralCount" from expert_promo_funnel_state f join expert_promo_codes i on i.user_id=f.user_id join users u on u.id=f.user_id and u.active where f.status='REFERRAL_ACTIVE' and not f.opt_out_ref and f.${marker} is null and (${sql.raw(input.kind === "message6" ? "f.code_issued_at" : "f.message6_confirmed_at")})<=clock_timestamp()-${age} and not exists(select 1 from expert_promo_guide_work w where w.user_id=f.user_id and w.status='delivered') and (select count(*) from expert_promo_registrations r join users ru on ru.id=r.user_id and ru.active where r.referrer_user_id=f.user_id and r.counts_for_inviter is distinct from false)<2 order by f.code_issued_at,f.user_id limit ${limit} for update of f skip locked`,
         )
       ).rows;
-      const claimed: ExpertPromoFunnelTarget[] = [];
+      const claimed: ExpertPromoTimerTarget[] = [];
       for (const row of rows) {
         if (!row.chatId || !(await this.consented(tx, row.userId, row.chatId)))
           continue;
         await tx.execute(
           sql`update expert_promo_funnel_state set ${marker}=clock_timestamp() where user_id=${row.userId}::uuid and ${marker} is null`,
         );
-        claimed.push({ userId: row.userId, chatId: row.chatId });
+        claimed.push({ ...row, chatId: row.chatId });
       }
       return claimed;
     });

@@ -11,15 +11,15 @@ const journal = JSON.parse(
 
 describe("expert service offer migration", () => {
   it("journals 0091 after the planerka purge migration", () => {
-    expect(journal.entries.at(-1)).toMatchObject({
+    expect(journal.entries[91]).toMatchObject({
       idx: 91,
       tag: "0091_expert_service_offer",
       when: 1793152800022,
     });
-    expect(journal.entries.at(-1)!.when).toBeGreaterThan(
-      journal.entries.at(-2)!.when,
+    expect(journal.entries[91]!.when).toBeGreaterThan(
+      journal.entries[90]!.when,
     );
-    expect(journal.entries.at(-2)!.tag).toBe("0090_planerka_test_purge");
+    expect(journal.entries[90]!.tag).toBe("0090_planerka_test_purge");
   });
 
   it("adds nullable display facts and rejects a negative price or unknown format in the database", () => {

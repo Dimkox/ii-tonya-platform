@@ -55,7 +55,7 @@ describe("B1 schema/migration parity", () => {
         breakpoints: true,
       },
     ]);
-    expect(journal.entries.slice(-5)).toEqual([
+    expect(journal.entries.slice(-6)).toEqual([
       {
         idx: 87,
         version: "7",
@@ -89,6 +89,13 @@ describe("B1 schema/migration parity", () => {
         version: "7",
         when: 1793152800022,
         tag: "0091_expert_service_offer",
+        breakpoints: true,
+      },
+      {
+        idx: 92,
+        version: "7",
+        when: 1793152800023,
+        tag: "0092_expert_promo_reminder_receipt",
         breakpoints: true,
       },
     ]);

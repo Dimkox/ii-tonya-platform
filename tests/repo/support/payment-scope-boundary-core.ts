@@ -2685,7 +2685,7 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/_journal.json",
-    "0f841c13ecb950393535a147665552e25613ad49fefd6f05ad43932565b70b8d",
+    "7df35fbf8206314575dff0e0e2236dd9c821297dea0812d265d4465efb369b50",
   ],
   [
     "packages/db/migrations/0091_expert_service_offer.sql",
@@ -2694,6 +2694,22 @@ const approvedMigrationHashes = new Map([
   [
     "packages/db/migrations/meta/0091_snapshot.json",
     "38f30fea2c6ad252159bc978db38b95af3105a1b6d18ae26348b2a55af9c673d",
+  ],
+  [
+    "packages/db/migrations/0092_expert_promo_reminder_receipt.sql",
+    "7d6fdf64b179bc507d7f50a6a617f3c74694c9df88290dc35081928b56f89fb4",
+  ],
+  [
+    "packages/db/migrations/meta/0092_snapshot.json",
+    "b4b893e381ae1971a9e6550cf9ba33435bb16463ed4753e8dff19607dd3e9331",
+  ],
+  [
+    "packages/db/migrations/state/0092_manifest.json",
+    "ba83ae2ef40ca683d908a8e3dc3ccd262612c5adb559929774af35affb01426f",
+  ],
+  [
+    "packages/db/migrations/state/0092_sql_objects.json",
+    "7378c36096de124fe6d41f473822fe1af3984d2781c25f916ebbfa0a1c397d13",
   ],
 ]);
 const approvedDatabaseRelations = new Set([
@@ -3894,6 +3910,8 @@ export function isApprovedLargeScopeArtifact(
   read: () => string,
 ): boolean {
   const approvedSizes = new Map<string, number>([
+    ["packages/db/migrations/meta/0092_snapshot.json", 1205628],
+    ["packages/db/migrations/state/0092_sql_objects.json", 1896391],
     ["packages/db/migrations/meta/0091_snapshot.json", 1204804],
     ["packages/db/migrations/state/0091_sql_objects.json", 1895463],
     ["packages/db/migrations/meta/0090_snapshot.json", 1166334],

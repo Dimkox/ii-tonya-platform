@@ -3,7 +3,7 @@ import {
   decideFirstAttribution,
 } from "@ii-tonya/domain";
 import { saveExpertOfferProfileInTransaction } from "./expert-offer-v2.js";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { PostgresExpertCampaignQuoteRepository } from "./expert-campaign-quote-repository.js";
 import { PostgresConsentEvidenceRepository } from "./consent-evidence-repository.js";
@@ -63,6 +63,38 @@ function command(input: ExpertPromoCommand) {
   )
     fail("promo_invalid_request");
   return copy;
+}
+
+function readPromoCode(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (
+    typeof value !== "string" ||
+    !/^(?:promo_[0-9a-f]{32}|REF_[0-9a-fA-F]{12})$/u.test(value)
+  )
+    return fail("promo_invalid_request");
+  return value;
+}
+
+async function canonicalPromoCode(tx: Executor, code: string | undefined) {
+  if (!code?.startsWith("REF_")) return code;
+  // Registration UUIDs survive erasure. A shared historical prefix must never change owners.
+  const { rows } = await tx.execute<{ refCode: string | null }>(
+    sql`select c.ref_code as "refCode" from expert_promo_registrations r
+        left join expert_promo_codes c on c.user_id=r.user_id
+        where upper(substr(replace(r.user_id::text,'-',''),1,12))=${code.slice(4).toUpperCase()}
+        limit 2`,
+  );
+  const owner = rows[0];
+  if (rows.length !== 1 || !owner?.refCode)
+    return fail("promo_invalid_request");
+  return owner.refCode;
+}
+
+async function activePromoCodeOwner(tx: Executor, refCode: string) {
+  const { rows } = await tx.execute<{ userId: string }>(
+    sql`select c.user_id as "userId" from expert_promo_codes c join users u on u.id=c.user_id and u.active=true where c.ref_code=${refCode} for share of c,u`,
+  );
+  return rows[0]?.userId ?? null;
 }
 
 export class PostgresExpertPromoRepository {
@@ -267,15 +299,11 @@ export class PostgresExpertPromoRepository {
     return row?.active === true;
   }
   async register(
-    raw: ExpertPromoCommand & { refCode?: string },
+    raw: ExpertPromoCommand & { refCode?: string; directStart?: true },
   ): Promise<ExpertPromoRegistration> {
     const input = command(raw);
-    let refCode = raw.refCode;
-    if (
-      refCode !== undefined &&
-      (typeof refCode !== "string" || !/^promo_[0-9a-f]{32}$/u.test(refCode))
-    )
-      fail("promo_invalid_request");
+    const requestedCode = readPromoCode(raw.refCode);
+    const directStart = raw.directStart === true && requestedCode === undefined;
     const identityDigest = digest(`telegram:${input.telegramUserId}`);
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`set local statement_timeout='2000ms'`);
@@ -291,6 +319,7 @@ export class PostgresExpertPromoRepository {
       );
       const replay = await this.replay(tx, input, userId, "register");
       if (replay) return this.status(tx, userId, true);
+      let refCode = await canonicalPromoCode(tx, requestedCode);
       const enrollment = (
         await tx.execute<{ refCode: string | null }>(
           sql`select ref_code as "refCode" from expert_promo_enrollments where user_id=${userId}::uuid and status='granted'`,
@@ -318,19 +347,21 @@ export class PostgresExpertPromoRepository {
           fail("promo_attribution_locked");
         refCode = enrollment.refCode;
       }
-      let requestedInviterId: string | null = null;
-      if (refCode) {
-        const owner = (
-          await tx.execute<{ userId: string }>(
-            sql`select c.user_id as "userId" from expert_promo_codes c join users u on u.id=c.user_id and u.active=true where c.ref_code=${refCode} for share of c,u`,
-          )
-        ).rows[0];
-        if (!owner) fail("promo_code_unavailable");
-        requestedInviterId = owner!.userId;
-        if (requestedInviterId === userId) fail("promo_self_referral");
-        if (prior && prior.referrerId !== requestedInviterId)
-          fail("promo_attribution_locked");
+      const requestedInviterId = refCode
+        ? await activePromoCodeOwner(tx, refCode)
+        : null;
+      if (refCode && !requestedInviterId) {
+        if (!directStart) return fail("promo_code_unavailable");
+        // Only a first, explicitly unreferred registration may discard a stale candidate.
+        refCode = undefined;
       }
+      if (requestedInviterId === userId) fail("promo_self_referral");
+      if (
+        requestedInviterId &&
+        prior &&
+        prior.referrerId !== requestedInviterId
+      )
+        fail("promo_attribution_locked");
       const decision = decideFirstAttribution({
         referredId: userId,
         requestedInviterId,
@@ -391,20 +422,20 @@ export class PostgresExpertPromoRepository {
           )
         ).rows[0]!.count;
         if (count >= 2) {
-          const created = (
-            await tx.execute<{ userId: string }>(
-              sql`insert into expert_promo_guide_work(user_id,content_slot) values(${rewardInviterId}::uuid,'TODO: Wait for PDF') on conflict do nothing returning user_id as "userId"`,
+          await tx.execute(
+            sql`insert into expert_promo_guide_work(user_id,content_slot)
+                values(${rewardInviterId}::uuid,'TODO: Wait for PDF') on conflict(user_id) do nothing`,
+          );
+          // A five-day gift can already have created this delivery before it was earned.
+          await tx.execute(sql`
+            with earned_work as (
+              select user_id from expert_promo_guide_work
+              where user_id=${rewardInviterId}::uuid and ready_log_event_id is null for update
+            ), ready_event as (
+              insert into expert_promo_ready_logs(event) select 'Ready to send' from earned_work returning id
             )
-          ).rows[0];
-          if (created) {
-            const eventId = randomUUID();
-            await tx.execute(
-              sql`insert into expert_promo_ready_logs(id,event) values(${eventId}::uuid,'Ready to send')`,
-            );
-            await tx.execute(
-              sql`update expert_promo_guide_work set ready_log_event_id=${eventId}::uuid where user_id=${rewardInviterId}::uuid`,
-            );
-          }
+            update expert_promo_guide_work w set ready_log_event_id=e.id
+            from earned_work, ready_event e where w.user_id=earned_work.user_id`);
           await tx.execute(
             sql`insert into expert_promo_bonus_indications(user_id) values(${rewardInviterId}::uuid) on conflict do nothing`,
           );
@@ -522,30 +553,37 @@ export class PostgresExpertPromoRepository {
     });
   }
 
+  async hasPendingEnrollmentConsent(scope: ExpertPromoScope): Promise<boolean> {
+    if (!valid(scope)) return false;
+    const { rows } = await this.db.execute<{ pending: boolean }>(sql`
+      select exists (
+        select 1 from expert_promo_enrollments en
+        join channel_identities ci on ci.id=en.channel_identity_id and ci.user_id=en.user_id
+        join users u on u.id=en.user_id and u.active
+        join consent_presentations p on p.id=en.presentation_id and p.user_id=en.user_id
+        where en.bot_id=${scope.botId} and en.status='pending' and en.expires_at>clock_timestamp()
+          and ci.provider='telegram' and ci.status='unresolved' and ci.bot_key=${scope.botKey}
+          and ci.external_id=${scope.telegramUserId} and ci.external_chat_id=${scope.chatId}
+          and p.channel='telegram' and p.purpose='client_messaging'
+          and p.invalidated_at is null and p.consumed_at is null and p.expires_at>clock_timestamp()
+          and en.policy_version=${this.consent.messagingConsentPolicyVersion}
+          and p.document_version_id=(select id from consent_document_versions
+              where document_key='consent.client_messaging' and status='approved' and effective_at<=clock_timestamp()
+              order by version desc limit 1)
+      ) as pending`);
+    return rows[0]?.pending === true;
+  }
+
   async beginEnrollment(raw: ExpertPromoCommand & { refCode?: string }) {
     const input = command(raw);
-    const refCode = raw.refCode;
-    if (
-      refCode !== undefined &&
-      !/^(?:promo_[0-9a-f]{32}|REF_[A-Za-z0-9_-]{4,48})$/u.test(refCode)
-    )
-      fail("promo_invalid_request");
+    const requestedCode = readPromoCode(raw.refCode);
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`set local statement_timeout='2000ms'`);
       await tx.execute(sql`set local lock_timeout='1000ms'`);
       await tx.execute(
         sql`select pg_advisory_xact_lock(hashtextextended(${`promo-request:${input.botId}:${input.requestKey}`},0))`,
       );
-      let canonicalRefCode = refCode;
-      if (refCode?.startsWith("REF_")) {
-        const owner = (
-          await tx.execute<{ refCode: string }>(
-            sql`select ref_code as "refCode" from expert_promo_codes where upper(substr(replace(user_id::text,'-',''),1,12))=${refCode.slice(4).toUpperCase()} order by created_at limit 1`,
-          )
-        ).rows[0];
-        if (!owner) fail("promo_invalid_request");
-        canonicalRefCode = owner!.refCode;
-      }
+      const canonicalRefCode = await canonicalPromoCode(tx, requestedCode);
       const receipt = (
         await tx.execute<{
           userId: string | null;
@@ -598,6 +636,11 @@ export class PostgresExpertPromoRepository {
             !existing.active))
       )
         fail("promo_identity_unavailable");
+      if (
+        canonicalRefCode &&
+        !(await activePromoCodeOwner(tx, canonicalRefCode))
+      )
+        return fail("promo_code_unavailable");
       const document = (
         await tx.execute<{ id: string; title: string; body: string }>(
           sql`select id,title,body from consent_document_versions where document_key='consent.client_messaging' and status='approved' and effective_at<=clock_timestamp() order by version desc limit 1`,
@@ -642,7 +685,10 @@ export class PostgresExpertPromoRepository {
         enrollment.botId !== input.botId
       )
         fail("promo_identity_unavailable");
-      if (refCode !== undefined && refCode !== enrollment!.refCode)
+      if (
+        canonicalRefCode !== undefined &&
+        canonicalRefCode !== enrollment!.refCode
+      )
         fail("promo_attribution_locked");
       if (!enrollment!.valid)
         await tx.execute(

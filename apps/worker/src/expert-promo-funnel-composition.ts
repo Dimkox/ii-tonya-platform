@@ -1,5 +1,7 @@
 import type { RuntimeConfig } from "@ii-tonya/config";
 import {
+  APPROVED_PROMO_GUIDE,
+  createApprovedGuideReader,
   EXPERT_PROMO_LOCAL_ASSETS,
   telegramAssetForm,
 } from "./expert-promo-local-assets.js";
@@ -26,6 +28,10 @@ export function createExpertPromoFunnelRunner(
     botKey: scope.botKey,
     messagingConsentPolicyVersion: scope.messagingConsentPolicyVersion,
   });
+  const readPresentation =
+    scope.guideFileId === APPROVED_PROMO_GUIDE.slot
+      ? createApprovedGuideReader(APPROVED_PROMO_GUIDE)
+      : undefined;
   const send = async (
     method: string,
     body: Record<string, unknown> | FormData,
@@ -34,6 +40,7 @@ export function createExpertPromoFunnelRunner(
       `https://api.telegram.org/bot${scope.botToken}/${method}`,
       {
         method: "POST",
+        redirect: "error",
         ...(body instanceof FormData
           ? { body }
           : {
@@ -48,15 +55,26 @@ export function createExpertPromoFunnelRunner(
       ok?: boolean;
       result?: { message_id?: number };
     };
-    if (value.ok !== true || !Number.isSafeInteger(value.result?.message_id))
+    const messageId = value.result?.message_id;
+    if (
+      value.ok !== true ||
+      typeof messageId !== "number" ||
+      !Number.isSafeInteger(messageId) ||
+      messageId <= 0
+    )
       throw new Error("expert_promo_telegram_receipt");
-    return { messageId: String(value.result!.message_id) };
+    return { messageId: String(messageId) };
   };
   return {
     async runOnce() {
+      const presentation = await readPresentation?.();
+      const document =
+        readPresentation && !presentation ? undefined : scope.guideFileId;
       const timers = await runExpertPromoFunnelTimers(
         {
           claimTimer: repository.claimTimer.bind(repository),
+          confirmFirstReminder:
+            repository.confirmFirstReminder.bind(repository),
           sendMessage: ({ chatId, text, replyMarkup }) =>
             send("sendMessage", {
               chat_id: chatId,
@@ -77,6 +95,7 @@ export function createExpertPromoFunnelRunner(
         },
         {
           limit: 20,
+          guideAvailable: Boolean(document),
           banner:
             scope.giftBannerFileId || EXPERT_PROMO_LOCAL_ASSETS.banner.slot,
         },
@@ -86,8 +105,17 @@ export function createExpertPromoFunnelRunner(
           claimGuideDeliveries:
             repository.claimGuideDeliveries.bind(repository),
           markGuideDelivered: repository.markGuideDelivered.bind(repository),
-          sendDocument: async ({ chatId, document, caption }) =>
-            document === EXPERT_PROMO_LOCAL_ASSETS.guide.slot
+          sendDocument: async ({ chatId, document, caption }) => {
+            if (document === APPROVED_PROMO_GUIDE.slot) {
+              if (!presentation)
+                throw new Error("expert_promo_guide_unavailable");
+              const form = new FormData();
+              form.set("chat_id", chatId);
+              form.set("document", presentation);
+              form.set("caption", caption);
+              return send("sendDocument", form);
+            }
+            return document === EXPERT_PROMO_LOCAL_ASSETS.guide.slot
               ? send(
                   "sendDocument",
                   await telegramAssetForm({
@@ -97,10 +125,11 @@ export function createExpertPromoFunnelRunner(
                     ...EXPERT_PROMO_LOCAL_ASSETS.guide,
                   }),
                 )
-              : send("sendDocument", { chat_id: chatId, document, caption }),
+              : send("sendDocument", { chat_id: chatId, document, caption });
+          },
         },
         {
-          document: scope.guideFileId || EXPERT_PROMO_LOCAL_ASSETS.guide.slot,
+          ...(document ? { document } : {}),
           limit: 20,
         },
       );
