@@ -2,8 +2,8 @@
   "description": "Additive0058 state replayed from the complete hand-authored SQL graph on PostgreSQL17.5. Supported snapshot normalized from fresh empty-directory introspection; SQL functions/triggers/views retained here. No generation authority.",
   "serverVersionNum": 170005,
   "sourceMigrationSha256": "b8e32b6377288312800692f03090a341744bec0f360ca108cf03bdadc63aab61",
-  "parentSnapshotSha256": "2eaa0c604dc8f3ffac0b0754e4fa2bd17d1fe98e14cc2b553f0bfa6721f91fb4",
-  "normalizedSnapshotSha256": "79449bbe6d9a42942cb32794250fb8a1ce2fdccbc751e7cc5ef1b88dbaafc78c",
+  "parentSnapshotSha256": "1b387728878b90d3572036242a9cd4bfc1ae07dfc0f4ce95700de28b0f42ffaf",
+  "normalizedSnapshotSha256": "e4c94716a41393b47fae34a947d692e3e0f5e8452e3a914cf43c703c00cf3ef6",
   "functions": [
     {
       "name": "expert_card_tag_selection_guard",
