@@ -1,3 +1,7 @@
+import { createHash } from "node:crypto";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { loadEnv } from "@ii-tonya/config";
 import {
@@ -7,6 +11,7 @@ import {
 import { createExpertApplicantComposition } from "../../api/src/expert-applicant-composition.js";
 import { createExpertPromoFunnelRunner } from "./expert-promo-funnel-composition.js";
 import { createExpertPromoGuideTelegramTransport } from "./expert-promo-guide-telegram.js";
+import * as localAssets from "./expert-promo-local-assets.js";
 
 const token = `123:${"a".repeat(30)}`;
 describe("WAIT-T03 guide transport", () => {
@@ -95,6 +100,7 @@ describe("WAIT-T03 guide availability", () => {
     });
     return {
       result: await worker.runOnce(),
+      worker,
       reply,
       sent,
       timer,
@@ -104,6 +110,70 @@ describe("WAIT-T03 guide availability", () => {
       request,
     };
   }
+
+  it("verifies the private presentation before claiming and uploads its exact bytes to the claimed chat", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "expert-presentation-"));
+    const path = join(dir, "presentation.pdf");
+    const bytes = Buffer.from("%PDF-1.7\nsynthetic approved presentation\n");
+    const selector = "local:expert-promo-presentation-v1";
+    const createReader = localAssets.createApprovedGuideReader;
+    try {
+      vi.spyOn(localAssets, "createApprovedGuideReader").mockImplementation(
+        (asset) => {
+          expect(asset).toMatchObject({
+            slot: selector,
+            path: "/etc/ii-tonya/guides/expert-promo-presentation-v1.pdf",
+            sha256:
+              "5529ab01650f9c4d331c8e348a601ba5d688715268c05f84b29b25630c5f9e15",
+            size: 5963385,
+          });
+          return createReader({
+            ...asset,
+            path,
+            size: bytes.length,
+            sha256: createHash("sha256").update(bytes).digest("hex"),
+          });
+        },
+      );
+      const { result, reply, sent, timer, claim, mark, worker } =
+        await exercise(selector);
+      expect(reply).toEqual({
+        status: "handled",
+        text: "Запрос на гайд принят.",
+      });
+      expect(result.guide.skipped).toBe(true);
+      expect(claim).not.toHaveBeenCalled();
+      expect(timer.mock.calls.map(([{ kind }]) => kind)).toEqual(["message6"]);
+      await writeFile(path, Buffer.alloc(bytes.length, 65));
+      expect((await worker.runOnce()).guide.skipped).toBe(true);
+      expect(claim).not.toHaveBeenCalled();
+      expect(mark).not.toHaveBeenCalled();
+      expect(sent.every(({ method }) => method === "sendMessage")).toBe(true);
+
+      await writeFile(path, bytes);
+      expect((await worker.runOnce()).guide.delivered).toBe(1);
+      expect(claim).toHaveBeenCalledWith({ contentSlot: selector, limit: 20 });
+      const docs = sent.filter(({ method }) => method === "sendDocument");
+      expect(docs).toHaveLength(1);
+      const body = docs[0]!.body as FormData;
+      expect(body.get("chat_id")).toBe(target.chatId);
+      const file = body.get("document") as File;
+      expect(file.name).toBe("Презентация сервиса ии-Тоня.pdf");
+      expect(file.type).toBe("application/pdf");
+      expect(Buffer.from(await file.arrayBuffer())).toEqual(bytes);
+      expect(mark).toHaveBeenCalledWith({
+        userId: target.userId,
+        receipt: "telegram:1",
+      });
+
+      await writeFile(path, Buffer.alloc(bytes.length, 66));
+      expect((await worker.runOnce()).guide.skipped).toBe(true);
+      expect(claim).toHaveBeenCalledTimes(1);
+      expect(mark).toHaveBeenCalledTimes(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
 
   it.each([undefined, "", "  "])(
     "keeps referrals running and holds PDF work when the guide selector is %j",
