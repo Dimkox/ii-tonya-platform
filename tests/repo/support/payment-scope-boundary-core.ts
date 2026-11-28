@@ -2066,11 +2066,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/state/0059_manifest.json",
-    "414ccd8d616a65be0beb91a94cc2d8220db1929db85c9e736b289be93e4952cc",
+    "303bc86d10ad60f33c3f2380ca14af8bb70784392542ff88233cd4f7220584f6",
   ],
   [
     "packages/db/migrations/meta/0059_snapshot.json",
-    "65f53050b8edbc5abe06cdde115b6ea6dc6751960b894dcf7b7f78a6d12d5ed5",
+    "b718ee7ddb85ddb8af7c8ab7021dc54082eb8f0dadff60cfaf38e369c97f6ed1",
   ],
   [
     "packages/db/migrations/0059_residency_separated_sales.sql",
@@ -2083,11 +2083,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/0058_snapshot.json",
-    "79449bbe6d9a42942cb32794250fb8a1ce2fdccbc751e7cc5ef1b88dbaafc78c",
+    "e4c94716a41393b47fae34a947d692e3e0f5e8452e3a914cf43c703c00cf3ef6",
   ],
   [
     "packages/db/migrations/state/0058_stabilization_sql_objects.json",
-    "4e502af2dc8bb11fffdd55d8a7a6175c7c328396304d661f6a6d34c9f59b4b07",
+    "1d4210a0392f5ef48657f33bea3f5a4be42385f83bd669d4b7f67e9b9a343652",
   ],
 
   // SQL replay + additive catalogue; docs/spec/verification-schema-form-guard-registration.md.
@@ -2097,11 +2097,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/0057_snapshot.json",
-    "2eaa0c604dc8f3ffac0b0754e4fa2bd17d1fe98e14cc2b553f0bfa6721f91fb4",
+    "1b387728878b90d3572036242a9cd4bfc1ae07dfc0f4ce95700de28b0f42ffaf",
   ],
   [
     "packages/db/migrations/state/0057_verification_sql_objects.json",
-    "23158ba19989bc5919a93bc967465244a2865f2be3d6550e8d2bacb538d2dc6c",
+    "0bebc73f30cb59a33c7ab8991b7f08b759693e49b420d7bdc67301489ee7bb3d",
   ],
 
   // Reviewed additive v2 SQL, PG-derived supported snapshot and exact catalogue.
@@ -2111,11 +2111,11 @@ const approvedMigrationHashes = new Map([
   ],
   [
     "packages/db/migrations/meta/0056_snapshot.json",
-    "b22ff021153b6a85fce4dad523921edba378be4ca518ffeb8d26c3811c0c5ec5",
+    "7c3ee1964b6098e313e53c2881aeaa20984cae23de3d7475827e2a9a75d1925a",
   ],
   [
     "packages/db/migrations/state/0056_offer_sql_objects.json",
-    "1b785221149f28bcff758f1829ec909ef385fbab2580ea11f61753933b61709d",
+    "9a1aecd5c56bf1f42c3c53539d31855cb02498d726d468f492540939c1b4f0f8",
   ],
 
   // BlockD actual full-chain replay; docs/spec/phase1-block-d-guard-registration.md.
